@@ -11,7 +11,6 @@ const GIT_BRANCH = /^[A-Za-z0-9][A-Za-z0-9._/-]*$/
 const safeRead = (path) => { try { return readFileSync(path, 'utf8') } catch { return '' } }
 const field = (text, name) => text.match(new RegExp(`^- ${name}:\\s*\`?([^\\n\`]+)\`?`, 'mi'))?.[1]?.trim() ?? null
 const fencedYaml = (text) => text.match(/```yaml\s*\n([\s\S]*?)\n```/)?.[1] ?? null
-const gateGroupNames = { Y: '링크 미리보기', L: '아이보리 표면 통일', B: '브랜드 표현', M: '더보기 화면', N: '새 폴더 만들기', E: '새 일정 만들기', A: '폴더 보관·복원', D: '폴더·콘텐츠 복구 삭제', G: '엔지니어링 완료 증거' }
 
 const githubRepository = (value) => {
   if (typeof value !== 'string') return null
@@ -95,39 +94,61 @@ const gateAnchorIds = (anchor) => {
 export function parseGateLedger(markdown, stageId, anchor = '') {
   const allowed = gateAnchorIds(anchor)
   const gates = []
+  let sourceGroup = null
+  let sourceGroupCode = null
+  let activeGate = null
   for (const line of markdown.split('\n')) {
+    const heading = line.match(/^([^\s#-].*?\bgates?\b(?:\s+\([^)]*\))?)[:.]?\s*$/i)
+    if (heading) { sourceGroup = sanitizeEvidenceText(heading[1].trim()); sourceGroupCode = null }
     const match = line.match(/^- \[([ xX])\]\s+([A-Za-z]+\d*|[^:]+):\s*(.+)$/)
-    if (!match) continue
-    const id = match[2].trim()
-    if (allowed && !allowed.has(id)) continue
-    const code = id.match(/^([A-Z])\d+$/)?.[1] ?? id.match(/^([A-Z]+)/)?.[1] ?? 'GATE'
-    gates.push({ id, stageId, title: sanitizeEvidenceText(match[3]), closed: match[1].toLowerCase() === 'x', groupCode: code })
+    if (match) {
+      const id = match[2].trim()
+      if (allowed && !allowed.has(id)) { activeGate = null; continue }
+      const code = id.match(/^([A-Z])\d+$/)?.[1] ?? id.match(/^([A-Z]+)/)?.[1] ?? 'GATE'
+      if (sourceGroup && sourceGroupCode === null) sourceGroupCode = code
+      activeGate = { id, stageId, title: sanitizeEvidenceText(match[3]), closed: match[1].toLowerCase() === 'x', groupCode: code, groupLabel: sourceGroupCode === code ? sourceGroup : null, proves: null, evidence: null }
+      gates.push(activeGate)
+      continue
+    }
+    const proves = line.match(/^\s+PROVES:\s*(\S+)/i)
+    const evidence = line.match(/^\s+EVIDENCE:\s*(.+)/i)
+    if (proves && activeGate) activeGate.proves = proves[1].toLowerCase()
+    if (evidence && activeGate) activeGate.evidence = sanitizeEvidenceText(evidence[1])
   }
   const groups = []
   for (const gate of gates) {
     let group = groups.find((item) => item.code === gate.groupCode)
-    if (!group) { group = { code: gate.groupCode, name: gateGroupNames[gate.groupCode] ?? gate.groupCode, total: 0, closed: 0 }; groups.push(group) }
+    if (!group) { group = { code: gate.groupCode, name: gate.groupLabel ?? gate.groupCode, total: 0, closed: 0 }; groups.push(group) }
     group.total += 1; if (gate.closed) group.closed += 1
   }
   return { gates, groups, total: gates.length, closed: gates.filter((gate) => gate.closed).length }
 }
 
+const axisState = (gates, proves) => {
+  const scoped = proves ? gates.filter((gate) => gate.proves === proves) : gates
+  if (!scoped.length) return 'not_sourced'
+  if (scoped.every((gate) => gate.closed && gate.evidence && !/^pending\b/i.test(gate.evidence))) return 'evidence_closed'
+  if (scoped.some((gate) => gate.closed)) return 'partially_evidenced'
+  return 'pending'
+}
+
 const stageState = (stage, gate) => {
   if (!gate.available) return stage.gate_file_state?.includes('blocked') || stage.gate_file_state?.includes('required') ? 'blocked' : 'unknown'
   if (gate.total > 0 && gate.closed === gate.total && String(stage.evidence_closure_state ?? '').includes('complete')) return 'complete'
+  if (gate.total > 0 && gate.closed === gate.total) return 'complete'
   if (String(stage.implementation_state ?? '').includes('work_in_progress') || String(stage.implementation_state ?? '').includes('active')) return 'active'
   if (String(stage.evidence_closure_state ?? '').includes('pending')) return 'pending'
-  return 'unknown'
+  return gate.total > 0 ? 'queued' : 'unknown'
 }
 
 function bindingViews(projectId, registry, now, staleAfterSeconds) {
   return ROLES.map((role) => {
     const history = registry.filter((item) => item.project_id === projectId && item.role === role).sort((a, b) => Date.parse(b.bound_at) - Date.parse(a.bound_at))
     const current = history.find((item) => !item.replaced_at) ?? null
-    if (!current) return { role, status: 'unbound', activity: null, observedAt: null, freshness: 'unknown', historyCount: history.length }
+    if (!current) return { role, status: 'unbound', activity: null, observedAt: null, freshness: 'unknown', historyCount: history.length, stageId: null }
     const observedAt = current.observed_at ?? current.bound_at
     const stale = !observedAt || now.getTime() - Date.parse(observedAt) > staleAfterSeconds * 1000
-    return { role, status: stale ? 'stale' : current.status, activity: sanitizeEvidenceText(current.activity), observedAt, freshness: stale ? 'stale' : 'fresh', historyCount: history.length }
+    return { role, status: stale ? 'stale' : current.status, activity: current.activity == null ? null : sanitizeEvidenceText(current.activity), observedAt, freshness: stale ? 'stale' : 'fresh', historyCount: history.length, stageId: current.stage_id ?? null }
   })
 }
 
@@ -159,8 +180,8 @@ export function buildPackageModel({ root, contractFile, mapFile, bindingRegistry
         const gateText = gatePath ? safeRead(gatePath) : ''
         if (!gateText) errors.push(`gate_reference_missing:${stage.id}`)
         const ledger = parseGateLedger(gateText, stage.id, gateAnchor)
-        const gate = { ...ledger, available: Boolean(gateText), sourceRef: gatePath ? basename(gatePath) : null }
-        return { id: stage.id, title: stage.title, purpose: stage.purpose, dependsOn: stage.depends_on ?? [], gatePurpose: gate.total ? `${stage.title} acceptance checklist` : 'Gate evidence unavailable', gate, sourceState: stage.gate_file_state ?? (gate.available ? 'present' : 'missing'), state: stageState(stage, gate), axes: { implementation: stage.implementation_state ?? 'unknown', test: stage.test_state ?? 'unknown', evidence: stage.evidence_closure_state ?? 'unknown', independentQa: stage.independent_qa_state ?? 'unknown', cherryAcceptance: stage.cherry_acceptance_state ?? 'unknown', release: stage.release_state ?? 'unknown' } }
+        const gate = { ...ledger, available: Boolean(gateText), sourceRef: gatePath ? basename(gatePath) : null, observedAt: gatePath && existsSync(gatePath) ? statSync(gatePath).mtime.toISOString() : null }
+        return { id: stage.id, title: stage.title, purpose: stage.purpose, dependsOn: stage.depends_on ?? [], gatePurpose: gate.total ? `${stage.title} acceptance checklist` : 'Gate evidence unavailable', gate, sourceState: stage.gate_file_state ?? (gate.available ? 'present' : 'missing'), state: stageState(stage, gate), axes: { implementation: stage.implementation_state ?? axisState(gate.gates, 'implementation'), test: stage.test_state ?? axisState(gate.gates, 'test'), evidence: stage.evidence_closure_state ?? axisState(gate.gates), independentQa: stage.independent_qa_state ?? axisState(gate.gates, 'ux_product_qa'), cherryAcceptance: stage.cherry_acceptance_state ?? axisState(gate.gates, 'cherry_acceptance'), release: stage.release_state ?? axisState(gate.gates, 'release_audit') } }
       }),
     })),
   }))
@@ -178,13 +199,18 @@ export function buildPackageModel({ root, contractFile, mapFile, bindingRegistry
   const currentIndex = current ? stages.indexOf(current) : -1
   if (explicitCurrents.length === 1 && current?.stage.gate.total > 0 && current.stage.gate.closed === current.stage.gate.total) errors.push('current_stage_gate_closed_conflict')
   const next = currentIndex >= 0 ? stages.slice(currentIndex + 1).find((item) => item.stage.state !== 'complete') ?? null : null
+  if (current && current.stage.state !== 'complete' && current.stage.gate.available) current.stage.state = 'active'
+  for (const item of stages.slice(currentIndex + 1)) {
+    if (item.stage.state === 'complete' || item.stage.state === 'blocked') continue
+    item.stage.state = item.stage.dependsOn.every((id) => stages.find((candidate) => candidate.stage.id === id)?.stage.state === 'complete') ? 'queued' : 'locked'
+  }
   const bindings = bindingViews(map.project_id, bindingRegistry, now, staleAfterSeconds)
   const builder = bindings.find((item) => item.role === 'builder')
-  const mtimes = [contractPath, mapPath].filter(existsSync).map((path) => statSync(path).mtimeMs)
-  const stale = mtimes.length < 2 || now.getTime() - Math.max(...mtimes) > staleAfterSeconds * 1000
+  const evidenceTimes = stages.map((item) => item.stage.gate.observedAt).filter(Boolean).map(Date.parse).filter(Number.isFinite)
+  const evidenceObservedAt = evidenceTimes.length ? new Date(Math.max(...evidenceTimes)).toISOString() : null
   const conflict = errors.some((error) => error.includes('conflict') || error.includes('mismatch') || error.includes('duplicate'))
   return {
-    status: conflict ? 'conflict' : errors.length ? 'unknown' : stale ? 'stale' : 'valid', errors: [...new Set(errors)], observedAt: mtimes.length ? new Date(Math.max(...mtimes)).toISOString() : null,
+    status: conflict ? 'conflict' : errors.length ? 'unknown' : 'valid', errors: [...new Set(errors)], observedAt: evidenceObservedAt, sourceFreshness: { state: evidenceObservedAt ? 'observed' : 'unknown', observedAt: evidenceObservedAt },
     project: { id: map.project_id, name: map.project_title ?? map.title ?? contract.projectName, outcome: map.project_purpose ?? contract.outcome, acceptanceAuthority: contract.acceptanceAuthority }, phases, connectors: { github },
     current: current ? { phaseId: current.phase.id, scopeId: current.scope.id, stageId: current.stage.id } : null,
     next: next ? { phaseId: next.phase.id, scopeId: next.scope.id, stageId: next.stage.id } : null,

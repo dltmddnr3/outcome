@@ -5,7 +5,7 @@ Observed: 2026-08-23 KST
 ## OUTCOME 저장소
 
 - 독립 Git 저장소 생성 완료
-- 현재 단계: Stage 4–5 Builder evidence closed; Package Map boundary refresh and independent QA/Audit remain separate
+- 현재 단계: Stage 6 independent UX & Product QA returned `NEEDS_REVISION` on candidate `48a488f28781`; a bounded Builder correction is being verified and requires fresh affected QA before Stage 7
 - dashboard UI, Cherry Note collector, authenticated read-only runtime, tests, styles, and package configuration are now in this repository
 - `/Users/rosum/Documents/ChatGPT/WhiteCastle Desk 2`의 기존 copy는 migration history/rollback reference이며 더 이상 intended product source가 아님
 - OUTCOME 자체 표준 입력:
@@ -28,7 +28,7 @@ Observed: 2026-08-23 KST
   - 네 역할 binding과 NOW/freshness 표시
   - 프로젝트별 Package truth 분리와 fail-closed source status
   - Stage 상세의 inline responsive 배치
-- 마지막 검증된 대시보드 회귀: 최종 Stage 4–5 evidence receipt 참조
+- 마지막 검증된 대시보드 회귀: Stage 6 correction Gate `GATES_STAGE6_QA_CORRECTION.md`; prior QA verdict remains immutable evidence, not fresh acceptance
 
 ## Cherry Note 최신 관측
 
@@ -56,8 +56,8 @@ Observed: 2026-08-23 KST
 
 ## 다음 정확한 작업
 
-1. Planner: Gate 근거상 Stage 4와 Stage 5가 닫힌 상태에 맞춰 `docs/OUTCOME_MAP.md`의 current/next boundary를 갱신할지 결정
-2. Planner/Cherry: 별도 Gate에서 stable hosting, persistent hostname, access/abuse policy, service supervision과 SLA를 결정
-3. UX & Product QA: Stage 6에서 데스크톱·모바일 30초 이해 과업과 Gate 의미를 독립 검증
-4. Release Audit: Stage 7에서 독립 실행·privacy·artifact 재현성을 검증
+1. UX & Product QA: corrected immutable candidate를 fresh affected QA로 다시 검증
+2. Package owner: Stage33 Korean-primary group labels가 필요하면 project Package source에 명시적 Korean labels를 추가; 그 전에는 English source heading을 정직하게 표시
+3. Planner/Cherry: 별도 Gate에서 stable hosting, persistent hostname, access/abuse policy, service supervision과 SLA를 결정
+4. Release Audit: Stage 6 fresh PASS 이후에만 Stage 7 독립 실행·privacy·artifact 재현성을 검증
 5. Cherry: Stage 8에서 Local MVP를 실제 사용하고 별도 수용

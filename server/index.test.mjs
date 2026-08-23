@@ -13,8 +13,8 @@ async function withServer(run) {
   try { await run(`http://127.0.0.1:${server.address().port}`) } finally { server.close(); await once(server, 'close') }
 }
 
-async function withPublicServer(collect, run, collectPackages = () => ({ schemaVersion: 2, projects: [{ project: { id: 'outcome', name: 'OUTCOME' }, bindings: [{ role: 'builder', status: 'unbound' }] }] })) {
-  const server = createOutcomeServer({ publicReadOnly: true, collect, collectPackages })
+async function withPublicServer(collect, run, collectPackages = () => ({ schemaVersion: 2, projects: [{ project: { id: 'outcome', name: 'OUTCOME' }, bindings: [{ role: 'builder', status: 'unbound' }] }] }), buildReceipt = { repository: 'dltmddnr3/outcome', ref: 'main', commit: '123456789abc', tree: 'abcdef123456', asset: 'index-test.js', runtimeNowPinned: false }) {
+  const server = createOutcomeServer({ publicReadOnly: true, collect, collectPackages, buildReceipt })
   server.listen(0, '127.0.0.1'); await once(server, 'listening')
   try { await run(`http://127.0.0.1:${server.address().port}`) } finally { server.close(); await once(server, 'close') }
 }
@@ -86,3 +86,14 @@ test('public generic connector payload removes credentials and preserves complet
   const connector = JSON.parse(text).dashboard.projects[0].connectors.github
   assert.equal(connector.repository, 'dltmddnr3/outcome'); assert.equal(connector.published.state, 'not_published'); assert.equal(connector.completionAuthority, false)
 }, () => ({ schemaVersion: 2, projects: [{ project: { id: 'outcome' }, connectors: { github: { repository: 'dltmddnr3/outcome', github_token: 'credential-value', remote_url: 'https://user:password@github.com/dltmddnr3/outcome.git', completionAuthority: false, published: { state: 'not_published' } } } }] })))
+
+test('served build receipt pins safe public candidate while runtime NOW stays unpinned', async () => withPublicServer(() => dashboard, async (base) => {
+  const body = await (await fetch(`${base}/api/dashboard`)).json()
+  assert.deepEqual(body.dashboard.build, { repository: 'dltmddnr3/outcome', ref: 'main', commit: '123456789abc', tree: 'abcdef123456', asset: 'index-test.js', runtimeNowPinned: false })
+  assert.equal(JSON.stringify(body).includes('session_id'), false); assert.equal(JSON.stringify(body).includes('a'.repeat(40)), false)
+}))
+
+test('arbitrary full build receipt hashes are not exempt from public redaction', async () => withPublicServer(() => dashboard, async (base) => {
+  const text = await (await fetch(`${base}/api/dashboard`)).text()
+  assert.equal(text.includes('a'.repeat(40)), false); assert.equal(text.includes('b'.repeat(64)), false)
+}, undefined, { repository: 'dltmddnr3/outcome', ref: 'main', commit: 'a'.repeat(40), tree: 'b'.repeat(64), asset: 'index-safe.js', runtimeNowPinned: false }))

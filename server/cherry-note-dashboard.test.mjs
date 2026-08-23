@@ -8,6 +8,21 @@ test('gate contract preserves hierarchy and exact counts', () => {
   assert.deepEqual(result.groups.map(({ id, total }) => ({ id, total })), [{ id: 'Y', total: 2 }, { id: 'G', total: 1 }])
 })
 test('progress layers remain separate', () => assert.deepEqual(parseProgressSnapshots('implemented: 54/57 tested: 50/57 evidence-closed: 44/57'), { implemented: 54, tested: 50, evidenceClosed: 44 }))
+test('no invented fallback counts appear when Gate and rollout evidence are missing', () => {
+  const result = buildCherryNoteDashboard({ root: '/missing', rolloutText: '', gateText: '', now: new Date('2026-08-23T12:00:00Z'), process: { running: false, elapsedSeconds: null, label: 'none' } })
+  assert.equal(result.progress.total, null)
+  assert.equal(result.progress.implemented, null)
+  assert.equal(result.progress.tested, null)
+  assert.equal(result.progress.evidenceClosed, null)
+  assert.deepEqual(result.progress.percentages, { implemented: null, tested: null, evidenceClosed: null })
+})
+test('source group labels are preserved from Gate headings without a translated lookup', () => {
+  const result = parseGateContract('YouTube addition gates (written before mutation):\n\n- [x] Y1: done\n\nRelease gates:\n\n- [ ] G1: open')
+  assert.deepEqual(result.groups.map(({ id, label, total }) => ({ id, label, total })), [
+    { id: 'Y', label: 'YouTube addition gates (written before mutation)', total: 1 },
+    { id: 'G', label: 'Release gates', total: 1 },
+  ])
+})
 test('live pulse is not aggregate progress', () => assert.deepEqual(parseLiveTestPulse('small passed=8 failed=1\nfull passed=12 failed=1 DockUITests'), { passed: 12, failed: 1, delta: 4, currentTest: 'DockUITests' }))
 test('collector offline fails closed instead of reporting fresh success', () => {
   const result = buildCherryNoteDashboard({ root: '/missing', now: new Date('2026-08-23T12:00:00Z'), process: { running: false, elapsedSeconds: null, label: 'none' } })

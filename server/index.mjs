@@ -1,5 +1,6 @@
 import { createHmac, timingSafeEqual } from 'node:crypto'
-import { createReadStream, existsSync, statSync } from 'node:fs'
+import { execFileSync } from 'node:child_process'
+import { createReadStream, existsSync, readFileSync, statSync } from 'node:fs'
 import { createServer } from 'node:http'
 import { extname, join, normalize, resolve } from 'node:path'
 import { fileURLToPath } from 'node:url'
@@ -18,6 +19,15 @@ const readBody = async (request) => {
 const constantEqual = (left, right) => { const a = Buffer.from(String(left)); const b = Buffer.from(String(right)); return a.length === b.length && timingSafeEqual(a, b) }
 const cookieValue = (request, name) => (request.headers.cookie ?? '').split(';').map((item) => item.trim().split('=')).find(([key]) => key === name)?.[1] ?? ''
 const loginHtml = (error = '') => `<!doctype html><html lang="ko"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><meta name="robots" content="noindex,nofollow,noarchive"><title>OUTCOME · Authentication</title></head><body><main><h1>OUTCOME</h1><p>Private read-only access</p><form method="post" action="/api/auth/login"><label for="outcome-password">접근 암호</label><input id="outcome-password" name="password" type="password" autocomplete="current-password" required><button type="submit">OUTCOME 열기</button></form>${error ? '<p role="alert">인증에 실패했습니다.</p>' : ''}</main></body></html>`
+
+export function readBuildReceipt(root = projectRoot) {
+  const read = (revision) => execFileSync('git', ['-C', root, 'rev-parse', revision], { encoding: 'utf8', stdio: ['ignore', 'pipe', 'ignore'] }).trim()
+  try {
+    const html = existsSync(join(root, 'dist', 'index.html')) ? readFileSync(join(root, 'dist', 'index.html'), 'utf8') : ''
+    const asset = html.match(/\/assets\/index-[A-Za-z0-9_-]+\.js/)?.[0]?.replace('/assets/', '') ?? null
+    return { repository: 'dltmddnr3/outcome', ref: 'main', commit: read('HEAD').slice(0, 12), tree: read('HEAD^{tree}').slice(0, 12), asset, runtimeNowPinned: false }
+  } catch { return { repository: 'dltmddnr3/outcome', ref: 'main', commit: null, tree: null, asset: null, runtimeNowPinned: false } }
+}
 
 export function createSessionAuth({ password, secret, secureCookies = true, now = () => Date.now() }) {
   if (!password || password.length < 12) throw new Error('OUTCOME_ACCESS_PASSWORD must contain at least 12 characters')
@@ -39,6 +49,7 @@ export function createOutcomeServer(options = {}) {
   const auth = publicReadOnly && !(options.password ?? process.env.OUTCOME_ACCESS_PASSWORD) && !(options.secret ?? process.env.OUTCOME_SESSION_SECRET) ? null : createSessionAuth({ password: options.password ?? process.env.OUTCOME_ACCESS_PASSWORD, secret: options.secret ?? process.env.OUTCOME_SESSION_SECRET, secureCookies: options.secureCookies ?? process.env.NODE_ENV === 'production', now: options.now })
   const collect = options.collect ?? (() => collectCherryNoteDashboard())
   const collectPackages = options.collectPackages ?? (() => collectOutcomePackages({ bindingRegistry: loadBindingRegistry() }))
+  const buildReceipt = options.buildReceipt ?? readBuildReceipt(root)
   const failures = new Map()
   return createServer(async (request, response) => {
     response.setHeader('x-content-type-options', 'nosniff'); response.setHeader('x-frame-options', 'DENY'); response.setHeader('referrer-policy', 'no-referrer'); response.setHeader('permissions-policy', 'camera=(), microphone=(), geolocation=()')
@@ -66,7 +77,7 @@ export function createOutcomeServer(options = {}) {
     if (request.method === 'POST' && url.pathname === '/api/auth/logout') return publicReadOnly || !auth ? json(response, 405, { error: 'read_only' }) : json(response, 200, { authenticated: false }, { 'set-cookie': auth.cookie('', 0) })
     if (url.pathname.startsWith('/api/')) {
       if (!accessGranted) return json(response, 401, { error: 'authentication_required' })
-      if (request.method === 'GET' && url.pathname === '/api/dashboard') return json(response, 200, { dashboard: sanitizeRemotePayload(collectPackages()) })
+      if (request.method === 'GET' && url.pathname === '/api/dashboard') return json(response, 200, { dashboard: { ...sanitizeRemotePayload(collectPackages()), build: sanitizeRemotePayload(buildReceipt) } })
       if (request.method === 'GET' && url.pathname === '/api/dashboard/cherry-note') return json(response, 200, { dashboard: sanitizeRemotePayload(collect()) })
       return json(response, request.method === 'GET' ? 404 : 405, { error: request.method === 'GET' ? 'not_found' : 'read_only' })
     }
