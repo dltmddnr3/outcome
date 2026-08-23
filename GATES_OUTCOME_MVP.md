@@ -117,7 +117,7 @@ Stage ID: `outcome-stage-6`
 
 - [x] Q1: Fresh independent UX & Product QA verifies the 30-second understanding task on desktop and mobile.
   PROVES: ux_product_qa
-  EVIDENCE: `docs/STAGE6_FRESH_UX_PRODUCT_QA_93b0497.md` records fresh Claude session `e38a17e5-7c5c-4a13-b3cf-ce8557dea226` PASS at desktop and mobile, including the 30-second comprehension task.
+  EVIDENCE: `docs/STAGE6_FRESH_UX_PRODUCT_QA_93b0497.md` records a fresh independent Claude PASS at desktop and mobile, including the 30-second comprehension task; the private session identifier remains only in the non-public audit artifact.
 - [x] Q2: QA adversarially tests hierarchy, Gate meaning, project switching, stale/unknown states, and accessibility.
   PROVES: ux_product_qa
   EVIDENCE: the fresh 93b0497 QA traversed 34 project-Stage-viewport states with zero F10 violations and passed hierarchy, isolation, fail-closed states, geometry, contrast, focus, mobile order, and GitHub authority separation.
@@ -134,10 +134,10 @@ Stage ID: `outcome-stage-7`
 
 - [ ] A1: A separate fresh Release Audit verifies the exact candidate after UX & Product QA PASS.
   PROVES: release_audit
-  EVIDENCE: `docs/STAGE7_FRESH_RELEASE_AUDIT_b57edd7.md` records fresh session `9f4a0176-9cad-4506-a25a-45f3e910564a`; candidate identity passed, but A1 remains open for the required corrected candidate rerun.
+  EVIDENCE: `docs/STAGE7_FRESH_RELEASE_AUDIT_b57edd7.md` records a separate fresh independent session; candidate identity passed, but A1 remains open for the required corrected candidate rerun. The private session identifier remains only in the non-public audit artifact.
 - [ ] A2: Audit verifies standalone startup, local-only privacy, source isolation, build reproducibility, and rollback.
   PROVES: release_audit
-  EVIDENCE: b57edd7 audit `FAIL`: public payload exposed a raw Stage 6 session UUID and documented PID-based teardown targeted dead origin/tunnel PIDs. Reproducible build, served-byte parity, regression, source isolation, and artifact rollback passed.
+  EVIDENCE: b57edd7 audit `FAIL` remains authoritative. Builder correction now redacts UUID/delimiter-less identifiers and validates PID command+port/URL before status/stop, but A2 stays open for fresh audit of the corrected candidate and Planner's actual origin restart/cleanup probe.
 - [ ] A3: Audit records commit, tree, artifact identity, tested paths, and `false_completion_count`.
   PROVES: release_audit
   EVIDENCE: b57edd7 audit recorded the full pin, artifact SHA-256 values, local/public test matrix, rollback probes, fresh session, and preserved the then-instructed cumulative count 10. Planner classified the newly exposed completion claim as event 11 after the audit.

@@ -36,6 +36,10 @@ test('evidence text redacts paths ids hashes and credentials', () => {
   const value = sanitizeEvidenceText('/Users/cherry/private task_id=abc123 token=secret 0123456789abcdef0123456789abcdef01234567')
   assert.equal(value.includes('/Users'), false); assert.equal(value.includes('abc123'), false); assert.equal(value.includes('secret'), false); assert.equal(value.includes('0123456789abcdef'), false)
 })
+test('evidence text redacts hyphenated UUID and delimiter-less session identifiers', () => {
+  const values = ['fresh session e38a17e5-7c5c-4a13-b3cf-ce8557dea226 PASS', 'thread 9f4a0176-9cad-4506-a25a-45f3e910564a', 'standalone 52ba3df8-b846-4a1e-abac-62f9eb418f13']
+  for (const source of values) { const raw = source.match(/[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}/i)[0]; const value = sanitizeEvidenceText(source); assert.doesNotMatch(value, /[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}/i); assert.equal(value.includes(raw), false) }
+})
 test('remote payload removes prohibited nested fields defensively', () => {
   const value = sanitizeRemotePayload({ project: { name: 'safe', local_path: '/Users/private' }, session_id: 'private', nested: [{ token: 'secret', title: 'visible' }] })
   assert.deepEqual(value, { project: { name: 'safe' }, nested: [{ title: 'visible' }] })

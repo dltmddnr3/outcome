@@ -57,11 +57,11 @@ Observed: 2026-08-24 KST
 - 현재 수치는 스냅샷입니다. UI는 authoritative source를 다시 읽어 갱신해야 합니다.
 - Live Cherry Note Package source는 QA 중에도 이동할 수 있습니다. 실제로 bottom-shell은 pending에서 complete로 이동했지만 Final Feed는 10/10 checkbox evidence와 별개로 locked 상태를 유지했습니다. Detail 의미는 특정 시점의 N/N이 아니라 매 관측의 Package Stage state를 따릅니다.
 - `npm run build`가 live origin이 읽는 ignored `dist/`에 직접 쓰므로, d77a52f startup receipt와 작업 중 asset bytes가 일시적으로 어긋난 운영 드리프트가 관측되었습니다. 이 build window는 exact pin 증거로 사용하지 않으며, candidate commit 이후 exact rebuild/restart로 receipt와 asset identity를 다시 맞춥니다. 원자적 isolated build/swap은 Release Audit 후속 검토 대상입니다.
-- b57edd7 Release Audit에서 parsed Gate evidence의 raw Claude session UUID가 public API에 노출되고, runtime PID 파일이 실제 origin/tunnel PID와 달라 documented teardown이 실패함을 확인했습니다. 두 항목은 corrected candidate와 fresh affected QA 및 fresh Release Audit이 필요합니다.
+- b57edd7 Release Audit의 R1/R2 Builder correction은 raw UUID/delimiter-less role ID sanitizer, API/HTML/bundle zero-hit 검사, actual origin PID self-bookkeeping, command+port/URL validated runtime status/stop, stale PID fail-closed runbook으로 구현·검증했습니다. 현재 tunnel PID record는 실제 PID 76819로 검증 교정했으며 tunnel/URL은 재시작하지 않았습니다. origin record는 corrected candidate의 Planner 재기동 전까지 stale로 fail-closed입니다. Fresh affected QA와 fresh Release Audit은 여전히 필요합니다.
 
 ## 다음 정확한 작업
 
-1. Builder: UUID/source redaction과 PID bookkeeping/teardown 계약을 red-first로 교정하고 새 immutable candidate를 만든다
+1. Planner: corrected candidate origin을 짧게 재기동하여 actual server PID self-record/cleanup과 public receipt를 검증한다. 기존 tunnel/hostname은 유지한다
 2. Planner/Cherry: 별도 Gate에서 stable hosting, persistent hostname, access/abuse policy, service supervision과 SLA를 결정
 3. UX & Product QA: corrected parsed public payload를 fresh affected session으로 재검증한다
 4. Release Audit: 별도 fresh session으로 A1–A4를 다시 감사한다

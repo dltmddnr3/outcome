@@ -97,3 +97,9 @@ test('arbitrary full build receipt hashes are not exempt from public redaction',
   const text = await (await fetch(`${base}/api/dashboard`)).text()
   assert.equal(text.includes('a'.repeat(40)), false); assert.equal(text.includes('b'.repeat(64)), false)
 }, undefined, { repository: 'dltmddnr3/outcome', ref: 'main', commit: 'a'.repeat(40), tree: 'b'.repeat(64), asset: 'index-safe.js', runtimeNowPinned: false }))
+
+test('public generic API redacts raw Gate evidence identifiers and UUIDs', async () => withPublicServer(() => dashboard, async (base) => {
+  const text = await (await fetch(`${base}/api/dashboard`)).text()
+  for (const prohibited of ['e38a17e5-7c5c-4a13-b3cf-ce8557dea226', '9f4a0176-9cad-4506-a25a-45f3e910564a', '/Users/private', 'credential-value', 'a'.repeat(40)]) assert.equal(text.includes(prohibited), false, prohibited)
+  assert.doesNotMatch(text, /[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}/i)
+}, () => ({ schemaVersion: 2, projects: [{ project: { id: 'outcome' }, gate: { evidence: 'fresh session e38a17e5-7c5c-4a13-b3cf-ce8557dea226 /Users/private token=credential-value aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa' }, audit: 'thread 9f4a0176-9cad-4506-a25a-45f3e910564a' }] })))

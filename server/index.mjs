@@ -6,6 +6,7 @@ import { extname, join, normalize, resolve } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { collectCherryNoteDashboard, sanitizeRemotePayload } from './cherry-note-dashboard.mjs'
 import { collectOutcomePackages, loadBindingRegistry } from './outcome-package.mjs'
+import { cleanupPidRecord, writePidRecord } from './runtime-process.mjs'
 
 const projectRoot = resolve(fileURLToPath(new URL('..', import.meta.url)))
 const mime = { '.html': 'text/html; charset=utf-8', '.js': 'text/javascript; charset=utf-8', '.css': 'text/css; charset=utf-8', '.svg': 'image/svg+xml', '.png': 'image/png', '.ico': 'image/x-icon' }
@@ -99,5 +100,10 @@ export function createOutcomeServer(options = {}) {
 if (process.argv[1] === fileURLToPath(import.meta.url)) {
   const host = process.env.OUTCOME_HOST ?? '127.0.0.1'
   const port = Number(process.env.OUTCOME_PORT ?? 8787)
-  createOutcomeServer().listen(port, host, () => console.log(`OUTCOME listening on http://${host}:${port}`))
+  const pidFile = join(process.env.OUTCOME_RUNTIME_DIR ?? join(projectRoot, '.outcome-runtime'), 'server.pid')
+  const server = createOutcomeServer()
+  const cleanup = () => cleanupPidRecord(pidFile, process.pid)
+  process.once('exit', cleanup)
+  for (const signal of ['SIGINT', 'SIGTERM']) process.once(signal, () => server.close(() => process.exit(0)))
+  server.listen(port, host, () => { writePidRecord(pidFile, process.pid); console.log(`OUTCOME listening on http://${host}:${port}`) })
 }

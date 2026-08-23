@@ -1,9 +1,13 @@
 import { spawn } from 'node:child_process'
+import { mkdtempSync, rmSync } from 'node:fs'
+import { tmpdir } from 'node:os'
+import { join } from 'node:path'
 import { chromium } from '@playwright/test'
 import { verifyAllDashboardStates } from './browser-assertions.mjs'
 
 const port = 18787
-const server = spawn(process.execPath, ['server/index.mjs'], { env: { ...process.env, OUTCOME_PORT: String(port), OUTCOME_PUBLIC_READ_ONLY: '1' }, stdio: 'ignore' })
+const runtime = mkdtempSync(join(tmpdir(), 'outcome-browser-runtime-'))
+const server = spawn(process.execPath, ['server/index.mjs'], { env: { ...process.env, OUTCOME_PORT: String(port), OUTCOME_PUBLIC_READ_ONLY: '1', OUTCOME_RUNTIME_DIR: runtime }, stdio: 'ignore' })
 const waitForServer = async () => { for (let attempt = 0; attempt < 50; attempt += 1) { try { if ((await fetch(`http://127.0.0.1:${port}/api/health`)).ok) return } catch { /* retry */ } await new Promise((resolve) => setTimeout(resolve, 100)) } throw new Error('OUTCOME server did not start') }
 try {
   await waitForServer()
@@ -16,4 +20,4 @@ try {
     await context.close()
   }
   await browser.close()
-} finally { server.kill('SIGTERM') }
+} finally { server.kill('SIGTERM'); await new Promise((resolve) => server.once('exit', resolve)); rmSync(runtime, { recursive: true, force: true }) }

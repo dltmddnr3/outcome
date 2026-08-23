@@ -40,16 +40,20 @@ The application binds to `127.0.0.1:8787` by default. In public mode `/api/healt
 
 Cloudflare Quick Tunnel is a free, accountless development tunnel. It creates a random `*.trycloudflare.com` URL for the lifetime of the tunnel process. The URL changes after restart and Cloudflare provides no SLA or uptime guarantee. It is not stable hosting.
 
-This candidate verified Cloudflare's official `cloudflared` 2026.8.2 macOS arm64 release after matching its GitHub release SHA-256. Start the origin and tunnel in one long-lived terminal session so termination cleans up the origin:
+This candidate verified Cloudflare's official `cloudflared` 2026.8.2 macOS arm64 release after matching its GitHub release SHA-256. The origin writes its actual PID atomically only after the loopback listener is active and removes that record only when it still owns it. Start the origin in one terminal:
 
 ```sh
-OUTCOME_PUBLIC_READ_ONLY=1 OUTCOME_PORT=8791 node server/index.mjs >.outcome-runtime/server.log 2>&1 &
-outcome_server_pid=$!
-trap 'kill "$outcome_server_pid" 2>/dev/null' EXIT INT TERM
-.outcome-runtime/cloudflared tunnel --url http://127.0.0.1:8791 --no-autoupdate 2>&1 | tee .outcome-runtime/tunnel.log
+OUTCOME_PUBLIC_READ_ONLY=1 OUTCOME_PORT=8791 npm start
 ```
 
-Read the random URL from `.outcome-runtime/tunnel.log` and record only the public URL in `.outcome-runtime/public-url`. Keep the two PID files with the originating processes. Process presence alone does not prove service health; verify the public health GET, dashboard GET, mutation 405, and redaction after every restart.
+In another long-lived terminal, verify the origin identity/port and start the tunnel through the validated runtime boundary:
+
+```sh
+OUTCOME_PORT=8791 node scripts/runtime-process.mjs status origin
+OUTCOME_PORT=8791 node scripts/runtime-process.mjs start-tunnel .outcome-runtime/cloudflared
+```
+
+The tunnel command records only the actual child after its command identity includes `cloudflared tunnel` and the exact loopback URL. Read the random URL from `.outcome-runtime/tunnel.log` and record only the public URL in `.outcome-runtime/public-url`. Process presence alone does not prove service health; verify the validated origin/tunnel statuses, public health GET, dashboard GET, mutation 405, and redaction after every restart.
 
 ## Offline and stale behavior
 
@@ -66,17 +70,22 @@ Rollout is reversible and does not mutate source evidence:
 Rollback:
 
 ```sh
-kill "$(cat .outcome-runtime/tunnel.pid)" "$(cat .outcome-runtime/server.pid)"
+OUTCOME_PORT=8791 node scripts/runtime-process.mjs status tunnel
+OUTCOME_PORT=8791 node scripts/runtime-process.mjs status origin
+OUTCOME_PORT=8791 node scripts/runtime-process.mjs stop tunnel
+OUTCOME_PORT=8791 node scripts/runtime-process.mjs stop origin
 git switch --detach <previous-commit>
 npm ci && npm run build
 ```
 
-Stopping the two recorded PIDs immediately removes the temporary public route without touching source evidence. Restart the previous pinned local process in its default authenticated mode. If the collector is unavailable during rollback, OUTCOME must remain offline rather than display a prior success snapshot.
+Each stop refuses a missing, malformed, dead, wrong-command, or wrong-port/URL PID record and sends SIGTERM only after actual process identity is verified. This prevents stale bookkeeping from signaling an unrelated process. A validated tunnel stop removes the temporary public route without touching source evidence. Restart the previous pinned local process in its default authenticated mode. If the collector is unavailable during rollback, OUTCOME must remain offline rather than display a prior success snapshot.
 
 ## Process restart
 
-After any Mac Mini restart, repeat the long-lived terminal command and re-run all public probes. The old URL must be treated as expired because Quick Tunnel assigns a new random URL on restart. To preserve the current hostname while rebinding the M15 candidate, the processes are temporarily split: origin PID `5278` is maintained by execution session `22094`, while tunnel PID `76819` is maintained by execution session `5623`. Both must remain active. The verified temporary URL for this process lifetime is `https://van-staff-excellence-investigated.trycloudflare.com`.
+After any Mac Mini restart, repeat the two validated start commands and re-run all public probes. The old URL must be treated as expired because Quick Tunnel assigns a new random URL on restart. Never copy a historical PID into runtime bookkeeping: `status` must confirm current command identity and origin port/tunnel URL relation. The current temporary URL remains recorded in `.outcome-runtime/public-url`; its process lifetime, not a documentation value, is authoritative.
 
 ## Stable hosting follow-up Gate
 
 Quick Tunnel closes only the temporary public-feedback slice. A later Gate must select stable hosting, persistent hostname/domain, access policy, service supervision, monitoring/SLA, secret ownership, abuse controls, and rollback. That Gate requires separate Cherry approval and must not infer a paid purchase, domain transfer, or public mutation authority.
+
+Atomic isolated `dist` build/swap, a stable hostname and supervisor, configurable validated Package roots, and explicit authenticated-cookie hardening remain Stage 7 operational follow-ups. They are not implemented by the PID/redaction corrective slice.

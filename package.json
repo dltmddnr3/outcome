@@ -21,7 +21,8 @@
     "test:browser": "node scripts/browser-check.mjs",
     "test:remote-browser": "node scripts/remote-browser-check.mjs",
     "check:scope": "node scripts/check-scope.mjs",
-    "check:runbook": "node scripts/check-runbook.mjs"
+    "check:runbook": "node scripts/check-runbook.mjs",
+    "check:public-boundary": "node scripts/check-public-redaction.mjs"
   },
   "dependencies": {
     "lucide-react": "^0.468.0",
