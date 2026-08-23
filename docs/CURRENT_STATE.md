@@ -5,14 +5,19 @@ Observed: 2026-08-23 KST
 ## OUTCOME 저장소
 
 - 독립 Git 저장소 생성 완료
-- 현재 단계: documentation bootstrap
-- 아직 제품 구현 없음
-- 현재 대시보드 실행 코드는 `/Users/rosum/Documents/ChatGPT/WhiteCastle Desk 2`에 있음
-- 새 저장소로의 코드 추출은 Planner 계약 이후 Builder가 수행할 첫 migration slice
+- 현재 단계: Stage 3 standalone migration local candidate complete; private HTTPS activation pending
+- dashboard UI, Cherry Note collector, authenticated read-only runtime, tests, styles, and package configuration are now in this repository
+- `/Users/rosum/Documents/ChatGPT/WhiteCastle Desk 2`의 기존 copy는 migration history/rollback reference이며 더 이상 intended product source가 아님
+- OUTCOME 자체 표준 입력:
+  - Contract: `docs/OUTCOME_CONTRACT.md`
+  - Map: `docs/OUTCOME_MAP.md`
+  - Gates: `GATES.md`, `GATES_OUTCOME_MVP.md`
+- OUTCOME dashboard registration: contract-ready; generic runtime adapter and self-tracking remain Stage 4–5 work
+- Cherry priority amendment: authenticated read-only web candidate is locally verified; external URL is not active because Tailscale has no active tailnet identity, DNS name, or certificate domain
 
 ## 현재 MVP 화면
 
-- 경로: `http://127.0.0.1:5173/cherry-note-dashboard`
+- 로컬 경로: `http://127.0.0.1:8787/cherry-note-dashboard`
 - 대상: Cherry Note 한 프로젝트
 - 구현 완료된 핵심:
   - Project → Phase → Scope → Stage 순서
@@ -44,15 +49,16 @@ Observed: 2026-08-23 KST
 ## 알려진 drift와 주의점
 
 - 현재 화면 수집기 일부 문구·fallback은 Stage 33 진행 중 상태를 전제로 작성되었습니다. Build 41 완료와 후속 seam correction을 함께 표현하도록 Builder가 source model을 정리해야 합니다.
-- 대시보드 코드가 WhiteCastle Desk의 dirty worktree에 있으므로, OUTCOME으로 옮길 때 unrelated Desk/Slack/account relay 변경을 함께 가져오면 안 됩니다.
+- legacy WhiteCastle Desk copy는 새 변경의 원본으로 사용하지 않습니다. OUTCOME candidate에는 Desk/Slack/account relay/provider dependency가 없습니다.
 - 생성된 네 작업은 기존 저장소 worktree 기반입니다. 독립 OUTCOME 저장소를 사용하는 새 작업 연결이 필요합니다.
 - 현재 수치는 스냅샷입니다. UI는 authoritative source를 다시 읽어 갱신해야 합니다.
 
 ## 다음 정확한 작업
 
-1. Planner: 이 문서와 현재 화면을 기준으로 OUTCOME MVP IA와 migration acceptance를 확정
-2. Builder: dashboard 전용 파일과 최소 runtime만 OUTCOME 저장소로 추출
-3. Builder: source adapter와 presentation을 분리하고 현재 Stage/Build를 하드코딩하지 않게 정리
-4. UX/Product QA: 데스크톱·모바일에서 30초 이해 과업과 Gate 의미를 독립 검증
-5. Release Audit: 독립 실행·local-only privacy·artifact 재현성을 검증
-
+1. Cherry: Mac Mini, MacBook Neo, mobile을 하나의 승인된 private tailnet에 sign in하고 Tailscale Serve activation을 승인
+2. Builder: activation 뒤 W1/W5 stable HTTPS 및 실제 remote desktop/mobile evidence를 닫기
+3. Builder: Stage 4에서 세 표준 문서 parser, role binding registry, source adapter와 presentation을 분리
+4. Builder: Stage 5에서 Cherry Note와 OUTCOME self-tracking을 같은 위계와 상태 언어로 표시
+5. UX & Product QA: Stage 6에서 데스크톱·모바일 30초 이해 과업과 Gate 의미를 독립 검증
+6. Release Audit: Stage 7에서 독립 실행·privacy·artifact 재현성을 검증
+7. Cherry: Stage 8에서 Local MVP를 실제 사용하고 별도 수용

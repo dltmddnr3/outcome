@@ -1,6 +1,47 @@
 # OUTCOME Contract · MVP
 
 Updated: 2026-08-23 KST
+Status: **Cherry approved · amended for OUTCOME self-tracking on 2026-08-23**
+
+## Package identity
+
+- Package name: `OUTCOME Package`
+- Package schema version: `1`
+- Project ID: `outcome`
+- Project name: `OUTCOME`
+- Repository: `/Users/rosum/Documents/ChatGPT/OUTCOME`
+- Outcome: Cherry가 여러 역할과 세션의 활동을 결과 구조와 검증 증거로 이해하고 현재 위치와 다음 경계를 30초 안에 판단한다.
+- Acceptance authority: `Cherry`
+- Required Package files:
+  - `docs/OUTCOME_CONTRACT.md`
+  - `docs/OUTCOME_MAP.md`
+  - `GATES.md`
+  - `GATES_OUTCOME_MVP.md`
+
+## Phase contract
+
+- Phase ID: `outcome-phase-1`
+- Phase name: `Phase 1 · Local MVP`
+- Purpose: Cherry Note와 OUTCOME 자체를 같은 Package 의미로 추적하는 독립 로컬 대시보드를 실제 사용 가능한 상태로 닫는다.
+- Entry condition: Cherry가 OUTCOME 제품 방향과 OUTCOME Package 운영 모델을 승인하고 기존 Cherry Note 1차 대시보드 근거가 읽기 가능하다.
+- Completion conditions:
+  - `GATES_OUTCOME_MVP.md`의 Stage 3–8 Gate가 실제 증거로 모두 닫힌다.
+  - fresh UX & Product QA와 별도 fresh Release Audit이 동일한 immutable candidate를 순서대로 검증한다.
+  - Cherry가 30초 이해 과업을 실제 화면에서 수용한다.
+- Included:
+  - Cherry Note 및 OUTCOME self-tracking
+  - standalone local runtime
+  - OUTCOME Package parser와 fail-closed validation
+  - 프로젝트별 역할 session binding과 NOW
+  - desktop/mobile outcome funnel
+  - 맥미니 source collector를 유지하면서 MacBook·모바일에서 접근 가능한 인증된 read-only 원격 피드백 화면
+- Excluded:
+  - 제3 프로젝트 포트폴리오
+  - 다른 PC·계정 수집
+  - 익명 공개 URL과 검색엔진 노출
+  - 원격 화면에서의 작업 dispatch·파일 변경·승인 mutation
+  - 원격 mutation·dispatch·release
+  - Cherry Note iOS 제품 변경
 
 ## 1. 누구를 위한 제품인가
 
@@ -24,27 +65,31 @@ Cherry가 대시보드를 열고 다음을 30초 안에 판단합니다.
 
 - MVP: 로컬에서 즉시 열리는 독립 HTML/React 대시보드
 - 초기 URL: `http://127.0.0.1:5173/cherry-note-dashboard`
-- MVP 데이터: 이 계정에서 진행 중인 Cherry Note의 로컬 근거
-- 후속: 별도 호스팅·인증·다중 계정·다중 기기 지원은 새 계약에서 결정
+- MVP 데이터: Cherry Note의 관측 가능한 로컬 근거와 OUTCOME 프로젝트 자체의 표준 문서·역할 세션·delivery evidence
+- 원격 피드백: MacBook·모바일에서 접근 가능한 인증된 read-only 웹. 로컬 source collector와 민감정보 redaction을 유지한다.
+- 후속: 다중 계정·다중 source host·원격 mutation은 새 계약에서 결정
 
 ## 5. 완료 조건
 
 MVP는 아래 조건이 모두 증명될 때 완료입니다.
 
 - Cherry Note의 Project → Phase → Scope → Stage → Gate 구조가 실제 근거와 일치합니다.
+- OUTCOME 자체가 `OUTCOME_CONTRACT.md`, `OUTCOME_MAP.md`, `GATES*.md`로 등록되고 같은 화면 의미와 source authority로 추적됩니다.
+- Cherry Note와 OUTCOME의 역할별 현재 세션 binding 및 freshness를 NOW에서 구분할 수 있습니다.
 - 현재 위치, 다음 경계, 실행 상태, 경과 시간, 최근 속도가 자동 갱신됩니다.
 - 구현·테스트·증거 확정은 서로 분리되어 표시됩니다.
 - Gate는 진행 순서가 아니라 선택한 Stage의 완료 조건임이 직관적으로 보입니다.
 - Stage 상세가 다른 콘텐츠를 가리지 않고 데스크톱·모바일에서 읽힙니다.
 - 근거 없음·오래됨·충돌은 `unknown` 또는 `stale`로 정직하게 표시됩니다.
 - 로컬 절대 경로, task/turn ID, 자격 증명, 전체 SHA 같은 내부 정보가 사용자 화면에 노출되지 않습니다.
+- 인증되지 않은 사용자는 프로젝트명·NOW·Gate·세션 metadata를 포함한 어떠한 대시보드 데이터도 읽을 수 없습니다.
 - Cherry가 실제 화면을 사용하고 “현재 위치와 다음 행동을 이해할 수 있다”고 수용합니다.
 
 테스트 PASS, 문서 작성, 빌드 성공만으로는 완료가 아닙니다.
 
 ## 6. 이번 MVP에서 하지 않는 것
 
-- 여러 프로젝트를 한 화면에서 관리
+- Cherry Note와 OUTCOME을 제외한 임의의 제3 프로젝트 포트폴리오 관리
 - 다른 PC 또는 다른 계정의 세션 수집
 - Slack/Desk/Provider 로그인과 결합
 - 원격 mutation, 작업 dispatch, 승인 대행
@@ -58,3 +103,12 @@ MVP는 아래 조건이 모두 증명될 때 완료입니다.
 - Phase 2 진입: 다중 프로젝트·다중 PC·CLI 기반 프로젝트를 위한 새 Outcome Contract를 Cherry와 합의한 뒤 시작
 - 종료 상태는 `MVP_SCOPE_CLOSED`와 `EXTERNAL_OUTCOME_COMPLETE`를 구분합니다.
 
+## 8. Final acceptance axes
+
+- Functional outcome: 두 프로젝트의 Package·Gate·NOW가 실제 source authority와 일치한다.
+- UX and product outcome: Cherry가 위계, 현재 위치, 남은 Gate, 다음 행동을 30초 안에 오해 없이 판단한다.
+- Real-use outcome: 재실행과 freshness 변화 후에도 실제 로컬 근거가 stale/unknown을 포함해 정직하게 반영된다.
+- Independent QA requirement: Builder와 분리된 fresh UX & Product QA가 pinned candidate를 반증한다.
+- Release audit requirement: QA PASS 뒤 별도 fresh Release Audit이 동일 candidate의 독립 실행·privacy·build·rollback을 감사한다.
+- Cherry acceptance requirement: Cherry의 명시적 Local MVP 수용이 필요하며 QA/Audit PASS가 이를 대신하지 않는다.
+- Release authority: 별도 Cherry 승인 전 push, deploy, 공개, 외부 mutation을 수행하지 않는다.

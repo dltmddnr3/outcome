@@ -2,26 +2,31 @@
 
 OUTCOME은 여러 AI 작업이 **원하는 결과물에 실제로 도달하고 있는지**를 근거 기반으로 보여주는 독립 대시보드 제품입니다.
 
-현재 저장소는 독립 프로젝트의 계약과 인계 문서를 먼저 고정한 상태입니다. MVP 대시보드 구현은 아직 `/Users/rosum/Documents/ChatGPT/WhiteCastle Desk 2`에 있으며, 검증된 추출 계획 없이 이 저장소로 복사하지 않습니다. 하나의 원본만 유지하기 위한 의도적인 경계입니다.
+신규 프로젝트의 표준 등록 묶음은 **OUTCOME Package**이며 `OUTCOME_CONTRACT.md`, `OUTCOME_MAP.md`, `GATES*.md`로 구성됩니다. 역할별 session binding은 OUTCOME runtime이 별도로 관리합니다.
+
+이 저장소가 OUTCOME dashboard의 intended product source입니다. Stage 3 local candidate에는 standalone UI, Cherry Note collector, authenticated read-only runtime, tests, styles, package, private HTTPS runbook이 있습니다. 이전 WhiteCastle Desk copy는 migration history/rollback reference일 뿐 새 제품 변경의 원본이 아닙니다.
 
 ## 문서 읽는 순서
 
 1. [Outcome Contract](docs/OUTCOME_CONTRACT.md)
-2. [제품 진행 모델](docs/PRODUCT_MODEL.md)
-3. [현재 상태](docs/CURRENT_STATE.md)
-4. [근거와 원본](docs/SOURCE_OF_TRUTH.md)
-5. [4개 세션 운영 모델](docs/OPERATING_MODEL.md)
-6. [로드맵](docs/ROADMAP.md)
-7. [문서 부트스트랩 Gate](GATES.md)
+2. [OUTCOME Map](docs/OUTCOME_MAP.md)
+3. [제품 진행 모델](docs/PRODUCT_MODEL.md)
+4. [현재 상태](docs/CURRENT_STATE.md)
+5. [근거와 원본](docs/SOURCE_OF_TRUTH.md)
+6. [4개 세션 운영 모델](docs/OPERATING_MODEL.md)
+7. [로드맵](docs/ROADMAP.md)
+8. [문서·운영 Gate](GATES.md)
+9. [Local MVP delivery Gate](GATES_OUTCOME_MVP.md)
 
 ## 지금의 제품 경계
 
 - 제품명: **OUTCOME**
-- 형태: 로그인 없이 빠르게 여는 로컬 우선 독립 웹 대시보드
+- 형태: 로컬 우선 독립 웹 대시보드 + 인증된 private read-only remote candidate
 - MVP 데이터 대상: **Cherry Note 한 프로젝트**
 - 핵심 뷰: Project → Phase → Scope → Stage의 진행 순서와 선택한 Stage의 Gate
 - 핵심 원칙: 구현률, 테스트율, 증거 확정률, 사용자 수용을 섞어 하나의 임의 퍼센트로 만들지 않음
-- 현재 경로: `http://127.0.0.1:5173/cherry-note-dashboard`
+- 현재 로컬 경로: `http://127.0.0.1:8787/cherry-note-dashboard`
+- Remote activation: Tailscale private identity/HTTPS activation pending; anonymous access forbidden
 
 ## 작업 시작 규칙
 
@@ -30,4 +35,3 @@ OUTCOME은 여러 AI 작업이 **원하는 결과물에 실제로 도달하고 �
 - UX/Product QA와 Release Audit은 서로 다른 fresh Claude 세션에서 독립 수행합니다.
 - Cherry의 실제 사용 수용 전에는 UI/UX 또는 최종 결과 도달을 완료로 선언하지 않습니다.
 - 모든 실질 작업은 `karpathy-guidelines`와 비례적인 `unlazy` Gate를 사용합니다.
-
