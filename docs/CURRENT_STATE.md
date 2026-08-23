@@ -1,11 +1,11 @@
 # 현재 상태
 
-Observed: 2026-08-23 KST
+Observed: 2026-08-24 KST
 
 ## OUTCOME 저장소
 
 - 독립 Git 저장소 생성 완료
-- 현재 단계: fresh independent UX & Product QA returned `NEEDS_REVISION` on candidate `aa90faffcd90` (`false_completion_count=10`; 8 resolved, 1 partial, 1 open); the final detail-semantics Builder correction is being verified and requires fresh affected QA before Stage 7
+- 현재 단계: Stage 6 fresh independent UX & Product QA returned `PASS` on candidate `93b0497d3881` with Q1–Q4 PASS and cumulative `false_completion_count=10`; Stage 7 separate fresh Release Audit is now eligible but is not yet accepted
 - dashboard UI, Cherry Note collector, authenticated read-only runtime, tests, styles, and package configuration are now in this repository
 - `/Users/rosum/Documents/ChatGPT/WhiteCastle Desk 2`의 기존 copy는 migration history/rollback reference이며 더 이상 intended product source가 아님
 - OUTCOME 자체 표준 입력:
@@ -29,7 +29,7 @@ Observed: 2026-08-23 KST
   - 프로젝트별 Package truth 분리와 fail-closed source status
   - Stage 상세의 inline responsive 배치
   - Cherry Note Stage33 Package-sourced Korean primary Gate group labels, with Gate code secondary and 57 source checks
-- 마지막 독립 QA 근거: `docs/STAGE6_FRESH_UX_PRODUCT_QA_aa90faf.md` (`NEEDS_REVISION`). 현재 Builder 보정 Gate는 `GATES_STAGE6_DETAIL_SEMANTICS_CORRECTION.md`; prior verdict는 불변 근거이며 새 candidate의 QA acceptance가 아님
+- 마지막 독립 QA 근거: `docs/STAGE6_FRESH_UX_PRODUCT_QA_93b0497.md` (`PASS`, SHA-256 `7235f3ac776bad7aace54d1111dd325d078a6e5863c61373175610549ae42c1a`). `docs/STAGE6_FRESH_UX_PRODUCT_QA_aa90faf.md`의 prior `NEEDS_REVISION`은 불변 이력으로 유지합니다.
 
 ## Cherry Note 최신 관측
 
@@ -59,7 +59,6 @@ Observed: 2026-08-23 KST
 
 ## 다음 정확한 작업
 
-1. UX & Product QA: corrected immutable candidate를 fresh affected QA로 다시 검증
+1. Release Audit: Stage 6 PASS와 분리된 새 Claude session으로 exact 93b0497 candidate의 실행·privacy·artifact 재현성·원자적 build/swap·rollback을 검증
 2. Planner/Cherry: 별도 Gate에서 stable hosting, persistent hostname, access/abuse policy, service supervision과 SLA를 결정
-3. Release Audit: Stage 6 fresh PASS 이후에만 Stage 7 독립 실행·privacy·artifact 재현성을 검증
-4. Cherry: Stage 8에서 Local MVP를 실제 사용하고 별도 수용
+3. Cherry: Stage 8에서 Local MVP를 실제 사용하고 별도 수용

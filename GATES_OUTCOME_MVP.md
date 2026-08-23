@@ -115,18 +115,18 @@ Stage ID: `outcome-stage-5`
 
 Stage ID: `outcome-stage-6`
 
-- [ ] Q1: Fresh independent UX & Product QA verifies the 30-second understanding task on desktop and mobile.
+- [x] Q1: Fresh independent UX & Product QA verifies the 30-second understanding task on desktop and mobile.
   PROVES: ux_product_qa
-  EVIDENCE: `docs/STAGE6_FRESH_UX_PRODUCT_QA_aa90faf.md` records geometry/mobile rapid-scan PASS but locked Final Feed false-completion detail; remains open pending fresh affected QA on the corrected candidate.
-- [ ] Q2: QA adversarially tests hierarchy, Gate meaning, project switching, stale/unknown states, and accessibility.
+  EVIDENCE: `docs/STAGE6_FRESH_UX_PRODUCT_QA_93b0497.md` records fresh Claude session `e38a17e5-7c5c-4a13-b3cf-ce8557dea226` PASS at desktop and mobile, including the 30-second comprehension task.
+- [x] Q2: QA adversarially tests hierarchy, Gate meaning, project switching, stale/unknown states, and accessibility.
   PROVES: ux_product_qa
-  EVIDENCE: `docs/STAGE6_FRESH_UX_PRODUCT_QA_aa90faf.md` records all prior semantic/accessibility classes resolved except state-unaware detail completion; remains open pending fresh affected QA.
+  EVIDENCE: the fresh 93b0497 QA traversed 34 project-Stage-viewport states with zero F10 violations and passed hierarchy, isolation, fail-closed states, geometry, contrast, focus, mobile order, and GitHub authority separation.
 - [x] Q3: QA uses a pinned immutable candidate and does not mutate or self-accept Builder work.
   PROVES: ux_product_qa
-  EVIDENCE: independent QA verified exact aa90faf commit/tree/parent/public receipt and served bytes without repository mutation or self-acceptance.
-- [ ] Q4: Any corrected candidate receives fresh affected QA evidence.
+  EVIDENCE: independent QA verified exact `93b0497d3881` commit, `74d1a34ce30b` tree, parent, origin, public receipt, and served bytes without product mutation, push, release, or self-acceptance.
+- [x] Q4: Any corrected candidate receives fresh affected QA evidence.
   PROVES: ux_product_qa
-  EVIDENCE: aa90faf received fresh affected QA; the next corrected candidate still requires a new fresh run.
+  EVIDENCE: corrected candidate 93b0497 received a new affected run; exact aa90faf negative control reproduced F10 and the current semantic scanner rejected it while accepting 93b0497. Cumulative `false_completion_count=10` is preserved.
 
 ## Stage 7 · Release Audit
 
