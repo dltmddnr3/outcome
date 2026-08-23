@@ -39,7 +39,7 @@ The canonical OUTCOME Gate ledger now closes M5–M15, while the Planner-owned O
 
 ## M15 optional GitHub connector
 
-- OUTCOME: `connected · dltmddnr3/outcome · origin/main`; the approved repository has no published heads before Parent's initial push, so published state is `not_published / empty_remote`.
+- OUTCOME: `connected · dltmddnr3/outcome · origin/main`; the approved repository was first verified `not_published / empty_remote`, then Parent performed the authorized initial push and refresh measured 0 behind / 0 ahead with published state connected.
 - Cherry Note: `connected · dltmddnr3/dock · origin/main`; read-only refresh measured local `main` at 0 behind / 15 ahead. Commit distance is delivery evidence, not progress.
 - UI separates Local candidate, GitHub published, Checks, and Release. Checks and Release remain `unknown` without source evidence.
 - Connector states cover missing, connected, unbound, conflict, unknown, and not-published while `required=false` and `completion_authority=false` remain explicit.
