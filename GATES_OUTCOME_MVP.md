@@ -16,7 +16,7 @@ Stage ID: `outcome-stage-3`
   EVIDENCE: OUTCOME scope check PASS across 10 product/runtime/test files; no Desk, Slack, relay, provider, or Cherry Note iOS dependency.
 - [x] M2: OUTCOME starts locally under its own package and route without Desk authentication or navigation.
   PROVES: implementation
-  EVIDENCE: standalone `outcome-dashboard` package serves `/cherry-note-dashboard` and a minimal read-only API; runtime tests PASS 7/7.
+  EVIDENCE: standalone `outcome-dashboard` package serves `/cherry-note-dashboard` and a minimal read-only API; runtime tests PASS 10/10.
 - [x] M3: Existing Cherry Note dashboard behavior has migration-parity tests and production build evidence.
   PROVES: test
   EVIDENCE: semantic parity tests PASS 2/2; full Node tests PASS 13/13; production build PASS; desktop/mobile geometry PASS.
@@ -26,24 +26,24 @@ Stage ID: `outcome-stage-3`
 
 ### Remote feedback foundation
 
-- [ ] W1: MacBook and mobile browsers can reach a stable HTTPS OUTCOME URL without depending on localhost routing.
+- [x] W1: MacBook and mobile browsers can reach a Cherry-approved public HTTPS OUTCOME URL without depending on localhost routing; temporary and stable hosting evidence remain distinguished.
   PROVES: implementation
-  EVIDENCE: BLOCKED — Tailscale is installed but stopped with no active tailnet identity, DNS name, or certificate domain. No anonymous fallback is permitted.
-- [x] W2: Authentication is required before any project, NOW, Gate, session, or freshness data is returned.
+  EVIDENCE: Cloudflare Quick Tunnel `https://prizes-subaru-participation-ram.trycloudflare.com` returned public health/dashboard GET 200; URL is explicitly temporary and stable hosting remains a later Gate.
+- [x] W2: Authentication remains the fail-closed default; only explicit `OUTCOME_PUBLIC_READ_ONLY=1` enables Cherry-approved unauthenticated sanitized GET access.
   PROVES: security
-  EVIDENCE: auth tests prove API 401 and a data-free login document before any dashboard bundle is returned; session uses HttpOnly, Secure-in-production, SameSite=Strict signed cookies.
+  EVIDENCE: auth-default and explicit-public mode regression tests PASS; public mode needs no password/secret and still rejects every POST with 405 `read_only`.
 - [x] W3: The remote payload excludes local paths, credentials, raw rollout text, task/turn IDs, full hashes, and mutation controls.
   PROVES: security
-  EVIDENCE: redaction tests PASS at evidence-text and serialized-payload boundaries; API rejects mutation routes with 405 `read_only`.
+  EVIDENCE: local and live public redaction probes PASS across payload/HTML/bundle; API rejects mutation routes with 405 `read_only`.
 - [x] W4: The Mac Mini remains the authoritative collector and the remote view reports collector offline/stale state rather than cached success.
   PROVES: implementation
   EVIDENCE: collector reads only configured Mac Mini local sources and reports explicit offline/stale states; collector tests PASS 6/6.
-- [ ] W5: Desktop and mobile remote browsers support Cherry's feedback loop with the same hierarchy and current/next boundary semantics.
+- [x] W5: Desktop and mobile remote browsers support Cherry's feedback loop with the same hierarchy and current/next boundary semantics.
   PROVES: test
-  EVIDENCE: LOCAL CANDIDATE PASS — Chrome 1440x900 and 390x844 both measured overflow=0, overlap=0, current=true, next=true. Actual remote-device proof waits on W1 activation.
+  EVIDENCE: public URL Chrome checks at 1440x900 and 390x844 measured overflow=0, overlap=0, current=true, next=true, public=true.
 - [x] W6: Hosting, tunnel, domain, identity provider, secrets, rollout, and rollback are documented; external activation uses only Cherry-approved credentials and target.
   PROVES: evidence
-  EVIDENCE: `docs/REMOTE_ACCESS.md` documents Tailscale Serve private HTTPS, two authentication layers, local-only secrets, monitoring, rollout, and rollback; runbook check PASS.
+  EVIDENCE: `docs/REMOTE_ACCESS.md` documents Cloudflare Quick Tunnel, random URL/restart/no-SLA limits, explicit public mode, PIDs, monitoring, rollout, rollback, and a separate stable-hosting follow-up Gate.
 
 ## Stage 4 · Generic source model
 

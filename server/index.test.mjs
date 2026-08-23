@@ -13,6 +13,12 @@ async function withServer(run) {
   try { await run(`http://127.0.0.1:${server.address().port}`) } finally { server.close(); await once(server, 'close') }
 }
 
+async function withPublicServer(collect, run) {
+  const server = createOutcomeServer({ publicReadOnly: true, collect })
+  server.listen(0, '127.0.0.1'); await once(server, 'listening')
+  try { await run(`http://127.0.0.1:${server.address().port}`) } finally { server.close(); await once(server, 'close') }
+}
+
 test('unauthenticated clients receive no dashboard data', async () => withServer(async (base) => {
   const response = await fetch(`${base}/api/dashboard/cherry-note`); const text = await response.text()
   assert.equal(response.status, 401); assert.equal(text.includes('Cherry Note'), false); assert.equal(text.includes('gateGroups'), false)
@@ -47,5 +53,24 @@ test('authenticated payload redacts prohibited remote fields', async () => withS
 }))
 
 test('session endpoint discloses only authentication state', async () => withServer(async (base) => {
-  const body = await (await fetch(`${base}/api/auth/session`)).json(); assert.deepEqual(body, { authenticated: false })
+  const body = await (await fetch(`${base}/api/auth/session`)).json(); assert.deepEqual(body, { authenticated: false, publicReadOnly: false })
+}))
+
+test('public mode serves sanitized dashboard GET without credentials', async () => withPublicServer(() => dashboard, async (base) => {
+  const response = await fetch(`${base}/api/dashboard/cherry-note`); assert.equal(response.status, 200)
+  assert.equal((await response.json()).dashboard.project.name, 'Cherry Note')
+  assert.deepEqual(await (await fetch(`${base}/api/auth/session`)).json(), { authenticated: false, publicReadOnly: true })
+}))
+
+test('public mode rejects every dashboard mutation as read-only', async () => withPublicServer(() => dashboard, async (base) => {
+  for (const path of ['/api/dashboard/cherry-note', '/api/unknown', '/api/auth/login', '/api/auth/logout']) {
+    const response = await fetch(`${base}${path}`, { method: 'POST', headers: { 'content-type': 'application/json' }, body: '{}' })
+    assert.equal(response.status, 405, path); assert.deepEqual(await response.json(), { error: 'read_only' })
+  }
+}))
+
+test('public mode removes prohibited fields and values from serialized payload', async () => withPublicServer(() => ({ ...dashboard, local_path: '/Users/cherry/private', token: 'secret', session_id: 'private', nested: { full_hash: 'a'.repeat(40), title: 'safe' } }), async (base) => {
+  const text = await (await fetch(`${base}/api/dashboard/cherry-note`)).text()
+  for (const prohibited of ['/Users/', 'secret', 'session_id', 'private', 'aaaaaaaaaaaaaaaa']) assert.equal(text.includes(prohibited), false, prohibited)
+  assert.equal(text.includes('safe'), true)
 }))

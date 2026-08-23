@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict'
 import test from 'node:test'
-import { buildCherryNoteDashboard, parseGateContract, parseLiveTestPulse, parseProgressSnapshots, sanitizeEvidenceText } from './cherry-note-dashboard.mjs'
+import { buildCherryNoteDashboard, parseGateContract, parseLiveTestPulse, parseProgressSnapshots, sanitizeEvidenceText, sanitizeRemotePayload } from './cherry-note-dashboard.mjs'
 
 test('gate contract preserves hierarchy and exact counts', () => {
   const result = parseGateContract('- [ ] Y1: first\n- [x] Y2: second\n- [ ] G1: close')
@@ -20,4 +20,8 @@ test('collector stale state is explicit', () => {
 test('evidence text redacts paths ids hashes and credentials', () => {
   const value = sanitizeEvidenceText('/Users/cherry/private task_id=abc123 token=secret 0123456789abcdef0123456789abcdef01234567')
   assert.equal(value.includes('/Users'), false); assert.equal(value.includes('abc123'), false); assert.equal(value.includes('secret'), false); assert.equal(value.includes('0123456789abcdef'), false)
+})
+test('remote payload removes prohibited nested fields defensively', () => {
+  const value = sanitizeRemotePayload({ project: { name: 'safe', local_path: '/Users/private' }, session_id: 'private', nested: [{ token: 'secret', title: 'visible' }] })
+  assert.deepEqual(value, { project: { name: 'safe' }, nested: [{ title: 'visible' }] })
 })

@@ -5,3 +5,4 @@ test-results/
 .env.local
 *.log
 *.tsbuildinfo
+.outcome-runtime/

@@ -1,6 +1,6 @@
 import type { CherryNoteDashboardData } from '../components/CherryNoteDashboard'
 
-type Session = { authenticated: boolean }
+type Session = { authenticated: boolean; publicReadOnly?: boolean }
 
 async function readJson<T>(response: Response): Promise<T> {
   const body = await response.json() as T & { error?: string }

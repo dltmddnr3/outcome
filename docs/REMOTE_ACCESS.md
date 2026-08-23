@@ -1,76 +1,82 @@
-# OUTCOME authenticated read-only remote access
+# OUTCOME public read-only remote access
 
-Status: locally verifiable candidate; external activation awaits an authenticated private-network identity.
+Status: Cherry-approved temporary public HTTPS mode using Cloudflare Quick Tunnel.
 
 ## Architecture
 
-The Mac Mini remains the authoritative collector and runs the only OUTCOME Node process. The process reads local Cherry Note evidence, reduces it to the dashboard schema, redacts private evidence text, and serves the built UI on loopback. Tailscale Serve is the preferred stable HTTPS edge because it provides a tailnet identity boundary and TLS without making OUTCOME anonymously public.
+The Mac Mini remains the authoritative collector and runs the only OUTCOME Node process. The process reads local Cherry Note evidence, reduces it to the dashboard schema, redacts private evidence text, and serves the built UI on loopback. A Cloudflare Quick Tunnel forwards public HTTPS GET requests to that loopback origin without opening an inbound port.
 
-`Mac Mini evidence → OUTCOME collector/API on 127.0.0.1:8787 → Tailscale Serve HTTPS → authenticated MacBook/mobile tailnet client`
+`Mac Mini evidence → OUTCOME collector/API on 127.0.0.1:8787 → Cloudflare Quick Tunnel HTTPS → MacBook/mobile browser`
 
-Two independent gates protect data:
+Access modes are explicit:
 
-1. The device must be authenticated to Cherry's private tailnet. Tailscale Funnel or any anonymous public tunnel is forbidden.
-2. OUTCOME requires its own 12-hour HttpOnly, Secure, SameSite=Strict session cookie before returning Project, NOW, Gate, freshness, or session-derived data.
+1. Default: without `OUTCOME_PUBLIC_READ_ONLY=1`, OUTCOME requires its 12-hour HttpOnly, Secure, SameSite=Strict signed session cookie before returning any dashboard data or bundle.
+2. Cherry-approved public read-only: with `OUTCOME_PUBLIC_READ_ONLY=1`, sanitized dashboard HTML, bundle, and GET API are public without login. No login secret is required or accepted in this mode.
 
-The remote API is read-only. It has no dispatch, approval, source-file write, provider, Slack, relay, or release endpoint.
+Both modes are read-only. Every dashboard mutation or unknown POST returns `405 {"error":"read_only"}`. There is no dispatch, approval, source-file write, provider, Slack, relay, or release endpoint. Public payloads pass a final recursive sanitizer that removes keys for paths, credentials, cookies, rollout/session/thread/task/turn data, and hashes, then sanitizes string values.
 
 ## Secrets
 
-Create a local `.env.local` or launchd environment that is readable only by the Mac Mini user:
+Authenticated mode may use a local launch environment readable only by the Mac Mini user:
 
 - `OUTCOME_ACCESS_PASSWORD`: a unique value of at least 12 characters.
 - `OUTCOME_SESSION_SECRET`: at least 32 random characters used to sign short-lived cookies.
 - `OUTCOME_CHERRY_NOTE_ROOT`: the authoritative local candidate root.
 - `OUTCOME_CHERRY_NOTE_ROLLOUT`: the authoritative local rollout evidence file.
 
-Do not put values in Git, logs, remote payloads, shell history, or the Tailscale configuration. Credential rotation is a Cherry-controlled action and is not part of this candidate.
+Public mode uses neither credential. Do not put source credentials or private values in Git, logs, remote payloads, or shell history.
 
 ## Local activation and verification
 
 ```sh
 npm ci
 npm run build
-OUTCOME_ACCESS_PASSWORD='use-a-private-value' OUTCOME_SESSION_SECRET='use-at-least-32-random-characters' npm start
+OUTCOME_PUBLIC_READ_ONLY=1 npm start
 ```
 
-The application binds to `127.0.0.1:8787` by default. `/api/health` reveals only availability and that authentication is required. `/api/auth/session` reveals only a boolean. All dashboard payload routes return `401 authentication_required` before login.
+The application binds to `127.0.0.1:8787` by default. In public mode `/api/health` returns only `status=available` and `access=public_read_only`; the dashboard GET returns sanitized evidence. POST probes must return `405 read_only`.
 
-## Private HTTPS activation
+## Temporary public HTTPS activation
 
-Prerequisites: Tailscale is running on the Mac Mini, MacBook Neo, and mobile; all three are signed into the Cherry-approved private tailnet; MagicDNS and HTTPS certificates are available.
+Cloudflare Quick Tunnel is a free, accountless development tunnel. It creates a random `*.trycloudflare.com` URL for the lifetime of the tunnel process. The URL changes after restart and Cloudflare provides no SLA or uptime guarantee. It is not stable hosting.
 
-After Cherry signs in and approves the tailnet identity, run on the Mac Mini:
+This candidate verified Cloudflare's official `cloudflared` 2026.8.2 macOS arm64 release after matching its GitHub release SHA-256. Start the origin and tunnel in one long-lived terminal session so termination cleans up the origin:
 
 ```sh
-tailscale serve --bg http://127.0.0.1:8787
-tailscale serve status
+OUTCOME_PUBLIC_READ_ONLY=1 OUTCOME_PORT=8791 node server/index.mjs >.outcome-runtime/server.log 2>&1 &
+outcome_server_pid=$!
+trap 'kill "$outcome_server_pid" 2>/dev/null' EXIT INT TERM
+.outcome-runtime/cloudflared tunnel --url http://127.0.0.1:8791 --no-autoupdate 2>&1 | tee .outcome-runtime/tunnel.log
 ```
 
-Use the stable HTTPS URL printed by `tailscale serve status`. Do not run `tailscale funnel`. Verify from both MacBook and mobile that an unauthenticated request receives no project data, login succeeds over HTTPS, and logout returns to the authentication screen.
+Read the random URL from `.outcome-runtime/tunnel.log` and record only the public URL in `.outcome-runtime/public-url`. Keep the two PID files with the originating processes. Process presence alone does not prove service health; verify the public health GET, dashboard GET, mutation 405, and redaction after every restart.
 
 ## Offline and stale behavior
 
-The collector is `offline` when the authoritative Gate source cannot be read and `stale` when its most recent evidence is older than 180 seconds. The UI displays a warning and never presents cached success as current. Monitor both the generic `/api/health` endpoint and the authenticated collector badge; health alone does not prove source freshness.
+The collector is `offline` when the authoritative Gate source cannot be read and `stale` when its most recent evidence is older than 180 seconds. The UI displays a warning and never presents cached success as current. Monitor both `/api/health` and the collector badge; health alone does not prove source freshness.
 
 ## Rollout and rollback
 
 Rollout is reversible and does not mutate source evidence:
 
-1. Stop the prior OUTCOME process, start the pinned candidate, and run local authenticated probes.
-2. Activate Tailscale Serve only after the private identity prerequisites are confirmed.
-3. Verify desktop/mobile authentication, redaction, collector freshness, and no mutation controls.
+1. Start the pinned candidate in explicit public mode and run local public/auth regression probes.
+2. Start one Quick Tunnel process and capture its random URL/PID.
+3. Verify desktop/mobile hierarchy, redaction, collector freshness, and no mutation controls through the public URL.
 
 Rollback:
 
 ```sh
-tailscale serve reset
+kill "$(cat .outcome-runtime/tunnel.pid)" "$(cat .outcome-runtime/server.pid)"
 git switch --detach <previous-commit>
 npm ci && npm run build
 ```
 
-Restart the previous pinned local process. `tailscale serve reset` removes the HTTPS route but leaves local source evidence untouched. If the collector is unavailable during rollback, OUTCOME must remain offline rather than display a prior success snapshot.
+Stopping the two recorded PIDs immediately removes the temporary public route without touching source evidence. Restart the previous pinned local process in its default authenticated mode. If the collector is unavailable during rollback, OUTCOME must remain offline rather than display a prior success snapshot.
 
-## Current activation blocker
+## Process restart
 
-Tailscale is installed on the Mac Mini but currently stopped and has no active tailnet user, DNS name, or certificate domain. Minimum Cherry action: start Tailscale and sign the Mac Mini, MacBook Neo, and mobile into one Cherry-approved private tailnet, then explicitly approve running the two `tailscale serve` commands above. No paid purchase, domain transfer, broad OAuth scope, or anonymous access is required.
+After any Mac Mini restart, repeat the long-lived terminal command and re-run all public probes. The old URL must be treated as expired because Quick Tunnel assigns a new random URL on restart. This Codex deployment is maintained by unified execution session `58594`; terminating that session stops both live processes.
+
+## Stable hosting follow-up Gate
+
+Quick Tunnel closes only the temporary public-feedback slice. A later Gate must select stable hosting, persistent hostname/domain, access policy, service supervision, monitoring/SLA, secret ownership, abuse controls, and rollback. That Gate requires separate Cherry approval and must not infer a paid purchase, domain transfer, or public mutation authority.

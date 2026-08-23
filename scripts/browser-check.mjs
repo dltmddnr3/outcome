@@ -2,8 +2,7 @@ import { spawn } from 'node:child_process'
 import { chromium } from '@playwright/test'
 
 const port = 18787
-const password = 'browser-check-password'
-const server = spawn(process.execPath, ['server/index.mjs'], { env: { ...process.env, OUTCOME_PORT: String(port), OUTCOME_ACCESS_PASSWORD: password, OUTCOME_SESSION_SECRET: 'b'.repeat(32) }, stdio: 'ignore' })
+const server = spawn(process.execPath, ['server/index.mjs'], { env: { ...process.env, OUTCOME_PORT: String(port), OUTCOME_PUBLIC_READ_ONLY: '1' }, stdio: 'ignore' })
 const waitForServer = async () => { for (let attempt = 0; attempt < 50; attempt += 1) { try { if ((await fetch(`http://127.0.0.1:${port}/api/health`)).ok) return } catch { /* retry */ } await new Promise((resolve) => setTimeout(resolve, 100)) } throw new Error('OUTCOME server did not start') }
 try {
   await waitForServer()
@@ -12,8 +11,6 @@ try {
     const context = await browser.newContext({ viewport })
     const page = await context.newPage()
     await page.goto(`http://127.0.0.1:${port}/cherry-note-dashboard`)
-    await page.getByLabel('접근 암호').fill(password)
-    await page.getByRole('button', { name: 'OUTCOME 열기' }).click()
     await page.getByText('진행 순서', { exact: false }).waitFor()
     const gate = page.locator('.cn-gate-groups button').first()
     if (await gate.count()) await gate.click()

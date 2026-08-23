@@ -3,7 +3,7 @@ import { createReadStream, existsSync, statSync } from 'node:fs'
 import { createServer } from 'node:http'
 import { extname, join, normalize, resolve } from 'node:path'
 import { fileURLToPath } from 'node:url'
-import { collectCherryNoteDashboard } from './cherry-note-dashboard.mjs'
+import { collectCherryNoteDashboard, sanitizeRemotePayload } from './cherry-note-dashboard.mjs'
 
 const projectRoot = resolve(fileURLToPath(new URL('..', import.meta.url)))
 const mime = { '.html': 'text/html; charset=utf-8', '.js': 'text/javascript; charset=utf-8', '.css': 'text/css; charset=utf-8', '.svg': 'image/svg+xml', '.png': 'image/png', '.ico': 'image/x-icon' }
@@ -34,17 +34,20 @@ export function createSessionAuth({ password, secret, secureCookies = true, now 
 export function createOutcomeServer(options = {}) {
   const root = options.root ?? projectRoot
   const dist = join(root, 'dist')
-  const auth = createSessionAuth({ password: options.password ?? process.env.OUTCOME_ACCESS_PASSWORD, secret: options.secret ?? process.env.OUTCOME_SESSION_SECRET, secureCookies: options.secureCookies ?? process.env.NODE_ENV === 'production', now: options.now })
+  const publicReadOnly = options.publicReadOnly ?? process.env.OUTCOME_PUBLIC_READ_ONLY === '1'
+  const auth = publicReadOnly && !(options.password ?? process.env.OUTCOME_ACCESS_PASSWORD) && !(options.secret ?? process.env.OUTCOME_SESSION_SECRET) ? null : createSessionAuth({ password: options.password ?? process.env.OUTCOME_ACCESS_PASSWORD, secret: options.secret ?? process.env.OUTCOME_SESSION_SECRET, secureCookies: options.secureCookies ?? process.env.NODE_ENV === 'production', now: options.now })
   const collect = options.collect ?? (() => collectCherryNoteDashboard())
   const failures = new Map()
   return createServer(async (request, response) => {
     response.setHeader('x-content-type-options', 'nosniff'); response.setHeader('x-frame-options', 'DENY'); response.setHeader('referrer-policy', 'no-referrer'); response.setHeader('permissions-policy', 'camera=(), microphone=(), geolocation=()')
     response.setHeader('content-security-policy', "default-src 'self'; script-src 'self'; style-src 'self'; img-src 'self' data:; connect-src 'self'; frame-ancestors 'none'; base-uri 'none'; form-action 'self'")
     const url = new URL(request.url, 'http://outcome.local')
-    const authenticated = auth.verify(cookieValue(request, 'outcome_session'))
-    if (request.method === 'GET' && url.pathname === '/api/health') return json(response, 200, { status: 'available', authentication: 'required' })
-    if (request.method === 'GET' && url.pathname === '/api/auth/session') return json(response, 200, { authenticated })
+    const authenticated = Boolean(auth?.verify(cookieValue(request, 'outcome_session')))
+    const accessGranted = publicReadOnly || authenticated
+    if (request.method === 'GET' && url.pathname === '/api/health') return json(response, 200, { status: 'available', access: publicReadOnly ? 'public_read_only' : 'authentication_required' })
+    if (request.method === 'GET' && url.pathname === '/api/auth/session') return json(response, 200, { authenticated, publicReadOnly })
     if (request.method === 'POST' && url.pathname === '/api/auth/login') {
+      if (publicReadOnly || !auth) return json(response, 405, { error: 'read_only' })
       const address = request.socket.remoteAddress ?? 'unknown'; const attempt = failures.get(address) ?? { count: 0, blockedUntil: 0 }
       if (attempt.blockedUntil > Date.now()) return json(response, 429, { error: 'too_many_attempts' })
       const isForm = request.headers['content-type']?.startsWith('application/x-www-form-urlencoded')
@@ -58,14 +61,14 @@ export function createOutcomeServer(options = {}) {
       if (isForm) { response.writeHead(303, { location: '/cherry-note-dashboard', 'set-cookie': auth.cookie(auth.issue()), 'cache-control': 'no-store' }); return response.end() }
       return json(response, 200, { authenticated: true }, { 'set-cookie': auth.cookie(auth.issue()) })
     }
-    if (request.method === 'POST' && url.pathname === '/api/auth/logout') return json(response, 200, { authenticated: false }, { 'set-cookie': auth.cookie('', 0) })
+    if (request.method === 'POST' && url.pathname === '/api/auth/logout') return publicReadOnly || !auth ? json(response, 405, { error: 'read_only' }) : json(response, 200, { authenticated: false }, { 'set-cookie': auth.cookie('', 0) })
     if (url.pathname.startsWith('/api/')) {
-      if (!authenticated) return json(response, 401, { error: 'authentication_required' })
-      if (request.method === 'GET' && url.pathname === '/api/dashboard/cherry-note') return json(response, 200, { dashboard: collect() })
+      if (!accessGranted) return json(response, 401, { error: 'authentication_required' })
+      if (request.method === 'GET' && url.pathname === '/api/dashboard/cherry-note') return json(response, 200, { dashboard: sanitizeRemotePayload(collect()) })
       return json(response, request.method === 'GET' ? 404 : 405, { error: request.method === 'GET' ? 'not_found' : 'read_only' })
     }
     if (!['GET', 'HEAD'].includes(request.method)) return json(response, 405, { error: 'read_only' })
-    if (!authenticated) {
+    if (!accessGranted) {
       response.writeHead(200, { 'content-type': 'text/html; charset=utf-8', 'cache-control': 'no-store' })
       return request.method === 'HEAD' ? response.end() : response.end(loginHtml())
     }

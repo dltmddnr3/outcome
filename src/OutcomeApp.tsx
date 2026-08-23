@@ -22,11 +22,12 @@ function Login({ onAuthenticated }: { onAuthenticated: () => void }) {
 
 export function OutcomeApp() {
   const [authenticated, setAuthenticated] = useState<boolean | null>(null)
-  useEffect(() => { void fetchSession().then((session) => setAuthenticated(session.authenticated)).catch(() => setAuthenticated(false)) }, [])
+  const [publicReadOnly, setPublicReadOnly] = useState(false)
+  useEffect(() => { void fetchSession().then((session) => { setPublicReadOnly(Boolean(session.publicReadOnly)); setAuthenticated(session.authenticated || Boolean(session.publicReadOnly)) }).catch(() => setAuthenticated(false)) }, [])
   if (authenticated === null) return <main className="outcome-login"><section aria-live="polite"><p>OUTCOME</p><h1>인증 상태 확인 중</h1></section></main>
   if (!authenticated) return <Login onAuthenticated={() => setAuthenticated(true)} />
   return <main className="cn-standalone-shell">
-    <header className="cn-standalone-heading"><div><p>OUTCOME · SOURCE-GROUNDED DASHBOARD</p><h1>목적지까지, 지금 어디쯤인지</h1><span>Mac Mini collector · 인증된 읽기 전용 화면</span></div><button className="cn-signout" onClick={() => void logout().finally(() => setAuthenticated(false))}>로그아웃</button></header>
+    <header className="cn-standalone-heading"><div><p>OUTCOME · SOURCE-GROUNDED DASHBOARD</p><h1>목적지까지, 지금 어디쯤인지</h1><span>Mac Mini collector · {publicReadOnly ? 'Cherry 승인 공개 read-only' : '인증된 읽기 전용 화면'}</span></div>{!publicReadOnly && <button className="cn-signout" onClick={() => void logout().finally(() => setAuthenticated(false))}>로그아웃</button>}</header>
     <CherryNoteDashboard onUnauthorized={() => setAuthenticated(false)} />
   </main>
 }

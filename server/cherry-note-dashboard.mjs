@@ -18,6 +18,13 @@ export function sanitizeEvidenceText(value) {
     .slice(0, 240)
 }
 
+const prohibitedRemoteKey = /(?:^|_)(?:path|root|token|secret|password|authorization|cookie|rollout|session|thread|task|turn|hash)(?:$|_)/i
+export function sanitizeRemotePayload(value) {
+  if (Array.isArray(value)) return value.map(sanitizeRemotePayload)
+  if (value && typeof value === 'object') return Object.fromEntries(Object.entries(value).filter(([key]) => !prohibitedRemoteKey.test(key)).map(([key, item]) => [key, sanitizeRemotePayload(item)]))
+  return typeof value === 'string' ? sanitizeEvidenceText(value) : value
+}
+
 export function parseGateContract(markdown) {
   const groups = []
   for (const line of markdown.split('\n')) {
