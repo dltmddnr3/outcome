@@ -3,14 +3,17 @@
   "private": true,
   "version": "0.1.0",
   "type": "module",
-  "engines": { "node": ">=22.13" },
+  "engines": {
+    "node": ">=22.13"
+  },
   "scripts": {
     "dev": "vite --host 127.0.0.1",
     "start": "node server/index.mjs",
     "build": "tsc -b && vite build",
     "test": "vitest run && node --test server/*.test.mjs",
-    "test:dashboard": "vitest run src/components/CherryNoteDashboard.test.tsx",
+    "test:dashboard": "vitest run src/components",
     "test:collector": "node --test server/cherry-note-dashboard.test.mjs",
+    "test:package-model": "node --test server/outcome-package.test.mjs",
     "test:runtime": "node --test server/index.test.mjs",
     "test:public": "node --test --test-name-pattern='public mode' server/index.test.mjs",
     "test:security": "node --test server/index.test.mjs",
@@ -23,7 +26,8 @@
   "dependencies": {
     "lucide-react": "^0.468.0",
     "react": "^19.1.1",
-    "react-dom": "^19.1.1"
+    "react-dom": "^19.1.1",
+    "yaml": "^2.9.0"
   },
   "devDependencies": {
     "@playwright/test": "^1.55.0",

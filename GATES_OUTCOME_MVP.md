@@ -49,41 +49,61 @@ Stage ID: `outcome-stage-3`
 
 Stage ID: `outcome-stage-4`
 
-- [ ] M5: A parser validates `OUTCOME_CONTRACT.md`, `OUTCOME_MAP.md`, and referenced `GATES*.md` without inferring missing meaning.
+- [x] M5: A parser validates `OUTCOME_CONTRACT.md`, `OUTCOME_MAP.md`, and referenced `GATES*.md` without inferring missing meaning.
   PROVES: implementation
-  EVIDENCE: pending
-- [ ] M6: Project, Phase, Scope, Stage, and Gate have stable IDs, purposes, states, and source references.
+  CHECK: npm run test:package-model -- --test-name-pattern='valid package|missing package|reference mismatch|conflicting current'
+  EXPECT: exit 0
+  EVIDENCE: Package parser/model tests PASS 13/13 including missing contract/map, invalid YAML, missing Gate references, project/current reference mismatch, invalid stable IDs, anchored Gate ranges, and conflicting current boundaries.
+- [x] M6: Project, Phase, Scope, Stage, and Gate have stable IDs, purposes, states, and source references.
   PROVES: implementation
-  EVIDENCE: pending
-- [ ] M7: Current and historical Planner, Builder, UX & Product QA, and Release Audit bindings are project-scoped.
+  CHECK: npm run test:package-model -- --test-name-pattern='stable hierarchy|invalid stable id|gate acceptance child'
+  EXPECT: exit 0
+  EVIDENCE: stable hierarchy tests prove unique kebab-case IDs and each Gate carries its owning Stage ID and logical source reference.
+- [x] M7: Current and historical Planner, Builder, UX & Product QA, and Release Audit bindings are project-scoped.
   PROVES: implementation
-  EVIDENCE: pending
-- [ ] M8: NOW uses active session evidence while progress and transitions use Gate evidence and immutable receipts.
+  CHECK: npm run test:package-model -- --test-name-pattern='role bindings'
+  EXPECT: exit 0
+  EVIDENCE: project-scoped four-role binding test preserves replaced history and selects only the current binding; missing registry renders all roles unbound.
+- [x] M8: NOW uses active session evidence while progress and transitions use Gate evidence and immutable receipts.
   PROVES: implementation
-  EVIDENCE: pending
-- [ ] M9: Missing, stale, conflicting, unbound, blocked, and locked inputs fail closed with no invented percentage.
+  CHECK: npm run test:package-model -- --test-name-pattern='NOW separation'
+  EXPECT: exit 0
+  EVIDENCE: NOW separation test prioritizes current Builder activity while cross-Stage progress remains unavailable; stage closure uses Gate checkboxes and source axes only.
+- [x] M9: Missing, stale, conflicting, unbound, blocked, and locked inputs fail closed with no invented percentage.
   PROVES: test
-  EVIDENCE: pending
+  CHECK: npm run test:package-model -- --test-name-pattern='fail-closed states'
+  EXPECT: exit 0
+  EVIDENCE: negative-state tests cover missing, stale, conflict, unbound, blocked/unknown Gate references, and no aggregate percentage; canonical Cherry Note resolves unknown because later required Gate files are absent, while OUTCOME fails closed as conflict because its declared current Stage 4 Gate is already closed.
 
 ## Stage 5 · OUTCOME self-tracking UI
 
 Stage ID: `outcome-stage-5`
 
-- [ ] M10: Cherry Note and OUTCOME can be selected and remain visually distinguishable.
+- [x] M10: Cherry Note and OUTCOME can be selected and remain visually distinguishable.
   PROVES: implementation
-  EVIDENCE: pending
-- [ ] M11: The active funnel shows Phase purpose → Scope purpose → Stage purpose → Gate purpose.
+  CHECK: npm run test:dashboard -- --test-name-pattern='project switch'
+  EXPECT: exit 0
+  EVIDENCE: project-switch semantic test and Chrome flow prove Cherry Note/OUTCOME selection resets Stage context and keeps Package truth isolated.
+- [x] M11: The active funnel shows Phase purpose → Scope purpose → Stage purpose → Gate purpose.
   PROVES: implementation
-  EVIDENCE: pending
-- [ ] M12: Each Stage summarizes what it verifies and evidence-closed checks out of total checks.
+  CHECK: npm run test:dashboard -- --test-name-pattern='purpose funnel'
+  EXPECT: exit 0
+  EVIDENCE: purpose-funnel test and browser flow show Phase, Scope, Stage, Gate purpose plus the exact evidence condition required before moving next.
+- [x] M12: Each Stage summarizes what it verifies and evidence-closed checks out of total checks.
   PROVES: implementation
-  EVIDENCE: pending
-- [ ] M13: Implementation, test, evidence closure, and recent activity are compact and semantically separate.
+  CHECK: npm run test:dashboard -- --test-name-pattern='stage summary'
+  EXPECT: exit 0
+  EVIDENCE: Stage summary tests prove closed/total/remaining from Gate checkboxes and null percentage when Gate evidence is absent; Cherry Note Stage 33 renders 9 Korean groups and 57/57 source checks.
+- [x] M13: Implementation, test, evidence closure, and recent activity are compact and semantically separate.
   PROVES: implementation
-  EVIDENCE: pending
-- [ ] M14: Desktop and mobile show current and next boundaries without overlap or horizontal overflow.
+  CHECK: npm run test:dashboard -- --test-name-pattern='evidence layers'
+  EXPECT: exit 0
+  EVIDENCE: evidence-layer test and UI keep implementation/test/evidence/NOW as four compact axes; activity never changes Gate completion.
+- [x] M14: Desktop and mobile show current and next boundaries without overlap or horizontal overflow.
   PROVES: test
-  EVIDENCE: pending
+  CHECK: npm run test:browser
+  EXPECT: exit 0
+  EVIDENCE: automated Chrome at 1440x900 and 390x844 measured overflow=0, overlap=0, project switch=true, purpose flow=true, current=true, next=true, inline detail=true.
 
 ## Stage 6 · UX & Product QA
 

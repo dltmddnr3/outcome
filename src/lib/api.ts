@@ -1,4 +1,5 @@
 import type { CherryNoteDashboardData } from '../components/CherryNoteDashboard'
+import type { OutcomeDashboardData } from '../components/OutcomeDashboard'
 
 type Session = { authenticated: boolean; publicReadOnly?: boolean }
 
@@ -26,5 +27,10 @@ export async function fetchCherryNoteDashboard(): Promise<CherryNoteDashboardDat
   const body = await readJson<{ dashboard: CherryNoteDashboardData }>(await fetch('/api/dashboard/cherry-note', {
     credentials: 'same-origin', headers: { accept: 'application/json' },
   }))
+  return body.dashboard
+}
+
+export async function fetchOutcomeDashboard(): Promise<OutcomeDashboardData> {
+  const body = await readJson<{ dashboard: OutcomeDashboardData }>(await fetch('/api/dashboard', { credentials: 'same-origin', headers: { accept: 'application/json' } }))
   return body.dashboard
 }

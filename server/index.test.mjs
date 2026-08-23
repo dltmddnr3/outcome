@@ -14,7 +14,7 @@ async function withServer(run) {
 }
 
 async function withPublicServer(collect, run) {
-  const server = createOutcomeServer({ publicReadOnly: true, collect })
+  const server = createOutcomeServer({ publicReadOnly: true, collect, collectPackages: () => ({ schemaVersion: 2, projects: [{ project: { id: 'outcome', name: 'OUTCOME' }, bindings: [{ role: 'builder', status: 'unbound' }] }] }) })
   server.listen(0, '127.0.0.1'); await once(server, 'listening')
   try { await run(`http://127.0.0.1:${server.address().port}`) } finally { server.close(); await once(server, 'close') }
 }
@@ -60,6 +60,11 @@ test('public mode serves sanitized dashboard GET without credentials', async () 
   const response = await fetch(`${base}/api/dashboard/cherry-note`); assert.equal(response.status, 200)
   assert.equal((await response.json()).dashboard.project.name, 'Cherry Note')
   assert.deepEqual(await (await fetch(`${base}/api/auth/session`)).json(), { authenticated: false, publicReadOnly: true })
+}))
+
+test('public mode serves generic project packages without mixing project identities', async () => withPublicServer(() => dashboard, async (base) => {
+  const response = await fetch(`${base}/api/dashboard`); const body = await response.json()
+  assert.equal(response.status, 200); assert.equal(body.dashboard.projects[0].project.id, 'outcome'); assert.equal(body.dashboard.projects[0].bindings[0].status, 'unbound')
 }))
 
 test('public mode rejects every dashboard mutation as read-only', async () => withPublicServer(() => dashboard, async (base) => {

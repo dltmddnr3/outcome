@@ -1,5 +1,5 @@
 import { FormEvent, useEffect, useState } from 'react'
-import { CherryNoteDashboard } from './components/CherryNoteDashboard'
+import { OutcomeDashboard } from './components/OutcomeDashboard'
 import { fetchSession, login, logout } from './lib/api'
 
 function Login({ onAuthenticated }: { onAuthenticated: () => void }) {
@@ -28,6 +28,6 @@ export function OutcomeApp() {
   if (!authenticated) return <Login onAuthenticated={() => setAuthenticated(true)} />
   return <main className="cn-standalone-shell">
     <header className="cn-standalone-heading"><div><p>OUTCOME · SOURCE-GROUNDED DASHBOARD</p><h1>목적지까지, 지금 어디쯤인지</h1><span>Mac Mini collector · {publicReadOnly ? 'Cherry 승인 공개 read-only' : '인증된 읽기 전용 화면'}</span></div>{!publicReadOnly && <button className="cn-signout" onClick={() => void logout().finally(() => setAuthenticated(false))}>로그아웃</button>}</header>
-    <CherryNoteDashboard onUnauthorized={() => setAuthenticated(false)} />
+    <OutcomeDashboard onUnauthorized={() => setAuthenticated(false)} />
   </main>
 }

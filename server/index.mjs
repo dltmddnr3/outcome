@@ -4,6 +4,7 @@ import { createServer } from 'node:http'
 import { extname, join, normalize, resolve } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { collectCherryNoteDashboard, sanitizeRemotePayload } from './cherry-note-dashboard.mjs'
+import { collectOutcomePackages, loadBindingRegistry } from './outcome-package.mjs'
 
 const projectRoot = resolve(fileURLToPath(new URL('..', import.meta.url)))
 const mime = { '.html': 'text/html; charset=utf-8', '.js': 'text/javascript; charset=utf-8', '.css': 'text/css; charset=utf-8', '.svg': 'image/svg+xml', '.png': 'image/png', '.ico': 'image/x-icon' }
@@ -37,6 +38,7 @@ export function createOutcomeServer(options = {}) {
   const publicReadOnly = options.publicReadOnly ?? process.env.OUTCOME_PUBLIC_READ_ONLY === '1'
   const auth = publicReadOnly && !(options.password ?? process.env.OUTCOME_ACCESS_PASSWORD) && !(options.secret ?? process.env.OUTCOME_SESSION_SECRET) ? null : createSessionAuth({ password: options.password ?? process.env.OUTCOME_ACCESS_PASSWORD, secret: options.secret ?? process.env.OUTCOME_SESSION_SECRET, secureCookies: options.secureCookies ?? process.env.NODE_ENV === 'production', now: options.now })
   const collect = options.collect ?? (() => collectCherryNoteDashboard())
+  const collectPackages = options.collectPackages ?? (() => collectOutcomePackages({ bindingRegistry: loadBindingRegistry() }))
   const failures = new Map()
   return createServer(async (request, response) => {
     response.setHeader('x-content-type-options', 'nosniff'); response.setHeader('x-frame-options', 'DENY'); response.setHeader('referrer-policy', 'no-referrer'); response.setHeader('permissions-policy', 'camera=(), microphone=(), geolocation=()')
@@ -64,6 +66,7 @@ export function createOutcomeServer(options = {}) {
     if (request.method === 'POST' && url.pathname === '/api/auth/logout') return publicReadOnly || !auth ? json(response, 405, { error: 'read_only' }) : json(response, 200, { authenticated: false }, { 'set-cookie': auth.cookie('', 0) })
     if (url.pathname.startsWith('/api/')) {
       if (!accessGranted) return json(response, 401, { error: 'authentication_required' })
+      if (request.method === 'GET' && url.pathname === '/api/dashboard') return json(response, 200, { dashboard: sanitizeRemotePayload(collectPackages()) })
       if (request.method === 'GET' && url.pathname === '/api/dashboard/cherry-note') return json(response, 200, { dashboard: sanitizeRemotePayload(collect()) })
       return json(response, request.method === 'GET' ? 404 : 405, { error: request.method === 'GET' ? 'not_found' : 'read_only' })
     }

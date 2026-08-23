@@ -1,0 +1,153 @@
+import { existsSync, readFileSync, statSync } from 'node:fs'
+import { basename, dirname, isAbsolute, join, resolve } from 'node:path'
+import YAML from 'yaml'
+import { sanitizeEvidenceText } from './cherry-note-dashboard.mjs'
+
+const ROLES = ['planner', 'builder', 'ux_product_qa', 'release_audit']
+const STABLE_ID = /^[a-z0-9]+(?:-[a-z0-9]+)*$/
+const safeRead = (path) => { try { return readFileSync(path, 'utf8') } catch { return '' } }
+const field = (text, name) => text.match(new RegExp(`^- ${name}:\\s*\`?([^\\n\`]+)\`?`, 'mi'))?.[1]?.trim() ?? null
+const fencedYaml = (text) => text.match(/```yaml\s*\n([\s\S]*?)\n```/)?.[1] ?? null
+const gateGroupNames = { Y: '링크 미리보기', L: '아이보리 표면 통일', B: '브랜드 표현', M: '더보기 화면', N: '새 폴더 만들기', E: '새 일정 만들기', A: '폴더 보관·복원', D: '폴더·콘텐츠 복구 삭제', G: '엔지니어링 완료 증거' }
+
+export function parseOutcomeContract(markdown) {
+  const projectId = field(markdown, 'Project ID')
+  const projectName = field(markdown, 'Project name') ?? markdown.match(/^#\s+(.+?)(?:\s+Outcome Contract|\s+Contract)/m)?.[1]?.trim() ?? null
+  const outcome = field(markdown, 'Outcome')
+  const acceptanceAuthority = field(markdown, 'Acceptance authority')
+  const phaseId = field(markdown, 'Phase ID')
+  const missing = [['project_id', projectId], ['project_name', projectName], ['outcome', outcome], ['acceptance_authority', acceptanceAuthority]].filter(([, value]) => !value).map(([name]) => name)
+  return { projectId, projectName, outcome, acceptanceAuthority, phaseId, missing }
+}
+
+export function parseOutcomeMap(markdown) {
+  const source = fencedYaml(markdown)
+  if (!source) return { value: null, errors: ['map_yaml_missing'] }
+  try { return { value: YAML.parse(source), errors: [] } } catch { return { value: null, errors: ['map_yaml_invalid'] } }
+}
+
+const gateAnchorIds = (anchor) => {
+  if (!anchor) return null
+  const ids = new Set()
+  for (const match of anchor.matchAll(/([A-Z]+)(\d+)-(?:([A-Z]+))?(\d+)/g)) {
+    const prefix = match[1]; const endPrefix = match[3] ?? prefix
+    if (prefix !== endPrefix) continue
+    for (let value = Number(match[2]); value <= Number(match[4]); value += 1) ids.add(`${prefix}${value}`)
+  }
+  return ids.size ? ids : null
+}
+
+export function parseGateLedger(markdown, stageId, anchor = '') {
+  const allowed = gateAnchorIds(anchor)
+  const gates = []
+  for (const line of markdown.split('\n')) {
+    const match = line.match(/^- \[([ xX])\]\s+([A-Za-z]+\d*|[^:]+):\s*(.+)$/)
+    if (!match) continue
+    const id = match[2].trim()
+    if (allowed && !allowed.has(id)) continue
+    const code = id.match(/^([A-Z])\d+$/)?.[1] ?? id.match(/^([A-Z]+)/)?.[1] ?? 'GATE'
+    gates.push({ id, stageId, title: sanitizeEvidenceText(match[3]), closed: match[1].toLowerCase() === 'x', groupCode: code })
+  }
+  const groups = []
+  for (const gate of gates) {
+    let group = groups.find((item) => item.code === gate.groupCode)
+    if (!group) { group = { code: gate.groupCode, name: gateGroupNames[gate.groupCode] ?? gate.groupCode, total: 0, closed: 0 }; groups.push(group) }
+    group.total += 1; if (gate.closed) group.closed += 1
+  }
+  return { gates, groups, total: gates.length, closed: gates.filter((gate) => gate.closed).length }
+}
+
+const stageState = (stage, gate) => {
+  if (!gate.available) return stage.gate_file_state?.includes('blocked') || stage.gate_file_state?.includes('required') ? 'blocked' : 'unknown'
+  if (gate.total > 0 && gate.closed === gate.total && String(stage.evidence_closure_state ?? '').includes('complete')) return 'complete'
+  if (String(stage.implementation_state ?? '').includes('work_in_progress') || String(stage.implementation_state ?? '').includes('active')) return 'active'
+  if (String(stage.evidence_closure_state ?? '').includes('pending')) return 'pending'
+  return 'unknown'
+}
+
+function bindingViews(projectId, registry, now, staleAfterSeconds) {
+  return ROLES.map((role) => {
+    const history = registry.filter((item) => item.project_id === projectId && item.role === role).sort((a, b) => Date.parse(b.bound_at) - Date.parse(a.bound_at))
+    const current = history.find((item) => !item.replaced_at) ?? null
+    if (!current) return { role, status: 'unbound', activity: null, observedAt: null, freshness: 'unknown', historyCount: history.length }
+    const observedAt = current.observed_at ?? current.bound_at
+    const stale = !observedAt || now.getTime() - Date.parse(observedAt) > staleAfterSeconds * 1000
+    return { role, status: stale ? 'stale' : current.status, activity: sanitizeEvidenceText(current.activity), observedAt, freshness: stale ? 'stale' : 'fresh', historyCount: history.length }
+  })
+}
+
+export function buildPackageModel({ root, contractFile, mapFile, bindingRegistry = [], now = new Date(), staleAfterSeconds = 900 }) {
+  const contractPath = resolve(root, contractFile)
+  const mapPath = resolve(root, mapFile)
+  const contractText = safeRead(contractPath)
+  const mapText = safeRead(mapPath)
+  const errors = []
+  if (!contractText) errors.push('contract_missing')
+  if (!mapText) errors.push('map_missing')
+  const contract = parseOutcomeContract(contractText)
+  errors.push(...contract.missing.map((name) => `contract_${name}_missing`))
+  const parsedMap = parseOutcomeMap(mapText); errors.push(...parsedMap.errors)
+  const map = parsedMap.value
+  if (!map) return { status: 'unknown', errors: [...new Set(errors)], project: { id: contract.projectId ?? 'unknown', name: contract.projectName ?? 'Unknown project', outcome: contract.outcome }, phases: [], bindings: bindingViews(contract.projectId, bindingRegistry, now, staleAfterSeconds), now: { status: 'unbound', activity: null }, progress: { available: false } }
+  if (contract.projectId !== map.project_id) errors.push('project_reference_mismatch')
+  const allIds = [map.project_id]
+  const phases = (map.phases ?? []).map((phase) => ({
+    id: phase.id, title: phase.title, purpose: phase.purpose, completion: phase.completion ?? phase.completion_marker ?? null,
+    scopes: (phase.scopes ?? []).map((scope) => ({
+      id: scope.id, title: scope.title, purpose: scope.purpose,
+      stages: (scope.stages ?? []).map((stage) => {
+        const [gateReference, gateAnchor = ''] = String(stage.gates_file ?? '').split('#', 2)
+        const relativeGatePath = gateReference ? resolve(root, gateReference) : null
+        const mapRelativeGatePath = gateReference ? resolve(dirname(mapPath), gateReference) : null
+        const gatePath = !gateReference ? null : isAbsolute(gateReference) ? gateReference : existsSync(relativeGatePath) ? relativeGatePath : mapRelativeGatePath
+        const gateText = gatePath ? safeRead(gatePath) : ''
+        if (!gateText) errors.push(`gate_reference_missing:${stage.id}`)
+        const ledger = parseGateLedger(gateText, stage.id, gateAnchor)
+        const gate = { ...ledger, available: Boolean(gateText), sourceRef: gatePath ? basename(gatePath) : null }
+        return { id: stage.id, title: stage.title, purpose: stage.purpose, dependsOn: stage.depends_on ?? [], gatePurpose: gate.total ? `${stage.title} acceptance checklist` : 'Gate evidence unavailable', gate, sourceState: stage.gate_file_state ?? (gate.available ? 'present' : 'missing'), state: stageState(stage, gate), axes: { implementation: stage.implementation_state ?? 'unknown', test: stage.test_state ?? 'unknown', evidence: stage.evidence_closure_state ?? 'unknown', independentQa: stage.independent_qa_state ?? 'unknown', cherryAcceptance: stage.cherry_acceptance_state ?? 'unknown', release: stage.release_state ?? 'unknown' } }
+      }),
+    })),
+  }))
+  for (const phase of phases) { allIds.push(phase.id); for (const scope of phase.scopes) { allIds.push(scope.id); for (const stage of scope.stages) allIds.push(stage.id) } }
+  if (allIds.some((id) => !STABLE_ID.test(String(id)))) errors.push('invalid_stable_id')
+  if (new Set(allIds).size !== allIds.length) errors.push('duplicate_stable_id')
+  const stages = phases.flatMap((phase) => phase.scopes.flatMap((scope) => scope.stages.map((stage) => ({ phase, scope, stage }))))
+  const explicitCurrents = [...mapText.matchAll(/^- Current:\s*`([^`]+)`/gm)].map((match) => match[1])
+  if (explicitCurrents.length > 1) errors.push('conflicting_current_boundary')
+  const explicitStageId = explicitCurrents[0]?.match(/([a-z0-9]+(?:-[a-z0-9]+)*)\s*(?:·|$)/)?.[1]
+  let current = stages.find((item) => item.stage.id === explicitStageId)
+  if (explicitCurrents.length === 1 && (!explicitStageId || !current)) errors.push('current_reference_mismatch')
+  current ??= stages.find((item) => item.stage.state === 'active')
+  current ??= stages.find((item) => item.stage.state !== 'complete')
+  const currentIndex = current ? stages.indexOf(current) : -1
+  if (explicitCurrents.length === 1 && current?.stage.gate.total > 0 && current.stage.gate.closed === current.stage.gate.total) errors.push('current_stage_gate_closed_conflict')
+  const next = currentIndex >= 0 ? stages.slice(currentIndex + 1).find((item) => item.stage.state !== 'complete') ?? null : null
+  const bindings = bindingViews(map.project_id, bindingRegistry, now, staleAfterSeconds)
+  const builder = bindings.find((item) => item.role === 'builder')
+  const mtimes = [contractPath, mapPath].filter(existsSync).map((path) => statSync(path).mtimeMs)
+  const stale = mtimes.length < 2 || now.getTime() - Math.max(...mtimes) > staleAfterSeconds * 1000
+  const conflict = errors.some((error) => error.includes('conflict') || error.includes('mismatch') || error.includes('duplicate'))
+  return {
+    status: conflict ? 'conflict' : errors.length ? 'unknown' : stale ? 'stale' : 'valid', errors: [...new Set(errors)], observedAt: mtimes.length ? new Date(Math.max(...mtimes)).toISOString() : null,
+    project: { id: map.project_id, name: map.project_title ?? map.title ?? contract.projectName, outcome: map.project_purpose ?? contract.outcome, acceptanceAuthority: contract.acceptanceAuthority }, phases,
+    current: current ? { phaseId: current.phase.id, scopeId: current.scope.id, stageId: current.stage.id } : null,
+    next: next ? { phaseId: next.phase.id, scopeId: next.scope.id, stageId: next.stage.id } : null,
+    bindings, now: builder && builder.status !== 'unbound' ? { status: builder.status, activity: builder.activity, observedAt: builder.observedAt, source: 'builder_binding' } : { status: 'unbound', activity: null, observedAt: null, source: 'runtime_registry' },
+    progress: { available: false, reason: 'no_cross_stage_aggregate' },
+  }
+}
+
+export function collectOutcomePackages({ bindingRegistry = [], now = new Date(), projects } = {}) {
+  const definitions = projects ?? [
+    { root: '/Users/rosum/Documents/ChatGPT/Cherry Note', contractFile: 'OUTCOME_CONTRACT.md', mapFile: 'OUTCOME_MAP.md' },
+    { root: '/Users/rosum/Documents/ChatGPT/OUTCOME', contractFile: 'docs/OUTCOME_CONTRACT.md', mapFile: 'docs/OUTCOME_MAP.md' },
+  ]
+  return { schemaVersion: 2, observedAt: now.toISOString(), projects: definitions.map((definition) => buildPackageModel({ ...definition, bindingRegistry, now })) }
+}
+
+export function loadBindingRegistry(path = process.env.OUTCOME_BINDING_REGISTRY ?? join(process.cwd(), '.outcome-runtime', 'bindings.json')) {
+  try {
+    const value = JSON.parse(readFileSync(path, 'utf8'))
+    return Array.isArray(value.bindings) ? value.bindings.filter((item) => item && typeof item.project_id === 'string' && ROLES.includes(item.role)) : []
+  } catch { return [] }
+}
