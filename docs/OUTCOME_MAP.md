@@ -18,6 +18,21 @@ gates_files:
   - GATES.md
   - GATES_OUTCOME_MVP.md
 runtime_binding_source: OUTCOME-managed registry
+source_connectors:
+  github:
+    adopted: true
+    required: false
+    repository: dltmddnr3/outcome
+    remote_name: origin
+    default_branch: main
+    binding_state: connected
+    observed_published_state: empty_remote
+    evidence_scope:
+      - published_commits
+      - pull_requests
+      - checks
+      - releases
+    completion_authority: false
 
 phases:
   - id: outcome-phase-1
@@ -59,17 +74,17 @@ phases:
           - project selector or equivalent project orientation
           - current and historical role session bindings
           - stale, unknown, blocked, unbound, and locked states
-          - authenticated read-only remote feedback surface
+          - Cherry-approved public read-only remote feedback surface
           - private source redaction and freshness
         excluded:
           - Cherry Note iOS changes
           - Desk auth, navigation, provider, or Slack coupling
           - remote mutation or dispatch
-          - anonymous public dashboard access
+          - stable hosted service, account system, and search-engine distribution
         stages:
           - id: outcome-stage-3
             title: Standalone migration and remote feedback foundation
-            purpose: dashboard 전용 코드와 최소 runtime을 OUTCOME 저장소의 단일 원본으로 옮기고 인증된 read-only 원격 접근 후보를 만든다.
+            purpose: dashboard 전용 코드와 최소 runtime을 OUTCOME 저장소의 단일 원본으로 옮기고 Cherry-approved public read-only 원격 접근 후보를 만든다.
             depends_on: [outcome-stage-2]
             gates_file: GATES_OUTCOME_MVP.md#M1-M4-W1-W6
           - id: outcome-stage-4
@@ -81,7 +96,7 @@ phases:
             title: OUTCOME self-tracking UI
             purpose: Cherry Note와 OUTCOME의 목적·현재 위치·Stage Gate·NOW를 같은 위계와 상태 언어로 보여준다.
             depends_on: [outcome-stage-4]
-            gates_file: GATES_OUTCOME_MVP.md#M10-M14
+            gates_file: GATES_OUTCOME_MVP.md#M10-M15
 
       - id: outcome-scope-acceptance
         title: Independent acceptance
@@ -113,8 +128,8 @@ phases:
 
 ## 현재 위치
 
-- Current: `outcome-phase-1 / outcome-scope-contract / outcome-stage-2`
-- Next: `outcome-scope-runtime / outcome-stage-3 · Standalone migration`
-- Dashboard registration: contract-ready, runtime adapter pending
+- Current: `outcome-phase-1 / outcome-scope-acceptance / outcome-stage-6 · UX & Product QA`
+- Next: `outcome-scope-acceptance / outcome-stage-7 · Release Audit`
+- Dashboard registration: Package-driven Cherry Note/OUTCOME UI and GitHub connector Gate M15 are evidence-closed on the Builder candidate; fresh independent UX & Product QA remains open.
 - `MVP_SCOPE_CLOSED`: false
 - `EXTERNAL_OUTCOME_COMPLETE`: false

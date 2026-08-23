@@ -14,6 +14,17 @@ Gate는 다음 진행 단계가 아니라 Stage의 완료 조건입니다. 문�
 
 역할별 session binding과 binding history는 OUTCOME Package의 정적 문서에 포함하지 않습니다. 이는 OUTCOME runtime registry가 프로젝트별로 연결하고 관리합니다.
 
+## 기본 Source Connector · GitHub
+
+GitHub는 OUTCOME Package가 기본 지원하는 선택적 source connector입니다. 별도의 네 번째 Package 문서를 만들지 않고 `OUTCOME_CONTRACT.md`에는 사람이 읽는 연결 상태를, `OUTCOME_MAP.md`에는 `source_connectors.github` metadata를 선언합니다.
+
+- Package 문서: 목적, 구조, Gate와 수용 의미
+- 로컬 Git: 아직 공개되지 않은 working change와 immutable candidate
+- GitHub: 공개된 commit, pull request, checks, release evidence
+- runtime registry: token, credential, host, local path와 연결 상태
+
+GitHub가 없거나 remote가 일치하지 않아도 Package 자체는 유효하지만 connector는 `unbound` 또는 `conflict`로 fail-closed 표시합니다. GitHub activity는 Gate closure, 독립 QA, Release Audit 또는 Cherry acceptance를 대신하지 않습니다.
+
 ## 세션 구성
 
 | 순서 | 세션 | 책임 | 변경 권한 |

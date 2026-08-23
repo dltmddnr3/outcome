@@ -1,7 +1,7 @@
 # OUTCOME Contract · MVP
 
 Updated: 2026-08-23 KST
-Status: **Cherry approved · amended for OUTCOME self-tracking on 2026-08-23**
+Status: **Cherry approved · amended for OUTCOME self-tracking and public read-only feedback on 2026-08-23**
 
 ## Package identity
 
@@ -10,6 +10,7 @@ Status: **Cherry approved · amended for OUTCOME self-tracking on 2026-08-23**
 - Project ID: `outcome`
 - Project name: `OUTCOME`
 - Repository: `/Users/rosum/Documents/ChatGPT/OUTCOME`
+- GitHub connector: `connected · dltmddnr3/outcome · origin/main · empty remote before approved initial push`
 - Outcome: Cherry가 여러 역할과 세션의 활동을 결과 구조와 검증 증거로 이해하고 현재 위치와 다음 경계를 30초 안에 판단한다.
 - Acceptance authority: `Cherry`
 - Required Package files:
@@ -17,6 +18,14 @@ Status: **Cherry approved · amended for OUTCOME self-tracking on 2026-08-23**
   - `docs/OUTCOME_MAP.md`
   - `GATES.md`
   - `GATES_OUTCOME_MVP.md`
+
+## Source connector contract
+
+- GitHub is a standard optional connector of the OUTCOME Package, not a fourth required Package document.
+- Package documents define intent and acceptance; local Git proves unpublished working candidates; GitHub proves published commits, pull requests, checks, and releases.
+- GitHub activity never substitutes for Gate closure, independent QA, Release Audit, or Cherry acceptance.
+- Repository identity is non-secret Package metadata. Tokens, credentials, local paths, and provider-specific bindings remain in the runtime registry.
+- A missing or mismatched remote is shown as `unbound` or `conflict`; a connected empty remote is shown as `not_published / empty_remote`, never as progress or conflict.
 
 ## Phase contract
 
@@ -34,11 +43,11 @@ Status: **Cherry approved · amended for OUTCOME self-tracking on 2026-08-23**
   - OUTCOME Package parser와 fail-closed validation
   - 프로젝트별 역할 session binding과 NOW
   - desktop/mobile outcome funnel
-  - 맥미니 source collector를 유지하면서 MacBook·모바일에서 접근 가능한 인증된 read-only 원격 피드백 화면
+  - 맥미니 source collector를 유지하면서 MacBook·모바일에서 접근 가능한 Cherry-approved public read-only 원격 피드백 화면
 - Excluded:
   - 제3 프로젝트 포트폴리오
   - 다른 PC·계정 수집
-  - 익명 공개 URL과 검색엔진 노출
+  - 검색엔진 배포 최적화와 안정 URL·SLA 보장
   - 원격 화면에서의 작업 dispatch·파일 변경·승인 mutation
   - 원격 mutation·dispatch·release
   - Cherry Note iOS 제품 변경
@@ -66,7 +75,7 @@ Cherry가 대시보드를 열고 다음을 30초 안에 판단합니다.
 - MVP: 로컬에서 즉시 열리는 독립 HTML/React 대시보드
 - 초기 URL: `http://127.0.0.1:5173/cherry-note-dashboard`
 - MVP 데이터: Cherry Note의 관측 가능한 로컬 근거와 OUTCOME 프로젝트 자체의 표준 문서·역할 세션·delivery evidence
-- 원격 피드백: MacBook·모바일에서 접근 가능한 인증된 read-only 웹. 로컬 source collector와 민감정보 redaction을 유지한다.
+- 원격 피드백: MacBook·모바일에서 접근 가능한 Cherry-approved public read-only 웹. 로컬 source collector, 민감정보 redaction, mutation 차단을 유지한다. 현재 Quick Tunnel URL은 임시이며 재시작 시 변경될 수 있다.
 - 후속: 다중 계정·다중 source host·원격 mutation은 새 계약에서 결정
 
 ## 5. 완료 조건
@@ -82,7 +91,7 @@ MVP는 아래 조건이 모두 증명될 때 완료입니다.
 - Stage 상세가 다른 콘텐츠를 가리지 않고 데스크톱·모바일에서 읽힙니다.
 - 근거 없음·오래됨·충돌은 `unknown` 또는 `stale`로 정직하게 표시됩니다.
 - 로컬 절대 경로, task/turn ID, 자격 증명, 전체 SHA 같은 내부 정보가 사용자 화면에 노출되지 않습니다.
-- 인증되지 않은 사용자는 프로젝트명·NOW·Gate·세션 metadata를 포함한 어떠한 대시보드 데이터도 읽을 수 없습니다.
+- 공개 모드에서는 사용자에게 필요한 정제된 프로젝트·NOW·Gate 정보만 읽을 수 있고, 로컬 경로·자격 증명·raw session/thread payload·민감 식별자는 읽을 수 없습니다.
 - Cherry가 실제 화면을 사용하고 “현재 위치와 다음 행동을 이해할 수 있다”고 수용합니다.
 
 테스트 PASS, 문서 작성, 빌드 성공만으로는 완료가 아닙니다.

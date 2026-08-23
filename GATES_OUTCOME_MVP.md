@@ -79,6 +79,12 @@ Stage ID: `outcome-stage-4`
 
 Stage ID: `outcome-stage-5`
 
+- [x] M15: GitHub is modeled as an optional project-scoped delivery evidence connector, with local candidate, published commit, checks, and release states kept separate from Gate closure and Cherry acceptance.
+  PROVES: implementation
+  CHECK: npm run test:package-model -- --test-name-pattern='GitHub connector' && npm run test:dashboard -- --test-name-pattern='GitHub evidence'
+  EXPECT: exit 0
+  EVIDENCE: GitHub connector parser tests PASS 5/5 for missing, connected, connected-empty-remote, unbound, and conflict/credential cases; UI semantic tests PASS 2/2; Cherry Note refreshed `origin/main...main` at 0 behind / 15 ahead; OUTCOME origin is connected to `dltmddnr3/outcome` with no published heads and renders `not_published / empty_remote`; `completion_authority=false`, Checks and Release remain unknown; local/remote browser, public 200, mutation 405, and redaction probes PASS.
+
 - [x] M10: Cherry Note and OUTCOME can be selected and remain visually distinguishable.
   PROVES: implementation
   CHECK: npm run test:dashboard -- --test-name-pattern='project switch'
