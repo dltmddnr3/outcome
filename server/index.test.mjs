@@ -13,8 +13,8 @@ async function withServer(run) {
   try { await run(`http://127.0.0.1:${server.address().port}`) } finally { server.close(); await once(server, 'close') }
 }
 
-async function withPublicServer(collect, run) {
-  const server = createOutcomeServer({ publicReadOnly: true, collect, collectPackages: () => ({ schemaVersion: 2, projects: [{ project: { id: 'outcome', name: 'OUTCOME' }, bindings: [{ role: 'builder', status: 'unbound' }] }] }) })
+async function withPublicServer(collect, run, collectPackages = () => ({ schemaVersion: 2, projects: [{ project: { id: 'outcome', name: 'OUTCOME' }, bindings: [{ role: 'builder', status: 'unbound' }] }] })) {
+  const server = createOutcomeServer({ publicReadOnly: true, collect, collectPackages })
   server.listen(0, '127.0.0.1'); await once(server, 'listening')
   try { await run(`http://127.0.0.1:${server.address().port}`) } finally { server.close(); await once(server, 'close') }
 }
@@ -79,3 +79,10 @@ test('public mode removes prohibited fields and values from serialized payload',
   for (const prohibited of ['/Users/', 'secret', 'session_id', 'private', 'aaaaaaaaaaaaaaaa']) assert.equal(text.includes(prohibited), false, prohibited)
   assert.equal(text.includes('safe'), true)
 }))
+
+test('public generic connector payload removes credentials and preserves completion authority boundary', async () => withPublicServer(() => dashboard, async (base) => {
+  const text = await (await fetch(`${base}/api/dashboard`)).text()
+  for (const prohibited of ['github_token', 'credential-value', 'user:password', '/Users/']) assert.equal(text.includes(prohibited), false, prohibited)
+  const connector = JSON.parse(text).dashboard.projects[0].connectors.github
+  assert.equal(connector.repository, 'dltmddnr3/outcome'); assert.equal(connector.published.state, 'not_published'); assert.equal(connector.completionAuthority, false)
+}, () => ({ schemaVersion: 2, projects: [{ project: { id: 'outcome' }, connectors: { github: { repository: 'dltmddnr3/outcome', github_token: 'credential-value', remote_url: 'https://user:password@github.com/dltmddnr3/outcome.git', completionAuthority: false, published: { state: 'not_published' } } } }] })))

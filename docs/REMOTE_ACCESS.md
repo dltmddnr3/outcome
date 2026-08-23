@@ -75,7 +75,7 @@ Stopping the two recorded PIDs immediately removes the temporary public route wi
 
 ## Process restart
 
-After any Mac Mini restart, repeat the long-lived terminal command and re-run all public probes. The old URL must be treated as expired because Quick Tunnel assigns a new random URL on restart. To preserve the current hostname while rebinding the immutable Stage 4–5 candidate, the processes are temporarily split: origin PID `79926` is maintained by execution session `88381`, while tunnel PID `76819` is maintained by execution session `5623`. Both must remain active. The verified temporary URL for this process lifetime is `https://van-staff-excellence-investigated.trycloudflare.com`.
+After any Mac Mini restart, repeat the long-lived terminal command and re-run all public probes. The old URL must be treated as expired because Quick Tunnel assigns a new random URL on restart. To preserve the current hostname while rebinding the M15 candidate, the processes are temporarily split: origin PID `5278` is maintained by execution session `22094`, while tunnel PID `76819` is maintained by execution session `5623`. Both must remain active. The verified temporary URL for this process lifetime is `https://van-staff-excellence-investigated.trycloudflare.com`.
 
 ## Stable hosting follow-up Gate
 

@@ -1,14 +1,69 @@
 import { existsSync, readFileSync, statSync } from 'node:fs'
+import { execFileSync } from 'node:child_process'
 import { basename, dirname, isAbsolute, join, resolve } from 'node:path'
 import YAML from 'yaml'
 import { sanitizeEvidenceText } from './cherry-note-dashboard.mjs'
 
 const ROLES = ['planner', 'builder', 'ux_product_qa', 'release_audit']
 const STABLE_ID = /^[a-z0-9]+(?:-[a-z0-9]+)*$/
+const GIT_REMOTE = /^[A-Za-z0-9][A-Za-z0-9._-]*$/
+const GIT_BRANCH = /^[A-Za-z0-9][A-Za-z0-9._/-]*$/
 const safeRead = (path) => { try { return readFileSync(path, 'utf8') } catch { return '' } }
 const field = (text, name) => text.match(new RegExp(`^- ${name}:\\s*\`?([^\\n\`]+)\`?`, 'mi'))?.[1]?.trim() ?? null
 const fencedYaml = (text) => text.match(/```yaml\s*\n([\s\S]*?)\n```/)?.[1] ?? null
 const gateGroupNames = { Y: '링크 미리보기', L: '아이보리 표면 통일', B: '브랜드 표현', M: '더보기 화면', N: '새 폴더 만들기', E: '새 일정 만들기', A: '폴더 보관·복원', D: '폴더·콘텐츠 복구 삭제', G: '엔지니어링 완료 증거' }
+
+const githubRepository = (value) => {
+  if (typeof value !== 'string') return null
+  const match = value.trim().match(/^(?:https:\/\/github\.com\/|git@github\.com:)?([A-Za-z0-9_.-]+\/[A-Za-z0-9_.-]+?)(?:\.git)?$/)
+  return match?.[1] ?? null
+}
+
+export function readLocalGitEvidence(root, connector = {}) {
+  const run = (...args) => execFileSync('git', ['-C', root, ...args], { encoding: 'utf8', stdio: ['ignore', 'pipe', 'ignore'] }).trim()
+  try {
+    const branch = run('branch', '--show-current') || null
+    const configuredRemote = typeof connector.remote_name === 'string' ? connector.remote_name : ''
+    const configuredBranch = typeof connector.default_branch === 'string' ? connector.default_branch : ''
+    const remoteName = GIT_REMOTE.test(configuredRemote) ? configuredRemote : null
+    const defaultBranch = GIT_BRANCH.test(configuredBranch) && !configuredBranch.includes('..') && !configuredBranch.includes('@{') ? configuredBranch : null
+    if (!remoteName || !defaultBranch) return { state: branch ? 'available' : 'unknown', branch, ahead: null, behind: null, observedRepository: null, remoteState: 'unbound' }
+    const observedRepository = githubRepository(run('remote', 'get-url', remoteName))
+    try {
+      run('show-ref', '--verify', `refs/remotes/${remoteName}/${defaultBranch}`)
+      const [behind, ahead] = run('rev-list', '--left-right', '--count', `${remoteName}/${defaultBranch}...${branch ?? defaultBranch}`).split(/\s+/).map(Number)
+      return { state: branch ? 'available' : 'unknown', branch, ahead: Number.isFinite(ahead) ? ahead : null, behind: Number.isFinite(behind) ? behind : null, observedRepository, remoteState: 'published' }
+    } catch { return { state: branch ? 'available' : 'unknown', branch, ahead: null, behind: null, observedRepository, remoteState: 'empty_remote' } }
+  } catch { return { state: 'unknown', branch: null, ahead: null, behind: null, observedRepository: null, remoteState: 'unknown' } }
+}
+
+export function parseGithubConnector(value, local = { state: 'unknown', branch: null, ahead: null, behind: null, observedRepository: null, remoteState: 'unknown' }) {
+  const sync = local.ahead == null || local.behind == null ? 'unknown' : local.ahead > 0 && local.behind > 0 ? 'diverged' : local.ahead > 0 ? 'ahead' : local.behind > 0 ? 'behind' : 'synced'
+  const localCandidate = { state: local.state, branch: local.branch, ahead: local.ahead, behind: local.behind, sync }
+  const empty = { adopted: false, required: false, state: 'missing', repository: null, remoteName: null, defaultBranch: null, completionAuthority: false, localCandidate, published: { state: 'unknown', repository: null, ref: null, detail: 'unknown' }, checks: { state: 'unknown' }, release: { state: 'unknown' } }
+  if (value == null) return empty
+  if (typeof value !== 'object' || typeof value.adopted !== 'boolean') return { ...empty, state: 'unknown' }
+  const repository = value.repository == null ? null : githubRepository(value.repository)
+  const configuredRemote = typeof value.remote_name === 'string' ? value.remote_name : ''
+  const configuredBranch = typeof value.default_branch === 'string' ? value.default_branch : ''
+  const remoteName = GIT_REMOTE.test(configuredRemote) ? configuredRemote : null
+  const defaultBranch = GIT_BRANCH.test(configuredBranch) && !configuredBranch.includes('..') && !configuredBranch.includes('@{') ? configuredBranch : null
+  const authoritySafe = value.completion_authority === false
+  const declared = value.binding_state
+  let state = ['connected', 'unbound'].includes(declared) ? declared : 'unknown'
+  if (!value.adopted && (repository || declared === 'connected')) state = 'conflict'
+  if (value.adopted && declared === 'unbound' && value.repository != null) state = 'conflict'
+  if (value.adopted && declared === 'connected' && (!repository || !remoteName || !defaultBranch)) state = 'conflict'
+  if (value.repository != null && !repository) state = 'conflict'
+  if (!authoritySafe || value.required === true) state = 'conflict'
+  if (state === 'connected' && local.observedRepository && local.observedRepository !== repository) state = 'conflict'
+  return {
+    adopted: value.adopted, required: value.required === true, state, repository, remoteName, defaultBranch, completionAuthority: false,
+    localCandidate,
+    published: { state: state === 'connected' && local.remoteState === 'empty_remote' ? 'not_published' : state === 'connected' ? 'connected' : state, repository, ref: remoteName && defaultBranch ? `${remoteName}/${defaultBranch}` : defaultBranch, detail: local.remoteState },
+    checks: { state: 'unknown' }, release: { state: 'unknown' },
+  }
+}
 
 export function parseOutcomeContract(markdown) {
   const projectId = field(markdown, 'Project ID')
@@ -76,7 +131,7 @@ function bindingViews(projectId, registry, now, staleAfterSeconds) {
   })
 }
 
-export function buildPackageModel({ root, contractFile, mapFile, bindingRegistry = [], now = new Date(), staleAfterSeconds = 900 }) {
+export function buildPackageModel({ root, contractFile, mapFile, bindingRegistry = [], gitEvidence, now = new Date(), staleAfterSeconds = 900 }) {
   const contractPath = resolve(root, contractFile)
   const mapPath = resolve(root, mapFile)
   const contractText = safeRead(contractPath)
@@ -90,6 +145,7 @@ export function buildPackageModel({ root, contractFile, mapFile, bindingRegistry
   const map = parsedMap.value
   if (!map) return { status: 'unknown', errors: [...new Set(errors)], project: { id: contract.projectId ?? 'unknown', name: contract.projectName ?? 'Unknown project', outcome: contract.outcome }, phases: [], bindings: bindingViews(contract.projectId, bindingRegistry, now, staleAfterSeconds), now: { status: 'unbound', activity: null }, progress: { available: false } }
   if (contract.projectId !== map.project_id) errors.push('project_reference_mismatch')
+  const github = parseGithubConnector(map.source_connectors?.github, gitEvidence ?? readLocalGitEvidence(root, map.source_connectors?.github))
   const allIds = [map.project_id]
   const phases = (map.phases ?? []).map((phase) => ({
     id: phase.id, title: phase.title, purpose: phase.purpose, completion: phase.completion ?? phase.completion_marker ?? null,
@@ -129,7 +185,7 @@ export function buildPackageModel({ root, contractFile, mapFile, bindingRegistry
   const conflict = errors.some((error) => error.includes('conflict') || error.includes('mismatch') || error.includes('duplicate'))
   return {
     status: conflict ? 'conflict' : errors.length ? 'unknown' : stale ? 'stale' : 'valid', errors: [...new Set(errors)], observedAt: mtimes.length ? new Date(Math.max(...mtimes)).toISOString() : null,
-    project: { id: map.project_id, name: map.project_title ?? map.title ?? contract.projectName, outcome: map.project_purpose ?? contract.outcome, acceptanceAuthority: contract.acceptanceAuthority }, phases,
+    project: { id: map.project_id, name: map.project_title ?? map.title ?? contract.projectName, outcome: map.project_purpose ?? contract.outcome, acceptanceAuthority: contract.acceptanceAuthority }, phases, connectors: { github },
     current: current ? { phaseId: current.phase.id, scopeId: current.scope.id, stageId: current.stage.id } : null,
     next: next ? { phaseId: next.phase.id, scopeId: next.scope.id, stageId: next.stage.id } : null,
     bindings, now: builder && builder.status !== 'unbound' ? { status: builder.status, activity: builder.activity, observedAt: builder.observedAt, source: 'builder_binding' } : { status: 'unbound', activity: null, observedAt: null, source: 'runtime_registry' },

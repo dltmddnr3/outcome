@@ -17,16 +17,20 @@ try {
     await page.getByRole('button', { name: /Stage 33 Engineering and Build 41 Evidence/ }).click()
     await page.getByText('57/57', { exact: true }).first().waitFor()
     await page.getByText('링크 미리보기', { exact: true }).waitFor()
+    await page.getByText('dltmddnr3/dock', { exact: false }).waitFor()
+    await page.getByText('15 ahead', { exact: false }).waitFor()
     await page.getByRole('button', { name: /OUTCOME/ }).click()
     await page.locator('[data-project-id="outcome"]').waitFor()
     await page.getByText('Generic source model', { exact: false }).first().waitFor()
+    await page.getByText('dltmddnr3/outcome', { exact: false }).waitFor()
+    await page.getByText('empty remote', { exact: false }).waitFor()
     const geometry = await page.evaluate(() => {
       const detail = document.querySelector('.oc-detail')?.getBoundingClientRect()
       const main = document.querySelector('.oc-main')?.getBoundingClientRect()
-      return { overflow: document.documentElement.scrollWidth - document.documentElement.clientWidth, overlap: detail && main ? Math.max(0, main.bottom - detail.top) : 0, current: document.body.innerText.includes('현재 위치'), next: document.body.innerText.includes('다음 Stage'), purpose: ['PHASE 목적', 'SCOPE 목적', 'STAGE 목적', 'GATE 목적'].every((label) => document.body.innerText.includes(label)), position: detail ? getComputedStyle(document.querySelector('.oc-detail')).position : 'missing' }
+      return { overflow: document.documentElement.scrollWidth - document.documentElement.clientWidth, overlap: detail && main ? Math.max(0, main.bottom - detail.top) : 0, current: document.body.innerText.includes('현재 위치'), next: document.body.innerText.includes('다음 Stage'), purpose: ['PHASE 목적', 'SCOPE 목적', 'STAGE 목적', 'GATE 목적'].every((label) => document.body.innerText.includes(label)), github: ['LOCAL CANDIDATE', 'GITHUB PUBLISHED', 'CHECKS', 'RELEASE', 'completion_authority=false'].every((label) => document.body.innerText.includes(label)), position: detail ? getComputedStyle(document.querySelector('.oc-detail')).position : 'missing' }
     })
-    if (geometry.overflow !== 0 || geometry.overlap !== 0 || !geometry.current || !geometry.next || !geometry.purpose || geometry.position !== 'relative') throw new Error(`${viewport.name} geometry failed: ${JSON.stringify(geometry)}`)
-    console.log(`${viewport.name} ${viewport.width}x${viewport.height}: overflow=0 overlap=0 switch=true purpose=true current=true next=true inline=true`)
+    if (geometry.overflow !== 0 || geometry.overlap !== 0 || !geometry.current || !geometry.next || !geometry.purpose || !geometry.github || geometry.position !== 'relative') throw new Error(`${viewport.name} geometry failed: ${JSON.stringify(geometry)}`)
+    console.log(`${viewport.name} ${viewport.width}x${viewport.height}: overflow=0 overlap=0 switch=true github=true purpose=true current=true next=true inline=true`)
     await context.close()
   }
   await browser.close()

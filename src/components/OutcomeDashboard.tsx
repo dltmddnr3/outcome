@@ -9,11 +9,12 @@ type GateGroup = { code: string; name: string; total: number; closed: number }
 export type PackageStage = { id: string; title: string; purpose: string; dependsOn: string[]; gatePurpose: string; sourceState: string; state: string; gate: { gates: Gate[]; groups: GateGroup[]; total: number; closed: number; available: boolean; sourceRef: string | null }; axes: { implementation: string; test: string; evidence: string; independentQa: string; cherryAcceptance: string; release: string } }
 type Scope = { id: string; title: string; purpose: string; stages: PackageStage[] }
 type Phase = { id: string; title: string; purpose: string; completion: string | null; scopes: Scope[] }
-export type PackageProject = { status: SourceState; errors: string[]; observedAt: string | null; project: { id: string; name: string; outcome: string; acceptanceAuthority: string }; phases: Phase[]; current: { phaseId: string; scopeId: string; stageId: string } | null; next: { phaseId: string; scopeId: string; stageId: string } | null; bindings: Binding[]; now: { status: string; activity: string | null; observedAt: string | null; source: string }; progress: { available: false; reason: string } }
+export type GithubConnector = { adopted: boolean; required: boolean; state: string; repository: string | null; remoteName: string | null; defaultBranch: string | null; completionAuthority: false; localCandidate: { state: string; branch: string | null; ahead: number | null; behind: number | null; sync: string }; published: { state: string; repository: string | null; ref: string | null; detail: string }; checks: { state: string }; release: { state: string } }
+export type PackageProject = { status: SourceState; errors: string[]; observedAt: string | null; project: { id: string; name: string; outcome: string; acceptanceAuthority: string }; connectors: { github: GithubConnector }; phases: Phase[]; current: { phaseId: string; scopeId: string; stageId: string } | null; next: { phaseId: string; scopeId: string; stageId: string } | null; bindings: Binding[]; now: { status: string; activity: string | null; observedAt: string | null; source: string }; progress: { available: false; reason: string } }
 export type OutcomeDashboardData = { schemaVersion: 2; observedAt: string; projects: PackageProject[] }
 
 const roleNames: Record<string, string> = { planner: 'Planner', builder: 'Builder', ux_product_qa: 'UX & Product QA', release_audit: 'Release Audit' }
-const stateNames: Record<string, string> = { valid: 'SOURCE VALID', stale: 'SOURCE STALE', unknown: 'SOURCE UNKNOWN', conflict: 'SOURCE CONFLICT', active: '활성', idle: '대기', terminal: '종료', unbound: '미연결', replaced: '교체됨', blocked: '차단', pending: '대기', complete: '확정' }
+const stateNames: Record<string, string> = { valid: 'SOURCE VALID', stale: 'SOURCE STALE', unknown: 'SOURCE UNKNOWN', conflict: 'SOURCE CONFLICT', active: '활성', idle: '대기', terminal: '종료', unbound: '미연결', connected: '연결됨', missing: '미채택', not_published: '미게시', replaced: '교체됨', blocked: '차단', pending: '대기', complete: '확정', available: '로컬 있음', ahead: '로컬 앞섬', behind: '로컬 뒤처짐', diverged: '분기됨', synced: '동기화' }
 const compactTime = (value: string | null) => value ? new Intl.DateTimeFormat('ko-KR', { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' }).format(new Date(value)) : '근거 없음'
 
 export function findStage(project: PackageProject, stageId: string | null | undefined) {
@@ -27,6 +28,16 @@ export function summarizeStage(stage: PackageStage) {
 }
 
 export function selectProject(projects: PackageProject[], id: string) { return projects.find((project) => project.project.id === id) ?? projects[0] ?? null }
+
+export function githubEvidenceItems(connector: GithubConnector) {
+  const distance = connector.localCandidate.ahead == null || connector.localCandidate.behind == null ? connector.localCandidate.sync : `${connector.localCandidate.ahead} ahead · ${connector.localCandidate.behind} behind`
+  return [
+    { label: 'LOCAL CANDIDATE', state: connector.localCandidate.state, value: connector.localCandidate.branch ? `${connector.localCandidate.branch} · ${distance}` : 'local evidence unknown' },
+    { label: 'GITHUB PUBLISHED', state: connector.published.state, value: connector.published.repository ? `${connector.published.repository} · ${connector.published.detail === 'empty_remote' ? 'empty remote' : connector.published.ref}` : `${connector.defaultBranch ?? 'branch unknown'} · repository unbound` },
+    { label: 'CHECKS', state: connector.checks.state, value: 'GitHub check evidence unknown' },
+    { label: 'RELEASE', state: connector.release.state, value: 'GitHub release evidence unknown' },
+  ]
+}
 
 function Axis({ label, value }: { label: string; value: string }) { return <div className="oc-axis"><small>{label}</small><strong>{value.replaceAll('_', ' ')}</strong></div> }
 
@@ -42,6 +53,7 @@ export function OutcomeDashboard({ onUnauthorized }: { onUnauthorized: () => voi
   const next = project ? findStage(project, project.next?.stageId) : null
   const selected = project ? findStage(project, selectedStageId) ?? current ?? findStage(project, project.phases[0]?.scopes[0]?.stages[0]?.id) : null
   const summary = selected ? summarizeStage(selected.stage) : null
+  const github = project?.connectors.github
   const stages = project?.phases.flatMap((phase) => phase.scopes.flatMap((scope) => scope.stages.map((stage) => ({ phase, scope, stage })))) ?? []
   if (!data || !project || !selected || !summary) return <section className="cn-dashboard cn-loading"><h2>{error ?? 'OUTCOME Package를 검증하고 있습니다'}</h2>{error && <button onClick={() => void load()}>다시 확인</button>}</section>
   const switchProject = (id: string) => { setSelectedProjectId(id); setSelectedStageId(null) }
@@ -50,6 +62,7 @@ export function OutcomeDashboard({ onUnauthorized }: { onUnauthorized: () => voi
     <div className="oc-project-head"><div><p>PROJECT · {project.project.id}</p><h2>{project.project.name}</h2><strong>{project.project.outcome}</strong></div><span className={`oc-source ${project.status}`}>{stateNames[project.status]}<small>{compactTime(project.observedAt)}</small></span></div>
     {project.status !== 'valid' && <div className={`oc-warning ${project.status}`} role="status"><strong>{stateNames[project.status]}</strong><span>{project.errors.length ? project.errors.join(' · ') : 'Package source freshness를 다시 확인하세요.'}</span></div>}
     <div className="oc-orientation" aria-label="현재 위치와 다음 Stage"><div><small>현재 위치</small><strong>{current ? `${current.phase.title} → ${current.scope.title} → ${current.stage.title}` : 'unknown'}</strong></div><ChevronRight size={16} /><div><small>다음 Stage</small><strong>{next?.stage.title ?? 'source evidence 없음'}</strong></div></div>
+    {github && <section className="oc-github" aria-label="GitHub delivery evidence connector"><header><div><small>OPTIONAL SOURCE CONNECTOR · GITHUB</small><strong>{github.adopted ? 'GitHub adopted' : 'GitHub not adopted'}</strong></div><span className={github.state}>{stateNames[github.state] ?? github.state}</span></header><div>{githubEvidenceItems(github).map((item) => <article key={item.label} className={item.state}><small>{item.label}</small><strong>{item.value}</strong><span>{stateNames[item.state] ?? item.state}</span></article>)}</div><p>completion_authority=false · GitHub activity는 Gate closure 또는 Cherry acceptance가 아닙니다.</p></section>}
     <div className="oc-now"><div><small>NOW · CURRENT BUILDER</small><strong>{project.now.activity ?? `Builder ${stateNames[project.now.status] ?? project.now.status}`}</strong><span>{project.now.source} · {compactTime(project.now.observedAt)} · 활동량은 진행률이 아닙니다</span></div><div className="oc-bindings">{project.bindings.map((binding) => <article key={binding.role} className={binding.status}><small>{roleNames[binding.role]}</small><strong>{stateNames[binding.status] ?? binding.status}</strong><span>{binding.freshness} · history {binding.historyCount}</span></article>)}</div></div>
     <div className="oc-axes" aria-label="Stage evidence axes"><Axis label="구현" value={selected.stage.axes.implementation} /><Axis label="테스트" value={selected.stage.axes.test} /><Axis label="증거 확정" value={selected.stage.axes.evidence} /><Axis label="변화 관측" value={project.now.status} /></div>
     <div className="oc-main">

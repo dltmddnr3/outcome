@@ -6,7 +6,7 @@ Authority: Cherry-approved Stage 4 then Stage 5 Builder slice
 ## Gate result
 
 - Stage 4 M5–M9: 5/5 Builder checks closed.
-- Stage 5 M10–M14: 5/5 Builder checks closed.
+- Stage 5 M10–M15: 6/6 Builder checks closed.
 - The generic parser reads each project's OUTCOME Contract, OUTCOME Map, and referenced Gate ranges. Missing, invalid, mismatched, stale, and conflicting inputs fail closed.
 - Gate remains a Stage-owned acceptance checklist. No cross-Stage aggregate percentage is produced.
 - Cherry Note and OUTCOME remain project-scoped across Package truth, NOW, four role bindings, current/next, and Stage Gate detail.
@@ -35,4 +35,16 @@ Authority: Cherry-approved Stage 4 then Stage 5 Builder slice
 
 ## Deliberate fail-closed boundary
 
-The canonical OUTCOME Gate ledger now closes M5–M14, while the Planner-owned OUTCOME Map still declares current Stage 4 and next Stage 5. The collector reports OUTCOME as `conflict` with `current_stage_gate_closed_conflict`; it does not infer Stage 6 or rewrite Planner truth. Planner must decide and publish the next current/next boundary before Stage 6 dispatch. This receipt is Builder evidence only, not independent UX & Product QA, Release Audit, Cherry acceptance, release, or external completion.
+The canonical OUTCOME Gate ledger now closes M5–M15, while the Planner-owned OUTCOME Map declares current Stage 5 and next Stage 6. After M15 closes, the collector reports OUTCOME as `conflict` with `current_stage_gate_closed_conflict`; it does not infer that Stage 6 has started or rewrite Planner truth. Planner must publish the transition boundary before Stage 6 dispatch. This receipt is Builder evidence only, not independent UX & Product QA, Release Audit, Cherry acceptance, release, or external completion.
+
+## M15 optional GitHub connector
+
+- OUTCOME: `connected · dltmddnr3/outcome · origin/main`; the approved repository has no published heads before Parent's initial push, so published state is `not_published / empty_remote`.
+- Cherry Note: `connected · dltmddnr3/dock · origin/main`; read-only refresh measured local `main` at 0 behind / 15 ahead. Commit distance is delivery evidence, not progress.
+- UI separates Local candidate, GitHub published, Checks, and Release. Checks and Release remain `unknown` without source evidence.
+- Connector states cover missing, connected, unbound, conflict, unknown, and not-published while `required=false` and `completion_authority=false` remain explicit.
+- Targeted connector model: 5/5 PASS. Targeted connector UI semantics: 2/2 PASS. Full frontend: 9/9 PASS. Full Node: 37/37 PASS. Production build: PASS.
+- Local and live public Chrome at 1440×900 and 390×844 measured horizontal overflow 0 and inline detail overlap 0 with project switching and connector evidence visible.
+- Live public API: GET health/dashboard 200; POST dashboard 405 `read_only`; structured key/value redaction probe PASS.
+- Live origin PID `5278` is maintained by execution session `22094`; Quick Tunnel PID `76819` remains separate and temporary.
+- No push, remote creation, PR, check run, release, or Cherry Note iOS edit was performed by Builder.

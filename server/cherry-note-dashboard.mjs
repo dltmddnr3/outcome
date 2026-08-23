@@ -11,6 +11,7 @@ const percent = (value, total) => total > 0 ? Math.round((value / total) * 100) 
 export function sanitizeEvidenceText(value) {
   return String(value ?? '')
     .replace(/(?:\/Users|\/home|[A-Za-z]:\\)[^\s`'"<>]+/g, '[local source]')
+    .replace(/\bhttps?:\/\/[^/\s:@]+:[^@\s/]+@/gi, 'https://[credential redacted]@')
     .replace(/\b(?:task|turn|thread|session)[_-]?(?:id)?\s*[:=]\s*[A-Za-z0-9_-]+/gi, '[private id]')
     .replace(/\b[0-9a-f]{24,64}\b/gi, '[immutable artifact]')
     .replace(/(?:token|secret|password|authorization)\s*[:=]\s*[^\s,;]+/gi, '[credential redacted]')
