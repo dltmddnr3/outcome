@@ -5,7 +5,7 @@ Observed: 2026-08-23 KST
 ## OUTCOME 저장소
 
 - 독립 Git 저장소 생성 완료
-- 현재 단계: fresh independent UX & Product QA returned `NEEDS_REVISION` on candidate `d77a52fe5ad3` (`false_completion_count=9`); the smallest all-state Builder correction is being verified and requires fresh affected QA before Stage 7
+- 현재 단계: fresh independent UX & Product QA returned `NEEDS_REVISION` on candidate `aa90faffcd90` (`false_completion_count=10`; 8 resolved, 1 partial, 1 open); the final detail-semantics Builder correction is being verified and requires fresh affected QA before Stage 7
 - dashboard UI, Cherry Note collector, authenticated read-only runtime, tests, styles, and package configuration are now in this repository
 - `/Users/rosum/Documents/ChatGPT/WhiteCastle Desk 2`의 기존 copy는 migration history/rollback reference이며 더 이상 intended product source가 아님
 - OUTCOME 자체 표준 입력:
@@ -29,7 +29,7 @@ Observed: 2026-08-23 KST
   - 프로젝트별 Package truth 분리와 fail-closed source status
   - Stage 상세의 inline responsive 배치
   - Cherry Note Stage33 Package-sourced Korean primary Gate group labels, with Gate code secondary and 57 source checks
-- 마지막 독립 QA 근거: `docs/STAGE6_FRESH_UX_PRODUCT_QA_d77a52f.md` (`NEEDS_REVISION`). 현재 Builder 보정 Gate는 `GATES_STAGE6_ALL_STATE_CORRECTION.md`; prior verdict는 불변 근거이며 새 candidate의 QA acceptance가 아님
+- 마지막 독립 QA 근거: `docs/STAGE6_FRESH_UX_PRODUCT_QA_aa90faf.md` (`NEEDS_REVISION`). 현재 Builder 보정 Gate는 `GATES_STAGE6_DETAIL_SEMANTICS_CORRECTION.md`; prior verdict는 불변 근거이며 새 candidate의 QA acceptance가 아님
 
 ## Cherry Note 최신 관측
 
@@ -54,6 +54,7 @@ Observed: 2026-08-23 KST
 - legacy WhiteCastle Desk copy는 새 변경의 원본으로 사용하지 않습니다. OUTCOME candidate에는 Desk/Slack/account relay/provider dependency가 없습니다.
 - 생성된 네 작업은 기존 저장소 worktree 기반입니다. 독립 OUTCOME 저장소를 사용하는 새 작업 연결이 필요합니다.
 - 현재 수치는 스냅샷입니다. UI는 authoritative source를 다시 읽어 갱신해야 합니다.
+- Live Cherry Note Package source는 QA 중에도 이동할 수 있습니다. 실제로 bottom-shell은 pending에서 complete로 이동했지만 Final Feed는 10/10 checkbox evidence와 별개로 locked 상태를 유지했습니다. Detail 의미는 특정 시점의 N/N이 아니라 매 관측의 Package Stage state를 따릅니다.
 - `npm run build`가 live origin이 읽는 ignored `dist/`에 직접 쓰므로, d77a52f startup receipt와 작업 중 asset bytes가 일시적으로 어긋난 운영 드리프트가 관측되었습니다. 이 build window는 exact pin 증거로 사용하지 않으며, candidate commit 이후 exact rebuild/restart로 receipt와 asset identity를 다시 맞춥니다. 원자적 isolated build/swap은 Release Audit 후속 검토 대상입니다.
 
 ## 다음 정확한 작업

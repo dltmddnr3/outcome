@@ -63,6 +63,12 @@ export async function measureDashboard(page) {
     const now = document.querySelector('.oc-now')?.getBoundingClientRect(); const axes = document.querySelector('.oc-axes')?.getBoundingClientRect(); const github = document.querySelector('.oc-github')?.getBoundingClientRect()
     const projectId = root.dataset.projectId
     const selectedStageId = document.querySelector('.oc-stage-list button[aria-pressed="true"]')?.dataset.stageId ?? null
+    const detail = document.querySelector('.oc-detail'); const detailState = detail?.dataset.stageState ?? null; const detailText = detail?.innerText ?? ''; const completionBar = Boolean(detail?.querySelector('.oc-confirmed'))
+    const detailSemantics = Boolean(detailState) && (detailState === 'complete'
+      ? completionBar && detailText.includes('evidence-closed / total') && detailText.includes('모두 evidence-closed')
+      : !completionBar && !detailText.includes('evidence-closed') && detailText.includes('checkbox checked / total') && !/남은\s*0|0\s*remaining/i.test(document.querySelector('.oc-next-condition')?.textContent ?? ''))
+    const bottomShell = [...document.querySelectorAll('.oc-stage-list > button')].find((button) => button.querySelector('strong')?.textContent.trim() === 'Bottom-shell Seam Correction'); const bottomState = bottomShell?.dataset.stageState; const bottomLabel = bottomShell?.querySelector('em')?.textContent.trim()
+    const bottomShellState = projectId !== 'cherry-note' || (bottomState === 'complete' ? bottomLabel === 'Gate 완료' : bottomState === 'gates_closed_evidence_pending' ? bottomLabel === 'Gate 체크 닫힘 · 증거 대기' : Boolean(bottomState && bottomLabel))
     return {
       projectId, selectedStageId,
       documentOverflow: document.documentElement.scrollWidth - document.documentElement.clientWidth,
@@ -76,7 +82,8 @@ export async function measureDashboard(page) {
       current: document.body.innerText.includes('현재 위치'), next: document.body.innerText.includes('다음 Stage'), inline: getComputedStyle(document.querySelector('.oc-detail')).position === 'relative',
       mobileAuthoritativeOrder: innerWidth > 600 || (now && axes && github && now.top < axes.top && axes.top < github.top),
       axisUsesGateVocabulary: [...document.querySelectorAll('.oc-axis strong')].some((element) => element.textContent.trim() === 'Gate 완료'),
-      bottomShellState: projectId !== 'cherry-note' || [...document.querySelectorAll('.oc-stage-list > button')].find((button) => button.querySelector('strong')?.textContent.trim() === 'Bottom-shell Seam Correction')?.querySelector('em')?.textContent.trim() === 'Gate 체크 닫힘 · 증거 대기',
+      bottomShellState,
+      detailState, detailSemantics,
       build: Boolean(buildCommit && buildTree && document.body.innerText.includes('runtime NOW is live/unpinned')), buildCommit, buildTree,
     }
   }, { requiredPurposeLabels, requiredGithubLabels })
@@ -91,7 +98,7 @@ export function assertDashboardMeasurement(name, result) {
   if (result.undersizedControls.length) failures.push(`undersizedControls=${result.undersizedControls.join(',')}`)
   if (result.undersizedText.length) failures.push(`undersizedText=${result.undersizedText.join(',')}`)
   if (result.lowContrastText.length) failures.push(`lowContrastText=${result.lowContrastText.join(',')}`)
-  for (const key of ['currentNextReadable', 'githubReadable', 'allStagesDiscoverable', 'selectedStageExposed', 'sourceStatusText', 'purpose', 'githubEvidence', 'current', 'next', 'inline', 'mobileAuthoritativeOrder', 'bottomShellState', 'build']) if (!result[key]) failures.push(`${key}=false`)
+  for (const key of ['currentNextReadable', 'githubReadable', 'allStagesDiscoverable', 'selectedStageExposed', 'sourceStatusText', 'purpose', 'githubEvidence', 'current', 'next', 'inline', 'mobileAuthoritativeOrder', 'bottomShellState', 'detailSemantics', 'build']) if (!result[key]) failures.push(`${key}=false`)
   if (result.axisUsesGateVocabulary) failures.push('axisUsesGateVocabulary=true')
   if (failures.length) throw new Error(`${name} failed: ${failures.join(' | ')}`)
 }

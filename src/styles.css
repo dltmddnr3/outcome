@@ -30,3 +30,4 @@
 .oc-dashboard strong{font-size:11px}
 .oc-dashboard .oc-project-head>div>strong,.oc-dashboard .oc-github>header strong,.oc-dashboard .oc-bindings article strong,.oc-dashboard .oc-stage-list header,.oc-dashboard .oc-stage-list header strong{font-size:11px}
 @media(max-width:600px){.oc-dashboard{display:flex;flex-direction:column}.oc-topbar{order:0}.oc-build{order:1}.oc-project-head{order:2}.oc-warning{order:3}.oc-orientation{order:4}.oc-now{order:5}.oc-axes{order:6}.oc-github{order:7}.oc-main{order:8}.oc-detail{order:9}.oc-project-head>div>strong{font-size:11px}}
+.oc-detail-boundary{margin:10px 0;color:#c6d0c3;line-height:1.5}
