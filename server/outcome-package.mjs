@@ -150,10 +150,14 @@ const axisState = (gates, proves) => {
 
 const stageState = (stage, gate) => {
   if (!gate.available) return stage.gate_file_state?.includes('blocked') || stage.gate_file_state?.includes('required') ? 'blocked' : 'unknown'
-  if (gate.total > 0 && gate.closed === gate.total && String(stage.evidence_closure_state ?? '').includes('complete')) return 'complete'
-  if (gate.total > 0 && gate.closed === gate.total) return 'complete'
-  if (String(stage.implementation_state ?? '').includes('work_in_progress') || String(stage.implementation_state ?? '').includes('active')) return 'active'
-  if (String(stage.evidence_closure_state ?? '').includes('pending')) return 'pending'
+  const implementation = String(stage.implementation_state ?? '')
+  const evidence = String(stage.evidence_closure_state ?? '')
+  if (gate.total > 0 && gate.closed === gate.total) {
+    if (implementation.includes('work_in_progress') || (evidence && !evidence.includes('complete'))) return 'gates_closed_evidence_pending'
+    return 'complete'
+  }
+  if (implementation.includes('work_in_progress') || implementation.includes('active')) return 'active'
+  if (evidence.includes('pending')) return 'pending'
   return gate.total > 0 ? 'queued' : 'unknown'
 }
 
@@ -218,7 +222,7 @@ export function buildPackageModel({ root, contractFile, mapFile, bindingRegistry
   const currentIndex = current ? stages.indexOf(current) : -1
   if (explicitCurrents.length === 1 && current?.stage.gate.total > 0 && current.stage.gate.closed === current.stage.gate.total) errors.push('current_stage_gate_closed_conflict')
   const next = currentIndex >= 0 ? stages.slice(currentIndex + 1).find((item) => item.stage.state !== 'complete') ?? null : null
-  if (current && current.stage.state !== 'complete' && current.stage.gate.available) current.stage.state = 'active'
+  if (current && !['complete', 'gates_closed_evidence_pending'].includes(current.stage.state) && current.stage.gate.available) current.stage.state = 'active'
   for (const item of stages.slice(currentIndex + 1)) {
     if (item.stage.state === 'complete' || item.stage.state === 'blocked') continue
     item.stage.state = item.stage.dependsOn.every((id) => stages.find((candidate) => candidate.stage.id === id)?.stage.state === 'complete') ? 'queued' : 'locked'

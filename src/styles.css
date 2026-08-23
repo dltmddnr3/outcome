@@ -23,3 +23,10 @@
 .oc-dashboard .oc-github>header small,.oc-dashboard .oc-github article small,.oc-dashboard .oc-github>header>span,.oc-dashboard .oc-github article span,.oc-dashboard .oc-github>p,.oc-dashboard .oc-now>div>small,.oc-dashboard .oc-now>div>span,.oc-dashboard .oc-bindings small,.oc-dashboard .oc-bindings article span,.oc-dashboard .oc-stage-list button small,.oc-dashboard .oc-stage-list button em,.oc-dashboard .oc-build small,.oc-dashboard .oc-build span{font-size:11px;color:#aeb7ad}
 .oc-dashboard .oc-bindings article span{overflow:visible;text-overflow:clip;white-space:normal;overflow-wrap:anywhere}
 .oc-dashboard .oc-groups article>span{min-width:0}.oc-dashboard .oc-groups strong,.oc-dashboard .oc-groups small{overflow:visible;text-overflow:clip;white-space:normal;overflow-wrap:anywhere}
+
+/* Stage 6 all-state correction: no clipped evidence qualifiers and one semantic text floor. */
+.oc-dashboard .oc-axis strong{overflow:visible;text-overflow:clip;white-space:normal;overflow-wrap:anywhere}
+.oc-dashboard p,.oc-dashboard small,.oc-dashboard span,.oc-dashboard em,.oc-dashboard b{font-size:11px!important}
+.oc-dashboard strong{font-size:11px}
+.oc-dashboard .oc-project-head>div>strong,.oc-dashboard .oc-github>header strong,.oc-dashboard .oc-bindings article strong,.oc-dashboard .oc-stage-list header,.oc-dashboard .oc-stage-list header strong{font-size:11px}
+@media(max-width:600px){.oc-dashboard{display:flex;flex-direction:column}.oc-topbar{order:0}.oc-build{order:1}.oc-project-head{order:2}.oc-warning{order:3}.oc-orientation{order:4}.oc-now{order:5}.oc-axes{order:6}.oc-github{order:7}.oc-main{order:8}.oc-detail{order:9}.oc-project-head>div>strong{font-size:11px}}

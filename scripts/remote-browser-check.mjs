@@ -1,5 +1,5 @@
 import { chromium } from '@playwright/test'
-import { assertDashboardMeasurement, exerciseDashboard, measureDashboard } from './browser-assertions.mjs'
+import { verifyAllDashboardStates } from './browser-assertions.mjs'
 
 const publicUrl = process.env.OUTCOME_PUBLIC_URL
 if (!publicUrl?.startsWith('https://')) throw new Error('OUTCOME_PUBLIC_URL must be an HTTPS URL')
@@ -9,8 +9,7 @@ try {
     const context = await browser.newContext({ viewport })
     const page = await context.newPage()
     await page.goto(`${publicUrl}/cherry-note-dashboard`, { waitUntil: 'networkidle' })
-    await exerciseDashboard(page)
-    assertDashboardMeasurement(viewport.name, await measureDashboard(page))
+    await verifyAllDashboardStates(page, viewport.name)
     await context.close()
   }
 } finally { await browser.close() }

@@ -1,6 +1,6 @@
 import { spawn } from 'node:child_process'
 import { chromium } from '@playwright/test'
-import { assertDashboardMeasurement, exerciseDashboard, measureDashboard } from './browser-assertions.mjs'
+import { verifyAllDashboardStates } from './browser-assertions.mjs'
 
 const port = 18787
 const server = spawn(process.execPath, ['server/index.mjs'], { env: { ...process.env, OUTCOME_PORT: String(port), OUTCOME_PUBLIC_READ_ONLY: '1' }, stdio: 'ignore' })
@@ -12,8 +12,7 @@ try {
     const context = await browser.newContext({ viewport })
     const page = await context.newPage()
     await page.goto(`http://127.0.0.1:${port}/cherry-note-dashboard`)
-    await exerciseDashboard(page)
-    assertDashboardMeasurement(viewport.name, await measureDashboard(page))
+    await verifyAllDashboardStates(page, viewport.name)
     await context.close()
   }
   await browser.close()

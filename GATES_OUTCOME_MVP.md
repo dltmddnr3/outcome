@@ -117,16 +117,16 @@ Stage ID: `outcome-stage-6`
 
 - [ ] Q1: Fresh independent UX & Product QA verifies the 30-second understanding task on desktop and mobile.
   PROVES: ux_product_qa
-  EVIDENCE: pending
+  EVIDENCE: `docs/STAGE6_FRESH_UX_PRODUCT_QA_d77a52f.md` records desktop PASS but mobile axis clipping; remains open pending fresh affected QA on the corrected candidate.
 - [ ] Q2: QA adversarially tests hierarchy, Gate meaning, project switching, stale/unknown states, and accessibility.
   PROVES: ux_product_qa
-  EVIDENCE: pending
-- [ ] Q3: QA uses a pinned immutable candidate and does not mutate or self-accept Builder work.
+  EVIDENCE: `docs/STAGE6_FRESH_UX_PRODUCT_QA_d77a52f.md` records four open semantic/accessibility findings; remains open pending fresh affected QA.
+- [x] Q3: QA uses a pinned immutable candidate and does not mutate or self-accept Builder work.
   PROVES: ux_product_qa
-  EVIDENCE: pending
+  EVIDENCE: independent QA verified exact d77a52f commit/tree/parent/public receipt without repository mutation or self-acceptance.
 - [ ] Q4: Any corrected candidate receives fresh affected QA evidence.
   PROVES: ux_product_qa
-  EVIDENCE: pending
+  EVIDENCE: d77a52f received fresh QA; the next corrected candidate still requires a new affected QA run.
 
 ## Stage 7 · Release Audit
 
