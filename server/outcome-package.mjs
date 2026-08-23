@@ -2,7 +2,7 @@ import { existsSync, readFileSync, statSync } from 'node:fs'
 import { execFileSync } from 'node:child_process'
 import { basename, dirname, isAbsolute, join, resolve } from 'node:path'
 import YAML from 'yaml'
-import { sanitizeEvidenceText } from './cherry-note-dashboard.mjs'
+import { sanitizeEvidenceText, sanitizeRemotePayload } from './cherry-note-dashboard.mjs'
 
 const ROLES = ['planner', 'builder', 'ux_product_qa', 'release_audit']
 const STABLE_ID = /^[a-z0-9]+(?:-[a-z0-9]+)*$/
@@ -248,6 +248,14 @@ export function collectOutcomePackages({ bindingRegistry = [], now = new Date(),
     { root: '/Users/rosum/Documents/ChatGPT/OUTCOME', contractFile: 'docs/OUTCOME_CONTRACT.md', mapFile: 'docs/OUTCOME_MAP.md' },
   ]
   return { schemaVersion: 2, observedAt: now.toISOString(), projects: definitions.map((definition) => buildPackageModel({ ...definition, bindingRegistry, now })) }
+}
+
+export function projectPublicPackages(value) {
+  const projected = sanitizeRemotePayload(value)
+  for (const project of projected.projects ?? []) for (const phase of project.phases ?? []) for (const scope of phase.scopes ?? []) for (const stage of scope.stages ?? []) {
+    if (Array.isArray(stage.gate?.gates)) stage.gate.gates = stage.gate.gates.map(({ evidence: _evidence, ...gate }) => gate)
+  }
+  return projected
 }
 
 export function loadBindingRegistry(path = process.env.OUTCOME_BINDING_REGISTRY ?? join(process.cwd(), '.outcome-runtime', 'bindings.json')) {

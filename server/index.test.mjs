@@ -68,10 +68,12 @@ test('public mode serves generic project packages without mixing project identit
 }))
 
 test('public mode rejects every dashboard mutation as read-only', async () => withPublicServer(() => dashboard, async (base) => {
-  for (const path of ['/api/dashboard/cherry-note', '/api/unknown', '/api/auth/login', '/api/auth/logout']) {
-    const response = await fetch(`${base}${path}`, { method: 'POST', headers: { 'content-type': 'application/json' }, body: '{}' })
-    assert.equal(response.status, 405, path); assert.deepEqual(await response.json(), { error: 'read_only' })
+  let checked = 0
+  for (const path of ['/api/dashboard', '/api/dashboard/cherry-note', '/api/auth/login', '/api/auth/logout', '/api/unknown', '/cherry-note-dashboard']) for (const method of ['POST', 'PUT', 'PATCH', 'DELETE']) {
+    const response = await fetch(`${base}${path}`, { method, headers: { 'content-type': 'application/json' }, body: '{}' })
+    assert.equal(response.status, 405, `${method} ${path}`); assert.deepEqual(await response.json(), { error: 'read_only' }); checked += 1
   }
+  assert.equal(checked, 24)
 }))
 
 test('public mode removes prohibited fields and values from serialized payload', async () => withPublicServer(() => ({ ...dashboard, local_path: '/Users/cherry/private', token: 'secret', session_id: 'private', nested: { full_hash: 'a'.repeat(40), title: 'safe' } }), async (base) => {
@@ -103,3 +105,8 @@ test('public generic API redacts raw Gate evidence identifiers and UUIDs', async
   for (const prohibited of ['e38a17e5-7c5c-4a13-b3cf-ce8557dea226', '9f4a0176-9cad-4506-a25a-45f3e910564a', '/Users/private', 'credential-value', 'a'.repeat(40)]) assert.equal(text.includes(prohibited), false, prohibited)
   assert.doesNotMatch(text, /[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}/i)
 }, () => ({ schemaVersion: 2, projects: [{ project: { id: 'outcome' }, gate: { evidence: 'fresh session e38a17e5-7c5c-4a13-b3cf-ce8557dea226 /Users/private token=credential-value aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa' }, audit: 'thread 9f4a0176-9cad-4506-a25a-45f3e910564a' }] })))
+
+test('public generic API removes raw Gate path evidence and preserves Stage evidence axis', async () => withPublicServer(() => dashboard, async (base) => {
+  const body = await (await fetch(`${base}/api/dashboard`)).json(); const stage = body.dashboard.projects[0].phases[0].scopes[0].stages[0]
+  assert.equal(Object.hasOwn(stage.gate.gates[0], 'evidence'), false); assert.equal(stage.axes.evidence, 'evidence_closed'); assert.equal(JSON.stringify(body).includes('/tmp/private-result.log'), false)
+}, () => ({ schemaVersion: 2, projects: [{ project: { id: 'cherry-note' }, phases: [{ scopes: [{ stages: [{ gate: { gates: [{ id: 'G1', title: 'safe', evidence: '/tmp/private-result.log' }] }, axes: { evidence: 'evidence_closed' } }] }] }] }] })))

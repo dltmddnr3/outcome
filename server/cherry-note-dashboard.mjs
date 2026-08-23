@@ -7,10 +7,11 @@ const DEFAULT_ROLLOUT = process.env.OUTCOME_CHERRY_NOTE_ROLLOUT ?? ''
 const safeRead = (path) => { try { return readFileSync(path, 'utf8') } catch { return '' } }
 const clamp = (value, min, max) => value == null ? null : Math.max(min, Math.min(max, value))
 const percent = (value, total) => value == null || !total ? null : Math.round((value / total) * 100)
+export const LOCAL_ABSOLUTE_PATH_SOURCE = String.raw`(?<![:/A-Za-z0-9.])(?:\/(?:Users|home|tmp|var|opt|etc|Volumes|Library|Applications|System|usr|bin|sbin|dev|private\/(?:tmp|var))(?:\/[^\s\x60'"<>),;]+)+|[A-Za-z]:\\[^\s\x60'"<>),;]+)`
 
 export function sanitizeEvidenceText(value) {
   return String(value ?? '')
-    .replace(/(?:\/Users|\/home|[A-Za-z]:\\)[^\s`'"<>]+/g, '[local source]')
+    .replace(new RegExp(LOCAL_ABSOLUTE_PATH_SOURCE, 'g'), '[local source]')
     .replace(/\bhttps?:\/\/[^/\s:@]+:[^@\s/]+@/gi, 'https://[credential redacted]@')
     .replace(/\b(?:task|turn|thread|session)[_-]?(?:id)?\s*[:=]\s*[A-Za-z0-9_-]+/gi, '[private id]')
     .replace(/\b(?:task|turn|thread|session)[_-]?(?:id)?\s+(?:[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}|[A-Za-z0-9_-]{16,})/gi, '[private id]')

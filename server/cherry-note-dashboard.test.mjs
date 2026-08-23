@@ -40,6 +40,12 @@ test('evidence text redacts hyphenated UUID and delimiter-less session identifie
   const values = ['fresh session e38a17e5-7c5c-4a13-b3cf-ce8557dea226 PASS', 'thread 9f4a0176-9cad-4506-a25a-45f3e910564a', 'standalone 52ba3df8-b846-4a1e-abac-62f9eb418f13']
   for (const source of values) { const raw = source.match(/[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}/i)[0]; const value = sanitizeEvidenceText(source); assert.doesNotMatch(value, /[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}/i); assert.equal(value.includes(raw), false) }
 })
+test('evidence text redacts absolute POSIX paths without treating URLs or API routes as paths', () => {
+  const localPaths = ['/tmp/result.log', '/private/tmp/result.xcresult', '/var/log/outcome.log', '/private/var/folders/result', '/opt/outcome/config', '/etc/outcome.conf', '/Volumes/Build/result', '/Library/Logs/outcome.log', '/Applications/OUTCOME.app/state', '/usr/local/var/outcome']
+  for (const path of localPaths) assert.equal(sanitizeEvidenceText(`artifact ${path} recorded`).includes(path), false, path)
+  const publicReferences = 'https://example.com/tmp/report /api/dashboard /assets/index.js https://example.com/var/log'
+  assert.equal(sanitizeEvidenceText(publicReferences), publicReferences)
+})
 test('remote payload removes prohibited nested fields defensively', () => {
   const value = sanitizeRemotePayload({ project: { name: 'safe', local_path: '/Users/private' }, session_id: 'private', nested: [{ token: 'secret', title: 'visible' }] })
   assert.deepEqual(value, { project: { name: 'safe' }, nested: [{ title: 'visible' }] })

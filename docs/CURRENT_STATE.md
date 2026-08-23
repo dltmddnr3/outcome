@@ -5,7 +5,7 @@ Observed: 2026-08-24 KST
 ## OUTCOME 저장소
 
 - 독립 Git 저장소 생성 완료
-- 현재 단계: Stage 7 correction candidate `9580c4547490` passed UUID and PID-boundary checks but fresh affected QA returned `NEEDS_REVISION`: nine `/tmp/...` absolute evidence paths remain in the public API and the shipped scanner missed them. Planner classified the false zero-path completion claim as cumulative `false_completion_count=12`.
+- 현재 단계: Stage 7 R1B-1 Builder correction removes non-rendered raw Gate evidence from the public Package projection and adds broad absolute-path sanitation/scanning. Local candidate verification passes, but the explicitly no-restart live origin still serves the previous server module and its public API scan remains red. Planner cumulative `false_completion_count=12` is preserved.
 - dashboard UI, Cherry Note collector, authenticated read-only runtime, tests, styles, and package configuration are now in this repository
 - `/Users/rosum/Documents/ChatGPT/WhiteCastle Desk 2`의 기존 copy는 migration history/rollback reference이며 더 이상 intended product source가 아님
 - OUTCOME 자체 표준 입력:
@@ -60,10 +60,11 @@ Observed: 2026-08-24 KST
 - `npm run build`가 live origin이 읽는 ignored `dist/`에 직접 쓰므로, d77a52f startup receipt와 작업 중 asset bytes가 일시적으로 어긋난 운영 드리프트가 관측되었습니다. 이 build window는 exact pin 증거로 사용하지 않으며, candidate commit 이후 exact rebuild/restart로 receipt와 asset identity를 다시 맞춥니다. 원자적 isolated build/swap은 Release Audit 후속 검토 대상입니다.
 - b57edd7 Release Audit의 R1/R2 Builder correction은 raw UUID/delimiter-less role ID sanitizer, API/HTML/bundle zero-hit 검사, actual origin PID self-bookkeeping, command+port/URL validated runtime status/stop, stale PID fail-closed runbook으로 구현·검증했습니다. 현재 tunnel PID record는 실제 PID 76819로 검증 교정했으며 tunnel/URL은 재시작하지 않았습니다. origin record는 corrected candidate의 Planner 재기동 전까지 stale로 fail-closed입니다. Fresh affected QA와 fresh Release Audit은 여전히 필요합니다.
 - 9580c45 affected QA에서 `/tmp`, `/private/tmp`, `/var`, `/opt`, `/etc` absolute POSIX path class가 sanitizer와 public-boundary scanner 양쪽에서 누락된 control gap을 확인했습니다. 공개 projection에서 비표시 Gate evidence를 제거하거나 전체 path class를 fail-closed redaction해야 합니다.
+- R1B-1 correction은 UI가 소비하지 않는 `gate.gates[*].evidence`만 공개 projection에서 제거하고 Stage `axes.evidence`를 보존하며, POSIX path class와 live public surface scan을 추가했습니다. Local API/HTML/bundle/rendered UI는 zero-hit이지만 no-restart origin PID 69313은 이전 server module을 유지해 live API가 여전히 `public:api:localPath`로 실패합니다. Tunnel PID 76819는 유지 중입니다.
 
 ## 다음 정확한 작업
 
-1. Builder: absolute POSIX path redaction/projection과 public-boundary scanner를 red-first로 교정한다
+1. Authorized operator: exact corrected commit에서 origin PID 69313만 재기동하고 tunnel PID 76819를 유지한 뒤 public boundary를 재검증한다
 2. Planner/Cherry: 별도 Gate에서 stable hosting, persistent hostname, access/abuse policy, service supervision과 SLA를 결정
 3. UX & Product QA: corrected parsed public payload를 fresh affected session으로 재검증한다
 4. Release Audit: 별도 fresh session으로 A1–A4를 다시 감사한다
