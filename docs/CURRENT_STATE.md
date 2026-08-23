@@ -5,7 +5,7 @@ Observed: 2026-08-24 KST
 ## OUTCOME 저장소
 
 - 독립 Git 저장소 생성 완료
-- 현재 단계: Stage 7 separate fresh Release Audit returned `PASS` on exact candidate `c821d7c81715` with A1–A4 PASS and cumulative `false_completion_count=12`. Current boundary is Stage 8 Cherry acceptance; C1–C2 remain open and owner-only.
+- 현재 단계: Stage 8 C1 한글화 candidate `399ac9df5b2d` / tree `89f98036255f` / asset `index-DG3dIvuW.js`가 origin PID 62455에서 exact public receipt로 활성화됐습니다. Builder K1–K6은 충족됐지만 fresh UX & Product QA K7과 Cherry C1·C2는 열려 있습니다. Activation evidence drift를 반영한 cumulative `false_completion_count=13`입니다.
 - dashboard UI, Cherry Note collector, authenticated read-only runtime, tests, styles, and package configuration are now in this repository
 - `/Users/rosum/Documents/ChatGPT/WhiteCastle Desk 2`의 기존 copy는 migration history/rollback reference이며 더 이상 intended product source가 아님
 - OUTCOME 자체 표준 입력:
@@ -13,12 +13,12 @@ Observed: 2026-08-24 KST
   - Map: `docs/OUTCOME_MAP.md`
   - Gates: `GATES.md`, `GATES_OUTCOME_MVP.md`
 - OUTCOME dashboard registration: generic Package parser/model and Cherry Note/OUTCOME project switching UI are implemented and locally evidenced.
-- Cherry priority amendment: Tailscale plan retired; explicit public read-only mode is active at `https://van-staff-excellence-investigated.trycloudflare.com`. This random Quick Tunnel URL changes on restart and has no SLA. Auth remains the default when public mode is absent.
+- Cherry priority amendment: Tailscale plan retired; explicit public read-only mode is active at `https://escape-lined-mercury-there.trycloudflare.com`. This random Quick Tunnel URL changes on restart and has no SLA. Auth remains the default when public mode is absent.
 - Long-term roadmap: Phase 1 Cherry Note MVP and project switching; Phase 2 public multi-project account service; Phase 4 OUTCOME-native development; Phase 5 Question 200 outcome discovery. Phase 3 connected operations bridge is recommended and awaits Cherry decision.
 
 ## 현재 MVP 화면
 
-- 로컬 경로: `http://127.0.0.1:8787/cherry-note-dashboard`
+- 로컬 경로: `http://127.0.0.1:8791/cherry-note-dashboard`
 - 대상: Cherry Note와 OUTCOME Package 두 프로젝트
 - 구현 완료된 핵심:
   - Project → Phase → Scope → Stage → Gate 위계
@@ -60,11 +60,13 @@ Observed: 2026-08-24 KST
 - 현재 수치는 스냅샷입니다. UI는 authoritative source를 다시 읽어 갱신해야 합니다.
 - Live Cherry Note Package source는 QA 중에도 이동할 수 있습니다. 실제로 bottom-shell은 pending에서 complete로 이동했지만 Final Feed는 10/10 checkbox evidence와 별개로 locked 상태를 유지했습니다. Detail 의미는 특정 시점의 N/N이 아니라 매 관측의 Package Stage state를 따릅니다.
 - `npm run build`가 live origin이 읽는 ignored `dist/`에 직접 쓰므로, d77a52f startup receipt와 작업 중 asset bytes가 일시적으로 어긋난 운영 드리프트가 관측되었습니다. 이 build window는 exact pin 증거로 사용하지 않으며, candidate commit 이후 exact rebuild/restart로 receipt와 asset identity를 다시 맞춥니다. 원자적 isolated build/swap은 Release Audit 후속 검토 대상입니다.
-- b57edd7 Release Audit의 R1/R2 Builder correction은 raw UUID/delimiter-less role ID sanitizer, API/HTML/bundle zero-hit 검사, actual origin PID self-bookkeeping, command+port/URL validated runtime status/stop, stale PID fail-closed runbook으로 구현·검증했습니다. 현재 tunnel PID record는 실제 PID 76819로 검증 교정했으며 tunnel/URL은 재시작하지 않았습니다. origin record는 corrected candidate의 Planner 재기동 전까지 stale로 fail-closed입니다. Fresh affected QA와 fresh Release Audit은 여전히 필요합니다.
+- b57edd7 Release Audit의 R1/R2 Builder correction은 raw UUID/delimiter-less role ID sanitizer, API/HTML/bundle zero-hit 검사, actual origin PID self-bookkeeping, command+port/URL validated runtime status/stop, stale PID fail-closed runbook으로 구현·검증했습니다. 당시 tunnel PID record는 PID 76819로 검증 교정됐고 origin record는 Planner 재기동 전까지 stale로 fail-closed였습니다.
 - 9580c45 affected QA에서 `/tmp`, `/private/tmp`, `/var`, `/opt`, `/etc` absolute POSIX path class가 sanitizer와 public-boundary scanner 양쪽에서 누락된 control gap을 확인했습니다. 공개 projection에서 비표시 Gate evidence를 제거하거나 전체 path class를 fail-closed redaction해야 합니다.
-- R1B-1 correction은 UI가 소비하지 않는 `gate.gates[*].evidence`만 공개 projection에서 제거하고 Stage `axes.evidence`를 보존하며, POSIX path class와 live public surface scan을 추가했습니다. Planner activation 뒤 origin PID 98804와 tunnel PID 76819가 검증됐고 fresh affected QA가 local/public zero-hit을 확인했습니다.
+- R1B-1 correction은 UI가 소비하지 않는 `gate.gates[*].evidence`만 공개 projection에서 제거하고 Stage `axes.evidence`를 보존하며, POSIX path class와 live public surface scan을 추가했습니다. 해당 fresh affected QA 당시 origin PID 98804와 tunnel PID 76819가 검증됐고 local/public zero-hit을 확인했습니다.
+- 현재 한글화 exact candidate는 origin PID 62455와 tunnel PID 88741에서 public GET 200, local/public mutation 각각 24/24, local/public prohibited identifiers=0, remote desktop/mobile projects=2·selectedStages=18·unexpectedEnglish=0·geometry 0으로 확인됐습니다. Immutable source에는 처음부터 `index-DG3dIvuW.js`가 기록됐으며, activation 전 receipt/PID 문구가 current truth로 남았던 mismatch를 false-completion event 13으로 append-only 기록했습니다.
 
 ## 다음 정확한 작업
 
-1. Cherry: Stage 8 C1–C2에서 실제 공개 OUTCOME을 사용하고 30초 이해도 및 Local MVP closure를 별도로 수용한다
-2. Planner/Cherry: 별도 Gate에서 stable hosting, persistent hostname, access/abuse policy, service supervision과 SLA를 결정
+1. Fresh UX & Product QA: exact activated candidate `399ac9df5b2d`의 한글화·30초 이해도·desktop/mobile을 독립 검증한다
+2. Cherry: fresh QA 뒤 Stage 8 C1–C2에서 실제 공개 OUTCOME을 사용하고 30초 이해도 및 Local MVP closure를 별도로 수용한다
+3. Planner/Cherry: 별도 Gate에서 stable hosting, persistent hostname, access/abuse policy, service supervision과 SLA를 결정

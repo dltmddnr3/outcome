@@ -2,7 +2,7 @@
 
 Outcome: Cherry가 OUTCOME 화면을 30초 안에 직관적으로 이해할 수 있도록 사용자에게 보이는 영문 UI 문구를 자연스러운 한글로 전환한다.
 
-Authority: Cherry C1 사용 피드백에 따른 OUTCOME-only Builder 수정. C1·C2, Cherry acceptance, release approval, `MVP_SCOPE_CLOSED`, `EXTERNAL_OUTCOME_COMPLETE`는 계속 열어둔다.
+Authority: Cherry C1 사용 피드백에 따른 OUTCOME-only Builder 수정. C1·C2, Cherry acceptance, release approval, `MVP_SCOPE_CLOSED`, `EXTERNAL_OUTCOME_COMPLETE`는 계속 열어둔다. Activation evidence correction 뒤 cumulative `false_completion_count=13`.
 
 ## Builder
 
@@ -35,13 +35,13 @@ Authority: Cherry C1 사용 피드백에 따른 OUTCOME-only Builder 수정. C1�
   PROVES: regression
   CHECK: npm test && npm run test:security && npm run check:public-boundary && npm run check:mutations && npm run check:scope && npm run build && git diff --check
   EXPECT: exit 0
-  EVIDENCE: frontend 19/19, Node 61/61, security 16/16, public boundary prohibited identifiers=0, mutation 24/24, scope/runbook, production build와 git diff check PASS.
+  EVIDENCE: frontend 19/19, Node 61/61, security 16/16, public boundary prohibited identifiers=0, mutation 24/24, scope/runbook, production build와 git diff check PASS. Planner exact activation 뒤 public GET 200, local/public mutation 각각 24/24, local/public prohibited identifiers=0, remote desktop/mobile 전수 geometry와 unexpectedEnglish=0을 확인했습니다.
 
 ## C1 재검증 경계
 
 - [ ] K7: Builder 후보가 immutable commit/tree/asset과 실제 공개 화면 증거를 보고한 뒤, fresh UX & Product QA가 한글화·30초 이해도·데스크톱·모바일을 독립 검증한다.
   PROVES: independent_qa
-  EVIDENCE: pending
+  EVIDENCE: exact commit `399ac9df5b2d`, tree `89f98036255f`, asset `index-DG3dIvuW.js`가 origin PID 62455에서 public receipt로 확인됐고 tunnel PID 88741은 유지됐습니다. Fresh UX & Product QA 판정은 아직 pending입니다.
 - [ ] K8: fresh QA PASS 이후 Cherry가 실제 화면을 다시 사용하고 C1을 직접 승인한다.
   PROVES: cherry_acceptance
   EVIDENCE: pending

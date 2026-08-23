@@ -151,7 +151,7 @@ Stage ID: `outcome-stage-8`
 
 - [ ] C1: Cherry uses OUTCOME and confirms both Cherry Note and OUTCOME current location and next action are understandable within 30 seconds.
   PROVES: cherry_acceptance
-  EVIDENCE: pending; Cherry requested full user-facing Korean localization before re-evaluation. Builder and fresh QA correction gates are defined in `GATES_STAGE8_C1_KOREANIZATION.md`.
+  EVIDENCE: pending; Cherry requested full user-facing Korean localization before re-evaluation. Builder K1–K6 candidate `399ac9df5b2d` / tree `89f98036255f` / asset `index-DG3dIvuW.js` is exactly activated and public checks pass, but K7 fresh QA and Cherry re-evaluation remain open. Activation evidence drift is recorded as cumulative `false_completion_count=13` in `GATES_STAGE8_C1_KOREANIZATION.md` and its Builder evidence.
 - [ ] C2: Cherry explicitly accepts Local MVP closure; release or external completion remains a separate decision.
   PROVES: cherry_acceptance
   EVIDENCE: pending
