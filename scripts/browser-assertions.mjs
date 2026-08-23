@@ -69,7 +69,7 @@ export async function measureDashboard(page) {
     const localizedBottomShell = [...document.querySelectorAll('.oc-stage-list > button')].find((button) => button.dataset.stageId === 'stage-33-bottom-shell-seam-correction'); const localizedBottomState = localizedBottomShell?.dataset.stageState; const localizedBottomLabel = localizedBottomShell?.querySelector('em')?.textContent.trim()
     const bottomShellState = projectId !== 'cherry-note' || (localizedBottomState === 'complete' ? localizedBottomLabel === '완료 조건 충족' : localizedBottomState === 'gates_closed_evidence_pending' ? localizedBottomLabel === '체크 항목 닫힘 · 증거 대기' : Boolean(localizedBottomState && localizedBottomLabel))
     const accessibleText = [...document.querySelectorAll('[aria-label],[title]')].flatMap((element) => [element.getAttribute('aria-label'), element.getAttribute('title')]).filter(Boolean).join('\n')
-    const technicalTokens = ['OUTCOME', 'Cherry Note', 'GitHub', 'Cherry', 'TestFlight', 'Mac Mini', 'MacBook', 'iPhone', 'completion_authority=false', 'ID', root.dataset.projectId,
+    const technicalTokens = ['OUTCOME', 'Cherry Note', 'GitHub', 'Cherry', 'TestFlight', 'Mac Mini', 'MacBook', 'iPhone', root.dataset.projectId,
       ...[...document.querySelectorAll('[data-stage-id]')].map((element) => element.dataset.stageId),
       ...[...document.querySelectorAll('.oc-detail-grid li b')].map((element) => element.textContent.trim()),
       ...[...document.querySelectorAll('.oc-groups small')].map((element) => element.textContent.trim()),
@@ -82,6 +82,7 @@ export async function measureDashboard(page) {
       .replace(/\b(?:main|origin)\b/gi, '')
     for (const token of technicalTokens) englishSurface = englishSurface.split(token).join('')
     const unexpectedEnglish = [...new Set(englishSurface.match(/[A-Za-z]+(?:\s*&\s*[A-Za-z]+)?/g) ?? [])].sort()
+    const translationFallback = [...(`${document.body.innerText}\n${accessibleText}`.match(/[^\n]*한글화 대기[^\n]*/g) ?? [])].map((value) => value.trim())
     return {
       projectId, selectedStageId,
       documentOverflow: document.documentElement.scrollWidth - document.documentElement.clientWidth,
@@ -97,7 +98,7 @@ export async function measureDashboard(page) {
       axisUsesGateVocabulary: [...document.querySelectorAll('.oc-axis strong')].some((element) => element.textContent.trim() === '완료 조건 충족'),
       bottomShellState,
       detailState, detailSemantics,
-      unexpectedEnglish,
+      unexpectedEnglish, translationFallback,
       build: Boolean(buildCommit && buildTree && document.body.innerText.includes('실시간 현재 작업은 빌드에 고정되지 않음')), buildCommit, buildTree,
     }
   }, { requiredPurposeLabels, requiredGithubLabels })
@@ -113,6 +114,7 @@ export function assertDashboardMeasurement(name, result) {
   if (result.undersizedText.length) failures.push(`undersizedText=${result.undersizedText.join(',')}`)
   if (result.lowContrastText.length) failures.push(`lowContrastText=${result.lowContrastText.join(',')}`)
   if (result.unexpectedEnglish.length) failures.push(`unexpectedEnglish=${result.unexpectedEnglish.join(',')}`)
+  if (result.translationFallback.length) failures.push(`translationFallback=${result.translationFallback.join(',')}`)
   for (const key of ['currentNextReadable', 'githubReadable', 'allStagesDiscoverable', 'selectedStageExposed', 'sourceStatusText', 'purpose', 'githubEvidence', 'current', 'next', 'inline', 'mobileAuthoritativeOrder', 'bottomShellState', 'detailSemantics', 'build']) if (!result[key]) failures.push(`${key}=false`)
   if (result.axisUsesGateVocabulary) failures.push('axisUsesGateVocabulary=true')
   if (failures.length) throw new Error(`${name} failed: ${failures.join(' | ')}`)
@@ -148,5 +150,5 @@ export async function verifyAllDashboardStates(page, viewportName) {
     }
   }
   if (failures.length) throw new Error(`${viewportName}: measured projects=2 selectedStages=${measuredStates}; axisClips=${axisClipCount} across ${axisClipStages.size} selectedStages; ${failures.join(' || ')}`)
-  console.log(`${viewportName}: projects=2 selectedStages=${measuredStates} unexpectedEnglish=0 clipped=0 intersections=0 viewportEscape=0 documentOverflow=0 controls>=44 text>=11 textContrast>=4.5 mobileOrder=true focusContrast>=${minimumFocusContrast.toFixed(2)}`)
+  console.log(`${viewportName}: projects=2 selectedStages=${measuredStates} unexpectedEnglish=0 translationFallback=0 clipped=0 intersections=0 viewportEscape=0 documentOverflow=0 controls>=44 text>=11 textContrast>=4.5 mobileOrder=true focusContrast>=${minimumFocusContrast.toFixed(2)}`)
 }

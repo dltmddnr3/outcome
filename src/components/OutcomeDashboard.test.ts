@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import { axisStateLabel, entityStateLabel, findStage, githubEvidenceItems, selectProject, sourceStateLabel, stageDetailSemantics, summarizeStage, type GithubConnector, type PackageProject, type PackageStage } from './OutcomeDashboard'
-import { activityLabelKo, groupPresentation, hierarchyLabels, phasePresentation, projectOutcomePresentation, roleLabel, stagePresentation } from './outcomeKorean'
+import { activityLabelKo, axisLabelKo, gatePresentation, groupPresentation, hierarchyLabels, loginErrorPresentation, phasePresentation, projectOutcomePresentation, roleLabel, stagePresentation } from './outcomeKorean'
 
 const stage = (overrides: Partial<PackageStage> = {}): PackageStage => ({ id: 'stage-one', title: 'Stage One', purpose: 'Verify the result', dependsOn: [], gatePurpose: 'Stage One acceptance checklist', sourceState: 'present', state: 'active', gate: { gates: [{ id: 'G1', title: 'closed', closed: true, groupCode: 'G' }, { id: 'G2', title: 'remaining', closed: false, groupCode: 'G' }], groups: [{ code: 'G', name: '증거', closed: 1, total: 2 }], total: 2, closed: 1, available: true, sourceRef: 'GATES.md' }, axes: { implementation: 'active', test: 'pending', evidence: 'pending', independentQa: 'not_started', cherryAcceptance: 'pending', release: 'not_started' }, ...overrides })
 const github = (overrides: Partial<GithubConnector> = {}): GithubConnector => ({ adopted: true, required: false, state: 'connected', repository: 'owner/repo', remoteName: 'origin', defaultBranch: 'main', completionAuthority: false, localCandidate: { state: 'available', branch: 'main', ahead: 15, behind: 0, sync: 'ahead' }, published: { state: 'connected', repository: 'owner/repo', ref: 'origin/main', detail: 'published' }, checks: { state: 'unknown' }, release: { state: 'unknown' }, ...overrides })
@@ -24,4 +24,25 @@ describe('OUTCOME Package dashboard', () => {
   it('한글 계층 labels use the approved five-level vocabulary', () => { expect(hierarchyLabels).toEqual(['프로젝트', '큰 단계', '범위', '작업 단계', '완료 조건']) })
   it('한글 운영 문구 covers roles states activity and source-facing fallbacks', () => { expect(['planner', 'builder', 'ux_product_qa', 'release_audit'].map(roleLabel)).toEqual(['기획', '구현', '사용성·제품 검수', '출시 감사']); expect(activityLabelKo('Stage 6 NEEDS_REVISION correction is active; fresh independent QA remains required')).toBe('6단계 수정 진행 중 · 새 독립 검수가 필요합니다'); expect(sourceStateLabel('conflict')).toBe('원본 묶음 충돌'); expect(groupPresentation('RA', 'RA')).toBe('완료 조건 그룹'); expect(stagePresentation('new-stage')).toEqual(['작업 단계 제목 한글화 대기', '작업 단계 목적 한글화 대기']) })
   it('기술 식별자 보존 keeps Package IDs and GitHub evidence unchanged beneath Korean presentation', () => { const value = project('outcome', 'OUTCOME'); const before = structuredClone(value); expect(phasePresentation(value.phases[0].id)).toEqual(['큰 단계 제목 한글화 대기', '큰 단계 목적 한글화 대기']); expect(projectOutcomePresentation(value.project.id, value.project.outcome)).toContain('인공지능'); expect(githubEvidenceItems(value.connectors.github)[1].value).toContain('owner/repo · origin/main'); expect(value).toEqual(before); expect(value.current?.stageId).toBe('outcome-stage') })
+  it('현재 렌더 가능한 미완료 완료 조건은 모두 자연스러운 한글 설명을 갖는다', () => {
+    const gateIds = [
+      ['stage-33-physical-acceptance-boundary', 'P33A3'], ['stage-33-physical-acceptance-boundary', 'P33A4'], ['stage-33-physical-acceptance-boundary', 'P33A5'],
+      ...Array.from({ length: 8 }, (_, index) => ['stage-ux-product-qa', `ANQ${index + 1}`]),
+      ['stage-release-audit', 'RA6'], ['stage-release-audit', 'RA7'], ['stage-release-audit', 'RA8'],
+      ...Array.from({ length: 6 }, (_, index) => ['stage-mvp-scope-closure', `MC${index + 4}`]),
+      ['outcome-stage-8', 'C1'], ['outcome-stage-8', 'C2'],
+    ]
+    const presentations = gateIds.map(([stageId, gateId]) => gatePresentation(stageId, gateId))
+    expect(gateIds).toHaveLength(22)
+    expect(presentations.filter((value) => value.includes('한글화 대기'))).toEqual([])
+  })
+  it('현재 렌더되는 근거 축 값은 모두 자연스러운 한글 상태를 갖는다', () => {
+    const values = ['complete_on_exact_1cdec3f_candidate', 'complete_523_foundation_248_docktests_and_signed_build_matrix', 'complete_receipt_87b4523_and_handoff_verified', 'exact_1cdec3f_frozen', 'complete_for_fresh_independent_review', 'not_started_preflight_hold']
+    expect(values.map(axisLabelKo).filter((value) => value.includes('한글화 대기'))).toEqual([])
+  })
+  it('인증 오류 식별자를 사용자용 한글로 바꾼다', () => {
+    expect(loginErrorPresentation('invalid_credentials')).toBe('접근 암호가 올바르지 않습니다.')
+    expect(loginErrorPresentation('too_many_attempts')).toBe('로그인 시도가 너무 많습니다. 잠시 후 다시 시도해 주세요.')
+    expect(loginErrorPresentation('unexpected_backend_code')).toBe('로그인하지 못했습니다.')
+  })
 })

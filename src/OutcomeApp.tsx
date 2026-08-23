@@ -1,5 +1,6 @@
 import { FormEvent, useEffect, useState } from 'react'
 import { OutcomeDashboard } from './components/OutcomeDashboard'
+import { loginErrorPresentation } from './components/outcomeKorean'
 import { fetchSession, login, logout } from './lib/api'
 
 function Login({ onAuthenticated }: { onAuthenticated: () => void }) {
@@ -9,7 +10,7 @@ function Login({ onAuthenticated }: { onAuthenticated: () => void }) {
   const submit = async (event: FormEvent) => {
     event.preventDefault(); setBusy(true); setError(null)
     try { await login(password); onAuthenticated() }
-    catch (reason) { setError(reason instanceof Error ? reason.message : '로그인하지 못했습니다.') }
+    catch (reason) { setError(reason instanceof Error ? loginErrorPresentation(reason.message) : '로그인하지 못했습니다.') }
     finally { setBusy(false) }
   }
   return <main className="outcome-login"><section>

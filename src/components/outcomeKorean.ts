@@ -49,6 +49,17 @@ const gateCopy: Record<string, string> = {
   'stage-mvp-scope-closure:MC4': '별도 신규 출시 감사가 정확한 후보에 대해 출시 감사만 통과 판정에 도달합니다.',
   'stage-mvp-scope-closure:MC5': '최종 피드의 정확한 후보에 승인된 내부 TestFlight 배포 산출물이 있습니다.',
   'stage-mvp-scope-closure:MC6': 'Cherry가 35단계 노트 상세와 하단 셸 경험을 실제로 승인합니다.',
+  'stage-ux-product-qa:ANQ1': '새 독립 검수자가 정확한 후보 식별자와 다섯 변경 경로를 고정합니다.',
+  'stage-ux-product-qa:ANQ2': '원본, 생성된 설정 파일과 빌드 묶음의 이름이 정식 값과 일치하는지 독립 확인합니다.',
+  'stage-ux-product-qa:ANQ3': '달력·미리 알림·사진 권한 설명 세 곳에 명확한 한글 체리노트 문구가 있는지 독립 확인합니다.',
+  'stage-ux-product-qa:ANQ4': '내부 식별자와 빌드·버전 불변 조건이 유지됐는지 독립 확인합니다.',
+  'stage-ux-product-qa:ANQ5': '이름 계약 검사와 변경 범위에 맞춘 회귀 검사가 새 검수 흐름에서 통과해야 합니다.',
+  'stage-ux-product-qa:ANQ6': '렌더링 화면이나 설치된 시뮬레이터 근거로 사용자에게 보이는 이름 영역을 확인합니다.',
+  'stage-ux-product-qa:ANQ7': '이전 판정을 재사용하지 않고 실패·불안정 검사·누적 오완료 수를 기록합니다.',
+  'stage-ux-product-qa:ANQ8': '새 사용성·제품 검수 판정을 명시하고, 출시 감사·배포·Cherry 승인 권한이 없음을 확인합니다.',
+  'stage-mvp-scope-closure:MC7': 'Cherry가 정확히 배포된 빌드에서 최종 피드를 실제로 승인합니다.',
+  'stage-mvp-scope-closure:MC8': '두 독립 보고서와 두 실제 사용 흐름을 검토한 뒤 Cherry가 1단계 최소 제품 범위 마감을 명시적으로 승인합니다.',
+  'stage-mvp-scope-closure:MC9': 'MC1부터 MC8까지 기계적으로 완료된 뒤에만 상위 관리 역할이 최소 제품 범위 마감 상태를 기록합니다.',
   'outcome-stage-8:C1': 'Cherry가 OUTCOME을 사용해 Cherry Note와 OUTCOME의 현재 위치와 다음 행동을 30초 안에 이해할 수 있는지 확인합니다.',
   'outcome-stage-8:C2': 'Cherry가 로컬 최소 제품 마감을 명시적으로 승인하며, 출시와 외부 완료는 별도 결정으로 남깁니다.',
 }
@@ -59,6 +70,12 @@ const stateCopy: Record<string, string> = {
 
 const axisCopy: Record<string, string> = {
   ...stateCopy,
+  complete_on_exact_1cdec3f_candidate: '정확한 1cdec3f 후보에서 완료',
+  complete_523_foundation_248_docktests_and_signed_build_matrix: '기반 검사 523개·도크 검사 248개와 서명 빌드 조합 완료',
+  complete_receipt_87b4523_and_handoff_verified: '87b4523 완료 영수증과 인계 검증 완료',
+  exact_1cdec3f_frozen: '정확한 1cdec3f 후보 고정됨',
+  complete_for_fresh_independent_review: '새 독립 검수 준비 완료',
+  not_started_preflight_hold: '시작 전 · 사전 점검 대기',
   complete: '완료',
   audit_not_release: '감사 근거이며 출시 아님', both_reports_required: '두 독립 보고서 필요', builder_dispatched_on_exact_4a3ad80_baseline: '정확한 4a3ad80 기준선에서 구현자 작업 배정됨', complete_4a3ad80_candidate_receipt_and_handoff_verified: '4a3ad80 후보 영수증과 인계 검증 완료', complete_523_246_41_plus_small_clearance_and_no_inset_mutation_red: '523·246·41 검사와 작은 화면 여백 완료, 안쪽 여백 제거 변경은 실패 확인', complete_57_of_57_engineering_gates: '엔지니어링 완료 조건 57/57 충족', complete_for_engineering_and_internal_distribution: '엔지니어링과 내부 배포 기준 완료', complete_for_engineering_candidate: '엔지니어링 후보 기준 완료', complete_on_pinned_candidate: '고정 후보에서 완료', evidence_manifest_validated: '근거 목록 검증됨', frozen_candidate_only: '고정 후보에만 해당', independently_reproduced_523_246_41_and_mutation_restored: '523·246·41 검사를 독립 재현하고 변경 원복 확인', independently_reproduced_not_started: '독립 재현 시작 전', internal_testflight_available_not_release: '내부 TestFlight 사용 가능 · 출시 아님', internal_testflight_build_43_available: '내부 TestFlight 빌드 43 사용 가능', internal_testflight_build_43_available_no_external_release: '내부 TestFlight 빌드 43 사용 가능 · 외부 출시 아님', must_be_complete_but_not_sufficient: '완료가 필요하지만 이것만으로 충분하지 않음', no_build_bump_or_testflight_upload: '빌드 번호 증가·TestFlight 업로드 없음', no_build_bump_upload_or_release_authority: '빌드 번호 증가·업로드·출시 권한 없음', not_applicable_at_this_boundary: '현재 경계에는 해당 없음', not_final_phase_qa: '최종 단계 검수 아님', pass_ux_product_qa_only_cumulative_false_completion_6: '사용성·제품 검수만 통과 · 누적 오완료 6', pending_cherry_physical_verdict: 'Cherry 실제 사용 판정 대기', pending_fresh_review_of_name_corrected_candidate: '이름 교정 후보 신규 검수 대기', pending_new_candidate_and_receipt: '새 후보와 영수증 대기', pending_parallel_lane: '병렬 검증 흐름 대기', pending_red_first_and_built_plist_evidence: '실패 우선 검사와 빌드 설정 근거 대기', pending_refresh_after_app_name_correction: '앱 이름 교정 후 갱신 대기', pending_refresh_after_new_user_visible_bytes: '새 사용자 표시 바이트 반영 후 갱신 대기', physical_verdict_pending: '실제 사용 판정 대기', present_open_2_of_6: '원본 있음 · 6개 중 2개 열림', present_open_4_of_10: '원본 있음 · 10개 중 4개 열림', present_package_projection_complete_3_of_3_source_12_of_12: '원본 묶음 투영 3/3, 원본 확인 12/12 완료', present_preflight_5_of_8_three_delivery_gates_open: '사전 점검 8개 중 5개 완료 · 전달 완료 조건 3개 열림', present_read_only: '읽기 전용 원본 있음', present_read_only_complete_10_of_10: '읽기 전용 원본 있음 · 10/10 완료', present_read_only_complete_9_of_9: '읽기 전용 원본 있음 · 9/9 완료', prior_4a3ad80_frozen: '이전 4a3ad80 후보 고정됨', prior_4a3ad80_frozen_superseded_for_release_eligibility: '이전 4a3ad80 고정 후보는 출시 자격 기준에서 대체됨', prior_candidate_complete_8_of_8_refresh_required: '이전 후보 8/8 완료 · 갱신 필요', prior_pass_not_current_candidate: '이전 통과이며 현재 후보 아님', prior_pass_preserved_not_transferable: '이전 통과 보존 · 현재 후보로 이전 불가', prior_profile_preactivation_pass_requires_candidate_repin: '이전 역할 구성 사전 통과 · 후보 재고정 필요', separate_explicit_authority_required: '별도 명시 권한 필요', third_test_evidence_correction_complete_on_4a3ad80: '4a3ad80에서 세 번째 테스트 근거 교정 완료',
 }
@@ -75,3 +92,7 @@ export const scopePresentation = (id: string) => scopeCopy[id] ?? ['범위 제�
 export const stagePresentation = (id: string) => stageCopy[id] ?? ['작업 단계 제목 한글화 대기', '작업 단계 목적 한글화 대기']
 export const gatePresentation = (stageId: string, gateId: string) => gateCopy[`${stageId}:${gateId}`] ?? '원본 완료 조건 설명 한글화 대기'
 export const groupPresentation = (name: string, code: string) => name === code ? '완료 조건 그룹' : name
+export const loginErrorPresentation = (value: string) => ({
+  invalid_credentials: '접근 암호가 올바르지 않습니다.',
+  too_many_attempts: '로그인 시도가 너무 많습니다. 잠시 후 다시 시도해 주세요.',
+}[value] ?? '로그인하지 못했습니다.')

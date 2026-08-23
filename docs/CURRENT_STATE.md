@@ -5,7 +5,7 @@ Observed: 2026-08-24 KST
 ## OUTCOME 저장소
 
 - 독립 Git 저장소 생성 완료
-- 현재 단계: Stage 8 C1 한글화 candidate `399ac9df5b2d` / tree `89f98036255f` / asset `index-DG3dIvuW.js`가 origin PID 62455에서 exact public receipt로 활성화됐습니다. Builder K1–K6은 충족됐지만 fresh UX & Product QA K7과 Cherry C1·C2는 열려 있습니다. Activation evidence drift를 반영한 cumulative `false_completion_count=13`입니다.
+- 현재 단계: Stage 8 C1 한글화 candidate `399ac9df5b2d` / tree `89f98036255f` / asset `index-DG3dIvuW.js`가 origin PID 62455에서 활성화돼 있지만 fresh UX & Product QA는 `NEEDS_REVISION`입니다. 한글 fallback·인증 오류·예외 계약 correction의 Builder C1K1–C1K6은 이 문서를 포함하는 후속 candidate에서 검증됐고, exact public 활성화·fresh QA C1K7과 Cherry C1·C2는 열려 있습니다. cumulative `false_completion_count=13`입니다.
 - dashboard UI, Cherry Note collector, authenticated read-only runtime, tests, styles, and package configuration are now in this repository
 - `/Users/rosum/Documents/ChatGPT/WhiteCastle Desk 2`의 기존 copy는 migration history/rollback reference이며 더 이상 intended product source가 아님
 - OUTCOME 자체 표준 입력:
@@ -67,6 +67,7 @@ Observed: 2026-08-24 KST
 
 ## 다음 정확한 작업
 
-1. Fresh UX & Product QA: exact activated candidate `399ac9df5b2d`의 한글화·30초 이해도·desktop/mobile을 독립 검증한다
-2. Cherry: fresh QA 뒤 Stage 8 C1–C2에서 실제 공개 OUTCOME을 사용하고 30초 이해도 및 Local MVP closure를 별도로 수용한다
-3. Planner/Cherry: 별도 Gate에서 stable hosting, persistent hostname, access/abuse policy, service supervision과 SLA를 결정
+1. Planner: 이 문서를 포함하는 correction candidate를 isolated exact rebuild하고 origin만 교체한 뒤 기존 tunnel을 유지하며 receipt·public boundary·36상태를 재검증한다
+2. Fresh UX & Product QA: exact activated correction candidate의 한글화·30초 이해도·desktop/mobile을 독립 검증한다
+3. Cherry: fresh QA 뒤 Stage 8 C1–C2에서 실제 공개 OUTCOME을 사용하고 30초 이해도 및 Local MVP closure를 별도로 수용한다
+4. Planner/Cherry: 별도 Gate에서 stable hosting, persistent hostname, access/abuse policy, service supervision과 SLA를 결정

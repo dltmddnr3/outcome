@@ -16,7 +16,7 @@ Authority: Cherry C1 사용 피드백에 따른 OUTCOME-only Builder 수정. C1�
   CHECK: npm run test:dashboard -- --testNamePattern='한글 운영 문구'
   EXPECT: exit 0; roles, states, NOW, current/next, checklist and fallback copy are Korean
   EVIDENCE: targeted 한글 운영 문구 test 1/1 PASS; 인증 화면, 네 역할, 현재 작업, 상태, GitHub 근거, 상세·빈 상태·오류 fallback을 포함합니다.
-- [x] K3: `OUTCOME`, `Cherry Note`, `GitHub`, 소스 코드·Stage/Gate ID, commit/tree/asset 식별자처럼 의미 보존이 필요한 고유명사·기술 증거만 영문 예외로 허용한다.
+- [x] K3: `OUTCOME`, `Cherry Note`, `GitHub`, `Cherry`, `iPhone`, `MacBook`과 소스 코드·Stage/Gate 식별자, commit/tree/asset 식별자처럼 의미 보존이 필요한 고유명사·기술 증거만 영문 예외로 허용한다.
   PROVES: source_truth_preserved
   CHECK: npm run test:dashboard -- --testNamePattern='기술 식별자 보존'
   EXPECT: exit 0; presentation translation preserves stable IDs and technical evidence values
@@ -41,7 +41,7 @@ Authority: Cherry C1 사용 피드백에 따른 OUTCOME-only Builder 수정. C1�
 
 - [ ] K7: Builder 후보가 immutable commit/tree/asset과 실제 공개 화면 증거를 보고한 뒤, fresh UX & Product QA가 한글화·30초 이해도·데스크톱·모바일을 독립 검증한다.
   PROVES: independent_qa
-  EVIDENCE: exact commit `399ac9df5b2d`, tree `89f98036255f`, asset `index-DG3dIvuW.js`가 origin PID 62455에서 public receipt로 확인됐고 tunnel PID 88741은 유지됐습니다. Fresh UX & Product QA 판정은 아직 pending입니다.
+  EVIDENCE: fresh QA `docs/STAGE8_C1_KOREANIZATION_FRESH_UX_QA_399ac9d.md` returned `NEEDS_REVISION`; correction gates are in `GATES_STAGE8_C1_KOREANIZATION_CORRECTION.md`.
 - [ ] K8: fresh QA PASS 이후 Cherry가 실제 화면을 다시 사용하고 C1을 직접 승인한다.
   PROVES: cherry_acceptance
   EVIDENCE: pending
