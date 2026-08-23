@@ -128,8 +128,8 @@ phases:
 
 ## 현재 위치
 
-- Current: `outcome-phase-1 / outcome-scope-acceptance / outcome-stage-7 · Release Audit`
-- Next: `outcome-scope-acceptance / outcome-stage-8 · Cherry acceptance`
-- Dashboard registration: Package-driven Cherry Note/OUTCOME UI, GitHub connector Gate M15, and fresh independent UX & Product QA Q1–Q4 are evidence-closed; separate fresh Release Audit A1–A4 remains open.
+- Current: `outcome-phase-1 / outcome-scope-acceptance / outcome-stage-8 · Cherry acceptance`
+- Next: `owner-only closure boundary · MVP_SCOPE_CLOSED after C1-C2`
+- Dashboard registration: Package-driven Cherry Note/OUTCOME UI, GitHub connector Gate M15, fresh UX & Product QA Q1–Q4, and separate fresh Release Audit A1–A4 are evidence-closed. Cherry acceptance C1–C2 remains open.
 - `MVP_SCOPE_CLOSED`: false
 - `EXTERNAL_OUTCOME_COMPLETE`: false

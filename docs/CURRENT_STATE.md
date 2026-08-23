@@ -5,7 +5,7 @@ Observed: 2026-08-24 KST
 ## OUTCOME 저장소
 
 - 독립 Git 저장소 생성 완료
-- 현재 단계: Stage 7 correction candidate `5d8d751ca567` received fresh affected UX & Product QA `PASS` for the path-projection correction. Cumulative `false_completion_count=12` is preserved; Stage 7 remains open pending a new separate Release Audit.
+- 현재 단계: Stage 7 separate fresh Release Audit returned `PASS` on exact candidate `c821d7c81715` with A1–A4 PASS and cumulative `false_completion_count=12`. Current boundary is Stage 8 Cherry acceptance; C1–C2 remain open and owner-only.
 - dashboard UI, Cherry Note collector, authenticated read-only runtime, tests, styles, and package configuration are now in this repository
 - `/Users/rosum/Documents/ChatGPT/WhiteCastle Desk 2`의 기존 copy는 migration history/rollback reference이며 더 이상 intended product source가 아님
 - OUTCOME 자체 표준 입력:
@@ -33,6 +33,7 @@ Observed: 2026-08-24 KST
 - 마지막 독립 Release Audit 근거: `docs/STAGE7_FRESH_RELEASE_AUDIT_b57edd7.md` (`FAIL`, SHA-256 `82bfa9a4109b95c05387b7116cc64dc605de712411b6eb063c30def25abb243e`). A1/A3/A4의 prior-candidate 확인은 통과했지만 A2 실패로 Stage 7 전체는 열려 있습니다.
 - 마지막 affected QA 근거: `docs/STAGE7_CORRECTION_FRESH_UX_QA_9580c45.md` (`NEEDS_REVISION`, SHA-256 `5376d1fc92be02e928fa368914a89741b7ded92338ebc57ce7a15d3eab398d26`). R2 PID 경계와 UUID redaction은 PASS; R1B absolute POSIX path redaction만 blocking입니다.
 - 최신 path-correction affected QA 근거: `docs/STAGE7_PATH_CORRECTION_FRESH_UX_QA_5d8d751.md` (`PASS`, SHA-256 `e1ca8ef0e1906ec564c4d41c877ff5860afa77a3808cdeb5c217fa6b4fa77f63`). Raw Gate evidence 144개는 public projection에서 제거되고 Stage evidence axes 17/17은 보존됐으며, 68 rendered Stage visits에서 prohibited hit 0입니다.
+- 최신 fresh Release Audit 근거: `docs/STAGE7_FRESH_RELEASE_AUDIT_c821d7c.md` (`PASS`, SHA-256 `bc6508b9492f87ff46c7d146a09240f4a8396eb267a2d6444f036dc867b467eb`). Exact pin, double-build parity, public bytes, security/privacy, regression, runtime identity, rollback, and separation from Cherry acceptance all passed.
 
 ## Cherry Note 최신 관측
 
@@ -65,6 +66,5 @@ Observed: 2026-08-24 KST
 
 ## 다음 정확한 작업
 
-1. Release Audit: corrected activated candidate와 fresh affected QA evidence를 별도 새 session으로 다시 감사한다
+1. Cherry: Stage 8 C1–C2에서 실제 공개 OUTCOME을 사용하고 30초 이해도 및 Local MVP closure를 별도로 수용한다
 2. Planner/Cherry: 별도 Gate에서 stable hosting, persistent hostname, access/abuse policy, service supervision과 SLA를 결정
-3. Cherry: Stage 8에서 Local MVP를 실제 사용하고 별도 수용

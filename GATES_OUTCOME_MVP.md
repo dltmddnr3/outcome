@@ -132,18 +132,18 @@ Stage ID: `outcome-stage-6`
 
 Stage ID: `outcome-stage-7`
 
-- [ ] A1: A separate fresh Release Audit verifies the exact candidate after UX & Product QA PASS.
+- [x] A1: A separate fresh Release Audit verifies the exact candidate after UX & Product QA PASS.
   PROVES: release_audit
-  EVIDENCE: `docs/STAGE7_FRESH_RELEASE_AUDIT_b57edd7.md` records a separate fresh independent session; candidate identity passed, but A1 remains open for the required corrected candidate rerun. The private session identifier remains only in the non-public audit artifact.
-- [ ] A2: Audit verifies standalone startup, local-only privacy, source isolation, build reproducibility, and rollback.
+  EVIDENCE: `docs/STAGE7_FRESH_RELEASE_AUDIT_c821d7c.md` records a new separate independent audit after affected QA PASS and verifies exact commit/tree/parent/origin. Private session identity remains only in the non-public audit artifact.
+- [x] A2: Audit verifies standalone startup, local-only privacy, source isolation, build reproducibility, and rollback.
   PROVES: release_audit
-  EVIDENCE: b57edd7 audit `FAIL` remains authoritative for that candidate. Candidate 5d8d751 removed raw Gate evidence from the public projection, preserved all Stage evidence axes, expanded path controls, and received fresh affected QA PASS in `docs/STAGE7_PATH_CORRECTION_FRESH_UX_QA_5d8d751.md`. A2 remains open until a new separate Release Audit.
-- [ ] A3: Audit records commit, tree, artifact identity, tested paths, and `false_completion_count`.
+  EVIDENCE: c821d7c fresh audit passed standalone/auth-default startup, privacy, source isolation, two clean reproducible builds, local/dist/public parity, full regression, validated PID controls, and artifact rollback. Non-atomic build, temporary hostname, hardcoded roots, and cookie runbook details remain explicitly non-blocking Local MVP debt.
+- [x] A3: Audit records commit, tree, artifact identity, tested paths, and `false_completion_count`.
   PROVES: release_audit
-  EVIDENCE: b57edd7 audit recorded the full pin, artifact SHA-256 values, local/public test matrix, rollback probes, fresh session, and preserved the then-instructed cumulative count 10. Planner classified the UUID privacy claim as event 11 and the later false zero-path scan on 9580c45 as event 12.
-- [ ] A4: Audit PASS remains separate from Cherry acceptance and release approval.
+  EVIDENCE: c821d7c audit records exact artifact SHA-256 values, tested paths, two-build parity, rollback candidates, runtime identities, and cumulative `false_completion_count=12`.
+- [x] A4: Audit PASS remains separate from Cherry acceptance and release approval.
   PROVES: release_audit
-  EVIDENCE: b57edd7 audit did not claim PASS, Cherry acceptance, release approval, `MVP_SCOPE_CLOSED`, or `EXTERNAL_OUTCOME_COMPLETE`; all A gates remain open pending a corrected candidate.
+  EVIDENCE: c821d7c audit PASS is explicitly Stage 7 evidence only and does not claim Cherry acceptance, release approval, `MVP_SCOPE_CLOSED`, or `EXTERNAL_OUTCOME_COMPLETE`.
 
 ## Stage 8 · Cherry acceptance
 
