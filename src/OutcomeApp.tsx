@@ -13,8 +13,8 @@ function Login({ onAuthenticated }: { onAuthenticated: () => void }) {
     finally { setBusy(false) }
   }
   return <main className="outcome-login"><section>
-    <p>OUTCOME · PRIVATE READ ONLY</p><h1>결과의 현재 위치를 확인하세요</h1>
-    <span>인증 후에만 Project, NOW, Stage, Gate 근거를 읽을 수 있습니다.</span>
+    <p>OUTCOME · 비공개 읽기 전용</p><h1>결과의 현재 위치를 확인하세요</h1>
+    <span>인증 후에만 프로젝트, 현재 작업, 작업 단계와 완료 조건 근거를 읽을 수 있습니다.</span>
     <form onSubmit={(event) => void submit(event)}><label htmlFor="outcome-password">접근 암호</label><input id="outcome-password" type="password" autoComplete="current-password" value={password} onChange={(event) => setPassword(event.target.value)} required /><button disabled={busy}>{busy ? '확인 중…' : 'OUTCOME 열기'}</button></form>
     {error && <strong role="alert">{error}</strong>}
   </section></main>
@@ -27,7 +27,7 @@ export function OutcomeApp() {
   if (authenticated === null) return <main className="outcome-login"><section aria-live="polite"><p>OUTCOME</p><h1>인증 상태 확인 중</h1></section></main>
   if (!authenticated) return <Login onAuthenticated={() => setAuthenticated(true)} />
   return <main className="cn-standalone-shell">
-    <header className="cn-standalone-heading"><div><p>OUTCOME · SOURCE-GROUNDED DASHBOARD</p><h1>목적지까지, 지금 어디쯤인지</h1><span>Mac Mini collector · {publicReadOnly ? 'Cherry 승인 공개 read-only' : '인증된 읽기 전용 화면'}</span></div>{!publicReadOnly && <button className="cn-signout" onClick={() => void logout().finally(() => setAuthenticated(false))}>로그아웃</button>}</header>
+    <header className="cn-standalone-heading"><div><p>OUTCOME · 원본 근거 대시보드</p><h1>목적지까지, 지금 어디쯤인지</h1><span>Mac Mini 수집기 · {publicReadOnly ? 'Cherry 승인 공개 읽기 전용' : '인증된 읽기 전용 화면'}</span></div>{!publicReadOnly && <button className="cn-signout" onClick={() => void logout().finally(() => setAuthenticated(false))}>로그아웃</button>}</header>
     <OutcomeDashboard onUnauthorized={() => setAuthenticated(false)} />
   </main>
 }

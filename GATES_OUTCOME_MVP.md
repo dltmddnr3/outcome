@@ -151,7 +151,7 @@ Stage ID: `outcome-stage-8`
 
 - [ ] C1: Cherry uses OUTCOME and confirms both Cherry Note and OUTCOME current location and next action are understandable within 30 seconds.
   PROVES: cherry_acceptance
-  EVIDENCE: pending
+  EVIDENCE: pending; Cherry requested full user-facing Korean localization before re-evaluation. Builder and fresh QA correction gates are defined in `GATES_STAGE8_C1_KOREANIZATION.md`.
 - [ ] C2: Cherry explicitly accepts Local MVP closure; release or external completion remains a separate decision.
   PROVES: cherry_acceptance
   EVIDENCE: pending

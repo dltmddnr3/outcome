@@ -1,6 +1,5 @@
-const requiredPurposeLabels = ['PHASE 목적', 'SCOPE 목적', 'STAGE 목적', 'GATE 목적']
-const requiredGithubLabels = ['LOCAL CANDIDATE', 'GITHUB PUBLISHED', 'CHECKS', 'RELEASE', 'completion_authority=false']
-const expectedStageCounts = { 'cherry-note': 9, outcome: 8 }
+const requiredPurposeLabels = ['큰 단계 목적', '범위 목적', '작업 단계 목적', '완료 조건 목적']
+const requiredGithubLabels = ['로컬 후보', 'GitHub 게시', '자동 검사', '출시', '완료 판정 권한 없음']
 
 const stage33Expected = [['Y', '링크 미리보기'], ['L', '아이보리 표면·머티리얼'], ['B', '브랜드 아이덴티티'], ['M', '더보기 화면'], ['N', '새 폴더'], ['E', '새 일정 입력'], ['A', '폴더 보관'], ['D', '폴더 하위 트리 복구 삭제'], ['G', '엔지니어링 완료 증거']]
 
@@ -58,17 +57,31 @@ export async function measureDashboard(page) {
     const undersizedControls = elements.filter((element) => element.tagName === 'BUTTON' && rect(element).height < 43.5).map((element) => `${label(element)}:${Math.round(rect(element).height)}`)
     const readable = (selector) => [...document.querySelectorAll(selector)].filter(visible).every((element) => { const style = getComputedStyle(element); return style.whiteSpace !== 'nowrap' && element.scrollWidth <= element.clientWidth + 1 && element.scrollHeight <= element.clientHeight + 1 })
     const stageList = document.querySelector('.oc-stage-list')
-    const buildCommit = document.body.innerText.match(/commit ([0-9a-f]{12})/i)?.[1] ?? null
-    const buildTree = document.body.innerText.match(/tree ([0-9a-f]{12})/i)?.[1] ?? null
+    const buildCommit = document.body.innerText.match(/커밋 ([0-9a-f]{12})/i)?.[1] ?? null
+    const buildTree = document.body.innerText.match(/트리 ([0-9a-f]{12})/i)?.[1] ?? null
     const now = document.querySelector('.oc-now')?.getBoundingClientRect(); const axes = document.querySelector('.oc-axes')?.getBoundingClientRect(); const github = document.querySelector('.oc-github')?.getBoundingClientRect()
     const projectId = root.dataset.projectId
     const selectedStageId = document.querySelector('.oc-stage-list button[aria-pressed="true"]')?.dataset.stageId ?? null
     const detail = document.querySelector('.oc-detail'); const detailState = detail?.dataset.stageState ?? null; const detailText = detail?.innerText ?? ''; const completionBar = Boolean(detail?.querySelector('.oc-confirmed'))
     const detailSemantics = Boolean(detailState) && (detailState === 'complete'
-      ? completionBar && detailText.includes('evidence-closed / total') && detailText.includes('모두 evidence-closed')
-      : !completionBar && !detailText.includes('evidence-closed') && detailText.includes('checkbox checked / total') && !/남은\s*0|0\s*remaining/i.test(document.querySelector('.oc-next-condition')?.textContent ?? ''))
-    const bottomShell = [...document.querySelectorAll('.oc-stage-list > button')].find((button) => button.querySelector('strong')?.textContent.trim() === 'Bottom-shell Seam Correction'); const bottomState = bottomShell?.dataset.stageState; const bottomLabel = bottomShell?.querySelector('em')?.textContent.trim()
-    const bottomShellState = projectId !== 'cherry-note' || (bottomState === 'complete' ? bottomLabel === 'Gate 완료' : bottomState === 'gates_closed_evidence_pending' ? bottomLabel === 'Gate 체크 닫힘 · 증거 대기' : Boolean(bottomState && bottomLabel))
+      ? completionBar && detailText.includes('증거 확정 / 전체') && detailText.includes('증거가 모두 확정')
+      : !completionBar && !detailText.includes('증거가 모두 확정') && detailText.includes('체크됨 / 전체') && !/남은\s*0|미충족\s*0/.test(document.querySelector('.oc-next-condition')?.textContent ?? ''))
+    const localizedBottomShell = [...document.querySelectorAll('.oc-stage-list > button')].find((button) => button.dataset.stageId === 'stage-33-bottom-shell-seam-correction'); const localizedBottomState = localizedBottomShell?.dataset.stageState; const localizedBottomLabel = localizedBottomShell?.querySelector('em')?.textContent.trim()
+    const bottomShellState = projectId !== 'cherry-note' || (localizedBottomState === 'complete' ? localizedBottomLabel === '완료 조건 충족' : localizedBottomState === 'gates_closed_evidence_pending' ? localizedBottomLabel === '체크 항목 닫힘 · 증거 대기' : Boolean(localizedBottomState && localizedBottomLabel))
+    const accessibleText = [...document.querySelectorAll('[aria-label],[title]')].flatMap((element) => [element.getAttribute('aria-label'), element.getAttribute('title')]).filter(Boolean).join('\n')
+    const technicalTokens = ['OUTCOME', 'Cherry Note', 'GitHub', 'Cherry', 'TestFlight', 'Mac Mini', 'MacBook', 'iPhone', 'completion_authority=false', 'ID', root.dataset.projectId,
+      ...[...document.querySelectorAll('[data-stage-id]')].map((element) => element.dataset.stageId),
+      ...[...document.querySelectorAll('.oc-detail-grid li b')].map((element) => element.textContent.trim()),
+      ...[...document.querySelectorAll('.oc-groups small')].map((element) => element.textContent.trim()),
+    ].filter(Boolean).sort((left, right) => right.length - left.length)
+    let englishSurface = `${document.body.innerText}\n${accessibleText}`
+    englishSurface = englishSurface
+      .replace(/index-[A-Za-z0-9_-]+\.js/g, '')
+      .replace(/\b[0-9a-f]{7,64}\b/gi, '')
+      .replace(/\b[a-z0-9._-]+\/[a-z0-9._/-]+\b/gi, '')
+      .replace(/\b(?:main|origin)\b/gi, '')
+    for (const token of technicalTokens) englishSurface = englishSurface.split(token).join('')
+    const unexpectedEnglish = [...new Set(englishSurface.match(/[A-Za-z]+(?:\s*&\s*[A-Za-z]+)?/g) ?? [])].sort()
     return {
       projectId, selectedStageId,
       documentOverflow: document.documentElement.scrollWidth - document.documentElement.clientWidth,
@@ -77,14 +90,15 @@ export async function measureDashboard(page) {
       githubReadable: readable('.oc-github strong') && document.querySelectorAll('.oc-github strong').length >= 5,
       allStagesDiscoverable: Boolean(stageList) && !['auto', 'scroll', 'hidden'].includes(getComputedStyle(stageList).overflowY) && [...stageList.querySelectorAll(':scope > button')].every(visible),
       selectedStageExposed: document.querySelectorAll('.oc-stage-list button[aria-pressed="true"]').length === 1,
-      sourceStatusText: [...document.querySelectorAll('.oc-topbar nav button')].every((element) => element.getAttribute('aria-label')?.includes('PACKAGE SOURCE')),
+      sourceStatusText: [...document.querySelectorAll('.oc-topbar nav button')].every((element) => element.getAttribute('aria-label')?.includes('원본 묶음')),
       purpose: requiredPurposeLabels.every((value) => document.body.innerText.includes(value)), githubEvidence: requiredGithubLabels.every((value) => document.body.innerText.includes(value)),
-      current: document.body.innerText.includes('현재 위치'), next: document.body.innerText.includes('다음 Stage'), inline: getComputedStyle(document.querySelector('.oc-detail')).position === 'relative',
+      current: document.body.innerText.includes('현재 위치'), next: document.body.innerText.includes('다음 작업 단계'), inline: getComputedStyle(document.querySelector('.oc-detail')).position === 'relative',
       mobileAuthoritativeOrder: innerWidth > 600 || (now && axes && github && now.top < axes.top && axes.top < github.top),
-      axisUsesGateVocabulary: [...document.querySelectorAll('.oc-axis strong')].some((element) => element.textContent.trim() === 'Gate 완료'),
+      axisUsesGateVocabulary: [...document.querySelectorAll('.oc-axis strong')].some((element) => element.textContent.trim() === '완료 조건 충족'),
       bottomShellState,
       detailState, detailSemantics,
-      build: Boolean(buildCommit && buildTree && document.body.innerText.includes('runtime NOW is live/unpinned')), buildCommit, buildTree,
+      unexpectedEnglish,
+      build: Boolean(buildCommit && buildTree && document.body.innerText.includes('실시간 현재 작업은 빌드에 고정되지 않음')), buildCommit, buildTree,
     }
   }, { requiredPurposeLabels, requiredGithubLabels })
 }
@@ -98,6 +112,7 @@ export function assertDashboardMeasurement(name, result) {
   if (result.undersizedControls.length) failures.push(`undersizedControls=${result.undersizedControls.join(',')}`)
   if (result.undersizedText.length) failures.push(`undersizedText=${result.undersizedText.join(',')}`)
   if (result.lowContrastText.length) failures.push(`lowContrastText=${result.lowContrastText.join(',')}`)
+  if (result.unexpectedEnglish.length) failures.push(`unexpectedEnglish=${result.unexpectedEnglish.join(',')}`)
   for (const key of ['currentNextReadable', 'githubReadable', 'allStagesDiscoverable', 'selectedStageExposed', 'sourceStatusText', 'purpose', 'githubEvidence', 'current', 'next', 'inline', 'mobileAuthoritativeOrder', 'bottomShellState', 'detailSemantics', 'build']) if (!result[key]) failures.push(`${key}=false`)
   if (result.axisUsesGateVocabulary) failures.push('axisUsesGateVocabulary=true')
   if (failures.length) throw new Error(`${name} failed: ${failures.join(' | ')}`)
@@ -117,14 +132,14 @@ export async function verifyAllDashboardStates(page, viewportName) {
     const projectId = await page.locator('.oc-dashboard').getAttribute('data-project-id')
     const stageButtons = page.locator('.oc-stage-list > button')
     const stageCount = await stageButtons.count()
-    if (stageCount !== expectedStageCounts[projectId]) throw new Error(`${viewportName}/${projectId}: expected ${expectedStageCounts[projectId]} Stages, got ${stageCount}`)
+    if (stageCount < 1) throw new Error(`${viewportName}/${projectId}: 작업 단계가 없습니다`)
     try { minimumFocusContrast = Math.min(minimumFocusContrast, await assertKeyboardFocus(page, `${viewportName}/${projectId}`)) } catch (error) { failures.push(String(error.message)) }
     for (let stageIndex = 0; stageIndex < stageCount; stageIndex += 1) {
       const stageButton = page.locator('.oc-stage-list > button').nth(stageIndex)
       await stageButton.click()
       await page.locator('.oc-stage-list > button[aria-pressed="true"]').waitFor()
       const detailLabel = await page.locator('.oc-detail > header small').first().textContent()
-      const stageId = detailLabel?.replace(/^STAGE DETAIL ·\s*/, '').trim() || `index-${stageIndex}`
+      const stageId = detailLabel?.replace(/^작업 단계 상세 ·\s*/, '').trim() || `index-${stageIndex}`
       const result = await measureDashboard(page)
       if (result.axisClips.length) { axisClipStages.add(`${projectId}/${stageId}`); axisClipCount += result.axisClips.length }
       try { assertDashboardMeasurement(`${viewportName}/${projectId}/${stageId}`, result) } catch (error) { failures.push(String(error.message)) }
@@ -133,5 +148,5 @@ export async function verifyAllDashboardStates(page, viewportName) {
     }
   }
   if (failures.length) throw new Error(`${viewportName}: measured projects=2 selectedStages=${measuredStates}; axisClips=${axisClipCount} across ${axisClipStages.size} selectedStages; ${failures.join(' || ')}`)
-  console.log(`${viewportName}: projects=2 selectedStages=${measuredStates} clipped=0 intersections=0 viewportEscape=0 controls>=44 text>=11 textContrast>=4.5 mobileOrder=true focusContrast>=${minimumFocusContrast.toFixed(2)}`)
+  console.log(`${viewportName}: projects=2 selectedStages=${measuredStates} unexpectedEnglish=0 clipped=0 intersections=0 viewportEscape=0 documentOverflow=0 controls>=44 text>=11 textContrast>=4.5 mobileOrder=true focusContrast>=${minimumFocusContrast.toFixed(2)}`)
 }

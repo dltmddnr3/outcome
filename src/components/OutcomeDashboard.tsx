@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState } from 'react'
 import { Check, ChevronRight, RefreshCw } from 'lucide-react'
 import { fetchOutcomeDashboard } from '../lib/api'
+import { activityLabelKo, axisLabelKo, freshnessLabelKo, gatePresentation, groupPresentation, phasePresentation, projectOutcomePresentation, roleLabel, scopePresentation, sourceLabelKo, sourceStateLabelKo, stagePresentation, stateLabelKo } from './outcomeKorean'
 
 type SourceState = 'valid' | 'stale' | 'unknown' | 'conflict'
 type Binding = { role: string; status: string; activity: string | null; observedAt: string | null; freshness: string; historyCount: number; stageId?: string | null }
@@ -13,10 +14,6 @@ export type GithubConnector = { adopted: boolean; required: boolean; state: stri
 export type PackageProject = { status: SourceState; errors: string[]; observedAt: string | null; sourceFreshness?: { state: string; observedAt: string | null }; project: { id: string; name: string; outcome: string; acceptanceAuthority: string }; connectors: { github: GithubConnector }; phases: Phase[]; current: { phaseId: string; scopeId: string; stageId: string } | null; next: { phaseId: string; scopeId: string; stageId: string } | null; bindings: Binding[]; now: { status: string; activity: string | null; observedAt: string | null; source: string }; progress: { available: false; reason: string } }
 export type OutcomeDashboardData = { schemaVersion: 2; observedAt: string; build: { repository: string; ref: string; commit: string | null; tree: string | null; asset: string | null; runtimeNowPinned: false }; projects: PackageProject[] }
 
-const roleNames: Record<string, string> = { planner: 'Planner', builder: 'Builder', ux_product_qa: 'UX & Product QA', release_audit: 'Release Audit' }
-const sourceStateNames: Record<string, string> = { valid: 'PACKAGE SOURCE VALID', stale: 'PACKAGE SOURCE OBSERVATION STALE', unknown: 'PACKAGE SOURCE UNKNOWN', conflict: 'PACKAGE SOURCE CONFLICT' }
-const entityStateNames: Record<string, string> = { active: '활성', idle: '대기', terminal: '종료', unbound: '미연결', connected: '연결됨', missing: '미채택', not_published: '미게시', replaced: '교체됨', blocked: '차단됨', pending: '증거 대기', complete: 'Gate 완료', gates_closed_evidence_pending: 'Gate 체크 닫힘 · 증거 대기', queued: '진입 대기', locked: '선행 Gate 잠김', unknown: '근거 없음', stale: 'binding 오래됨', available: '로컬 있음', ahead: '로컬 앞섬', behind: '로컬 뒤처짐', diverged: '분기됨', synced: '동기화', evidence_closed: '증거 확정', partially_evidenced: '일부 증거', not_sourced: '해당 축 근거 없음' }
-const axisStateNames: Record<string, string> = { complete: '완료', active: '활동 관측됨', idle: '활동 없음', stale: '관측 오래됨', unbound: '관측 binding 없음', unknown: '관측 근거 없음', pending: '증거 대기', evidence_closed: '증거 확정', partially_evidenced: '일부 증거', not_sourced: '해당 축 근거 없음', not_started: '시작 전' }
 const compactTime = (value: string | null) => value ? new Intl.DateTimeFormat('ko-KR', { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' }).format(new Date(value)) : '근거 없음'
 
 export function findStage(project: PackageProject, stageId: string | null | undefined) {
@@ -31,37 +28,38 @@ export function summarizeStage(stage: PackageStage) {
 
 export function stageDetailSemantics(stage: PackageStage, dependencyTitles: string[] = []) {
   const summary = summarizeStage(stage)
-  const dependency = dependencyTitles.length ? dependencyTitles.join(', ') : '선행 Stage'
+  const dependency = dependencyTitles.length ? dependencyTitles.join(', ') : '선행 작업 단계'
   const boundaryByState: Record<string, string> = {
-    locked: `${dependency}가 완료되지 않아 이 Stage는 잠겨 있습니다.`,
-    blocked: `${dependency} 이후 Package Gate source ${stage.sourceState.replaceAll('_', ' ')} 차단 경계가 해제되어야 이 Stage를 진행할 수 있습니다.`,
-    gates_closed_evidence_pending: 'checkbox checks는 모두 닫혔지만 Package evidence closure는 아직 pending입니다.',
-    queued: '선행 Stage 완료 후 진입 가능한 대기 상태이며, 아직 완료 증거가 아닙니다.',
-    pending: 'Package evidence closure가 pending이며 checkbox 수는 완료 판정이 아닙니다.',
-    active: '현재 Stage 작업이 진행 중이며 checkbox 수는 완료 판정이 아닙니다.',
-    unknown: 'Package Stage 상태 근거가 없어 완료 여부를 판단하지 않습니다.',
+    locked: `${dependency}가 완료되지 않아 이 작업 단계는 잠겨 있습니다.`,
+    blocked: `${dependency} 이후 원본 완료 조건의 ${stateLabelKo(stage.sourceState)} 차단 경계가 해제되어야 진행할 수 있습니다.`,
+    gates_closed_evidence_pending: '체크 항목은 모두 닫혔지만 증거 확정은 아직 대기 중입니다.',
+    queued: '선행 작업 단계 완료 후 진입 가능한 대기 상태이며, 아직 완료 증거가 아닙니다.',
+    pending: '원본 묶음의 증거 확정이 대기 중이며 체크 수는 완료 판정이 아닙니다.',
+    active: '현재 작업 단계가 진행 중이며 체크 수는 완료 판정이 아닙니다.',
+    unknown: '원본 묶음에 작업 단계 상태 근거가 없어 완료 여부를 판단하지 않습니다.',
   }
   const complete = stage.state === 'complete'
-  const boundaryCopy = complete ? `${stage.title}의 Gate evidence closure가 source에서 완료로 확인되었습니다.` : boundaryByState[stage.state] ?? `Package Stage 상태 ${stage.state.replaceAll('_', ' ')}는 완료가 아닙니다.`
-  const checkedCopy = complete ? '연결된 Gate가 모두 evidence-closed입니다.' : summary.total ? `${summary.closed}/${summary.total} checkbox checks 확인 · ${boundaryCopy}` : `Gate source가 없어 unknown입니다. ${boundaryCopy}`
-  return { ...summary, countLabel: complete ? 'evidence-closed / total' : 'checkbox checked / total', boundaryCopy, checkedCopy }
+  const stageTitle = stagePresentation(stage.id)[0]
+  const boundaryCopy = complete ? `${stageTitle}의 완료 조건 증거가 원본에서 확정되었습니다.` : boundaryByState[stage.state] ?? `원본 작업 단계 상태는 ${stateLabelKo(stage.state)}이며 완료가 아닙니다.`
+  const checkedCopy = complete ? '연결된 완료 조건의 증거가 모두 확정되었습니다.' : summary.total ? `${summary.closed}/${summary.total} 체크 항목 확인 · ${boundaryCopy}` : `완료 조건 원본이 없어 상태를 판단할 수 없습니다. ${boundaryCopy}`
+  return { ...summary, countLabel: complete ? '증거 확정 / 전체' : '체크됨 / 전체', boundaryCopy, checkedCopy }
 }
 
 export function selectProject(projects: PackageProject[], id: string) { return projects.find((project) => project.project.id === id) ?? projects[0] ?? null }
 
 export function githubEvidenceItems(connector: GithubConnector) {
-  const distance = connector.localCandidate.ahead == null || connector.localCandidate.behind == null ? connector.localCandidate.sync : `${connector.localCandidate.ahead} ahead · ${connector.localCandidate.behind} behind`
+  const distance = connector.localCandidate.ahead == null || connector.localCandidate.behind == null ? stateLabelKo(connector.localCandidate.sync) : `${connector.localCandidate.ahead}개 앞섬 · ${connector.localCandidate.behind}개 뒤처짐`
   return [
-    { label: 'LOCAL CANDIDATE', state: connector.localCandidate.state, value: connector.localCandidate.branch ? `${connector.localCandidate.branch} · ${distance}` : 'local evidence unknown' },
-    { label: 'GITHUB PUBLISHED', state: connector.published.state, value: connector.published.repository ? `${connector.published.repository} · ${connector.published.detail === 'empty_remote' ? 'empty remote' : connector.published.ref}` : `${connector.defaultBranch ?? 'branch unknown'} · repository unbound` },
-    { label: 'CHECKS', state: connector.checks.state, value: 'GitHub check evidence unknown' },
-    { label: 'RELEASE', state: connector.release.state, value: 'GitHub release evidence unknown' },
+    { label: '로컬 후보', state: connector.localCandidate.state, value: connector.localCandidate.branch ? `${connector.localCandidate.branch} · ${distance}` : '로컬 근거 없음' },
+    { label: 'GitHub 게시', state: connector.published.state, value: connector.published.repository ? `${connector.published.repository} · ${connector.published.detail === 'empty_remote' ? '빈 원격 저장소' : connector.published.ref}` : `${connector.defaultBranch ?? '브랜치 근거 없음'} · 저장소 연결 없음` },
+    { label: '자동 검사', state: connector.checks.state, value: 'GitHub 검사 근거 없음' },
+    { label: '출시', state: connector.release.state, value: 'GitHub 출시 근거 없음' },
   ]
 }
 
-export const entityStateLabel = (value: string) => entityStateNames[value] ?? value.replaceAll('_', ' ')
-export const sourceStateLabel = (value: string) => sourceStateNames[value] ?? `PACKAGE SOURCE ${value.replaceAll('_', ' ').toUpperCase()}`
-export const axisStateLabel = (value: string) => axisStateNames[value] ?? value.replaceAll('_', ' ')
+export const entityStateLabel = stateLabelKo
+export const sourceStateLabel = sourceStateLabelKo
+export const axisStateLabel = axisLabelKo
 function Axis({ label, value }: { label: string; value: string }) { return <div className="oc-axis"><small>{label}</small><strong>{axisStateLabel(value)}</strong></div> }
 
 export function OutcomeDashboard({ onUnauthorized }: { onUnauthorized: () => void }) {
@@ -69,31 +67,34 @@ export function OutcomeDashboard({ onUnauthorized }: { onUnauthorized: () => voi
   const [selectedProjectId, setSelectedProjectId] = useState('outcome')
   const [selectedStageId, setSelectedStageId] = useState<string | null>(null)
   const [error, setError] = useState<string | null>(null)
-  const load = async () => { try { setData(await fetchOutcomeDashboard()); setError(null) } catch (reason) { const message = reason instanceof Error ? reason.message : '대시보드를 읽지 못했습니다.'; if (message === 'authentication_required') onUnauthorized(); else setError(message) } }
+  const load = async () => { try { setData(await fetchOutcomeDashboard()); setError(null) } catch (reason) { const message = reason instanceof Error ? reason.message : ''; if (message === 'authentication_required') onUnauthorized(); else setError('대시보드를 읽지 못했습니다.') } }
   useEffect(() => { void load(); const timer = window.setInterval(() => void load(), 10_000); return () => window.clearInterval(timer) }, [])
   const project = useMemo(() => data ? selectProject(data.projects, selectedProjectId) : null, [data, selectedProjectId])
   const current = project ? findStage(project, project.current?.stageId) : null
   const next = project ? findStage(project, project.next?.stageId) : null
   const selected = project ? findStage(project, selectedStageId) ?? current ?? findStage(project, project.phases[0]?.scopes[0]?.stages[0]?.id) : null
   const stages = project?.phases.flatMap((phase) => phase.scopes.flatMap((scope) => scope.stages.map((stage) => ({ phase, scope, stage })))) ?? []
-  const dependencyTitles = selected ? selected.stage.dependsOn.map((id) => stages.find((item) => item.stage.id === id)?.stage.title ?? id) : []
+  const dependencyTitles = selected ? selected.stage.dependsOn.map((id) => stages.find((item) => item.stage.id === id) ? stagePresentation(id)[0] : id) : []
   const summary = selected ? stageDetailSemantics(selected.stage, dependencyTitles) : null
   const github = project?.connectors.github
-  if (!data || !project || !selected || !summary) return <section className="cn-dashboard cn-loading"><h2>{error ?? 'OUTCOME Package를 검증하고 있습니다'}</h2>{error && <button onClick={() => void load()}>다시 확인</button>}</section>
+  if (!data || !project || !selected || !summary) return <section className="cn-dashboard cn-loading"><h2>{error ?? 'OUTCOME 원본 묶음을 검증하고 있습니다'}</h2>{error && <button onClick={() => void load()}>다시 확인</button>}</section>
+  const phaseText = phasePresentation(selected.phase.id)
+  const scopeText = scopePresentation(selected.scope.id)
+  const stageText = stagePresentation(selected.stage.id)
   const switchProject = (id: string) => { setSelectedProjectId(id); setSelectedStageId(null) }
   return <section className="cn-dashboard oc-dashboard" data-project-id={project.project.id}>
-    <header className="oc-topbar"><nav aria-label="프로젝트 전환">{data.projects.map((item) => <button key={item.project.id} aria-label={`${item.project.name} · ${sourceStateLabel(item.status)}`} aria-current={item.project.id === project.project.id ? 'page' : undefined} onClick={() => switchProject(item.project.id)}><i className={item.status} aria-hidden="true" />{item.project.name}<span className="oc-visually-hidden">{sourceStateLabel(item.status)}</span></button>)}</nav><button className="cn-refresh" onClick={() => void load()} aria-label="Package truth 새로고침"><RefreshCw size={16} /></button></header>
-    <div className="oc-build" aria-label="서빙 중인 immutable build"><small>SERVED BUILD · PINNED · {data.build.repository}/{data.build.ref}</small><strong>commit {data.build.commit ?? 'unknown'} · tree {data.build.tree ?? 'unknown'}</strong><span>asset {data.build.asset ?? 'unknown'} · runtime NOW is live/unpinned</span></div>
-    <div className="oc-project-head"><div><p>PROJECT · {project.project.id}</p><h2>{project.project.name}</h2><strong>{project.project.outcome}</strong></div><span className={`oc-source ${project.status}`}>{sourceStateLabel(project.status)}<small>source observed {compactTime(project.sourceFreshness?.observedAt ?? project.observedAt)}</small></span></div>
-    {project.status !== 'valid' && <div className={`oc-warning ${project.status}`} role="status"><strong>{sourceStateLabel(project.status)}</strong><span>{project.errors.length ? project.errors.join(' · ') : 'Package source observation을 다시 확인하세요.'}</span></div>}
-    <div className="oc-orientation" aria-label="현재 위치와 다음 Stage"><div><small>현재 위치</small><strong>{current ? `${current.phase.title} → ${current.scope.title} → ${current.stage.title}` : 'unknown'}</strong></div><ChevronRight size={16} /><div><small>다음 Stage</small><strong>{next?.stage.title ?? 'source evidence 없음'}</strong></div></div>
-    {github && <section className="oc-github" aria-label="GitHub delivery evidence connector"><header><div><small>OPTIONAL SOURCE CONNECTOR · GITHUB</small><strong>{github.adopted ? 'GitHub adopted' : 'GitHub not adopted'}</strong></div><span className={github.state}>{entityStateLabel(github.state)}</span></header><div>{githubEvidenceItems(github).map((item) => <article key={item.label} className={item.state}><small>{item.label}</small><strong>{item.value}</strong><span>{entityStateLabel(item.state)}</span></article>)}</div><p>completion_authority=false · GitHub activity는 Gate closure 또는 Cherry acceptance가 아닙니다.</p></section>}
-    <div className="oc-now"><div><small>NOW · LIVE / UNPINNED BUILDER BINDING</small><strong>{project.now.activity ?? `Builder ${entityStateLabel(project.now.status)}`}</strong><span>{project.now.source} · {compactTime(project.now.observedAt)} · runtime NOW는 build pin과 진행률이 아닙니다</span></div><div className="oc-bindings">{project.bindings.map((binding) => <article key={binding.role} className={binding.status}><small>{roleNames[binding.role]}</small><strong>{entityStateLabel(binding.status)}</strong><span>{binding.freshness} · {binding.stageId ?? 'Stage binding 없음'} · history {binding.historyCount}</span></article>)}</div></div>
-    <div className="oc-axes" aria-label="Stage evidence axes"><Axis label="구현" value={selected.stage.axes.implementation} /><Axis label="테스트" value={selected.stage.axes.test} /><Axis label="증거 확정" value={selected.stage.axes.evidence} /><Axis label="변화 관측" value={project.now.status} /></div>
+    <header className="oc-topbar"><nav aria-label="프로젝트 전환">{data.projects.map((item) => <button key={item.project.id} aria-label={`${item.project.name} · ${sourceStateLabel(item.status)}`} aria-current={item.project.id === project.project.id ? 'page' : undefined} onClick={() => switchProject(item.project.id)}><i className={item.status} aria-hidden="true" />{item.project.name}<span className="oc-visually-hidden">{sourceStateLabel(item.status)}</span></button>)}</nav><button className="cn-refresh" onClick={() => void load()} aria-label="원본 묶음 새로고침"><RefreshCw size={16} /></button></header>
+    <div className="oc-build" aria-label="제공 중인 고정 빌드"><small>제공 중인 고정 빌드 · {data.build.repository}/{data.build.ref}</small><strong>커밋 {data.build.commit ?? '근거 없음'} · 트리 {data.build.tree ?? '근거 없음'}</strong><span>에셋 {data.build.asset ?? '근거 없음'} · 실시간 현재 작업은 빌드에 고정되지 않음</span></div>
+    <div className="oc-project-head"><div><p>프로젝트 ID · {project.project.id}</p><h2>{project.project.name}</h2><strong>{projectOutcomePresentation(project.project.id, project.project.outcome)}</strong></div><span className={`oc-source ${project.status}`}>{sourceStateLabel(project.status)}<small>원본 관측 {compactTime(project.sourceFreshness?.observedAt ?? project.observedAt)}</small></span></div>
+    {project.status !== 'valid' && <div className={`oc-warning ${project.status}`} role="status"><strong>{sourceStateLabel(project.status)}</strong><span>원본 묶음의 참조와 식별자를 다시 확인하세요.</span></div>}
+    <div className="oc-orientation" aria-label="현재 위치와 다음 작업 단계"><div><small>현재 위치</small><strong>{current ? `${phasePresentation(current.phase.id)[0]} → ${scopePresentation(current.scope.id)[0]} → ${stagePresentation(current.stage.id)[0]}` : '위치 근거 없음'}</strong></div><ChevronRight size={16} /><div><small>다음 작업 단계</small><strong>{next ? stagePresentation(next.stage.id)[0] : '다음 단계 근거 없음'}</strong></div></div>
+    {github && <section className="oc-github" aria-label="GitHub 전달 근거 연결"><header><div><small>선택 연결 근거 · GitHub</small><strong>{github.adopted ? 'GitHub 연결 채택' : 'GitHub 연결 미채택'}</strong></div><span className={github.state}>{entityStateLabel(github.state)}</span></header><div>{githubEvidenceItems(github).map((item) => <article key={item.label} className={item.state}><small>{item.label}</small><strong>{item.value}</strong><span>{entityStateLabel(item.state)}</span></article>)}</div><p>완료 판정 권한 없음(completion_authority=false) · GitHub 활동은 완료 조건 충족이나 Cherry 승인이 아닙니다.</p></section>}
+    <div className="oc-now"><div><small>현재 작업 · 실시간 · 빌드에 고정되지 않은 구현 역할 연결</small><strong>{activityLabelKo(project.now.activity) ?? `구현 ${entityStateLabel(project.now.status)}`}</strong><span>{sourceLabelKo(project.now.source)} · {compactTime(project.now.observedAt)} · 실시간 현재 작업은 빌드 고정이나 진행률이 아닙니다</span></div><div className="oc-bindings">{project.bindings.map((binding) => <article key={binding.role} className={binding.status}><small>{roleLabel(binding.role)}</small><strong>{entityStateLabel(binding.status)}</strong><span>{freshnessLabelKo(binding.freshness)} · {binding.stageId ?? '작업 단계 연결 없음'} · 이력 {binding.historyCount}</span></article>)}</div></div>
+    <div className="oc-axes" aria-label="작업 단계 근거 축"><Axis label="구현" value={selected.stage.axes.implementation} /><Axis label="테스트" value={selected.stage.axes.test} /><Axis label="증거 확정" value={selected.stage.axes.evidence} /><Axis label="변화 관측" value={project.now.status} /></div>
     <div className="oc-main">
-      <section className="oc-funnel"><header><p>PROJECT → PHASE → SCOPE → STAGE</p><h3>목적과 다음 경계</h3></header><div className="oc-purpose-flow"><article><small>PHASE 목적</small><strong>{selected.phase.title}</strong><p>{selected.phase.purpose}</p></article><ChevronRight size={16} /><article><small>SCOPE 목적</small><strong>{selected.scope.title}</strong><p>{selected.scope.purpose}</p></article><ChevronRight size={16} /><article><small>STAGE 목적</small><strong>{selected.stage.title}</strong><p>{selected.stage.purpose}</p></article><ChevronRight size={16} /><article className="gate"><small>GATE 목적 · STAGE 하위 CHECKLIST</small><strong>{selected.stage.gatePurpose}</strong><p>{summary.total ? `${summary.closed}/${summary.total} checkbox checks · ${summary.total - summary.closed} unchecked` : 'Gate evidence unavailable · percentage 없음'}</p></article></div><div className="oc-next-condition"><small>무엇을 달성해야 다음으로 가는가</small><strong>{summary.boundaryCopy}</strong></div></section>
-      <aside className="oc-stage-list"><header><small>STAGES</small><strong>{stages.length} source-defined</strong></header>{stages.map((item) => <button key={item.stage.id} data-stage-id={item.stage.id} data-stage-state={item.stage.state} className={item.stage.id === selected.stage.id ? 'active' : ''} aria-pressed={item.stage.id === selected.stage.id} aria-current={item.stage.id === project.current?.stageId ? 'step' : undefined} onClick={() => setSelectedStageId(item.stage.id)}><i className={item.stage.state} aria-hidden="true">{item.stage.state === 'complete' && <Check size={11} />}</i><span><small>{item.scope.title}</small><strong>{item.stage.title}</strong></span><em>{entityStateLabel(item.stage.state)}</em></button>)}</aside>
+      <section className="oc-funnel"><header><p>프로젝트 → 큰 단계 → 범위 → 작업 단계 → 완료 조건</p><h3>목적과 다음 경계</h3></header><div className="oc-purpose-flow"><article><small>큰 단계 목적</small><strong>{phaseText[0]}</strong><p>{phaseText[1]}</p></article><ChevronRight size={16} /><article><small>범위 목적</small><strong>{scopeText[0]}</strong><p>{scopeText[1]}</p></article><ChevronRight size={16} /><article><small>작업 단계 목적</small><strong>{stageText[0]}</strong><p>{stageText[1]}</p></article><ChevronRight size={16} /><article className="gate"><small>완료 조건 목적 · 작업 단계 하위 체크리스트</small><strong>{stageText[0]}의 완료 조건 목록</strong><p>{summary.total ? `${summary.closed}/${summary.total} 체크됨 · ${summary.total - summary.closed}개 미충족` : '완료 조건 근거 없음 · 비율 산출 안 함'}</p></article></div><div className="oc-next-condition"><small>무엇을 달성해야 다음으로 가는가</small><strong>{summary.boundaryCopy}</strong></div></section>
+      <aside className="oc-stage-list"><header><small>작업 단계</small><strong>원본 정의 {stages.length}개</strong></header>{stages.map((item) => <button key={item.stage.id} data-stage-id={item.stage.id} data-stage-state={item.stage.state} className={item.stage.id === selected.stage.id ? 'active' : ''} aria-pressed={item.stage.id === selected.stage.id} aria-current={item.stage.id === project.current?.stageId ? 'step' : undefined} onClick={() => setSelectedStageId(item.stage.id)}><i className={item.stage.state} aria-hidden="true">{item.stage.state === 'complete' && <Check size={11} />}</i><span><small>{scopePresentation(item.scope.id)[0]}</small><strong>{stagePresentation(item.stage.id)[0]}</strong></span><em>{entityStateLabel(item.stage.state)}</em></button>)}</aside>
     </div>
-    <section className="oc-detail" data-stage-state={selected.stage.state} aria-live="polite"><header><div><small>STAGE DETAIL · {selected.stage.id}</small><h3>{selected.stage.title}</h3><p>{selected.stage.purpose}</p></div><div><strong>{summary.total ? `${summary.closed}/${summary.total}` : 'unknown'}</strong><small>{summary.countLabel}</small></div></header><p className="oc-detail-boundary">{summary.boundaryCopy}</p>{summary.confirmedPercent !== null && <div className="oc-confirmed"><i aria-label={`Gate confirmed completion ${summary.confirmedPercent}%`}><em style={{ width: `${summary.confirmedPercent}%` }} /></i><span>{summary.confirmedPercent}% · Gate evidence only</span></div>}<div className="oc-detail-grid"><section><h4>남은 핵심 Gate</h4>{summary.remaining.length ? <ol>{summary.remaining.map((gate) => <li key={gate.id}><b>{gate.id}</b><span>{gate.title}</span></li>)}</ol> : <p>{summary.checkedCopy}</p>}</section><section><h4>Gate 그룹</h4>{selected.stage.gate.groups.length ? <div className="oc-groups">{selected.stage.gate.groups.map((group) => <article key={group.code}><span><strong>{group.name}</strong><small>코드 {group.code}</small></span><b>{group.closed}/{group.total}</b></article>)}</div> : <p>그룹 근거 없음</p>}</section></div></section>
+    <section className="oc-detail" data-stage-state={selected.stage.state} aria-live="polite"><header><div><small>작업 단계 상세 · {selected.stage.id}</small><h3>{stageText[0]}</h3><p>{stageText[1]}</p></div><div><strong>{summary.total ? `${summary.closed}/${summary.total}` : '근거 없음'}</strong><small>{summary.countLabel}</small></div></header><p className="oc-detail-boundary">{summary.boundaryCopy}</p>{summary.confirmedPercent !== null && <div className="oc-confirmed"><i aria-label={`완료 조건 증거 확정 ${summary.confirmedPercent}%`}><em style={{ width: `${summary.confirmedPercent}%` }} /></i><span>{summary.confirmedPercent}% · 완료 조건 근거만 반영</span></div>}<div className="oc-detail-grid"><section><h4>남은 핵심 완료 조건</h4>{summary.remaining.length ? <ol>{summary.remaining.map((gate) => <li key={gate.id}><b>{gate.id}</b><span>{gatePresentation(selected.stage.id, gate.id)}</span></li>)}</ol> : <p>{summary.checkedCopy}</p>}</section><section><h4>완료 조건 그룹</h4>{selected.stage.gate.groups.length ? <div className="oc-groups">{selected.stage.gate.groups.map((group) => <article key={group.code}><span><strong>{groupPresentation(group.name, group.code)}</strong><small>코드 {group.code}</small></span><b>{group.closed}/{group.total}</b></article>)}</div> : <p>그룹 근거 없음</p>}</section></div></section>
   </section>
 }

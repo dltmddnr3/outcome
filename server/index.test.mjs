@@ -24,6 +24,7 @@ test('unauthenticated clients receive no dashboard data', async () => withServer
   assert.equal(response.status, 401); assert.equal(text.includes('Cherry Note'), false); assert.equal(text.includes('gateGroups'), false)
   const page = await (await fetch(`${base}/cherry-note-dashboard`)).text()
   assert.equal(page.includes('Cherry Note'), false); assert.equal(page.includes('Gate'), false); assert.equal(page.includes('/assets/'), false)
+  assert.equal(page.includes('비공개 읽기 전용 접근'), true); assert.equal(page.includes('Authentication'), false); assert.equal(page.includes('Private read-only access'), false)
 }))
 
 test('html form login gates the dashboard bundle', async () => withServer(async (base) => {
