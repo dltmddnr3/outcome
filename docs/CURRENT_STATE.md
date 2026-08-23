@@ -5,7 +5,7 @@ Observed: 2026-08-24 KST
 ## OUTCOME 저장소
 
 - 독립 Git 저장소 생성 완료
-- 현재 단계: Stage 7 fresh Release Audit returned `FAIL` on candidate `b57edd7b4f83`; public session UUID leakage and stale PID-based rollback teardown are release blockers. Planner classified the post-QA public privacy completion claim as cumulative `false_completion_count=11`.
+- 현재 단계: Stage 7 correction candidate `9580c4547490` passed UUID and PID-boundary checks but fresh affected QA returned `NEEDS_REVISION`: nine `/tmp/...` absolute evidence paths remain in the public API and the shipped scanner missed them. Planner classified the false zero-path completion claim as cumulative `false_completion_count=12`.
 - dashboard UI, Cherry Note collector, authenticated read-only runtime, tests, styles, and package configuration are now in this repository
 - `/Users/rosum/Documents/ChatGPT/WhiteCastle Desk 2`의 기존 copy는 migration history/rollback reference이며 더 이상 intended product source가 아님
 - OUTCOME 자체 표준 입력:
@@ -31,6 +31,7 @@ Observed: 2026-08-24 KST
   - Cherry Note Stage33 Package-sourced Korean primary Gate group labels, with Gate code secondary and 57 source checks
 - 마지막 독립 QA 근거: `docs/STAGE6_FRESH_UX_PRODUCT_QA_93b0497.md` (`PASS`, SHA-256 `7235f3ac776bad7aace54d1111dd325d078a6e5863c61373175610549ae42c1a`). `docs/STAGE6_FRESH_UX_PRODUCT_QA_aa90faf.md`의 prior `NEEDS_REVISION`은 불변 이력으로 유지합니다.
 - 마지막 독립 Release Audit 근거: `docs/STAGE7_FRESH_RELEASE_AUDIT_b57edd7.md` (`FAIL`, SHA-256 `82bfa9a4109b95c05387b7116cc64dc605de712411b6eb063c30def25abb243e`). A1/A3/A4의 prior-candidate 확인은 통과했지만 A2 실패로 Stage 7 전체는 열려 있습니다.
+- 마지막 affected QA 근거: `docs/STAGE7_CORRECTION_FRESH_UX_QA_9580c45.md` (`NEEDS_REVISION`, SHA-256 `5376d1fc92be02e928fa368914a89741b7ded92338ebc57ce7a15d3eab398d26`). R2 PID 경계와 UUID redaction은 PASS; R1B absolute POSIX path redaction만 blocking입니다.
 
 ## Cherry Note 최신 관측
 
@@ -58,10 +59,11 @@ Observed: 2026-08-24 KST
 - Live Cherry Note Package source는 QA 중에도 이동할 수 있습니다. 실제로 bottom-shell은 pending에서 complete로 이동했지만 Final Feed는 10/10 checkbox evidence와 별개로 locked 상태를 유지했습니다. Detail 의미는 특정 시점의 N/N이 아니라 매 관측의 Package Stage state를 따릅니다.
 - `npm run build`가 live origin이 읽는 ignored `dist/`에 직접 쓰므로, d77a52f startup receipt와 작업 중 asset bytes가 일시적으로 어긋난 운영 드리프트가 관측되었습니다. 이 build window는 exact pin 증거로 사용하지 않으며, candidate commit 이후 exact rebuild/restart로 receipt와 asset identity를 다시 맞춥니다. 원자적 isolated build/swap은 Release Audit 후속 검토 대상입니다.
 - b57edd7 Release Audit의 R1/R2 Builder correction은 raw UUID/delimiter-less role ID sanitizer, API/HTML/bundle zero-hit 검사, actual origin PID self-bookkeeping, command+port/URL validated runtime status/stop, stale PID fail-closed runbook으로 구현·검증했습니다. 현재 tunnel PID record는 실제 PID 76819로 검증 교정했으며 tunnel/URL은 재시작하지 않았습니다. origin record는 corrected candidate의 Planner 재기동 전까지 stale로 fail-closed입니다. Fresh affected QA와 fresh Release Audit은 여전히 필요합니다.
+- 9580c45 affected QA에서 `/tmp`, `/private/tmp`, `/var`, `/opt`, `/etc` absolute POSIX path class가 sanitizer와 public-boundary scanner 양쪽에서 누락된 control gap을 확인했습니다. 공개 projection에서 비표시 Gate evidence를 제거하거나 전체 path class를 fail-closed redaction해야 합니다.
 
 ## 다음 정확한 작업
 
-1. Planner: corrected candidate origin을 짧게 재기동하여 actual server PID self-record/cleanup과 public receipt를 검증한다. 기존 tunnel/hostname은 유지한다
+1. Builder: absolute POSIX path redaction/projection과 public-boundary scanner를 red-first로 교정한다
 2. Planner/Cherry: 별도 Gate에서 stable hosting, persistent hostname, access/abuse policy, service supervision과 SLA를 결정
 3. UX & Product QA: corrected parsed public payload를 fresh affected session으로 재검증한다
 4. Release Audit: 별도 fresh session으로 A1–A4를 다시 감사한다

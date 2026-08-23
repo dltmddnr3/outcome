@@ -137,10 +137,10 @@ Stage ID: `outcome-stage-7`
   EVIDENCE: `docs/STAGE7_FRESH_RELEASE_AUDIT_b57edd7.md` records a separate fresh independent session; candidate identity passed, but A1 remains open for the required corrected candidate rerun. The private session identifier remains only in the non-public audit artifact.
 - [ ] A2: Audit verifies standalone startup, local-only privacy, source isolation, build reproducibility, and rollback.
   PROVES: release_audit
-  EVIDENCE: b57edd7 audit `FAIL` remains authoritative. Builder correction now redacts UUID/delimiter-less identifiers and validates PID command+port/URL before status/stop, but A2 stays open for fresh audit of the corrected candidate and Planner's actual origin restart/cleanup probe.
+  EVIDENCE: b57edd7 audit `FAIL` remains authoritative. Candidate 9580c45 corrected UUID and PID boundaries, but fresh affected QA `docs/STAGE7_CORRECTION_FRESH_UX_QA_9580c45.md` found nine `/tmp/...` absolute paths in public Gate evidence and a matching scanner blind spot. A2 remains open.
 - [ ] A3: Audit records commit, tree, artifact identity, tested paths, and `false_completion_count`.
   PROVES: release_audit
-  EVIDENCE: b57edd7 audit recorded the full pin, artifact SHA-256 values, local/public test matrix, rollback probes, fresh session, and preserved the then-instructed cumulative count 10. Planner classified the newly exposed completion claim as event 11 after the audit.
+  EVIDENCE: b57edd7 audit recorded the full pin, artifact SHA-256 values, local/public test matrix, rollback probes, fresh session, and preserved the then-instructed cumulative count 10. Planner classified the UUID privacy claim as event 11 and the later false zero-path scan on 9580c45 as event 12.
 - [ ] A4: Audit PASS remains separate from Cherry acceptance and release approval.
   PROVES: release_audit
   EVIDENCE: b57edd7 audit did not claim PASS, Cherry acceptance, release approval, `MVP_SCOPE_CLOSED`, or `EXTERNAL_OUTCOME_COMPLETE`; all A gates remain open pending a corrected candidate.
