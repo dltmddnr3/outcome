@@ -5,7 +5,7 @@ Observed: 2026-08-24 KST
 ## OUTCOME 저장소
 
 - 독립 Git 저장소 생성 완료
-- 현재 단계: Stage 6 fresh independent UX & Product QA returned `PASS` on candidate `93b0497d3881` with Q1–Q4 PASS and cumulative `false_completion_count=10`; Stage 7 separate fresh Release Audit is now eligible but is not yet accepted
+- 현재 단계: Stage 7 fresh Release Audit returned `FAIL` on candidate `b57edd7b4f83`; public session UUID leakage and stale PID-based rollback teardown are release blockers. Planner classified the post-QA public privacy completion claim as cumulative `false_completion_count=11`.
 - dashboard UI, Cherry Note collector, authenticated read-only runtime, tests, styles, and package configuration are now in this repository
 - `/Users/rosum/Documents/ChatGPT/WhiteCastle Desk 2`의 기존 copy는 migration history/rollback reference이며 더 이상 intended product source가 아님
 - OUTCOME 자체 표준 입력:
@@ -30,6 +30,7 @@ Observed: 2026-08-24 KST
   - Stage 상세의 inline responsive 배치
   - Cherry Note Stage33 Package-sourced Korean primary Gate group labels, with Gate code secondary and 57 source checks
 - 마지막 독립 QA 근거: `docs/STAGE6_FRESH_UX_PRODUCT_QA_93b0497.md` (`PASS`, SHA-256 `7235f3ac776bad7aace54d1111dd325d078a6e5863c61373175610549ae42c1a`). `docs/STAGE6_FRESH_UX_PRODUCT_QA_aa90faf.md`의 prior `NEEDS_REVISION`은 불변 이력으로 유지합니다.
+- 마지막 독립 Release Audit 근거: `docs/STAGE7_FRESH_RELEASE_AUDIT_b57edd7.md` (`FAIL`, SHA-256 `82bfa9a4109b95c05387b7116cc64dc605de712411b6eb063c30def25abb243e`). A1/A3/A4의 prior-candidate 확인은 통과했지만 A2 실패로 Stage 7 전체는 열려 있습니다.
 
 ## Cherry Note 최신 관측
 
@@ -56,9 +57,12 @@ Observed: 2026-08-24 KST
 - 현재 수치는 스냅샷입니다. UI는 authoritative source를 다시 읽어 갱신해야 합니다.
 - Live Cherry Note Package source는 QA 중에도 이동할 수 있습니다. 실제로 bottom-shell은 pending에서 complete로 이동했지만 Final Feed는 10/10 checkbox evidence와 별개로 locked 상태를 유지했습니다. Detail 의미는 특정 시점의 N/N이 아니라 매 관측의 Package Stage state를 따릅니다.
 - `npm run build`가 live origin이 읽는 ignored `dist/`에 직접 쓰므로, d77a52f startup receipt와 작업 중 asset bytes가 일시적으로 어긋난 운영 드리프트가 관측되었습니다. 이 build window는 exact pin 증거로 사용하지 않으며, candidate commit 이후 exact rebuild/restart로 receipt와 asset identity를 다시 맞춥니다. 원자적 isolated build/swap은 Release Audit 후속 검토 대상입니다.
+- b57edd7 Release Audit에서 parsed Gate evidence의 raw Claude session UUID가 public API에 노출되고, runtime PID 파일이 실제 origin/tunnel PID와 달라 documented teardown이 실패함을 확인했습니다. 두 항목은 corrected candidate와 fresh affected QA 및 fresh Release Audit이 필요합니다.
 
 ## 다음 정확한 작업
 
-1. Release Audit: Stage 6 PASS와 분리된 새 Claude session으로 exact 93b0497 candidate의 실행·privacy·artifact 재현성·원자적 build/swap·rollback을 검증
+1. Builder: UUID/source redaction과 PID bookkeeping/teardown 계약을 red-first로 교정하고 새 immutable candidate를 만든다
 2. Planner/Cherry: 별도 Gate에서 stable hosting, persistent hostname, access/abuse policy, service supervision과 SLA를 결정
-3. Cherry: Stage 8에서 Local MVP를 실제 사용하고 별도 수용
+3. UX & Product QA: corrected parsed public payload를 fresh affected session으로 재검증한다
+4. Release Audit: 별도 fresh session으로 A1–A4를 다시 감사한다
+5. Cherry: Stage 8에서 Local MVP를 실제 사용하고 별도 수용

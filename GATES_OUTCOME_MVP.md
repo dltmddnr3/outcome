@@ -134,16 +134,16 @@ Stage ID: `outcome-stage-7`
 
 - [ ] A1: A separate fresh Release Audit verifies the exact candidate after UX & Product QA PASS.
   PROVES: release_audit
-  EVIDENCE: pending
+  EVIDENCE: `docs/STAGE7_FRESH_RELEASE_AUDIT_b57edd7.md` records fresh session `9f4a0176-9cad-4506-a25a-45f3e910564a`; candidate identity passed, but A1 remains open for the required corrected candidate rerun.
 - [ ] A2: Audit verifies standalone startup, local-only privacy, source isolation, build reproducibility, and rollback.
   PROVES: release_audit
-  EVIDENCE: pending
+  EVIDENCE: b57edd7 audit `FAIL`: public payload exposed a raw Stage 6 session UUID and documented PID-based teardown targeted dead origin/tunnel PIDs. Reproducible build, served-byte parity, regression, source isolation, and artifact rollback passed.
 - [ ] A3: Audit records commit, tree, artifact identity, tested paths, and `false_completion_count`.
   PROVES: release_audit
-  EVIDENCE: pending
+  EVIDENCE: b57edd7 audit recorded the full pin, artifact SHA-256 values, local/public test matrix, rollback probes, fresh session, and preserved the then-instructed cumulative count 10. Planner classified the newly exposed completion claim as event 11 after the audit.
 - [ ] A4: Audit PASS remains separate from Cherry acceptance and release approval.
   PROVES: release_audit
-  EVIDENCE: pending
+  EVIDENCE: b57edd7 audit did not claim PASS, Cherry acceptance, release approval, `MVP_SCOPE_CLOSED`, or `EXTERNAL_OUTCOME_COMPLETE`; all A gates remain open pending a corrected candidate.
 
 ## Stage 8 · Cherry acceptance
 
