@@ -7,7 +7,11 @@ export async function exerciseDashboard(page) {
   await page.locator('[data-project-id="cherry-note"]').waitFor()
   await page.getByRole('button', { name: /Stage 33 Engineering and Build 41 Evidence/ }).click()
   await page.getByText('57/57', { exact: true }).first().waitFor()
-  await page.getByText('YouTube addition gates', { exact: false }).waitFor()
+  await page.getByText('링크 미리보기', { exact: true }).waitFor()
+  const stage33Groups = await page.evaluate(() => [...document.querySelectorAll('.oc-groups article')].map((group) => ({ label: group.querySelector('strong')?.textContent?.trim(), code: group.querySelector('small')?.textContent?.replace('코드 ', '').trim(), total: Number(group.querySelector('b')?.textContent?.split('/')[1]) })))
+  const expectedStage33Groups = [['Y', '링크 미리보기'], ['L', '아이보리 표면·머티리얼'], ['B', '브랜드 아이덴티티'], ['M', '더보기 화면'], ['N', '새 폴더'], ['E', '새 일정 입력'], ['A', '폴더 보관'], ['D', '폴더 하위 트리 복구 삭제'], ['G', '엔지니어링 완료 증거']]
+  if (stage33Groups.length !== 9 || stage33Groups.reduce((sum, group) => sum + group.total, 0) !== 57 || expectedStage33Groups.some(([code, label], index) => stage33Groups[index]?.code !== code || stage33Groups[index]?.label !== label)) throw new Error(`Stage33 Package labels failed: ${JSON.stringify(stage33Groups)}`)
+  console.log('Stage33 UI: koreanPrimary=9 codeSecondary=9 sourceChecks=57')
   await page.getByText('dltmddnr3/dock', { exact: false }).waitFor()
   await page.getByText('15 ahead', { exact: false }).waitFor()
   await page.getByRole('button', { name: /OUTCOME/ }).click()

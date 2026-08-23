@@ -26,15 +26,15 @@ Authority: Cherry-approved OUTCOME-only Builder correction
 - [x] C6: Cherry Note counts and group labels come only from Gate source; absent evidence remains null/unknown.
   CHECK: npm run test:collector -- --test-name-pattern='no invented fallback|source group labels'
   EXPECT: exit 0
-  EVIDENCE: collector 9/9 PASS; missing Gate/rollout yields null counts and percentages. Stage 33 renders 9 source headings and 57/57 checks; Korean-primary remains open because no Package source supplies Korean labels.
+  EVIDENCE: collector 9/9 PASS; missing Gate/rollout yields null counts and percentages. Planner-supplied Cherry Note Package `gate_groups` now provides nine validated Korean primary labels while 57/57 counts remain referenced-Gate evidence; no hardcoded translation table exists.
 - [x] C7: Public API/UI exposes an immutable served build commit/tree receipt while NOW remains live and unpinned, with no secret/runtime IDs.
   CHECK: npm run test:runtime -- --test-name-pattern='served build receipt'
   EXPECT: exit 0
   EVIDENCE: runtime/security 14/14 PASS; API/UI receipt exposes safe repo/ref, 12-character commit/tree and asset identity, labels NOW live/unpinned, and redacts arbitrary full 40/64-hex values and runtime IDs.
-- [ ] C8: Full frontend/Node, production build, local/live browser, public 200/405, redaction, scope, and diff checks pass on one candidate.
+- [x] C8: Full frontend/Node, production build, local/live browser, public 200/405, redaction, scope, and diff checks pass on one candidate.
   CHECK: npm test && npm run build && npm run test:browser && npm run test:security && npm run check:scope && git diff --check
   EXPECT: exit 0
-  EVIDENCE: pending
+  EVIDENCE: candidate `37a08b75a2e6` / tree `92ad7a8b722d` passed frontend 10/10, Node 46/46, production build, local/live 1440×900 and 390×844 geometry/accessibility, public GET 200, mutation 405, redaction, scope and diff checks before exact push.
 - [x] C9: Prior-candidate independent QA evidence is included byte-for-byte and remains `NEEDS_REVISION`, not fresh QA.
   CHECK: test "$(shasum -a 256 docs/STAGE6_INDEPENDENT_UX_PRODUCT_QA_48a488f.md | awk '{print $1}')" = 3561dc76b5ff7e89dddbf5fc381ead2c63223e1623ddd06bb2eba32cac3ec61a
   EXPECT: exit 0

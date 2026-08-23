@@ -99,7 +99,7 @@ Stage ID: `outcome-stage-5`
   PROVES: implementation
   CHECK: npm run test:dashboard -- --test-name-pattern='stage summary'
   EXPECT: exit 0
-  EVIDENCE: Stage summary tests prove closed/total/remaining from Gate checkboxes and null percentage when Gate evidence is absent; Cherry Note Stage 33 renders 9 source-headed groups and 57/57 source checks. Korean-primary labels remain open because the Package does not source them; no hardcoded translation is used.
+  EVIDENCE: Stage summary tests prove closed/total/remaining from Gate checkboxes and null percentage when Gate evidence is absent; Cherry Note Stage 33 Package supplies nine exact `gate_groups` Korean primary labels, the UI renders Gate code secondary, and all 57/57 checks remain derived from the referenced Gate source. Duplicate, missing/blank, and code-mismatched metadata fail closed without a hardcoded translation table.
 - [x] M13: Implementation, test, evidence closure, and recent activity are compact and semantically separate.
   PROVES: implementation
   CHECK: npm run test:dashboard -- --test-name-pattern='evidence layers'

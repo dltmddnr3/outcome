@@ -118,10 +118,26 @@ export function parseGateLedger(markdown, stageId, anchor = '') {
   const groups = []
   for (const gate of gates) {
     let group = groups.find((item) => item.code === gate.groupCode)
-    if (!group) { group = { code: gate.groupCode, name: gate.groupLabel ?? gate.groupCode, total: 0, closed: 0 }; groups.push(group) }
+    if (!group) { const sourceName = gate.groupLabel ?? gate.groupCode; group = { code: gate.groupCode, name: sourceName, sourceName, total: 0, closed: 0 }; groups.push(group) }
     group.total += 1; if (gate.closed) group.closed += 1
   }
   return { gates, groups, total: gates.length, closed: gates.filter((gate) => gate.closed).length }
+}
+
+const projectGateGroupLabels = (metadata, groups, stageId, supplied) => {
+  if (!supplied) return { groups, errors: [] }
+  if (!Array.isArray(metadata) || metadata.length === 0) return { groups, errors: [`gate_group_metadata_conflict:${stageId}:invalid_entry`] }
+  const labels = new Map()
+  for (const entry of metadata) {
+    const code = typeof entry?.code === 'string' && entry.code === entry.code.trim() ? entry.code : ''
+    const label = typeof entry?.primary_label === 'string' ? entry.primary_label.trim() : ''
+    if (!code || !label) return { groups, errors: [`gate_group_metadata_conflict:${stageId}:invalid_entry`] }
+    if (labels.has(code)) return { groups, errors: [`gate_group_metadata_conflict:${stageId}:duplicate_code`] }
+    labels.set(code, sanitizeEvidenceText(label))
+  }
+  const sourceCodes = groups.map((group) => group.code)
+  if (labels.size !== sourceCodes.length || sourceCodes.some((code) => !labels.has(code))) return { groups, errors: [`gate_group_metadata_conflict:${stageId}:code_mismatch`] }
+  return { groups: groups.map((group) => ({ ...group, name: labels.get(group.code) })), errors: [] }
 }
 
 const axisState = (gates, proves) => {
@@ -180,6 +196,9 @@ export function buildPackageModel({ root, contractFile, mapFile, bindingRegistry
         const gateText = gatePath ? safeRead(gatePath) : ''
         if (!gateText) errors.push(`gate_reference_missing:${stage.id}`)
         const ledger = parseGateLedger(gateText, stage.id, gateAnchor)
+        const projectedGroups = projectGateGroupLabels(stage.gate_groups, ledger.groups, stage.id, Object.hasOwn(stage, 'gate_groups'))
+        errors.push(...projectedGroups.errors)
+        ledger.groups = projectedGroups.groups
         const gate = { ...ledger, available: Boolean(gateText), sourceRef: gatePath ? basename(gatePath) : null, observedAt: gatePath && existsSync(gatePath) ? statSync(gatePath).mtime.toISOString() : null }
         return { id: stage.id, title: stage.title, purpose: stage.purpose, dependsOn: stage.depends_on ?? [], gatePurpose: gate.total ? `${stage.title} acceptance checklist` : 'Gate evidence unavailable', gate, sourceState: stage.gate_file_state ?? (gate.available ? 'present' : 'missing'), state: stageState(stage, gate), axes: { implementation: stage.implementation_state ?? axisState(gate.gates, 'implementation'), test: stage.test_state ?? axisState(gate.gates, 'test'), evidence: stage.evidence_closure_state ?? axisState(gate.gates), independentQa: stage.independent_qa_state ?? axisState(gate.gates, 'ux_product_qa'), cherryAcceptance: stage.cherry_acceptance_state ?? axisState(gate.gates, 'cherry_acceptance'), release: stage.release_state ?? axisState(gate.gates, 'release_audit') } }
       }),

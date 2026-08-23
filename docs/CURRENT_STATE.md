@@ -28,6 +28,7 @@ Observed: 2026-08-23 KST
   - 네 역할 binding과 NOW/freshness 표시
   - 프로젝트별 Package truth 분리와 fail-closed source status
   - Stage 상세의 inline responsive 배치
+  - Cherry Note Stage33 Package-sourced Korean primary Gate group labels, with Gate code secondary and 57 source checks
 - 마지막 검증된 대시보드 회귀: Stage 6 correction Gate `GATES_STAGE6_QA_CORRECTION.md`; prior QA verdict remains immutable evidence, not fresh acceptance
 
 ## Cherry Note 최신 관측
@@ -57,7 +58,6 @@ Observed: 2026-08-23 KST
 ## 다음 정확한 작업
 
 1. UX & Product QA: corrected immutable candidate를 fresh affected QA로 다시 검증
-2. Package owner: Stage33 Korean-primary group labels가 필요하면 project Package source에 명시적 Korean labels를 추가; 그 전에는 English source heading을 정직하게 표시
-3. Planner/Cherry: 별도 Gate에서 stable hosting, persistent hostname, access/abuse policy, service supervision과 SLA를 결정
-4. Release Audit: Stage 6 fresh PASS 이후에만 Stage 7 독립 실행·privacy·artifact 재현성을 검증
-5. Cherry: Stage 8에서 Local MVP를 실제 사용하고 별도 수용
+2. Planner/Cherry: 별도 Gate에서 stable hosting, persistent hostname, access/abuse policy, service supervision과 SLA를 결정
+3. Release Audit: Stage 6 fresh PASS 이후에만 Stage 7 독립 실행·privacy·artifact 재현성을 검증
+4. Cherry: Stage 8에서 Local MVP를 실제 사용하고 별도 수용
