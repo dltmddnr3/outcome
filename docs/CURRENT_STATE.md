@@ -5,7 +5,7 @@ Observed: 2026-08-24 KST
 ## OUTCOME 저장소
 
 - 독립 Git 저장소 생성 완료
-- 현재 단계: Stage 7 R1B-1 Builder correction removes non-rendered raw Gate evidence from the public Package projection and adds broad absolute-path sanitation/scanning. Local candidate verification passes, but the explicitly no-restart live origin still serves the previous server module and its public API scan remains red. Planner cumulative `false_completion_count=12` is preserved.
+- 현재 단계: Stage 7 correction candidate `5d8d751ca567` received fresh affected UX & Product QA `PASS` for the path-projection correction. Cumulative `false_completion_count=12` is preserved; Stage 7 remains open pending a new separate Release Audit.
 - dashboard UI, Cherry Note collector, authenticated read-only runtime, tests, styles, and package configuration are now in this repository
 - `/Users/rosum/Documents/ChatGPT/WhiteCastle Desk 2`의 기존 copy는 migration history/rollback reference이며 더 이상 intended product source가 아님
 - OUTCOME 자체 표준 입력:
@@ -32,6 +32,7 @@ Observed: 2026-08-24 KST
 - 마지막 독립 QA 근거: `docs/STAGE6_FRESH_UX_PRODUCT_QA_93b0497.md` (`PASS`, SHA-256 `7235f3ac776bad7aace54d1111dd325d078a6e5863c61373175610549ae42c1a`). `docs/STAGE6_FRESH_UX_PRODUCT_QA_aa90faf.md`의 prior `NEEDS_REVISION`은 불변 이력으로 유지합니다.
 - 마지막 독립 Release Audit 근거: `docs/STAGE7_FRESH_RELEASE_AUDIT_b57edd7.md` (`FAIL`, SHA-256 `82bfa9a4109b95c05387b7116cc64dc605de712411b6eb063c30def25abb243e`). A1/A3/A4의 prior-candidate 확인은 통과했지만 A2 실패로 Stage 7 전체는 열려 있습니다.
 - 마지막 affected QA 근거: `docs/STAGE7_CORRECTION_FRESH_UX_QA_9580c45.md` (`NEEDS_REVISION`, SHA-256 `5376d1fc92be02e928fa368914a89741b7ded92338ebc57ce7a15d3eab398d26`). R2 PID 경계와 UUID redaction은 PASS; R1B absolute POSIX path redaction만 blocking입니다.
+- 최신 path-correction affected QA 근거: `docs/STAGE7_PATH_CORRECTION_FRESH_UX_QA_5d8d751.md` (`PASS`, SHA-256 `e1ca8ef0e1906ec564c4d41c877ff5860afa77a3808cdeb5c217fa6b4fa77f63`). Raw Gate evidence 144개는 public projection에서 제거되고 Stage evidence axes 17/17은 보존됐으며, 68 rendered Stage visits에서 prohibited hit 0입니다.
 
 ## Cherry Note 최신 관측
 
@@ -60,12 +61,10 @@ Observed: 2026-08-24 KST
 - `npm run build`가 live origin이 읽는 ignored `dist/`에 직접 쓰므로, d77a52f startup receipt와 작업 중 asset bytes가 일시적으로 어긋난 운영 드리프트가 관측되었습니다. 이 build window는 exact pin 증거로 사용하지 않으며, candidate commit 이후 exact rebuild/restart로 receipt와 asset identity를 다시 맞춥니다. 원자적 isolated build/swap은 Release Audit 후속 검토 대상입니다.
 - b57edd7 Release Audit의 R1/R2 Builder correction은 raw UUID/delimiter-less role ID sanitizer, API/HTML/bundle zero-hit 검사, actual origin PID self-bookkeeping, command+port/URL validated runtime status/stop, stale PID fail-closed runbook으로 구현·검증했습니다. 현재 tunnel PID record는 실제 PID 76819로 검증 교정했으며 tunnel/URL은 재시작하지 않았습니다. origin record는 corrected candidate의 Planner 재기동 전까지 stale로 fail-closed입니다. Fresh affected QA와 fresh Release Audit은 여전히 필요합니다.
 - 9580c45 affected QA에서 `/tmp`, `/private/tmp`, `/var`, `/opt`, `/etc` absolute POSIX path class가 sanitizer와 public-boundary scanner 양쪽에서 누락된 control gap을 확인했습니다. 공개 projection에서 비표시 Gate evidence를 제거하거나 전체 path class를 fail-closed redaction해야 합니다.
-- R1B-1 correction은 UI가 소비하지 않는 `gate.gates[*].evidence`만 공개 projection에서 제거하고 Stage `axes.evidence`를 보존하며, POSIX path class와 live public surface scan을 추가했습니다. Local API/HTML/bundle/rendered UI는 zero-hit이지만 no-restart origin PID 69313은 이전 server module을 유지해 live API가 여전히 `public:api:localPath`로 실패합니다. Tunnel PID 76819는 유지 중입니다.
+- R1B-1 correction은 UI가 소비하지 않는 `gate.gates[*].evidence`만 공개 projection에서 제거하고 Stage `axes.evidence`를 보존하며, POSIX path class와 live public surface scan을 추가했습니다. Planner activation 뒤 origin PID 98804와 tunnel PID 76819가 검증됐고 fresh affected QA가 local/public zero-hit을 확인했습니다.
 
 ## 다음 정확한 작업
 
-1. Authorized operator: exact corrected commit에서 origin PID 69313만 재기동하고 tunnel PID 76819를 유지한 뒤 public boundary를 재검증한다
+1. Release Audit: corrected activated candidate와 fresh affected QA evidence를 별도 새 session으로 다시 감사한다
 2. Planner/Cherry: 별도 Gate에서 stable hosting, persistent hostname, access/abuse policy, service supervision과 SLA를 결정
-3. UX & Product QA: corrected parsed public payload를 fresh affected session으로 재검증한다
-4. Release Audit: 별도 fresh session으로 A1–A4를 다시 감사한다
-5. Cherry: Stage 8에서 Local MVP를 실제 사용하고 별도 수용
+3. Cherry: Stage 8에서 Local MVP를 실제 사용하고 별도 수용

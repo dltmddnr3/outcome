@@ -33,3 +33,7 @@ The corrected local candidate returns zero prohibited hits across API, HTML, bun
 Exact activation blocker: an authorized operator must restart origin PID 69313 from the exact corrected commit while preserving tunnel PID 76819, then rerun the public boundary scan. This Builder slice does not perform that prohibited restart.
 
 Stage 7 and Stage 8 remain open. Fresh affected QA and fresh Release Audit are still required after exact-candidate activation.
+
+## Planner activation and fresh affected QA
+
+Planner later used the validated origin stop boundary, preserved tunnel PID 76819, and activated exact candidate `5d8d751ca567`. The new origin self-recorded PID 98804, and the public receipt matched commit/tree/asset. Fresh independent affected QA `docs/STAGE7_PATH_CORRECTION_FRESH_UX_QA_5d8d751.md` then returned PASS with zero prohibited hits across local/public API, HTML, bundle, rendered UI, and 68 Stage visits. This closes P4 only; separate Release Audit and Stage 8 remain open.
