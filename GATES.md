@@ -108,6 +108,6 @@ Outcome: A fresh OUTCOME session can understand the product, its evidence, its c
   EVIDENCE: R14_PASS
 
 - [x] R15: GitHub is a standard optional OUTCOME Package connector while credentials remain runtime-only and GitHub activity cannot self-close outcomes.
-  CHECK: rg -q "기본 Source Connector · GitHub" docs/OPERATING_MODEL.md && rg -q "repository: dltmddnr3/outcome" docs/OUTCOME_MAP.md && rg -q "binding_state: connected" docs/OUTCOME_MAP.md && rg -q "observed_published_state: empty_remote" docs/OUTCOME_MAP.md && rg -q "completion_authority: false" docs/OUTCOME_MAP.md && echo R15_PASS
+  CHECK: rg -q "기본 Source Connector · GitHub" docs/OPERATING_MODEL.md && rg -q "repository: dltmddnr3/outcome" docs/OUTCOME_MAP.md && rg -q "binding_state: connected" docs/OUTCOME_MAP.md && rg -q "observed_published_state: published_current" docs/OUTCOME_MAP.md && rg -q "completion_authority: false" docs/OUTCOME_MAP.md && echo R15_PASS
   EXPECT: R15_PASS
-  EVIDENCE: R15_PASS; OUTCOME is connected to the approved public repository and remains truthfully unpublished until the Parent-owned initial push.
+  EVIDENCE: R15_PASS; approved public repository `dltmddnr3/outcome` has `main` published and local HEAD equals `origin/main` at the initial-push receipt; GitHub still has no completion authority.

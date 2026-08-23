@@ -26,7 +26,7 @@ source_connectors:
     remote_name: origin
     default_branch: main
     binding_state: connected
-    observed_published_state: empty_remote
+    observed_published_state: published_current
     evidence_scope:
       - published_commits
       - pull_requests
