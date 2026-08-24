@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { OutcomeDashboard, axisStateLabel, currentHierarchy, deriveScopeState, deriveStageRailState, entityStateLabel, findStage, gateProgress, githubEvidenceItems, heroGateEvidence, hierarchyPlacement, nextStageOptionIndex, nowPresentation, projectHeroModel, selectedStageContext, selectLiveBinding, selectProject, sourceStateLabel, stageDetailSemantics, summarizeStage, timingPresentation, type Binding, type GithubConnector, type PackageProject, type PackageStage } from './OutcomeDashboard'
+import { OutcomeDashboard, axisStateLabel, bindingObservationLabel, currentHierarchy, deriveScopeState, deriveStageRailState, detailContentPolicy, entityStateLabel, findStage, gateGroupPresentation, gateProgress, githubEvidenceItems, heroGateEvidence, hierarchyPlacement, nextStageOptionIndex, nowPresentation, projectHeroModel, selectedGateCount, selectedStageContext, selectLiveBinding, selectProject, sourceStateLabel, stageDetailSemantics, summarizeStage, timingPresentation, type Binding, type GithubConnector, type PackageProject, type PackageStage } from './OutcomeDashboard'
 import { activityLabelKo, axisLabelKo, gatePresentation, groupPresentation, hierarchyLabels, loginErrorPresentation, phasePresentation, projectOutcomePresentation, roleLabel, stagePresentation } from './outcomeKorean'
 
 const stage = (overrides: Partial<PackageStage> = {}): PackageStage => ({ id: 'stage-one', title: 'Stage One', purpose: 'Verify the result', dependsOn: [], gatePurpose: 'Stage One acceptance checklist', sourceState: 'present', state: 'active', gate: { gates: [{ id: 'G1', title: 'closed', closed: true, groupCode: 'G' }, { id: 'G2', title: 'remaining', closed: false, groupCode: 'G' }], groups: [{ code: 'G', name: '증거', closed: 1, total: 2 }], total: 2, closed: 1, available: true, sourceRef: 'GATES.md' }, axes: { implementation: 'active', test: 'pending', evidence: 'pending', independentQa: 'not_started', cherryAcceptance: 'pending', release: 'not_started' }, ...overrides })
@@ -30,6 +30,36 @@ describe('OUTCOME Package dashboard', () => {
     expect(source).toContain('role="option"')
     expect(source).toContain('aria-selected')
     expect(source).not.toContain('aria-pressed')
+  })
+  it('선택 작업 단계 완료 조건은 실제 closed total을 표시한다', () => {
+    expect(selectedGateCount(stage())).toBe('1/2')
+    expect(selectedGateCount(stage({ gate: { gates: [], groups: [], total: 0, closed: 0, available: false, sourceRef: null } }))).toBe('완료 조건 근거 없음')
+    expect(selectedGateCount(stage({ state: 'complete', gate: { gates: [], groups: [], total: 10, closed: 10, available: true, sourceRef: 'GATES.md' } }))).toBe('10/10')
+  })
+  it('현재 선택 상세는 완료 조건과 경계를 중복하지 않는다', () => {
+    expect(detailContentPolicy(false)).toEqual({ showTitle: false, showPurpose: false, showBoundary: false, showGateList: false })
+    expect(detailContentPolicy(true)).toEqual({ showTitle: true, showPurpose: true, showBoundary: true, showGateList: true })
+    const source = OutcomeDashboard.toString()
+    expect(source).toContain('data-current-boundary')
+    expect(source).toContain('data-selected-boundary')
+    expect(source).toContain('data-current-gates')
+    expect(source).toContain('data-selected-gates')
+  })
+  it('완료 조건 그룹은 source label과 code를 필요한 경우에만 표시한다', () => {
+    expect(gateGroupPresentation('RA', 'RA')).toEqual({ primaryLabel: null, secondaryCode: null })
+    expect(gateGroupPresentation('물리 수용 경계', 'P33A')).toEqual({ primaryLabel: '물리 수용 경계', secondaryCode: 'P33A' })
+  })
+  it('작업 단계 listbox는 이름 있는 group만 option을 소유한다', () => {
+    const source = OutcomeDashboard.toString()
+    expect(source).toMatch(/groupLabelId[\s\S]{0,600}role: "group"[\s\S]{0,200}"aria-labelledby": groupLabelId/)
+    expect(source).not.toContain('className="oc-stage-group" key={group.scope.id} aria-label=')
+  })
+  it('역할 관측과 프로젝트 식별자는 primary에서 중복되지 않는다', () => {
+    expect(bindingObservationLabel({ role: 'builder', status: 'stale', activity: null, boundAt: null, observedAt: null, freshness: 'stale', historyCount: 0 })).toBe('관측 오래됨')
+    expect(bindingObservationLabel({ role: 'builder', status: 'idle', activity: null, boundAt: null, observedAt: null, freshness: 'fresh', historyCount: 0 })).toBe('대기 중 · 최근 관측')
+    const source = OutcomeDashboard.toString()
+    expect(source).not.toContain('<small>프로젝트 식별자 · {project.project.id}</small>')
+    expect(source).toContain('기술 증거 · 프로젝트 식별자')
   })
   it('정보 구조 리뉴얼은 핵심 source-grounded 기능을 보존한다', () => {
     const source = OutcomeDashboard.toString()

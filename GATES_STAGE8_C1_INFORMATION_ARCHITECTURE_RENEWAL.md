@@ -52,7 +52,7 @@ Authority: Cherry의 2026-08-24 세 이미지 비교 피드백과 `docs/STAGE8_C
   EVIDENCE: frontend 39, Node 64, security 16, browser harness 3, local public boundary prohibited=0, mutations 24/24=405, scope 17 paths, runbook/build/diff PASS. `false_completion_count=13` 보존.
 - [ ] I11: exact public candidate에서 fresh independent UX & Product QA가 초안 대비 glanceability, 역할 축소, 통합 flow, master-detail, truth, desktop/mobile을 PASS한다.
   PROVES: fresh_independent_qa
-  EVIDENCE: pending
+  EVIDENCE: exact public candidate `36b07cc2141bb00074c75664cfe615ae49911daa` / tree `a8692b2440fa7751b664166d2780c7340e54a430` / asset `index-B2epVH5T.js`의 fresh independent QA는 `NEEDS_REVISION`이었다. closed/total, current-detail 중복, Gate group 배치, listbox group ownership과 두 polishing 결함을 bounded correction candidate에서 교정했으나 fresh QA 재검증 전이므로 pending을 유지한다.
 - [ ] I12: fresh QA PASS 뒤 Cherry가 공개 화면을 직접 보고 C1 또는 추가 디테일을 결정한다.
   PROVES: cherry_acceptance
   EVIDENCE: pending
