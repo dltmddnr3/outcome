@@ -1,8 +1,16 @@
 import assert from 'node:assert/strict'
-import { existsSync, readFileSync } from 'node:fs'
+import { execFileSync } from 'node:child_process'
+import { existsSync, readFileSync, writeFileSync } from 'node:fs'
 import test from 'node:test'
-import { handleStableHostRequest } from '../api/index.mjs'
-import snapshot from '../snapshot/outcome-package-public.json' with { type: 'json' }
+import source from '../snapshot/outcome-package-source.json' with { type: 'json' }
+import { assertFinalizedReceipt, extractBuiltAsset, finalizeDeploymentSnapshot } from '../scripts/finalize-stable-snapshot.mjs'
+
+if (process.env.OUTCOME_ASSERT_BUILT !== '1') {
+  const fixture = finalizeDeploymentSnapshot({ source, commit: '1111111111111111111111111111111111111111', tree: '2222222222222222222222222222222222222222', asset: 'index-test.js' })
+  writeFileSync(new URL('../api/deployment-snapshot.mjs', import.meta.url), `export default ${JSON.stringify(fixture)}\n`, 'utf8')
+}
+const { handleStableHostRequest } = await import('../api/index.mjs')
+const { default: snapshot } = await import('../api/deployment-snapshot.mjs')
 
 const request = (method, pathname) => handleStableHostRequest({ method, pathname })
 
@@ -13,6 +21,19 @@ test('stable host exposes the public Package snapshot needed by the app', () => 
   assert.equal(response.body.dashboard.snapshot.source, 'sanitized_public_projection')
   assert.equal(response.body.dashboard.snapshot.liveSessionRelay, false)
   assert.equal(response.body.dashboard.projects.length >= 2, true)
+})
+
+test('stale or null source receipt is rejected before serving', () => {
+  const stale = { ...source, build: { repository: 'dltmddnr3/outcome', ref: 'main', commit: 'ef2b9719d780', tree: 'b5192111b034', asset: null, runtimeNowPinned: false } }
+  assert.throws(() => assertFinalizedReceipt(stale, { commit: 'eab0cdfd19eda14bb317de00bd9875f91060c032', tree: 'eb99c218f193b9d09702f698fca33963b35f8e0f', asset: 'index-f7tnHLzV.js' }), /stale/)
+})
+
+test('deployment finalization pins exact commit tree and built asset while preserving source capture time', () => {
+  const finalized = finalizeDeploymentSnapshot({ source, commit: '123456789abc0123456789abcdef0123456789ab', tree: 'abcdef1234560123456789abcdef0123456789ab', asset: 'index-exact123.js' })
+  assertFinalizedReceipt(finalized, { commit: '123456789abc0123456789abcdef0123456789ab', tree: 'abcdef1234560123456789abcdef0123456789ab', asset: 'index-exact123.js' })
+  assert.equal(finalized.snapshot.capturedAt, source.snapshot.capturedAt)
+  assert.equal(finalized.build.commit, '123456789abc')
+  assert.equal(finalized.build.tree, 'abcdef123456')
 })
 
 test('stable host exposes public read-only session and health GETs', () => {
@@ -35,6 +56,7 @@ test('stable snapshot has no prohibited disclosure or Gate evidence fields', () 
   for (const pattern of [/\/Users\//, /\/tmp\//, /(?:session|thread|turn|task)[_-]?id/i, /\b[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}\b/i, /\b[0-9a-f]{40}\b/i, /\b[0-9a-f]{64}\b/i, /(?:token|secret|password|authorization)\s*[:=]/i]) assert.doesNotMatch(text, pattern)
   for (const project of snapshot.projects) for (const phase of project.phases ?? []) for (const scope of phase.scopes ?? []) for (const stage of scope.stages ?? []) for (const gate of stage.gate?.gates ?? []) assert.equal(Object.hasOwn(gate, 'evidence'), false)
   assert.equal(snapshot.snapshot.boundary, 'deployment_snapshot')
+  assert.notEqual(snapshot.build.asset, null)
 })
 
 test('Vercel config preserves dashboard route fallback and built output contract', () => {
@@ -46,5 +68,9 @@ test('Vercel config preserves dashboard route fallback and built output contract
     assert.equal(existsSync(new URL('../dist/index.html', import.meta.url)), true)
     const html = readFileSync(new URL('../dist/index.html', import.meta.url), 'utf8')
     assert.match(html, /\/assets\/index-[A-Za-z0-9_-]+\.js/)
+    const git = (...args) => { try { return execFileSync('git', args, { encoding: 'utf8', stdio: ['ignore', 'pipe', 'ignore'] }).trim() } catch { return null } }
+    const commit = process.env.VERCEL_GIT_COMMIT_SHA ?? git('rev-parse', 'HEAD')
+    const tree = process.env.OUTCOME_DEPLOY_TREE ?? (commit ? git('rev-parse', `${commit}^{tree}`) : null)
+    assertFinalizedReceipt(snapshot, { commit, tree, asset: extractBuiltAsset(html) })
   }
 })

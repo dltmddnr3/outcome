@@ -1,6 +1,6 @@
 {
   "schemaVersion": 2,
-  "observedAt": "2026-08-24T09:29:06.439Z",
+  "observedAt": "2026-08-24T09:36:38.701Z",
   "projects": [
     {
       "status": "valid",
@@ -2605,9 +2605,9 @@
           "localCandidate": {
             "state": "available",
             "branch": "main",
-            "ahead": 0,
+            "ahead": 1,
             "behind": 0,
-            "sync": "synced"
+            "sync": "ahead"
           },
           "published": {
             "state": "connected",
@@ -2685,17 +2685,9 @@
   ],
   "snapshot": {
     "boundary": "deployment_snapshot",
-    "capturedAt": "2026-08-24T09:29:06.439Z",
+    "capturedAt": "2026-08-24T09:36:38.701Z",
     "source": "sanitized_public_projection",
     "liveSessionRelay": false,
     "refreshBehavior": "new_deployment_required"
-  },
-  "build": {
-    "repository": "dltmddnr3/outcome",
-    "ref": "main",
-    "commit": "ef2b9719d780",
-    "tree": "b5192111b034",
-    "asset": null,
-    "runtimeNowPinned": false
   }
 }

@@ -1,4 +1,4 @@
-import snapshot from '../snapshot/outcome-package-public.json' with { type: 'json' }
+import snapshot from './deployment-snapshot.mjs'
 
 const result = (status, body) => ({ status, body })
 

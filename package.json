@@ -10,7 +10,7 @@
     "dev": "vite --host 127.0.0.1",
     "start": "node server/index.mjs",
     "build": "tsc -b && vite build",
-    "build:vercel": "node scripts/validate-stable-snapshot.mjs && tsc -b && vite build && OUTCOME_ASSERT_BUILT=1 node --test server/stable-host.test.mjs",
+    "build:vercel": "node scripts/validate-stable-snapshot.mjs && tsc -b && vite build && node scripts/finalize-stable-snapshot.mjs && OUTCOME_ASSERT_BUILT=1 node --test server/stable-host.test.mjs",
     "build:isolated": "tsc -b && vite build --outDir .outcome-runtime/candidate-dist --emptyOutDir",
     "test": "vitest run && node --test server/*.test.mjs",
     "test:dashboard": "vitest run src/components",
