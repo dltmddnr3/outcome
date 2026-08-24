@@ -1,14 +1,16 @@
 {
   "schemaVersion": 2,
-  "observedAt": "2026-08-24T12:01:35.988Z",
+  "observedAt": "2026-08-24T23:58:58.382Z",
   "projects": [
     {
-      "status": "valid",
-      "errors": [],
-      "observedAt": "2026-08-23T23:14:47.050Z",
+      "status": "conflict",
+      "errors": [
+        "current_stage_gate_closed_conflict"
+      ],
+      "observedAt": "2026-08-24T15:35:24.793Z",
       "sourceFreshness": {
         "state": "observed",
-        "observedAt": "2026-08-23T23:14:47.050Z"
+        "observedAt": "2026-08-24T15:35:24.793Z"
       },
       "project": {
         "id": "cherry-note",
@@ -1259,7 +1261,7 @@
                         "id": "ANQ1",
                         "stageId": "stage-ux-product-qa",
                         "title": "Fresh isolated reviewer pins the exact candidate identity and five-path scope.",
-                        "closed": false,
+                        "closed": true,
                         "groupCode": "ANQ",
                         "groupLabel": null,
                         "proves": null
@@ -1268,7 +1270,7 @@
                         "id": "ANQ2",
                         "stageId": "stage-ux-product-qa",
                         "title": "Source, generated plist and built bundle names independently match the canonical values.",
-                        "closed": false,
+                        "closed": true,
                         "groupCode": "ANQ",
                         "groupLabel": null,
                         "proves": null
@@ -1277,7 +1279,7 @@
                         "id": "ANQ3",
                         "stageId": "stage-ux-product-qa",
                         "title": "All three permission descriptions independently contain clear Korean 체리노트 copy.",
-                        "closed": false,
+                        "closed": true,
                         "groupCode": "ANQ",
                         "groupLabel": null,
                         "proves": null
@@ -1286,7 +1288,7 @@
                         "id": "ANQ4",
                         "stageId": "stage-ux-product-qa",
                         "title": "Internal identity and build/version invariants are independently preserved.",
-                        "closed": false,
+                        "closed": true,
                         "groupCode": "ANQ",
                         "groupLabel": null,
                         "proves": null
@@ -1295,7 +1297,7 @@
                         "id": "ANQ5",
                         "stageId": "stage-ux-product-qa",
                         "title": "Name contracts and proportional regressions pass in the fresh lane.",
-                        "closed": false,
+                        "closed": true,
                         "groupCode": "ANQ",
                         "groupLabel": null,
                         "proves": null
@@ -1304,7 +1306,7 @@
                         "id": "ANQ6",
                         "stageId": "stage-ux-product-qa",
                         "title": "Rendered or installed simulator evidence checks relevant user-visible naming surfaces.",
-                        "closed": false,
+                        "closed": true,
                         "groupCode": "ANQ",
                         "groupLabel": null,
                         "proves": null
@@ -1313,7 +1315,7 @@
                         "id": "ANQ7",
                         "stageId": "stage-ux-product-qa",
                         "title": "Reviewer records failures, flakes and false_completion_count without reusing prior verdicts.",
-                        "closed": false,
+                        "closed": true,
                         "groupCode": "ANQ",
                         "groupLabel": null,
                         "proves": null
@@ -1322,7 +1324,7 @@
                         "id": "ANQ8",
                         "stageId": "stage-ux-product-qa",
                         "title": "Fresh UX/Product verdict is explicit and grants no Release Audit, distribution or Cherry acceptance authority.",
-                        "closed": false,
+                        "closed": true,
                         "groupCode": "ANQ",
                         "groupLabel": null,
                         "proves": null
@@ -1334,17 +1336,17 @@
                         "name": "ANQ",
                         "sourceName": "ANQ",
                         "total": 8,
-                        "closed": 0
+                        "closed": 8
                       }
                     ],
                     "total": 8,
-                    "closed": 0,
+                    "closed": 8,
                     "available": true,
                     "sourceRef": "GATES_UX_PRODUCT_QA_APP_NAME_CORRECTION.md",
-                    "observedAt": "2026-08-23T23:14:47.050Z"
+                    "observedAt": "2026-08-24T15:35:24.793Z"
                   },
                   "sourceState": "current_candidate_open_0_of_8",
-                  "state": "active",
+                  "state": "gates_closed_evidence_pending",
                   "axes": {
                     "implementation": "exact_1cdec3f_frozen",
                     "test": "not_started_preflight_hold",
@@ -1694,10 +1696,10 @@
     {
       "status": "valid",
       "errors": [],
-      "observedAt": "2026-08-24T12:00:57.361Z",
+      "observedAt": "2026-08-24T23:48:56.100Z",
       "sourceFreshness": {
         "state": "observed",
-        "observedAt": "2026-08-24T12:00:57.361Z"
+        "observedAt": "2026-08-24T23:48:56.100Z"
       },
       "project": {
         "id": "outcome",
@@ -2091,7 +2093,7 @@
                     "closed": 10,
                     "available": true,
                     "sourceRef": "GATES_OUTCOME_MVP.md",
-                    "observedAt": "2026-08-24T11:49:37.042Z"
+                    "observedAt": "2026-08-24T23:42:25.359Z"
                   },
                   "sourceState": "present",
                   "state": "complete",
@@ -2174,7 +2176,7 @@
                     "closed": 5,
                     "available": true,
                     "sourceRef": "GATES_OUTCOME_MVP.md",
-                    "observedAt": "2026-08-24T11:49:37.042Z"
+                    "observedAt": "2026-08-24T23:42:25.359Z"
                   },
                   "sourceState": "present",
                   "state": "complete",
@@ -2266,7 +2268,7 @@
                     "closed": 6,
                     "available": true,
                     "sourceRef": "GATES_OUTCOME_MVP.md",
-                    "observedAt": "2026-08-24T11:49:37.042Z"
+                    "observedAt": "2026-08-24T23:42:25.359Z"
                   },
                   "sourceState": "present",
                   "state": "complete",
@@ -2347,7 +2349,7 @@
                     "closed": 4,
                     "available": true,
                     "sourceRef": "GATES_OUTCOME_MVP.md",
-                    "observedAt": "2026-08-24T11:49:37.042Z"
+                    "observedAt": "2026-08-24T23:42:25.359Z"
                   },
                   "sourceState": "present",
                   "state": "complete",
@@ -2421,7 +2423,7 @@
                     "closed": 4,
                     "available": true,
                     "sourceRef": "GATES_OUTCOME_MVP.md",
-                    "observedAt": "2026-08-24T11:49:37.042Z"
+                    "observedAt": "2026-08-24T23:42:25.359Z"
                   },
                   "sourceState": "present",
                   "state": "complete",
@@ -2449,7 +2451,7 @@
                         "id": "C1",
                         "stageId": "outcome-stage-8",
                         "title": "Cherry uses OUTCOME and confirms both Cherry Note and OUTCOME current location and next action are understandable within 30 seconds.",
-                        "closed": false,
+                        "closed": true,
                         "groupCode": "C",
                         "groupLabel": null,
                         "proves": "cherry_acceptance"
@@ -2458,7 +2460,7 @@
                         "id": "C2",
                         "stageId": "outcome-stage-8",
                         "title": "Cherry explicitly accepts Local MVP closure; release or external completion remains a separate decision.",
-                        "closed": false,
+                        "closed": true,
                         "groupCode": "C",
                         "groupLabel": null,
                         "proves": "cherry_acceptance"
@@ -2470,23 +2472,23 @@
                         "name": "C",
                         "sourceName": "C",
                         "total": 2,
-                        "closed": 0
+                        "closed": 2
                       }
                     ],
                     "total": 2,
-                    "closed": 0,
+                    "closed": 2,
                     "available": true,
                     "sourceRef": "GATES_OUTCOME_MVP.md",
-                    "observedAt": "2026-08-24T11:49:37.042Z"
+                    "observedAt": "2026-08-24T23:42:25.359Z"
                   },
                   "sourceState": "present",
-                  "state": "active",
+                  "state": "complete",
                   "axes": {
                     "implementation": "not_sourced",
                     "test": "not_sourced",
-                    "evidence": "pending",
+                    "evidence": "evidence_closed",
                     "independentQa": "not_sourced",
-                    "cherryAcceptance": "pending",
+                    "cherryAcceptance": "evidence_closed",
                     "release": "not_sourced"
                   }
                 }
@@ -2780,10 +2782,10 @@
                     "closed": 0,
                     "available": true,
                     "sourceRef": "GATES_PHASE2_ACCOUNT_ACCESS_DEFINITION.md",
-                    "observedAt": "2026-08-24T12:00:57.361Z"
+                    "observedAt": "2026-08-24T23:48:56.100Z"
                   },
                   "sourceState": "present",
-                  "state": "queued",
+                  "state": "active",
                   "axes": {
                     "implementation": "not_sourced",
                     "test": "not_sourced",
@@ -2901,15 +2903,11 @@
         }
       },
       "current": {
-        "phaseId": "outcome-phase-1",
-        "scopeId": "outcome-scope-acceptance",
-        "stageId": "outcome-stage-8"
-      },
-      "next": {
         "phaseId": "outcome-phase-2",
         "scopeId": "outcome-phase-2-account-service",
         "stageId": "outcome-stage-account-access-definition"
       },
+      "next": null,
       "bindings": [
         {
           "role": "planner",
@@ -2966,7 +2964,7 @@
   ],
   "snapshot": {
     "boundary": "deployment_snapshot",
-    "capturedAt": "2026-08-24T12:01:35.988Z",
+    "capturedAt": "2026-08-24T23:58:58.382Z",
     "source": "sanitized_public_projection",
     "liveSessionRelay": false,
     "refreshBehavior": "new_deployment_required"

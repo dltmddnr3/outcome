@@ -4,6 +4,7 @@
 
 - Fixed public URL: `https://outcome-five.vercel.app/cherry-note-dashboard`
 - Provider/project: Vercel · WhiteCastle · `outcome`
+- Deployment automation: Vercel project `outcome` is connected to GitHub `dltmddnr3/outcome`; pushes to `main` create the production candidate after the repository connection approved by Cherry on 2026-08-25 KST.
 - First verified production deployment: `dpl_295fnPLU1qGCc2RkmYG1ZB3UTjgQ` · `READY`
 - Receipt contract: the public API commit/tree/asset must match exact `origin/main`; stale/null receipt fails closed.
 - Snapshot capture: `2026-08-24T09:36:38.701Z`
