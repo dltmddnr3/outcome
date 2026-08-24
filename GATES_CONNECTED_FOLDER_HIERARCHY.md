@@ -36,6 +36,8 @@
 
 ## F5 · 공개 증거
 
-- [ ] `origin/main`의 exact commit/tree/asset이 공개 URL에 반영된다.
-- [ ] 공개 화면 GET 200, `/api/dashboard` mutation 405, public-boundary prohibited hit 0이다.
-- [ ] Cherry acceptance, release approval, `MVP_SCOPE_CLOSED`, `EXTERNAL_OUTCOME_COMPLETE`는 별도 미결 경계로 남긴다.
+- [x] `origin/main`의 exact commit/tree/asset이 공개 URL에 반영된다.
+- [x] 공개 화면 GET 200, `/api/dashboard` mutation 405, public-boundary prohibited hit 0이다.
+- [x] Cherry acceptance, release approval, `MVP_SCOPE_CLOSED`, `EXTERNAL_OUTCOME_COMPLETE`는 별도 미결 경계로 남긴다.
+
+근거: production alias `outcome-five.vercel.app`에서 page/API 200, mutation 24/24 405, API/HTML/bundle/rendered UI prohibited identifier 0 및 원격 desktop/mobile 전체 계층 검증 통과. 최종 Gate 영수증 commit 반영 후 exact receipt를 다시 고정한다.
