@@ -17,8 +17,8 @@ Outcome: 모바일에서 사용자가 지금 보고 있는 목록이 페이즈·
 - [x] L5: 390×844, 375×812, 844×390과 1440×900에서 영문 fallback·겹침·잘림·가로 넘침이 0이고 reduced motion·키보드·초점 계약이 유지된다.
   PROVES: test
   EVIDENCE: full local/stable/portfolio browser matrices PASS; 1440×900, 390×844, 375×812, 844×390에서 unexpected English, fallback, clipped, intersections, viewport/document overflow가 모두 0이고 reduced motion static=true다.
-- [ ] L6: exact candidate가 고정 공개 주소에서 commit/tree/asset receipt, GET 200, mutation 405와 동일한 모바일 층위 신호를 제공한다.
+- [x] L6: exact candidate가 고정 공개 주소에서 commit/tree/asset receipt, GET 200, mutation 405와 동일한 모바일 층위 신호를 제공한다.
   PROVES: evidence
-  EVIDENCE: pending
+  EVIDENCE: production deployment `dpl_GMSodzPmqjQpM3A5ojHJK6tEEXd3`가 고정 주소에서 candidate `750ce6aff8c6` / tree `cb4abd072a0b` / asset `index-BicBEPAE.js`를 제공했다. Public desktop/mobile full hierarchy traversal PASS, GET 200, mutation 24/24=405, prohibited disclosure=0이며 Gate-close-only descendant도 동일 UI asset과 검사를 다시 통과해야 한다.
 
 ABANDON: 위계 의미, Gate count, 프로젝트 진행 상태, 계정 Stage K1-K6, C1-C2와 release authority는 이 시각 교정으로 변경하지 않는다.
