@@ -17,9 +17,9 @@ Outcome: 세 번째 이후 프로젝트도 코드에 프로젝트 이름이나 �
 - [x] P5: 로컬 레지스트리 경로와 source credential은 공개 snapshot/API/UI에 포함되지 않고, GET-only·mutation 405·completion authority false 경계를 유지한다.
   PROVES: security
   EVIDENCE: fresh detached security tests 27/27와 stable snapshot disclosure probe PASS; registry root/path/credential과 raw Gate evidence는 public projection에 없고 stable API는 GET-only, mutation 405, `completion_authority=false`를 보존한다.
-- [ ] P6: exact candidate가 전체 회귀와 fresh affected UX & Product QA를 통과하고 고정 공개 주소에서 Git commit/tree/asset과 일치한다.
+- [x] P6: exact candidate가 전체 회귀와 fresh affected UX & Product QA를 통과하고 고정 공개 주소에서 Git commit/tree/asset과 일치한다.
   PROVES: evidence
-  EVIDENCE: pending
+  EVIDENCE: fresh affected QA PASS 뒤 candidate `7f32f429bfaf` / tree `bd80c35cc838` / asset `index-CrD1KR7s.js`를 production deployment `dpl_71n65XTmFni6NHZhCZC7p8QdGBQB`로 활성화했다. `https://outcome-five.vercel.app/cherry-note-dashboard`와 public API가 exact receipt를 반환했고 GET 200, desktop/mobile hierarchy 43 selections·20 Stages, fallback/overlap/overflow=0, prohibited disclosure=0, mutation 24/24=405를 통과했다. Gate-close-only descendant도 같은 asset과 snapshot boundary로 다시 배포·검증한다.
 
 ABANDON: 실제 제3 프로젝트 등록은 그 프로젝트의 Contract·Map·Gates와 root authority가 제공된 뒤 별도 Gate로 수행한다.
 ABANDON: 계정, 권한, durable database, 다중 PC/CLI collector, live session relay, dispatch, custom domain, release approval은 이 Stage 범위가 아니다.
