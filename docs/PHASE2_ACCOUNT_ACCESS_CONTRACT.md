@@ -1,6 +1,7 @@
 # Phase 2 · Account Access Outcome Contract
 
 Status: `DRAFT · CHERRY DECISION REQUIRED`
+Updated: 2026-08-25 KST
 
 Decision boundary: `NO_ACCOUNT_IMPLEMENTATION_BEFORE_CHERRY_DECISION`
 
@@ -13,7 +14,7 @@ Cherry가 고정 공개 주소의 정제된 결과 지도는 계속 안전하게
 - The fixed public snapshot is available at `https://outcome-five.vercel.app/cherry-note-dashboard` and remains sanitized, GET-only, mutation-denied, and deployment-pinned.
 - Registered Package portfolio foundation is evidence-closed for a validated registry and three-project fixture; the actual public registry still contains Cherry Note and OUTCOME only.
 - The current deployment is a snapshot. It is not a durable database, live session relay, multi-PC collector, dispatch service, or completion authority.
-- Phase 1 owner-only C1-C2, release approval, `MVP_SCOPE_CLOSED`, and `EXTERNAL_OUTCOME_COMPLETE` remain open.
+- Phase 1 C1-C2 and the internal-use Local MVP scope were accepted by Cherry on 2026-08-25 KST. This does not approve an external public MVP, release, or `EXTERNAL_OUTCOME_COMPLETE`.
 
 ## Recommended v1 boundary
 

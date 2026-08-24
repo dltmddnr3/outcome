@@ -17,7 +17,7 @@ Outcome: Cherry의 2026-08-25 내부사용 종료 승인을 Phase 1 Local MVP에
 - [x] H4: K1–K6는 결정 전 상태로 유지되며 인증·DB·secret 제품 변경은 시작되지 않는다.
   CHECK: test "$(rg -c '^- \[ \] K[1-6]:' GATES_PHASE2_ACCOUNT_ACCESS_DEFINITION.md)" = 6 && rg -q 'provider 설치, 계정 생성, secret·database·domain 변경' GATES_PHASE2_ACCOUNT_ACCESS_DEFINITION.md && echo H4_PASS
   EXPECT: H4_PASS
-  EVIDENCE: all K1–K6 remain unchecked; docs/PHASE2_ACCOUNT_ACCESS_DECISION_BRIEF.md is labeled recommendation draft and the ABANDON boundary remains explicit.
+  EVIDENCE: all K1–K6 remain unchecked; docs/PHASE2_ACCOUNT_ACCESS_CONTRACT.md is labeled Cherry decision required and the ABANDON boundary remains explicit.
 - [x] H5: Package parser, frontend, Node, production build가 모두 통과한다.
   CHECK: npm test && npm run build
   EXPECT: exit 0

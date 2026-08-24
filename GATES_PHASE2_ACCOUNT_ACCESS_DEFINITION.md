@@ -2,7 +2,7 @@
 
 Outcome: 계정 구현을 시작하기 전에 공개 배포본과 인증된 비공개 작업공간의 경계, 사용자·프로젝트 권한, 데이터 수명주기와 운영 책임을 Cherry가 선택한 검증 가능한 계약으로 고정한다.
 
-Decision brief: `docs/PHASE2_ACCOUNT_ACCESS_DECISION_BRIEF.md` (추천 초안이며 Gate evidence가 아님)
+Decision contract: `docs/PHASE2_ACCOUNT_ACCESS_CONTRACT.md` (추천 초안이며 Gate evidence가 아님)
 
 - [ ] K1: Cherry가 1차 사용자 범위와 공개 화면·비공개 작업공간의 분리를 승인한다.
   PROVES: cherry_decision
