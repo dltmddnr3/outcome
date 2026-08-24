@@ -1,6 +1,6 @@
 # OUTCOME public read-only remote access
 
-Status: Cherry-approved temporary public HTTPS mode using Cloudflare Quick Tunnel.
+Status: Cherry-approved fixed Vercel snapshot host is the stable feedback endpoint. Cloudflare Quick Tunnel is retained only as historical temporary-local access guidance.
 
 ## Architecture
 
@@ -84,8 +84,16 @@ Each stop refuses a missing, malformed, dead, wrong-command, or wrong-port/URL P
 
 After any Mac Mini restart, repeat the two validated start commands and re-run all public probes. The old URL must be treated as expired because Quick Tunnel assigns a new random URL on restart. Never copy a historical PID into runtime bookkeeping: `status` must confirm current command identity and origin port/tunnel URL relation. The current temporary URL remains recorded in `.outcome-runtime/public-url`; its process lifetime, not a documentation value, is authoritative.
 
-## Stable hosting follow-up Gate
+## Stable snapshot host
 
-Quick Tunnel closes only the temporary public-feedback slice. A later Gate must select stable hosting, persistent hostname/domain, access policy, service supervision, monitoring/SLA, secret ownership, abuse controls, and rollback. That Gate requires separate Cherry approval and must not infer a paid purchase, domain transfer, or public mutation authority.
+Cherry approved a persistent public feedback host after the Quick Tunnel returned Error 1033. The fixed production route is:
+
+`https://outcome-five.vercel.app/cherry-note-dashboard`
+
+This Vercel route survives Mac origin and Quick Tunnel process exits. It serves only the sanitized Package snapshot captured for the deployment, and the UI explicitly says `배포 스냅샷 · 실시간 세션 연결 대기 · 새 배포 시 갱신`. GET is public read-only; API and page mutations fail with 405. A new deployment is required to refresh the snapshot.
+
+Rollback is a Vercel production rollback to the prior READY deployment or redeployment of a previously verified commit/tree/asset. The local Quick Tunnel is no longer the stable feedback endpoint.
+
+Stable live session relay, account access, custom-domain ownership, service SLA, secret ownership and abuse controls remain separate Phase 2 Gates. This snapshot host does not infer those outcomes or any paid purchase/domain transfer.
 
 Atomic isolated `dist` build/swap, a stable hostname and supervisor, configurable validated Package roots, and explicit authenticated-cookie hardening remain Stage 7 operational follow-ups. They are not implemented by the PID/redaction corrective slice.

@@ -1,6 +1,6 @@
 {
   "schemaVersion": 2,
-  "observedAt": "2026-08-24T09:36:38.701Z",
+  "observedAt": "2026-08-24T10:02:31.138Z",
   "projects": [
     {
       "status": "valid",
@@ -1694,10 +1694,10 @@
     {
       "status": "valid",
       "errors": [],
-      "observedAt": "2026-08-24T08:04:22.858Z",
+      "observedAt": "2026-08-24T10:02:23.684Z",
       "sourceFreshness": {
         "state": "observed",
-        "observedAt": "2026-08-24T08:04:22.858Z"
+        "observedAt": "2026-08-24T10:02:23.684Z"
       },
       "project": {
         "id": "outcome",
@@ -2091,7 +2091,7 @@
                     "closed": 10,
                     "available": true,
                     "sourceRef": "GATES_OUTCOME_MVP.md",
-                    "observedAt": "2026-08-24T08:04:22.858Z"
+                    "observedAt": "2026-08-24T10:02:23.684Z"
                   },
                   "sourceState": "present",
                   "state": "complete",
@@ -2174,7 +2174,7 @@
                     "closed": 5,
                     "available": true,
                     "sourceRef": "GATES_OUTCOME_MVP.md",
-                    "observedAt": "2026-08-24T08:04:22.858Z"
+                    "observedAt": "2026-08-24T10:02:23.684Z"
                   },
                   "sourceState": "present",
                   "state": "complete",
@@ -2266,7 +2266,7 @@
                     "closed": 6,
                     "available": true,
                     "sourceRef": "GATES_OUTCOME_MVP.md",
-                    "observedAt": "2026-08-24T08:04:22.858Z"
+                    "observedAt": "2026-08-24T10:02:23.684Z"
                   },
                   "sourceState": "present",
                   "state": "complete",
@@ -2347,7 +2347,7 @@
                     "closed": 4,
                     "available": true,
                     "sourceRef": "GATES_OUTCOME_MVP.md",
-                    "observedAt": "2026-08-24T08:04:22.858Z"
+                    "observedAt": "2026-08-24T10:02:23.684Z"
                   },
                   "sourceState": "present",
                   "state": "complete",
@@ -2421,7 +2421,7 @@
                     "closed": 4,
                     "available": true,
                     "sourceRef": "GATES_OUTCOME_MVP.md",
-                    "observedAt": "2026-08-24T08:04:22.858Z"
+                    "observedAt": "2026-08-24T10:02:23.684Z"
                   },
                   "sourceState": "present",
                   "state": "complete",
@@ -2477,7 +2477,7 @@
                     "closed": 0,
                     "available": true,
                     "sourceRef": "GATES_OUTCOME_MVP.md",
-                    "observedAt": "2026-08-24T08:04:22.858Z"
+                    "observedAt": "2026-08-24T10:02:23.684Z"
                   },
                   "sourceState": "present",
                   "state": "active",
@@ -2504,7 +2504,98 @@
               "id": "outcome-phase-2-public-hosting",
               "title": "Stable public delivery",
               "purpose": "임시 tunnel이 아닌 안정 주소와 운영 경계를 정의한다.",
-              "stages": []
+              "stages": [
+                {
+                  "id": "outcome-stage-stable-snapshot-host",
+                  "title": "Stable snapshot host",
+                  "purpose": "Mac origin과 임시 tunnel에 의존하지 않는 고정 HTTPS 주소에서 정제된 Package 스냅샷을 제공한다.",
+                  "dependsOn": [],
+                  "expectedDurationMinutes": null,
+                  "gatePurpose": "Stable snapshot host acceptance checklist",
+                  "gate": {
+                    "gates": [
+                      {
+                        "id": "S1",
+                        "stageId": "outcome-stage-stable-snapshot-host",
+                        "title": "persistent Vercel project가 고정 public production alias에서 /cherry-note-dashboard를 GET 200으로 제공한다.",
+                        "closed": true,
+                        "groupCode": "S",
+                        "groupLabel": null,
+                        "proves": "implementation"
+                      },
+                      {
+                        "id": "S2",
+                        "stageId": "outcome-stage-stable-snapshot-host",
+                        "title": "hosted data는 기존 public projection과 sanitizer에서 캡처한 deployment snapshot이며 live session relay로 표시되지 않는다.",
+                        "closed": true,
+                        "groupCode": "S",
+                        "groupLabel": null,
+                        "proves": "implementation"
+                      },
+                      {
+                        "id": "S3",
+                        "stageId": "outcome-stage-stable-snapshot-host",
+                        "title": "served receipt가 배포 commit, tree, 실제 Vite asset을 고정하고 stale/null receipt를 거부한다.",
+                        "closed": true,
+                        "groupCode": "S",
+                        "groupLabel": null,
+                        "proves": "evidence"
+                      },
+                      {
+                        "id": "S4",
+                        "stageId": "outcome-stage-stable-snapshot-host",
+                        "title": "공개 payload와 렌더링 화면은 로컬 경로, credential, raw role identifier, UUID, full hash, raw Gate evidence를 노출하지 않는다.",
+                        "closed": true,
+                        "groupCode": "S",
+                        "groupLabel": null,
+                        "proves": "security"
+                      },
+                      {
+                        "id": "S5",
+                        "stageId": "outcome-stage-stable-snapshot-host",
+                        "title": "API와 page mutation은 모두 405로 fail closed하고 API mutation은 canonical read-only JSON을 반환한다.",
+                        "closed": true,
+                        "groupCode": "S",
+                        "groupLabel": null,
+                        "proves": "security"
+                      },
+                      {
+                        "id": "S6",
+                        "stageId": "outcome-stage-stable-snapshot-host",
+                        "title": "production desktop/mobile에서 전체 hierarchy 탐색, responsive geometry, 접근성 최소값이 통과한다.",
+                        "closed": true,
+                        "groupCode": "S",
+                        "groupLabel": null,
+                        "proves": "test"
+                      }
+                    ],
+                    "groups": [
+                      {
+                        "code": "S",
+                        "name": "안정적 스냅샷 호스트",
+                        "sourceName": "S",
+                        "total": 6,
+                        "closed": 6
+                      }
+                    ],
+                    "total": 6,
+                    "closed": 6,
+                    "available": true,
+                    "sourceRef": "GATES_PHASE2_STABLE_SNAPSHOT_HOST.md",
+                    "observedAt": "2026-08-24T09:55:59.375Z"
+                  },
+                  "sourceState": "present",
+                  "state": "complete",
+                  "axes": {
+                    "implementation": "evidence_closed",
+                    "test": "evidence_closed",
+                    "evidence": "evidence_closed",
+                    "independentQa": "not_sourced",
+                    "cherryAcceptance": "not_sourced",
+                    "release": "not_sourced"
+                  }
+                }
+              ]
             },
             {
               "id": "outcome-phase-2-project-portfolio",
@@ -2685,7 +2776,7 @@
   ],
   "snapshot": {
     "boundary": "deployment_snapshot",
-    "capturedAt": "2026-08-24T09:36:38.701Z",
+    "capturedAt": "2026-08-24T10:02:31.138Z",
     "source": "sanitized_public_projection",
     "liveSessionRelay": false,
     "refreshBehavior": "new_deployment_required"

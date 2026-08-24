@@ -49,6 +49,7 @@ const stageCopy: Record<string, [string, string]> = {
   'outcome-stage-6': ['사용성·제품 검수', '실제 화면에서 위계, 목적, 현재 위치와 다음 경계가 오해 없이 읽히는지 반증합니다.'],
   'outcome-stage-7': ['출시 감사', '고정 후보의 독립 실행, 개인정보, 원본 격리, 빌드와 되돌리기 준비도를 감사합니다.'],
   'outcome-stage-8': ['Cherry 승인', 'Cherry가 OUTCOME으로 Cherry Note와 OUTCOME의 현재 위치와 다음 행동을 30초 안에 판단합니다.'],
+  'outcome-stage-stable-snapshot-host': ['안정적인 배포 스냅샷 호스트', '로컬 원본과 임시 연결 없이 고정 보안 웹 주소에서 정제된 프로젝트 스냅샷을 제공합니다.'],
 }
 
 const gateCopy: Record<string, string> = {

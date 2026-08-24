@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict'
 import test from 'node:test'
-import { assertDashboardMeasurement, assertMobileStickyMeasurement } from './browser-assertions.mjs'
+import { assertDashboardMeasurement, assertMobileStickyMeasurement, assertSourceGroupOccurrences, sourceLabeledGroupStageKeys } from './browser-assertions.mjs'
 
 const passingMeasurement = () => ({
   documentOverflow: 0, clippedDescendants: [], ellipsisTruncation: [], viewportEscape: [], siblingIntersections: [], roleDescendantIntersections: [], roleStatusOverflow: [], undersizedText: [], lowContrastText: [], undersizedControls: [], unexpectedEnglish: [], translationFallback: [], activeAnimationCount: 0,
@@ -53,4 +53,21 @@ test('interactive Phase options fail closed for vertical or horizontal title cli
 
 test('deployment snapshot badge fails closed below the 11px text contract', () => {
   assert.throws(() => assertDashboardMeasurement('mobile-390x844/outcome', { ...passingMeasurement(), snapshotBadgeTextTruth: false, snapshotBadgeTextSizes: [10, 8] }), /snapshotBadgeTextTruth=false/)
+})
+
+test('source-labeled Gate group expectations derive from the Package payload', () => {
+  const dashboard = { projects: [{ project: { id: 'outcome' }, phases: [{ scopes: [{ stages: [
+    { id: 'outcome-stage-stable-snapshot-host', gate: { available: true, groups: [{ code: 'S', name: '안정적인 공개 호스트' }] } },
+    { id: 'outcome-stage-generic', gate: { available: true, groups: [{ code: 'G', name: 'G' }] } },
+    { id: 'outcome-stage-no-gates', gate: { available: false, groups: [] } },
+  ] }] }] }] }
+  assert.deepEqual(sourceLabeledGroupStageKeys(dashboard), ['outcome:outcome-stage-stable-snapshot-host'])
+})
+
+test('source-labeled Gate group occurrence check fails closed for missing, generic, or duplicate sections', () => {
+  const expected = ['outcome:outcome-stage-stable-snapshot-host']
+  assert.doesNotThrow(() => assertSourceGroupOccurrences('desktop', expected, expected))
+  assert.throws(() => assertSourceGroupOccurrences('desktop', expected, []), /missing=outcome:outcome-stage-stable-snapshot-host/)
+  assert.throws(() => assertSourceGroupOccurrences('desktop', expected, ['outcome:outcome-stage-generic']), /unexpected=outcome:outcome-stage-generic/)
+  assert.throws(() => assertSourceGroupOccurrences('desktop', expected, [...expected, ...expected]), /unexpected=outcome:outcome-stage-stable-snapshot-host/)
 })

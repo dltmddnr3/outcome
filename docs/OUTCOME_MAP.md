@@ -133,7 +133,15 @@ phases:
       - id: outcome-phase-2-public-hosting
         title: Stable public delivery
         purpose: 임시 tunnel이 아닌 안정 주소와 운영 경계를 정의한다.
-        stages: []
+        stages:
+          - id: outcome-stage-stable-snapshot-host
+            title: Stable snapshot host
+            purpose: Mac origin과 임시 tunnel에 의존하지 않는 고정 HTTPS 주소에서 정제된 Package 스냅샷을 제공한다.
+            depends_on: []
+            gates_file: GATES_PHASE2_STABLE_SNAPSHOT_HOST.md#S1-S6
+            gate_groups:
+              - code: S
+                primary_label: 안정적 스냅샷 호스트
       - id: outcome-phase-2-project-portfolio
         title: Multi-project portfolio
         purpose: OUTCOME, Cherry Note, Cherry Picker 등 등록 프로젝트를 같은 Package 의미로 전환·조회한다.
