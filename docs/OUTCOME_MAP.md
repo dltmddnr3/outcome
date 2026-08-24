@@ -124,6 +124,74 @@ phases:
             purpose: Cherry가 OUTCOME으로 Cherry Note와 OUTCOME의 현재 위치와 다음 행동을 30초 안에 판단한다.
             depends_on: [outcome-stage-7]
             gates_file: GATES_OUTCOME_MVP.md#C1-C2
+
+  - id: outcome-phase-2
+    title: Phase 2 · Public Multi-project Service
+    purpose: 여러 프로젝트를 계정 기반 공개 서비스에서 안전하게 전환·조회한다.
+    completion: stable public hosting, multi-project portfolio, and account access are evidence-closed.
+    scopes:
+      - id: outcome-phase-2-public-hosting
+        title: Stable public delivery
+        purpose: 임시 tunnel이 아닌 안정 주소와 운영 경계를 정의한다.
+        stages: []
+      - id: outcome-phase-2-project-portfolio
+        title: Multi-project portfolio
+        purpose: OUTCOME, Cherry Note, Cherry Picker 등 등록 프로젝트를 같은 Package 의미로 전환·조회한다.
+        stages: []
+      - id: outcome-phase-2-account-service
+        title: Account-based access
+        purpose: 프로젝트별 가시성과 접근 권한을 계정 기반으로 관리한다.
+        stages: []
+
+  - id: outcome-phase-3
+    title: Phase 3 · Definition Pending
+    purpose: Cherry가 Phase 2와 Phase 4 사이의 제품 목적을 결정하기 전까지 기능과 진행을 추론하지 않는다.
+    completion: Cherry-approved Phase 3 Outcome Contract exists.
+    scopes:
+      - id: outcome-phase-3-definition
+        title: Purpose definition pending
+        purpose: Phase 3 목적·범위·Stage·Gate를 Cherry와 정의한다.
+        stages: []
+
+  - id: outcome-phase-4
+    title: Phase 4 · In-OUTCOME Development
+    purpose: Codex/Claude 화면 없이 OUTCOME 안에서 프로젝트 생성, 역할 세션 구성, 작업 대화를 수행한다.
+    completion: project creation, four-role session creation, linked chat, and end-to-end development are evidence-closed.
+    scopes:
+      - id: outcome-phase-4-project-creation
+        title: Project and Package creation
+        purpose: OUTCOME에서 프로젝트와 표준 Package를 직접 만든다.
+        stages: []
+      - id: outcome-phase-4-role-sessions
+        title: Four-role session composition
+        purpose: Planner, Builder, UX & Product QA, Release Audit 세션을 프로젝트에 생성·연결한다.
+        stages: []
+      - id: outcome-phase-4-linked-chat
+        title: Session-linked chat and control
+        purpose: OUTCOME 안에서 역할별 작업 지시와 결과 대화를 수행한다.
+        stages: []
+      - id: outcome-phase-4-full-development
+        title: Full development workspace
+        purpose: 외부 Codex/Claude 화면 없이 개발 흐름을 완결한다.
+        stages: []
+
+  - id: outcome-phase-5
+    title: Phase 5 · Outcome-first Creation
+    purpose: 초기 목적지를 명확히 찾고 고정된 세션 구성을 넘어 필요한 실행 구조를 만든다.
+    completion: destination discovery, Question 200, and extensible execution composition are evidence-closed.
+    scopes:
+      - id: outcome-phase-5-destination
+        title: Destination discovery
+        purpose: 프로젝트 시작 전에 원하는 결과와 성공 조건을 명확히 파악한다.
+        stages: []
+      - id: outcome-phase-5-question-200
+        title: Question 200
+        purpose: 200Q를 통해 목적·사용자·제약·완료 조건을 Outcome Contract로 만든다.
+        stages: []
+      - id: outcome-phase-5-composition
+        title: Beyond fixed sessions
+        purpose: 고정된 세션보다 더 많은 역할·도구·실행 단위를 Outcome에 맞게 구성한다.
+        stages: []
 ```
 
 ## 현재 위치
@@ -131,5 +199,6 @@ phases:
 - Current: `outcome-phase-1 / outcome-scope-acceptance / outcome-stage-8 · Cherry acceptance`
 - Next: `owner-only closure boundary · MVP_SCOPE_CLOSED after C1-C2`
 - Dashboard registration: Package-driven Cherry Note/OUTCOME UI, GitHub connector Gate M15, fresh UX & Product QA Q1–Q4, and separate fresh Release Audit A1–A4 are evidence-closed. Cherry acceptance C1–C2 remains open.
+- Future roadmap visibility: Phase 2, 4, 5는 Cherry가 이미 정한 목적을 source-visible roadmap container로 등록했다. Phase 3은 `Definition Pending`이며 어떤 진행도 추론하지 않는다. Future scopes에는 아직 Stage/Gate가 없어 모두 definition-pending이다.
 - `MVP_SCOPE_CLOSED`: false
 - `EXTERNAL_OUTCOME_COMPLETE`: false
