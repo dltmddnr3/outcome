@@ -2,6 +2,8 @@
 
 Outcome: 계정 구현을 시작하기 전에 공개 배포본과 인증된 비공개 작업공간의 경계, 사용자·프로젝트 권한, 데이터 수명주기와 운영 책임을 Cherry가 선택한 검증 가능한 계약으로 고정한다.
 
+Decision brief: `docs/PHASE2_ACCOUNT_ACCESS_DECISION_BRIEF.md` (추천 초안이며 Gate evidence가 아님)
+
 - [ ] K1: Cherry가 1차 사용자 범위와 공개 화면·비공개 작업공간의 분리를 승인한다.
   PROVES: cherry_decision
   EVIDENCE: pending
@@ -23,6 +25,6 @@ Outcome: 계정 구현을 시작하기 전에 공개 배포본과 인증된 비�
 
 ABANDON: 인증 provider 설치, 계정 생성, secret·database·domain 변경, product code mutation은 K1-K6 결정 전 수행하지 않는다.
 ABANDON: live multi-PC collector, role session relay, 작업 dispatch, approval mutation과 account billing은 이 definition Stage 범위가 아니다.
-ABANDON: C1, C2, H13, `MVP_SCOPE_CLOSED`, `EXTERNAL_OUTCOME_COMPLETE`는 계속 open이다.
+ABANDON: 외부 공개 수준 MVP, release approval, `EXTERNAL_OUTCOME_COMPLETE`는 계속 open이다. Phase 1의 `MVP_SCOPE_CLOSED=true`는 내부사용 Local MVP 종료만 뜻한다.
 
 <!-- Internal trace vocabulary: tenant isolation; deletion/export. -->

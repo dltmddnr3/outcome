@@ -1,7 +1,7 @@
 # OUTCOME Contract · MVP
 
-Updated: 2026-08-23 KST
-Status: **Cherry approved · amended for OUTCOME self-tracking and public read-only feedback on 2026-08-23**
+Updated: 2026-08-25 KST
+Status: **Phase 1 internal-use Local MVP accepted · external public MVP not accepted**
 
 ## Package identity
 
@@ -108,9 +108,10 @@ MVP는 아래 조건이 모두 증명될 때 완료입니다.
 
 ## 7. 종료 또는 다음 Phase 진입
 
-- MVP 종료: 위 완료 조건과 Cherry 수용이 모두 충족된 시점
-- Phase 2 진입: 다중 프로젝트·다중 PC·CLI 기반 프로젝트를 위한 새 Outcome Contract를 Cherry와 합의한 뒤 시작
-- 종료 상태는 `MVP_SCOPE_CLOSED`와 `EXTERNAL_OUTCOME_COMPLETE`를 구분합니다.
+- Phase 1 내부사용 Local MVP 종료: 2026-08-25 KST Cherry의 명시적 `내부사용기준 종료 승인`으로 위 완료 조건과 Cherry 수용이 닫혔다.
+- 승인 경계: 같은 결정에서 Cherry가 `외부 공개수준의 mvp는 아님`을 명시했으므로 외부 공개 수준 MVP, release approval, 외부 서비스 완료는 미승인이다.
+- Phase 2 진입: 다중 프로젝트 공개 서비스의 남은 경계인 계정 접근 계약 K1–K6 정의부터 진행한다.
+- `MVP_SCOPE_CLOSED`는 Phase 1 내부사용 Local MVP 범위의 종료만 뜻하며 `EXTERNAL_OUTCOME_COMPLETE`와 항상 구분합니다.
 
 ## 8. Final acceptance axes
 

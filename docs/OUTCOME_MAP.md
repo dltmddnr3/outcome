@@ -1,7 +1,7 @@
 # OUTCOME Map · MVP
 
 Contract status: **APPROVED**
-Updated: 2026-08-23 KST
+Updated: 2026-08-25 KST
 
 이 문서는 OUTCOME 프로젝트 자체의 `Project → Phase → Scope → Stage` 구조와 각 목적을 정의합니다. 상태는 연결된 Gate evidence와 immutable receipt에서만 판정하며 이 문서의 설명만으로 완료를 선언하지 않습니다.
 
@@ -220,9 +220,10 @@ phases:
 
 ## 현재 위치
 
-- Current: `outcome-phase-1 / outcome-scope-acceptance / outcome-stage-8 · Cherry acceptance`
-- Next: `outcome-stage-account-access-definition · Phase 2 account access contract definition`; Phase 1 owner-only closure boundary C1-C2 remains open in parallel.
-- Dashboard registration: Package-driven Cherry Note/OUTCOME UI, GitHub connector Gate M15, fresh UX & Product QA Q1–Q4, separate fresh Release Audit A1–A4, stable snapshot host S1–S6, and registered Package portfolio foundation P1–P6 are evidence-closed. Cherry acceptance C1–C2 remains open.
+- Current: `outcome-phase-2 / outcome-phase-2-account-service / outcome-stage-account-access-definition · Phase 2 account access contract definition`
+- Next: `K1 · first-user scope and public/private workspace boundary decision`; K1–K6 승인 전 인증·DB·secret·domain 제품 변경은 시작하지 않는다.
+- Dashboard registration: Package-driven Cherry Note/OUTCOME UI, GitHub connector Gate M15, fresh UX & Product QA Q1–Q4, separate fresh Release Audit A1–A4, Cherry acceptance C1–C2, stable snapshot host S1–S6, and registered Package portfolio foundation P1–P6 are evidence-closed.
+- Phase 1 closure boundary: 2026-08-25 KST Cherry가 내부사용 Local MVP 종료를 승인했다. 외부 공개 수준 MVP와 release approval은 이 결정에 포함되지 않는다.
 - Future roadmap visibility: Phase 2의 account access definition은 K1–K6 Cherry 결정 대기 상태로 source-visible하다. Phase 4와 5는 roadmap container이며 Phase 3은 `Definition Pending`으로 어떤 진행도 추론하지 않는다.
-- `MVP_SCOPE_CLOSED`: false
+- `MVP_SCOPE_CLOSED`: true
 - `EXTERNAL_OUTCOME_COMPLETE`: false
