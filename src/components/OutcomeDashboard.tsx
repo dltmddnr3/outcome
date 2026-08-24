@@ -4,10 +4,10 @@ import { fetchOutcomeDashboard } from '../lib/api'
 import { activityLabelKo, axisLabelKo, freshnessLabelKo, gatePresentation, groupPresentation, phasePresentation, projectOutcomePresentation, roleLabel, scopePresentation, sourceLabelKo, sourceStateLabelKo, stagePresentation, stateLabelKo } from './outcomeKorean'
 
 type SourceState = 'valid' | 'stale' | 'unknown' | 'conflict'
-type Binding = { role: string; status: string; activity: string | null; observedAt: string | null; freshness: string; historyCount: number; stageId?: string | null }
+export type Binding = { role: string; status: string; activity: string | null; boundAt: string | null; observedAt: string | null; freshness: string; historyCount: number; stageId?: string | null }
 type Gate = { id: string; title: string; closed: boolean; groupCode: string }
 type GateGroup = { code: string; name: string; total: number; closed: number }
-export type PackageStage = { id: string; title: string; purpose: string; dependsOn: string[]; gatePurpose: string; sourceState: string; state: string; gate: { gates: Gate[]; groups: GateGroup[]; total: number; closed: number; available: boolean; sourceRef: string | null }; axes: { implementation: string; test: string; evidence: string; independentQa: string; cherryAcceptance: string; release: string } }
+export type PackageStage = { id: string; title: string; purpose: string; dependsOn: string[]; expectedDurationMinutes?: number | null; gatePurpose: string; sourceState: string; state: string; gate: { gates: Gate[]; groups: GateGroup[]; total: number; closed: number; available: boolean; sourceRef: string | null }; axes: { implementation: string; test: string; evidence: string; independentQa: string; cherryAcceptance: string; release: string } }
 type Scope = { id: string; title: string; purpose: string; stages: PackageStage[] }
 type Phase = { id: string; title: string; purpose: string; completion: string | null; scopes: Scope[] }
 export type GithubConnector = { adopted: boolean; required: boolean; state: string; repository: string | null; remoteName: string | null; defaultBranch: string | null; completionAuthority: false; localCandidate: { state: string; branch: string | null; ahead: number | null; behind: number | null; sync: string }; published: { state: string; repository: string | null; ref: string | null; detail: string }; checks: { state: string }; release: { state: string } }
@@ -36,6 +36,18 @@ export function heroGateEvidence(stage: PackageStage | null) {
   return { available, closed: stage?.gate.closed ?? 0, total: stage?.gate.total ?? 0, scale: available ? Math.max(0, Math.min(1, stage!.gate.closed / stage!.gate.total)) : null }
 }
 
+export function gateProgress(stage: PackageStage | null) {
+  const available = Boolean(stage?.gate.available && stage.gate.total > 0)
+  const closed = stage?.gate.closed ?? 0
+  const total = stage?.gate.total ?? 0
+  return { available, closed, total, percent: available ? Math.round(closed / total * 100) : null, scale: available ? Math.max(0, Math.min(1, closed / total)) : null }
+}
+
+export function hierarchyPlacement(project: PackageProject) {
+  const hierarchy = currentHierarchy(project)
+  return { phase: `${hierarchy.phaseIndex} / ${hierarchy.phaseTotal}`, scope: `${hierarchy.scopeIndex} / ${hierarchy.scopeTotal}`, stage: `${hierarchy.stageIndex} / ${hierarchy.stageTotal}` }
+}
+
 export function deriveScopeState(scope: Scope, currentScopeId: string | undefined): 'complete' | 'active' | 'pending' | 'unknown' {
   if (!scope.stages.length) return 'unknown'
   if (scope.stages.every((stage) => stage.state === 'complete')) return 'complete'
@@ -51,6 +63,24 @@ export function deriveStageRailState(stage: PackageStage, currentStageId: string
 }
 
 export function selectLiveBinding(bindings: Binding[]) { return bindings.find((binding) => binding.status === 'active' && binding.freshness === 'fresh') ?? null }
+
+const durationKo = (minutes: number) => {
+  const hours = Math.floor(minutes / 60)
+  const rest = minutes % 60
+  return hours ? `${hours}시간${rest ? ` ${rest}분` : ''}` : `${rest}분`
+}
+
+export function timingPresentation(stage: PackageStage, binding: Binding | null, currentStageId: string, now = new Date()) {
+  const boundAt = binding?.boundAt ? Date.parse(binding.boundAt) : NaN
+  const eligible = Boolean(binding && binding.status === 'active' && binding.freshness === 'fresh' && binding.stageId === currentStageId && Number.isFinite(boundAt) && boundAt <= now.getTime())
+  if (!eligible || !binding) return { elapsed: { available: false, label: '현재 작업시간', value: '작업시간 측정 근거 없음', basis: null }, eta: { available: false, label: '남은 예상 시간', value: '남은 시간 예상 근거 없음' } }
+  const elapsedMinutes = Math.max(0, Math.floor((now.getTime() - boundAt) / 60_000))
+  const expected = Number.isInteger(stage.expectedDurationMinutes) && stage.expectedDurationMinutes! > 0 ? stage.expectedDurationMinutes! : null
+  return {
+    elapsed: { available: true, label: '현재 역할 연결 후 경과', value: durationKo(elapsedMinutes), basis: `${roleLabel(binding.role)} 연결 시작 ${compactTime(binding.boundAt)}` },
+    eta: expected === null ? { available: false, label: '남은 예상 시간', value: '남은 시간 예상 근거 없음' } : { available: true, label: '계획 기준 예상', value: durationKo(Math.max(0, expected - elapsedMinutes)) },
+  }
+}
 
 export function summarizeStage(stage: PackageStage) {
   const remaining = stage.gate.gates.filter((gate) => !gate.closed)
@@ -123,7 +153,10 @@ export function OutcomeDashboard({ onUnauthorized }: { onUnauthorized: () => voi
   const hero = projectHeroModel(project)
   const now = nowPresentation(project.now)
   const gateEvidence = heroGateEvidence(current.stage)
+  const currentGateProgress = gateProgress(current.stage)
   const liveBinding = selectLiveBinding(project.bindings)
+  const timingBinding = project.bindings.find((binding) => binding.status === 'active' && binding.freshness === 'fresh' && binding.stageId === current.stage.id) ?? null
+  const timing = timingPresentation(current.stage, timingBinding, current.stage.id, new Date(data.observedAt))
   const currentSummary = stageDetailSemantics(current.stage, current.stage.dependsOn.map((id) => stagePresentation(id)[0]))
   const selectedSummary = stageDetailSemantics(selected.stage, selected.stage.dependsOn.map((id) => stagePresentation(id)[0]))
   const allStages = project.phases.flatMap((phase) => phase.scopes.flatMap((scope) => scope.stages.map((stage) => ({ phase, scope, stage }))))
@@ -132,9 +165,27 @@ export function OutcomeDashboard({ onUnauthorized }: { onUnauthorized: () => voi
 
   return <section className="cn-dashboard oc-dashboard" data-project-id={project.project.id} data-current-stage-id={current.stage.id} data-selected-stage-id={selected.stage.id}>
     <header className="oc-topbar"><nav aria-label="프로젝트 전환">{data.projects.map((item) => <button key={item.project.id} aria-label={`${item.project.name} · ${sourceStateLabel(item.status)}`} aria-current={item.project.id === project.project.id ? 'page' : undefined} onClick={() => switchProject(item.project.id)}><i className={item.status} aria-hidden="true" />{item.project.name}<span className="oc-visually-hidden">{sourceStateLabel(item.status)}</span></button>)}</nav></header>
-    <section className={`oc-hero ${project.status}`} aria-labelledby="oc-project-title">{gateEvidence.available && <span className="oc-hero-fill" style={{ transform: `scaleX(${gateEvidence.scale})` }} aria-hidden="true" />}<div className="oc-hero-title"><Layers3 size={22} aria-hidden="true" /><div><small>프로젝트 식별자 · {project.project.id}</small><h1 id="oc-project-title">{hero.name}</h1><p>{hero.outcome}</p></div></div><div className="oc-hero-orientation"><div><small>현재 위치</small><strong>{hero.current}</strong></div><ChevronRight size={17} aria-hidden="true" /><div><small>다음 경계</small><strong>{hero.next}</strong></div></div><div className="oc-hero-meta"><span className={`oc-source ${project.status}`}><strong>{sourceStateLabel(project.status)}</strong><small>원본 관측 {hero.freshness}</small></span><button className="cn-refresh" onClick={() => void load()} aria-label="원본 묶음 새로고침"><RefreshCw size={16} /></button></div><div className="oc-hero-gate" data-gate-fill={gateEvidence.available ? 'available' : 'unavailable'}><small>현재 작업 단계 완료 조건 근거</small><strong>{gateEvidence.available ? `${gateEvidence.closed}/${gateEvidence.total} 체크됨` : '완료 조건 근거 없음'}</strong><span>프로젝트 전체 진행률이 아닙니다.</span></div>{project.status !== 'valid' && <div className={`oc-warning ${project.status}`} role="status"><strong>{sourceStateLabel(project.status)}</strong><span>원본 묶음의 참조와 식별자를 다시 확인하세요.</span></div>}</section>
+    <section className={`oc-hero ${project.status}`} aria-labelledby="oc-project-title">
+      {gateEvidence.available && <span className="oc-hero-fill" style={{ transform: `scaleX(${gateEvidence.scale})` }} aria-hidden="true" />}
+      <div className="oc-hero-title"><Layers3 size={22} aria-hidden="true" /><div><small>프로젝트 식별자 · {project.project.id}</small><h1 id="oc-project-title">{hero.name}</h1><p>{hero.outcome}</p></div></div>
+      <div className="oc-hero-orientation"><div><small>현재 위치</small><strong>{hero.current}</strong></div><ChevronRight size={17} aria-hidden="true" /><div><small>다음 경계</small><strong>{hero.next}</strong></div></div>
+      <div className="oc-hero-meta"><span className={`oc-source ${project.status}`}><strong>{sourceStateLabel(project.status)}</strong><small>원본 관측 {hero.freshness}</small></span><button className="cn-refresh" onClick={() => void load()} aria-label="원본 묶음 새로고침"><RefreshCw size={16} /></button></div>
+      <div className="oc-hero-gate" data-gate-fill={currentGateProgress.available ? 'available' : 'unavailable'}>
+        <small>현재 작업 단계 완료 조건</small>
+        <strong>{currentGateProgress.available ? `${currentGateProgress.closed}/${currentGateProgress.total} · ${currentGateProgress.percent}%` : '완료 조건 근거 없음'}</strong>
+        {currentGateProgress.available && <span className="oc-gate-gauge" role="img" aria-label={`현재 작업 단계 완료 조건 ${currentGateProgress.percent}%`}><i style={{ transform: `scaleX(${currentGateProgress.scale})` }} /></span>}
+        <span>프로젝트 전체 진행률이 아닙니다.</span>
+      </div>
+      {project.status !== 'valid' && <div className={`oc-warning ${project.status}`} role="status"><strong>{sourceStateLabel(project.status)}</strong><span>원본 묶음의 참조와 식별자를 다시 확인하세요.</span></div>}
+    </section>
     <h2 className="oc-visually-hidden">프로젝트 현재 상태와 진행 근거</h2>
-    <section className="oc-now-summary" data-now-status={project.now.status} data-has-activity={project.now.activity ? 'true' : 'false'}><small>현재 작업 · 실시간 · 빌드에 고정되지 않음</small><strong>{now.headline}</strong><span>{now.metadata}</span></section>
+    <section className="oc-now-summary" data-now-status={project.now.status} data-has-activity={project.now.activity ? 'true' : 'false'}>
+      <div className="oc-now-copy"><small>현재 작업 · 실시간 · 빌드에 고정되지 않음</small><strong>{now.headline}</strong><span>{now.metadata}</span></div>
+      <div className="oc-now-timing" aria-label="현재 작업 시간 근거">
+        <span className="oc-time-elapsed" data-available={timing.elapsed.available ? 'true' : 'false'}><small>{timing.elapsed.label}</small><strong>{timing.elapsed.value}</strong>{timing.elapsed.basis && <em>{timing.elapsed.basis}</em>}</span>
+        <span className="oc-time-eta" data-available={timing.eta.available ? 'true' : 'false'}><small>{timing.eta.label}</small><strong>{timing.eta.value}</strong></span>
+      </div>
+    </section>
     <section className="oc-bindings" aria-label="역할별 세션 관측">{project.bindings.map((binding) => { const live = liveBinding === binding; return <article key={binding.role} className={`${binding.status}${live ? ' is-live' : ''}`} data-live={live ? 'true' : 'false'}><div><small>{roleLabel(binding.role)}</small>{live && <span className="oc-live-bars" aria-label="실시간 활동"><i /><i /><i /></span>}</div><strong>{entityStateLabel(binding.status)}</strong><span>{freshnessLabelKo(binding.freshness)} · {binding.stageId ?? '작업 단계 연결 없음'} · 이력 {binding.historyCount}</span></article> })}</section>
     <section className="oc-current-flow" aria-labelledby="oc-flow-title"><header><small>현재 원본 흐름</small><h3 id="oc-flow-title">큰 단계에서 완료 조건까지</h3><p>아래 수치는 선택한 탐색 화면이 아니라 실제 현재 위치에서만 계산합니다.</p></header><div className="oc-funnel-row oc-funnel-phase" data-index={hierarchy.phaseIndex} data-total={hierarchy.phaseTotal}><div className="oc-funnel-heading"><span>1</span><small>큰 단계 {hierarchy.phaseIndex} / {hierarchy.phaseTotal}</small><strong>{phasePresentation(current.phase.id)[0]}</strong></div><p>{phasePresentation(current.phase.id)[1]}</p></div><div className="oc-funnel-row oc-funnel-scope" data-index={hierarchy.scopeIndex} data-total={hierarchy.scopeTotal}><div className="oc-funnel-heading"><span>2</span><small>범위 {hierarchy.scopeIndex} / {hierarchy.scopeTotal}</small><strong>{scopePresentation(current.scope.id)[0]}</strong></div><p>{scopePresentation(current.scope.id)[1]}</p><div className="oc-rail oc-scope-rail">{current.phase.scopes.map((scope) => { const state = deriveScopeState(scope, project.current?.scopeId); return <article key={scope.id} className={state} data-rail-state={state}><i aria-hidden="true"><RailIcon state={state} /></i><span><strong>{scopePresentation(scope.id)[0]}</strong><small>{railStateLabel(state)}</small></span></article> })}</div></div><div className="oc-funnel-row oc-funnel-stage" data-index={hierarchy.stageIndex} data-total={hierarchy.stageTotal}><div className="oc-funnel-heading"><span>3</span><small>작업 단계 {hierarchy.stageIndex} / {hierarchy.stageTotal}</small><strong>{stagePresentation(current.stage.id)[0]}</strong></div><p>{stagePresentation(current.stage.id)[1]}</p><div className="oc-rail oc-current-stage-rail">{current.scope.stages.map((stage) => { const state = deriveStageRailState(stage, project.current?.stageId); return <article key={stage.id} className={state} data-stage-id={stage.id} data-rail-state={state}><i aria-hidden="true"><RailIcon state={state} /></i><span><strong>{stagePresentation(stage.id)[0]}</strong><small>{railStateLabel(state)}</small></span></article> })}</div></div><div className="oc-funnel-row oc-funnel-gate" data-closed={currentSummary.closed} data-total={currentSummary.total}><div className="oc-funnel-heading"><span>4</span><small>완료 조건 {current.stage.gate.available ? `${currentSummary.closed} / ${currentSummary.total}` : '근거 없음'}</small><strong>다음 경계를 여는 현재 조건</strong></div><p>{currentSummary.boundaryCopy}</p><ol>{currentSummary.remaining.length ? currentSummary.remaining.map((gate) => <li key={gate.id}><b>{gate.id}</b><span>{gatePresentation(current.stage.id, gate.id)}</span></li>) : <li><span>{currentSummary.checkedCopy}</span></li>}</ol></div></section>
     <section className="oc-current-stage" aria-label="현재 작업 단계 요약"><header><div><small>현재 작업 단계</small><h3>{stagePresentation(current.stage.id)[0]}</h3></div><strong>{current.stage.gate.available ? `${currentSummary.closed}/${currentSummary.total}` : '근거 없음'}</strong></header><p>{currentSummary.boundaryCopy}</p></section>

@@ -19,7 +19,12 @@ try {
   const base = `http://127.0.0.1:${server.address().port}`
   const browser = await chromium.launch({ headless: true, executablePath: '/Applications/Google Chrome.app/Contents/MacOS/Google Chrome' })
   try {
-    for (const viewport of [{ name: 'desktop-1440x900', width: 1440, height: 900 }, { name: 'mobile-390x844', width: 390, height: 844 }]) {
+    for (const viewport of [
+      { name: 'desktop-1440x900', width: 1440, height: 900 },
+      { name: 'mobile-390x844', width: 390, height: 844 },
+      { name: 'phone-375x812', width: 375, height: 812 },
+      { name: 'landscape-844x390', width: 844, height: 390 },
+    ]) {
       const context = await browser.newContext({ viewport })
       const page = await context.newPage(); await page.goto(`${base}/cherry-note-dashboard`); await verifyAllDashboardStates(page, viewport.name); await context.close()
     }

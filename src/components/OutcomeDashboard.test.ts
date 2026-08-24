@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { axisStateLabel, currentHierarchy, deriveScopeState, deriveStageRailState, entityStateLabel, findStage, githubEvidenceItems, heroGateEvidence, nowPresentation, projectHeroModel, selectedStageContext, selectLiveBinding, selectProject, sourceStateLabel, stageDetailSemantics, summarizeStage, type GithubConnector, type PackageProject, type PackageStage } from './OutcomeDashboard'
+import { OutcomeDashboard, axisStateLabel, currentHierarchy, deriveScopeState, deriveStageRailState, entityStateLabel, findStage, gateProgress, githubEvidenceItems, heroGateEvidence, hierarchyPlacement, nowPresentation, projectHeroModel, selectedStageContext, selectLiveBinding, selectProject, sourceStateLabel, stageDetailSemantics, summarizeStage, timingPresentation, type Binding, type GithubConnector, type PackageProject, type PackageStage } from './OutcomeDashboard'
 import { activityLabelKo, axisLabelKo, gatePresentation, groupPresentation, hierarchyLabels, loginErrorPresentation, phasePresentation, projectOutcomePresentation, roleLabel, stagePresentation } from './outcomeKorean'
 
 const stage = (overrides: Partial<PackageStage> = {}): PackageStage => ({ id: 'stage-one', title: 'Stage One', purpose: 'Verify the result', dependsOn: [], gatePurpose: 'Stage One acceptance checklist', sourceState: 'present', state: 'active', gate: { gates: [{ id: 'G1', title: 'closed', closed: true, groupCode: 'G' }, { id: 'G2', title: 'remaining', closed: false, groupCode: 'G' }], groups: [{ code: 'G', name: '증거', closed: 1, total: 2 }], total: 2, closed: 1, available: true, sourceRef: 'GATES.md' }, axes: { implementation: 'active', test: 'pending', evidence: 'pending', independentQa: 'not_started', cherryAcceptance: 'pending', release: 'not_started' }, ...overrides })
@@ -7,6 +7,10 @@ const github = (overrides: Partial<GithubConnector> = {}): GithubConnector => ({
 const project = (id: string, title: string): PackageProject => ({ status: 'valid', errors: [], observedAt: null, project: { id, name: title, outcome: `${title} outcome`, acceptanceAuthority: 'Cherry' }, connectors: { github: github() }, phases: [{ id: `${id}-phase`, title: 'Phase', purpose: 'Phase purpose', completion: null, scopes: [{ id: `${id}-scope`, title: 'Scope', purpose: 'Scope purpose', stages: [stage({ id: `${id}-stage` })] }] }], current: { phaseId: `${id}-phase`, scopeId: `${id}-scope`, stageId: `${id}-stage` }, next: null, bindings: [], now: { status: 'unbound', activity: null, observedAt: null, source: 'runtime_registry' }, progress: { available: false, reason: 'no_cross_stage_aggregate' } })
 
 describe('OUTCOME Package dashboard', () => {
+  it('핵심 정보 영역을 시각 리뉴얼 뒤에도 보존한다', () => {
+    const source = OutcomeDashboard.toString()
+    for (const token of ['oc-hero', 'oc-now-summary', 'oc-bindings', 'oc-current-flow', 'oc-current-stage', 'oc-selected-detail', 'oc-technical']) expect(source).toContain(token)
+  })
   it('project switch keeps Package truth isolated', () => { const projects = [project('cherry-note', 'Cherry Note'), project('outcome', 'OUTCOME')]; expect(selectProject(projects, 'outcome')?.project.outcome).toBe('OUTCOME outcome'); expect(selectProject(projects, 'cherry-note')?.project.outcome).toBe('Cherry Note outcome') })
   it('purpose funnel resolves Phase Scope and Stage from one project', () => { const value = project('outcome', 'OUTCOME'); const found = findStage(value, 'outcome-stage'); expect([found?.phase.purpose, found?.scope.purpose, found?.stage.purpose]).toEqual(['Phase purpose', 'Scope purpose', 'Verify the result']) })
   it('stage summary reports checkbox evidence without a completion percentage for an active Stage', () => { expect(summarizeStage(stage())).toEqual({ closed: 1, total: 2, remaining: [{ id: 'G2', title: 'remaining', closed: false, groupCode: 'G' }], confirmedPercent: null }) })
@@ -58,12 +62,16 @@ describe('OUTCOME Package dashboard', () => {
     expect(heroGateEvidence(stage({ gate: { gates: [], groups: [], total: 4, closed: 2, available: true, sourceRef: 'GATES.md' } }))).toEqual({ available: true, closed: 2, total: 4, scale: 0.5 })
     expect(heroGateEvidence(stage({ gate: { gates: [], groups: [], total: 0, closed: 0, available: false, sourceRef: null } }))).toEqual({ available: false, closed: 0, total: 0, scale: null })
   })
+  it('현재 작업 단계 퍼센트는 완료 조건 closed total만 사용한다', () => {
+    expect(gateProgress(stage({ gate: { gates: [], groups: [], total: 4, closed: 2, available: true, sourceRef: 'GATES.md' } }))).toEqual({ available: true, closed: 2, total: 4, percent: 50, scale: 0.5 })
+    expect(gateProgress(stage({ gate: { gates: [], groups: [], total: 0, closed: 0, available: false, sourceRef: null } }))).toEqual({ available: false, closed: 0, total: 0, percent: null, scale: null })
+  })
   it('실시간 세션은 active와 fresh가 모두 맞는 역할 하나만 선택한다', () => {
     const bindings = [
-      { role: 'planner', status: 'active', activity: null, observedAt: null, freshness: 'stale', historyCount: 0 },
-      { role: 'release_audit', status: 'idle', activity: null, observedAt: null, freshness: 'fresh', historyCount: 0 },
-      { role: 'builder', status: 'active', activity: null, observedAt: null, freshness: 'fresh', historyCount: 0 },
-      { role: 'ux_product_qa', status: 'active', activity: null, observedAt: null, freshness: 'fresh', historyCount: 0 },
+      { role: 'planner', status: 'active', activity: null, boundAt: null, observedAt: null, freshness: 'stale', historyCount: 0 },
+      { role: 'release_audit', status: 'idle', activity: null, boundAt: null, observedAt: null, freshness: 'fresh', historyCount: 0 },
+      { role: 'builder', status: 'active', activity: null, boundAt: null, observedAt: null, freshness: 'fresh', historyCount: 0 },
+      { role: 'ux_product_qa', status: 'active', activity: null, boundAt: null, observedAt: null, freshness: 'fresh', historyCount: 0 },
     ]
     expect(selectLiveBinding(bindings)?.role).toBe('builder')
   })
@@ -84,6 +92,11 @@ describe('OUTCOME Package dashboard', () => {
     value.current = { phaseId: 'phase-a', scopeId: 'scope-b', stageId: 'current-stage' }
     expect(currentHierarchy(value)).toMatchObject({ phaseIndex: 1, phaseTotal: 2, scopeIndex: 2, scopeTotal: 2, stageIndex: 2, stageTotal: 2, stage: current })
   })
+  it('위계 위치를 프로젝트 전체 퍼센트로 환산하지 않는다', () => {
+    const placement = hierarchyPlacement(project('outcome', 'OUTCOME'))
+    expect(placement).toEqual({ phase: '1 / 1', scope: '1 / 1', stage: '1 / 1' })
+    expect(Object.values(placement).join(' ')).not.toContain('%')
+  })
   it('Scope와 작업 단계 rail 상태를 원본 자식 상태와 current ID로만 계산한다', () => {
     expect(deriveScopeState({ id: 'done', title: '', purpose: '', stages: [stage({ state: 'complete' })] }, 'other')).toBe('complete')
     expect(deriveScopeState({ id: 'current', title: '', purpose: '', stages: [stage({ state: 'pending' })] }, 'current')).toBe('active')
@@ -93,6 +106,26 @@ describe('OUTCOME Package dashboard', () => {
     expect(deriveStageRailState(stage({ id: 'current', state: 'pending' }), 'current')).toBe('active')
     expect(deriveStageRailState(stage({ id: 'unknown', state: 'unknown' }), 'other')).toBe('unknown')
     expect(deriveStageRailState(stage({ id: 'later', state: 'queued' }), 'other')).toBe('pending')
+  })
+  it('Scope 레일은 완료 현재 대기 위치를 원본 상태로만 계산한다', () => {
+    const scopes = [
+      { id: 'done', title: '', purpose: '', stages: [stage({ state: 'complete' })] },
+      { id: 'current', title: '', purpose: '', stages: [stage({ state: 'active' })] },
+      { id: 'later', title: '', purpose: '', stages: [stage({ state: 'queued' })] },
+    ]
+    expect(scopes.map((scope) => deriveScopeState(scope, 'current'))).toEqual(['complete', 'active', 'pending'])
+  })
+  it('작업 경과 시간은 현재 작업 단계의 활성 최신 연결 시각만 사용한다', () => {
+    const binding: Binding = { role: 'builder', status: 'active', activity: null, boundAt: '2026-08-24T00:00:00.000Z', observedAt: '2026-08-24T01:20:00.000Z', freshness: 'fresh', historyCount: 1, stageId: 'stage-one' }
+    const eligible = timingPresentation(stage(), binding, 'stage-one', new Date('2026-08-24T01:30:00.000Z'))
+    expect(eligible.elapsed).toMatchObject({ available: true, label: '현재 역할 연결 후 경과', value: '1시간 30분' })
+    expect(eligible.elapsed.basis).toContain('구현 연결 시작')
+    for (const invalid of [{ ...binding, freshness: 'stale' }, { ...binding, stageId: 'other' }, { ...binding, boundAt: null }]) expect(timingPresentation(stage(), invalid, 'stage-one', new Date('2026-08-24T01:30:00.000Z')).elapsed).toEqual({ available: false, label: '현재 작업시간', value: '작업시간 측정 근거 없음', basis: null })
+  })
+  it('남은 시간은 명시적 계획 예상치 없이는 계산하지 않는다', () => {
+    const binding: Binding = { role: 'builder', status: 'active', activity: null, boundAt: '2026-08-24T00:00:00.000Z', observedAt: '2026-08-24T00:30:00.000Z', freshness: 'fresh', historyCount: 1, stageId: 'stage-one' }
+    expect(timingPresentation(stage(), binding, 'stage-one', new Date('2026-08-24T00:30:00.000Z')).eta).toEqual({ available: false, label: '남은 예상 시간', value: '남은 시간 예상 근거 없음' })
+    expect(timingPresentation(stage({ expectedDurationMinutes: 120 }), binding, 'stage-one', new Date('2026-08-24T00:30:00.000Z')).eta).toEqual({ available: true, label: '계획 기준 예상', value: '1시간 30분' })
   })
   it('선택한 과거 작업 단계가 현재 funnel을 바꾸지 않는다', () => {
     const value = project('outcome', 'OUTCOME')

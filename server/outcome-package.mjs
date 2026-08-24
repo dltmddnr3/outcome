@@ -165,10 +165,11 @@ function bindingViews(projectId, registry, now, staleAfterSeconds) {
   return ROLES.map((role) => {
     const history = registry.filter((item) => item.project_id === projectId && item.role === role).sort((a, b) => Date.parse(b.bound_at) - Date.parse(a.bound_at))
     const current = history.find((item) => !item.replaced_at) ?? null
-    if (!current) return { role, status: 'unbound', activity: null, observedAt: null, freshness: 'unknown', historyCount: history.length, stageId: null }
+    if (!current) return { role, status: 'unbound', activity: null, boundAt: null, observedAt: null, freshness: 'unknown', historyCount: history.length, stageId: null }
+    const boundAt = Number.isFinite(Date.parse(current.bound_at)) ? current.bound_at : null
     const observedAt = current.observed_at ?? current.bound_at
     const stale = !observedAt || now.getTime() - Date.parse(observedAt) > staleAfterSeconds * 1000
-    return { role, status: stale ? 'stale' : current.status, activity: current.activity == null ? null : sanitizeEvidenceText(current.activity), observedAt, freshness: stale ? 'stale' : 'fresh', historyCount: history.length, stageId: current.stage_id ?? null }
+    return { role, status: stale ? 'stale' : current.status, activity: current.activity == null ? null : sanitizeEvidenceText(current.activity), boundAt, observedAt, freshness: stale ? 'stale' : 'fresh', historyCount: history.length, stageId: current.stage_id ?? null }
   })
 }
 
@@ -204,7 +205,10 @@ export function buildPackageModel({ root, contractFile, mapFile, bindingRegistry
         errors.push(...projectedGroups.errors)
         ledger.groups = projectedGroups.groups
         const gate = { ...ledger, available: Boolean(gateText), sourceRef: gatePath ? basename(gatePath) : null, observedAt: gatePath && existsSync(gatePath) ? statSync(gatePath).mtime.toISOString() : null }
-        return { id: stage.id, title: stage.title, purpose: stage.purpose, dependsOn: stage.depends_on ?? [], gatePurpose: gate.total ? `${stage.title} acceptance checklist` : 'Gate evidence unavailable', gate, sourceState: stage.gate_file_state ?? (gate.available ? 'present' : 'missing'), state: stageState(stage, gate), axes: { implementation: stage.implementation_state ?? axisState(gate.gates, 'implementation'), test: stage.test_state ?? axisState(gate.gates, 'test'), evidence: stage.evidence_closure_state ?? axisState(gate.gates), independentQa: stage.independent_qa_state ?? axisState(gate.gates, 'ux_product_qa'), cherryAcceptance: stage.cherry_acceptance_state ?? axisState(gate.gates, 'cherry_acceptance'), release: stage.release_state ?? axisState(gate.gates, 'release_audit') } }
+        const expectedDurationSupplied = Object.hasOwn(stage, 'expected_duration_minutes')
+        const expectedDurationMinutes = Number.isInteger(stage.expected_duration_minutes) && stage.expected_duration_minutes > 0 ? stage.expected_duration_minutes : null
+        if (expectedDurationSupplied && expectedDurationMinutes === null) errors.push(`invalid_expected_duration_minutes:${stage.id}`)
+        return { id: stage.id, title: stage.title, purpose: stage.purpose, dependsOn: stage.depends_on ?? [], expectedDurationMinutes, gatePurpose: gate.total ? `${stage.title} acceptance checklist` : 'Gate evidence unavailable', gate, sourceState: stage.gate_file_state ?? (gate.available ? 'present' : 'missing'), state: stageState(stage, gate), axes: { implementation: stage.implementation_state ?? axisState(gate.gates, 'implementation'), test: stage.test_state ?? axisState(gate.gates, 'test'), evidence: stage.evidence_closure_state ?? axisState(gate.gates), independentQa: stage.independent_qa_state ?? axisState(gate.gates, 'ux_product_qa'), cherryAcceptance: stage.cherry_acceptance_state ?? axisState(gate.gates, 'cherry_acceptance'), release: stage.release_state ?? axisState(gate.gates, 'release_audit') } }
       }),
     })),
   }))
