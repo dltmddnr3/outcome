@@ -4,8 +4,8 @@
 
 - Fixed public URL: `https://outcome-five.vercel.app/cherry-note-dashboard`
 - Provider/project: Vercel · WhiteCastle · `outcome`
-- Production deployment: `dpl_295fnPLU1qGCc2RkmYG1ZB3UTjgQ` · `READY`
-- Verified product receipt: `f8b9287d3255 / 55e01f29460b / index-w-BzCHtB.js`
+- First verified production deployment: `dpl_295fnPLU1qGCc2RkmYG1ZB3UTjgQ` · `READY`
+- Receipt contract: the public API commit/tree/asset must match exact `origin/main`; stale/null receipt fails closed.
 - Snapshot capture: `2026-08-24T09:36:38.701Z`
 - Snapshot boundary: `deployment_snapshot`; live session relay disabled; a new deployment is required to refresh.
 
@@ -14,8 +14,8 @@
 - Public page, health, dashboard GET: `200`
 - Mutation status: `24/24 = 405`; API canonical read-only JSON `20/20`; Vercel page boundary empty 405 `4/4`
 - Public prohibited identifiers across API, HTML, bundle, rendered UI: `0`
-- Frontend `52/52`; Node `71/71`; security `26/26`; stable-host `7/7`; mutation regressions `3/3`
-- Production desktop/mobile: each `41` hierarchy selections and `18` Stage selections; clipping, ellipsis, intersection, viewport escape and horizontal overflow `0`
+- Frontend `53/53`; Node `71/71`; security `26/26`; stable-host `7/7`; mutation regressions `3/3`
+- Desktop, mobile, phone, and landscape: each `42` hierarchy selections and `19` Stage selections; clipping, ellipsis, intersection, viewport escape and horizontal overflow `0`
 - Minimum controls `44px`; minimum text `11px`; contrast `>=4.5`
 - Cumulative `false_completion_count=21`: stale receipt, invalid runtime config, undersized snapshot badge, platform-specific empty page 405 harness assumption, and the newly registered Stage's missing Korean presentation metadata were independently found and corrected.
 
