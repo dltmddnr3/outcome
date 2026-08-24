@@ -85,7 +85,7 @@ export function assertDashboardMeasurement(name, result) {
   if (result.documentOverflow !== 0) failures.push(`documentOverflow=${result.documentOverflow}`)
   if (result.clippedDescendants.length) failures.push(`clipped=${result.clippedDescendants.join(',')}`)
   if (result.ellipsisTruncation.length) failures.push(`ellipsis=${result.ellipsisTruncation.join(',')}`)
-  if (name.startsWith('mobile/') && result.gateRowTop > 1688) failures.push(`gateRowTop=${result.gateRowTop}`)
+  if (/^(?:remote-)?mobile-390x844\//.test(name) && result.gateRowTop > 1688) failures.push(`gateRowTop=${result.gateRowTop}`)
   if (result.viewportEscape.length) failures.push(`viewportEscape=${result.viewportEscape.join(',')}`)
   if (result.siblingIntersections.length) failures.push(`intersections=${result.siblingIntersections.join(',')}`)
   if (result.undersizedControls.length) failures.push(`undersizedControls=${result.undersizedControls.join(',')}`)

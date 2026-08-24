@@ -78,3 +78,9 @@ Authority: `docs/STAGE8_C1_DASHBOARD_REDESIGN_FRESH_UX_QA_97dcef3.md`의 비차�
   CHECK: npm run test:dashboard -- --testNamePattern='활동이 있는 오래된 NOW는 headline과 metadata에 관측 오래됨을 직접 표시한다'
   EXPECT: stale activity remains visible; headline and metadata include 관측 오래됨; progress disclaimer remains
   EVIDENCE: red-first `(0, nowPresentation) is not a function`에서 시작해 targeted 1/1과 frontend 29/29가 통과했습니다. stale activity headline과 metadata 양쪽에 `관측 오래됨`을 표시하고 `세션 활동은 진행률이 아닙니다`를 유지합니다.
+
+- [x] D1-1: 모바일 완료 조건 행 1688px budget guard가 local/remote 실제 viewport 이름에서 모두 발화하고 desktop에는 적용되지 않는다.
+  PROVES: mobile_budget_guard_integrity
+  CHECK: node --test scripts/browser-assertions.test.mjs
+  EXPECT: local/remote mobile 1689 rejects; 1688 and current 1679/1646 pass; desktop is not subject to the mobile budget
+  EVIDENCE: red-first에서 local/remote `1689`가 `Missing expected exception`으로 거부되지 않음을 재현했습니다. `^(?:remote-)?mobile-390x844/` fail-closed predicate 적용 뒤 harness 3/3이 통과했고, local/remote 36/36 실제 browser에서 `1679/1646`, desktop `1004/1004`를 확인했습니다.

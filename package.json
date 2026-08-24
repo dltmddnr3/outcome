@@ -19,7 +19,7 @@
     "test:public": "node --test --test-name-pattern='public mode' server/index.test.mjs",
     "test:security": "node --test server/index.test.mjs",
     "test:redaction": "node --test --test-name-pattern='redacts|public mode removes' server/index.test.mjs",
-    "test:browser": "node scripts/browser-check.mjs",
+    "test:browser": "node --test scripts/browser-assertions.test.mjs && node scripts/browser-check.mjs",
     "test:remote-browser": "node scripts/remote-browser-check.mjs",
     "check:scope": "node scripts/check-scope.mjs",
     "check:runbook": "node scripts/check-runbook.mjs",
