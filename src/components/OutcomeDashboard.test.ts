@@ -156,10 +156,13 @@ describe('OUTCOME Package dashboard', () => {
     expect(source).toContain('스테이지 위치')
     expect(source).toContain('확인된 항목 / 전체')
   })
-  it('structural band track 수는 fixed five가 아니라 source Phase count를 사용한다', () => {
+  it('상단은 중복 페이즈 탭 없이 source Phase 상태를 단일 진행 rail에 표시한다', () => {
     const source = OutcomeDashboard.toString()
-    expect(source).toContain('--oc-phase-count')
+    expect(source).toContain('oc-project-progress-track')
+    expect(source).toContain('전체 진행 흐름')
     expect(source).toContain('phases.length')
+    expect(source).not.toContain('페이즈 탐색')
+    expect(source).not.toContain('role: "tablist"')
   })
   it('긴 완료 branch만 disclosure 대상으로 접고 선택된 과거 Stage는 노출한다', () => {
     const stages = Array.from({ length: 13 }, (_, index) => stage({ id: `stage-${index + 1}`, state: index < 12 ? 'complete' : 'active' }))

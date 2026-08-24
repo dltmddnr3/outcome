@@ -4,7 +4,7 @@ import { assertDashboardMeasurement, assertMobileStickyMeasurement, assertSource
 
 const passingMeasurement = () => ({
   documentOverflow: 0, clippedDescendants: [], ellipsisTruncation: [], viewportEscape: [], siblingIntersections: [], roleDescendantIntersections: [], roleStatusOverflow: [], undersizedText: [], lowContrastText: [], undersizedControls: [], unexpectedEnglish: [], translationFallback: [], activeAnimationCount: 0,
-  pageHeading: true, sequentialHeadings: true, compactHero: true, roleGeometry: true, heroGeometry: true, mobileMapFirstFold: true, mobileDomOrder: true, mobileHierarchyTruth: true, currentStageActionTruth: true, phaseTabTruth: true, currentSelectionDistinctionTruth: true, folderHierarchyTruth: true, phaseCurrentColorTruth: true, phaseProgressRowsAligned: true, phaseLabelsFull: true, phaseBandTruth: true, phaseOptionTitlesFull: true, desktopPhaseListFirstFold: true, liveSemantics: true, structureTruth: true, phaseCompletionTruth: true, stagePositionTruth: true, snapshotHeroTruth: true, oneMapSurface: true, roving: true, desktopColumns: true, mobileDrill: true, gateCountTruth: true, gaugeTruth: true, explorationTruth: true, groupTruth: true, singleStaleNowSignal: true, snapshotBadgeTextTruth: true, technicalCollapsed: true, technicalEvidence: true, noFabricatedProgress: true, firstFold: true,
+  pageHeading: true, sequentialHeadings: true, compactHero: true, roleGeometry: true, heroGeometry: true, mobileMapFirstFold: true, mobileDomOrder: true, mobileHierarchyTruth: true, currentStageActionTruth: true, singleProgressRailTruth: true, phaseNavigationUniqueTruth: true, currentSelectionDistinctionTruth: true, folderHierarchyTruth: true, phaseCurrentMarkerTruth: true, phaseLabelsFull: true, phaseBandTruth: true, phaseOptionTitlesFull: true, desktopPhaseListFirstFold: true, liveSemantics: true, structureTruth: true, phaseCompletionTruth: true, stagePositionTruth: true, snapshotHeroTruth: true, oneMapSurface: true, roving: true, desktopColumns: true, mobileDrill: true, gateCountTruth: true, gaugeTruth: true, explorationTruth: true, groupTruth: true, singleStaleNowSignal: true, snapshotBadgeTextTruth: true, technicalCollapsed: true, technicalEvidence: true, noFabricatedProgress: true, firstFold: true,
 })
 
 test('all contracted viewport names accept the interactive hierarchy measurement', () => {
@@ -27,18 +27,18 @@ test('mobile hierarchy clarity fails closed when the fourth tab or visible activ
   assert.throws(() => assertDashboardMeasurement('mobile/outcome', { ...passingMeasurement(), mobileHierarchyTruth: false }), /mobileHierarchyTruth=false/)
 })
 
-test('current-stage return action and Phase progress rows fail closed when absent or misaligned', () => {
+test('current-stage return action and the single project progress rail fail closed when absent', () => {
   assert.throws(() => assertDashboardMeasurement('mobile/outcome', { ...passingMeasurement(), currentStageActionTruth: false }), /currentStageActionTruth=false/)
-  assert.throws(() => assertDashboardMeasurement('mobile/outcome', { ...passingMeasurement(), phaseProgressRowsAligned: false }), /phaseProgressRowsAligned=false/)
+  assert.throws(() => assertDashboardMeasurement('mobile/outcome', { ...passingMeasurement(), singleProgressRailTruth: false }), /singleProgressRailTruth=false/)
 })
 
-test('Phase tabs fail closed when they wrap or confuse actual current with touched selection', () => {
-  assert.throws(() => assertDashboardMeasurement('mobile/outcome', { ...passingMeasurement(), phaseTabTruth: false }), /phaseTabTruth=false/)
+test('Phase navigation fails closed when duplicated or when actual current and touched selection are confused', () => {
+  assert.throws(() => assertDashboardMeasurement('mobile/outcome', { ...passingMeasurement(), phaseNavigationUniqueTruth: false }), /phaseNavigationUniqueTruth=false/)
   assert.throws(() => assertDashboardMeasurement('mobile/outcome', { ...passingMeasurement(), currentSelectionDistinctionTruth: false }), /currentSelectionDistinctionTruth=false/)
-  assert.throws(() => assertDashboardMeasurement('mobile/outcome', { ...passingMeasurement(), phaseCurrentColorTruth: false }), /phaseCurrentColorTruth=false/)
+  assert.throws(() => assertDashboardMeasurement('mobile/outcome', { ...passingMeasurement(), phaseCurrentMarkerTruth: false }), /phaseCurrentMarkerTruth=false/)
 })
 
-test('connected folder hierarchy fails closed when the selected Phase bridge or nested rails disappear', () => {
+test('connected folder hierarchy fails closed when nested Scope or Stage rails disappear', () => {
   assert.throws(() => assertDashboardMeasurement('mobile/outcome', { ...passingMeasurement(), folderHierarchyTruth: false }), /folderHierarchyTruth=false/)
 })
 
@@ -59,7 +59,7 @@ test('mobile role geometry fails closed for collapsed names, row escape, descend
   assert.throws(() => assertDashboardMeasurement('mobile-390x844/cherry-note', { ...passingMeasurement(), roleStatusOverflow: ['사용성·제품 검수:114x44->114x111'] }), /roleStatusOverflow=/)
 })
 
-test('structural band fails closed for source Phase count drift, phantom tracks, empty width, and label clipping', () => {
+test('single progress rail fails closed for source Phase count drift, empty width, and label clipping', () => {
   assert.throws(() => assertDashboardMeasurement('mobile-390x844/cherry-note', { ...passingMeasurement(), phaseBandTruth: false, phaseCount: 1, phaseCompartmentCount: 1, phaseTrackCount: 5, occupiedBandRatio: .1987 }), /phaseBandTruth=false/)
   assert.throws(() => assertDashboardMeasurement('mobile-390x844/outcome', { ...passingMeasurement(), phaseLabelsFull: false, phaseCount: 5, phaseCompartmentCount: 5, phaseTrackCount: 5, occupiedBandRatio: .994 }), /phaseLabelsFull=false/)
 })
