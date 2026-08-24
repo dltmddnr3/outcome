@@ -36,7 +36,7 @@ Authority: `docs/STAGE8_C1_KOREANIZATION_FRESH_UX_QA_399ac9d.md`의 `NEEDS_REVIS
   EVIDENCE: frontend 22/22, Node 61/61, security 16/16, local public boundary prohibited identifiers=0, mutation 24/24=405, scope/runbook/build/browser와 diff check가 통과했습니다. 공유 public dist를 변경하지 않은 isolated production asset은 `index-puw5_elB.js`입니다.
 - [ ] C1K7: Planner exact activation 후 새 fresh affected UX & Product QA가 두 프로젝트 30초 과업과 전수 상태를 독립 PASS한다.
   PROVES: independent_qa
-  EVIDENCE: pending
+  EVIDENCE: `docs/STAGE8_C1_KOREANIZATION_CORRECTION_FRESH_UX_QA_7222cf4.md`의 새 session `24b5b053-c375-447d-9848-a4031aa8bbcb`가 exact commit/tree/asset, 공개 36상태, translation fallback·영문 prose·geometry 0, 인증 오류 3종 한글화와 두 프로젝트 30초 과업을 직접 검증해 affected verdict `PASS`를 기록했습니다. C1K7 checkbox와 C1K8·K8·C1·C2는 계속 열려 있습니다.
 - [ ] C1K8: fresh QA PASS 뒤 Cherry가 실제 공개 화면에서 C1을 직접 재평가한다.
   PROVES: cherry_acceptance
   EVIDENCE: pending
