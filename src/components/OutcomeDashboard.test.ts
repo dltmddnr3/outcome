@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { OutcomeDashboard, axisStateLabel, bindingHeroLabel, bindingObservationLabel, collapsedStageCount, currentHierarchy, defaultHierarchySelection, deriveScopeState, deriveStageRailState, detailContentPolicy, entityStateLabel, findStage, gateGroupPresentation, gateProgress, githubEvidenceItems, heroGateEvidence, hierarchyIsExploring, hierarchyPlacement, meaningfulGateGroups, nextStageOptionIndex, nowPresentation, projectHeroModel, resolveHierarchySelection, selectedGateCount, selectedStageContext, selectHierarchyPhase, selectHierarchyScope, selectLiveBinding, selectProject, snapshotPresentation, sourceStateLabel, stageDetailSemantics, structuralPhaseModel, summarizeStage, timingPresentation, type Binding, type GithubConnector, type PackageProject, type PackageStage } from './OutcomeDashboard'
+import { OutcomeDashboard, axisStateLabel, bindingHeroLabel, bindingObservationLabel, collapsedStageCount, currentHierarchy, defaultHierarchySelection, deriveScopeState, deriveStageRailState, detailContentPolicy, entityStateLabel, findStage, gateGroupPresentation, gateProgress, githubEvidenceItems, heroGateEvidence, hierarchyIsExploring, hierarchyPlacement, meaningfulGateGroups, nextStageOptionIndex, nowPresentation, projectHeroModel, resolveHierarchySelection, selectedGateCount, selectedStageContext, selectHierarchyPhase, selectHierarchyScope, selectLiveBinding, selectProject, snapshotPresentation, sourceStateLabel, stageDetailSemantics, structuralPhaseModel, structureStatusLabel, summarizeStage, timingPresentation, type Binding, type GithubConnector, type PackageProject, type PackageStage } from './OutcomeDashboard'
 import { activityLabelKo, axisLabelKo, gatePresentation, groupPresentation, hierarchyLabels, loginErrorPresentation, phasePresentation, projectOutcomePresentation, roleLabel, stagePresentation } from './outcomeKorean'
 
 const stage = (overrides: Partial<PackageStage> = {}): PackageStage => ({ id: 'stage-one', title: 'Stage One', purpose: 'Verify the result', dependsOn: [], gatePurpose: 'Stage One acceptance checklist', sourceState: 'present', state: 'active', gate: { gates: [{ id: 'G1', title: 'closed', closed: true, groupCode: 'G' }, { id: 'G2', title: 'remaining', closed: false, groupCode: 'G' }], groups: [{ code: 'G', name: '증거', closed: 1, total: 2 }], total: 2, closed: 1, available: true, sourceRef: 'GATES.md' }, axes: { implementation: 'active', test: 'pending', evidence: 'pending', independentQa: 'not_started', cherryAcceptance: 'pending', release: 'not_started' }, ...overrides })
@@ -8,9 +8,14 @@ const project = (id: string, title: string): PackageProject => ({ status: 'valid
 
 describe('OUTCOME Package dashboard', () => {
   it('고정 호스트 스냅샷은 실시간 연결과 구분되어 표시된다', () => {
-    expect(snapshotPresentation({ boundary: 'deployment_snapshot', capturedAt: '2026-08-24T09:00:00.000Z', source: 'sanitized_public_projection', liveSessionRelay: false, refreshBehavior: 'new_deployment_required' })).toEqual({ label: '배포 스냅샷', detail: '실시간 세션 연결 대기 · 새 배포 시 갱신' })
+    expect(snapshotPresentation({ boundary: 'deployment_snapshot', capturedAt: '2026-08-24T09:00:00.000Z', source: 'sanitized_public_projection', liveSessionRelay: false, refreshBehavior: 'new_deployment_required' })).toEqual({ label: '배포 스냅샷', detail: '실시간 세션 연결 대기 · 새 배포 시 갱신', sourceLabel: '패키지 구조 정상', timePrefix: '스냅샷 생성', refreshLabel: '배포 스냅샷 다시 불러오기' })
     expect(snapshotPresentation(undefined)).toBeNull()
-    expect(OutcomeDashboard.toString()).toContain('data-snapshot-boundary')
+    const source = OutcomeDashboard.toString()
+    expect(source).toContain('data-snapshot-boundary')
+    expect(source).toContain('snapshot.capturedAt')
+    expect(source).toContain('title: refreshLabel')
+    expect(source).toContain('원본 관측')
+    expect(source).toContain('원본 묶음 새로고침')
   })
   it('역할 세션은 네 개의 간결한 행과 단일 활성 신호로 표시한다', () => {
     const source = OutcomeDashboard.toString()
@@ -116,6 +121,23 @@ describe('OUTCOME Package dashboard', () => {
     value.phases = Array.from({ length: 5 }, (_, index) => ({ id: `phase-${index + 1}`, title: '', purpose: '', completion: null, scopes: [{ id: `scope-${index + 1}`, title: '', purpose: '', stages: index === 0 ? [stage({ id: 'current-stage' })] : [] }] }))
     value.current = { phaseId: 'phase-1', scopeId: 'scope-1', stageId: 'current-stage' }
     expect(structuralPhaseModel(value).map(({ status, stages }) => [status, stages])).toEqual([['current', 1], ['definition_pending', 0], ['definition_pending', 0], ['definition_pending', 0], ['definition_pending', 0]])
+  })
+  it('완료 Stage와 Stage 미정의 Scope가 섞인 Phase는 일부 완료이며 완료로 올리지 않는다', () => {
+    const value = project('outcome', 'OUTCOME')
+    value.current = null
+    value.phases = [{ id: 'outcome-phase-2', title: '', purpose: '', completion: null, scopes: [
+      { id: 'stable-host', title: '', purpose: '', stages: [stage({ id: 'stable-stage', state: 'complete' })] },
+      { id: 'portfolio', title: '', purpose: '', stages: [] },
+      { id: 'accounts', title: '', purpose: '', stages: [] },
+    ] }]
+    expect(structuralPhaseModel(value)[0]).toMatchObject({ status: 'partial', scopes: 3, stages: 1, complete: 1 })
+    expect(structureStatusLabel('partial')).toBe('일부 완료')
+    expect(structureStatusLabel('partial')).not.toContain('%')
+  })
+  it('Stage 행의 분수는 Gate 진행이 아니라 스테이지 위치로 명시한다', () => {
+    const source = OutcomeDashboard.toString()
+    expect(source).toContain('스테이지 위치')
+    expect(source).toContain('확인된 항목 / 전체')
   })
   it('structural band track 수는 fixed five가 아니라 source Phase count를 사용한다', () => {
     const source = OutcomeDashboard.toString()
