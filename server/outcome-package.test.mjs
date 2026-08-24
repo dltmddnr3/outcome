@@ -68,6 +68,12 @@ test('public portfolio projection never contains registry roots or document path
   assert.equal(text.includes(value.repositoryRoot), false); for (const token of ['CONTRACT.md', 'MAP.md', 'registry.json']) assert.equal(text.includes(token), false)
 })
 
+test('tracked portfolio browser registry is worktree-contained and yields three valid distinct Packages', () => {
+  const repositoryRoot = resolve('.'); const fixtureRoot = join(repositoryRoot, 'test', 'fixtures'); const environment = { OUTCOME_PROJECT_REGISTRY: join(fixtureRoot, 'portfolio-registry.json') }
+  const definitions = loadProjectRegistry({ environment, repositoryRoot }); assert.equal(definitions.every(({ root }) => root.startsWith(`${fixtureRoot}/`)), true)
+  const projects = collectOutcomePackages({ environment, repositoryRoot }).projects; assert.equal(projects.length, 3); assert.equal(projects.every(({ status }) => status === 'valid'), true); assert.equal(new Set(projects.map(({ project }) => project.id)).size, 3)
+})
+
 test('valid package parses contract map and referenced gates', () => { const model = fixture(); assert.equal(model.errors.length, 0); assert.equal(model.phases[0].scopes[0].stages[0].gate.total, 2) })
 test('missing package documents fail closed unknown', () => { const model = buildPackageModel({ root: '/missing', contractFile: 'none', mapFile: 'none' }); assert.equal(model.status, 'unknown'); assert.ok(model.errors.includes('contract_missing')) })
 test('reference mismatch fails closed conflict', () => { const model = fixture({ mapText: map().replace('project_id: demo', 'project_id: other') }); assert.equal(model.status, 'conflict'); assert.ok(model.errors.includes('project_reference_mismatch')) })

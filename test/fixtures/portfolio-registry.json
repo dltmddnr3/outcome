@@ -2,14 +2,14 @@
   "schema_version": 1,
   "projects": [
     {
-      "root": "../Cherry Note",
+      "root": "test/fixtures/portfolio-cherry-note",
       "contract_file": "OUTCOME_CONTRACT.md",
       "map_file": "OUTCOME_MAP.md"
     },
     {
-      "root": ".",
-      "contract_file": "docs/OUTCOME_CONTRACT.md",
-      "map_file": "docs/OUTCOME_MAP.md"
+      "root": "test/fixtures/portfolio-outcome",
+      "contract_file": "OUTCOME_CONTRACT.md",
+      "map_file": "OUTCOME_MAP.md"
     },
     {
       "root": "test/fixtures/portfolio-third",
