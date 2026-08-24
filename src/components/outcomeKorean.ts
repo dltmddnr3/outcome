@@ -50,6 +50,7 @@ const stageCopy: Record<string, [string, string]> = {
   'outcome-stage-7': ['출시 감사', '고정 후보의 독립 실행, 개인정보, 원본 격리, 빌드와 되돌리기 준비도를 감사합니다.'],
   'outcome-stage-8': ['Cherry 승인', 'Cherry가 OUTCOME으로 Cherry Note와 OUTCOME의 현재 위치와 다음 행동을 30초 안에 판단합니다.'],
   'outcome-stage-stable-snapshot-host': ['안정적인 배포 스냅샷 호스트', '로컬 원본과 임시 연결 없이 고정 보안 웹 주소에서 정제된 프로젝트 스냅샷을 제공합니다.'],
+  'outcome-stage-project-portfolio-foundation': ['등록 원본 묶음 포트폴리오 기반', '명시적 등록부와 원본 묶음 표시 정보로 세 번째 이후 프로젝트도 코드별 고정값 없이 같은 읽기 전용 결과 지도에 등록합니다.'],
 }
 
 const gateCopy: Record<string, string> = {
@@ -78,6 +79,12 @@ const gateCopy: Record<string, string> = {
   'stage-mvp-scope-closure:MC9': 'MC1부터 MC8까지 기계적으로 완료된 뒤에만 상위 관리 역할이 최소 제품 범위 마감 상태를 기록합니다.',
   'outcome-stage-8:C1': 'Cherry가 OUTCOME을 사용해 Cherry Note와 OUTCOME의 현재 위치와 다음 행동을 30초 안에 이해할 수 있는지 확인합니다.',
   'outcome-stage-8:C2': 'Cherry가 로컬 최소 제품 마감을 명시적으로 승인하며, 출시와 외부 완료는 별도 결정으로 남깁니다.',
+  'outcome-stage-project-portfolio-foundation:P1': '프로젝트 등록부가 명시적 형식과 원본 묶음의 루트·계약·지도 입력을 가지며 기존 두 프로젝트도 같은 경로로 등록되는지 확인합니다.',
+  'outcome-stage-project-portfolio-foundation:P2': '누락·형식 오류·중복·허용되지 않은 경로를 실패로 닫고 기본값 대체나 프로젝트 식별자 혼합이 없는지 확인합니다.',
+  'outcome-stage-project-portfolio-foundation:P3': '새 프로젝트의 사용자 표시명과 목적이 원본 묶음에서 오며 프로젝트별 코드 번역표를 요구하지 않는지 확인합니다.',
+  'outcome-stage-project-portfolio-foundation:P4': '세 프로젝트 이상 검증 묶음에서 전환·현재 위치·위계 탐색과 모바일 단계 탐색이 각 프로젝트 식별자를 보존하는지 확인합니다.',
+  'outcome-stage-project-portfolio-foundation:P5': '로컬 등록 경로와 인증 정보가 공개 결과에 포함되지 않고 읽기 전용·변경 차단·완료 권한 없음 경계를 유지하는지 확인합니다.',
+  'outcome-stage-project-portfolio-foundation:P6': '정확한 후보가 전체 회귀와 새 사용성·제품 검수를 통과하고 고정 공개 주소의 버전 관리·트리·에셋과 일치하는지 확인합니다.',
 }
 
 const stateCopy: Record<string, string> = {
@@ -103,10 +110,10 @@ export const axisLabelKo = (value: string) => axisCopy[value] ?? '원본 상태 
 export const freshnessLabelKo = (value: string) => ({ fresh: '최근 관측', stale: '관측 오래됨', unknown: '관측 근거 없음', replaced: '교체된 관측' }[value] ?? '관측 상태 미상')
 export const sourceLabelKo = (value: string) => ({ runtime_registry: '실시간 역할 연결', builder_binding: '구현 역할 연결' }[value] ?? '원본 연결')
 export const activityLabelKo = (value: string | null) => value === 'Stage 6 NEEDS_REVISION correction is active; fresh independent QA remains required' ? '6단계 수정 진행 중 · 새 독립 검수가 필요합니다' : value ? '현재 작업 설명 한글화 대기' : null
-export const phasePresentation = (id: string) => phaseCopy[id] ?? ['큰 단계 제목 한글화 대기', '큰 단계 목적 한글화 대기']
-export const scopePresentation = (id: string) => scopeCopy[id] ?? ['범위 제목 한글화 대기', '범위 목적 한글화 대기']
-export const stagePresentation = (id: string) => stageCopy[id] ?? ['작업 단계 제목 한글화 대기', '작업 단계 목적 한글화 대기']
-export const gatePresentation = (stageId: string, gateId: string) => gateCopy[`${stageId}:${gateId}`] ?? '원본 완료 조건 설명 한글화 대기'
+export const phasePresentation = (id: string, sourceTitle?: string, sourcePurpose?: string) => phaseCopy[id] ?? [sourceTitle || '큰 단계 제목 한글화 대기', sourcePurpose || '큰 단계 목적 한글화 대기']
+export const scopePresentation = (id: string, sourceTitle?: string, sourcePurpose?: string) => scopeCopy[id] ?? [sourceTitle || '범위 제목 한글화 대기', sourcePurpose || '범위 목적 한글화 대기']
+export const stagePresentation = (id: string, sourceTitle?: string, sourcePurpose?: string) => stageCopy[id] ?? [sourceTitle || '작업 단계 제목 한글화 대기', sourcePurpose || '작업 단계 목적 한글화 대기']
+export const gatePresentation = (stageId: string, gateId: string, sourceTitle?: string) => gateCopy[`${stageId}:${gateId}`] ?? (sourceTitle || '원본 완료 조건 설명 한글화 대기')
 export const groupPresentation = (name: string, code: string) => name === code ? '완료 조건 그룹' : name
 export const loginErrorPresentation = (value: string) => ({
   invalid_credentials: '접근 암호가 올바르지 않습니다.',

@@ -165,7 +165,7 @@ describe('OUTCOME Package dashboard', () => {
   it('Stage detail retains completion semantics only for complete Stage', () => { const value = stageDetailSemantics(stage({ state: 'complete', gate: { gates: [{ id: 'G1', title: 'checked', closed: true, groupCode: 'G' }, { id: 'G2', title: 'checked', closed: true, groupCode: 'G' }], groups: [], total: 2, closed: 2, available: true, sourceRef: 'GATES.md' } })); expect(value.confirmedPercent).toBe(100); expect(value.countLabel).toBe('증거 확정 / 전체'); expect(value.checkedCopy).toContain('증거가 모두 확정') })
   it('Stage detail gives every non-complete state an honest boundary', () => { for (const state of ['locked', 'blocked', 'queued', 'pending', 'active', 'unknown', 'gates_closed_evidence_pending']) { const value = stageDetailSemantics(stage({ state }), ['이전 작업 단계']); expect(value.confirmedPercent).toBeNull(); expect(value.countLabel).toBe('체크됨 / 전체'); expect(value.boundaryCopy.length).toBeGreaterThan(20); expect(value.checkedCopy).not.toContain('증거가 모두 확정') } })
   it('한글 계층 labels use the approved five-level vocabulary', () => { expect(hierarchyLabels).toEqual(['프로젝트', '큰 단계', '범위', '작업 단계', '완료 조건']) })
-  it('한글 운영 문구 covers roles states activity and source-facing fallbacks', () => { expect(['planner', 'builder', 'ux_product_qa', 'release_audit'].map(roleLabel)).toEqual(['기획', '구현', '사용성·제품 검수', '출시 감사']); expect(activityLabelKo('Stage 6 NEEDS_REVISION correction is active; fresh independent QA remains required')).toBe('6단계 수정 진행 중 · 새 독립 검수가 필요합니다'); expect(sourceStateLabel('conflict')).toBe('원본 묶음 충돌'); expect(groupPresentation('RA', 'RA')).toBe('완료 조건 그룹'); expect(stagePresentation('new-stage')).toEqual(['작업 단계 제목 한글화 대기', '작업 단계 목적 한글화 대기']) })
+  it('한글 운영 문구 covers roles states activity and Package source-facing fallbacks', () => { expect(['planner', 'builder', 'ux_product_qa', 'release_audit'].map(roleLabel)).toEqual(['기획', '구현', '사용성·제품 검수', '출시 감사']); expect(activityLabelKo('Stage 6 NEEDS_REVISION correction is active; fresh independent QA remains required')).toBe('6단계 수정 진행 중 · 새 독립 검수가 필요합니다'); expect(sourceStateLabel('conflict')).toBe('원본 묶음 충돌'); expect(groupPresentation('RA', 'RA')).toBe('완료 조건 그룹'); expect(stagePresentation('new-stage', '원본 스테이지', '원본 목적')).toEqual(['원본 스테이지', '원본 목적']); expect(phasePresentation('new-phase', '원본 페이즈', '원본 목적')).toEqual(['원본 페이즈', '원본 목적']) })
   it('stable deployment snapshot Stage는 사용자용 한글 제목과 목적을 갖는다', () => {
     expect(stagePresentation('outcome-stage-stable-snapshot-host')).toEqual(['안정적인 배포 스냅샷 호스트', '로컬 원본과 임시 연결 없이 고정 보안 웹 주소에서 정제된 프로젝트 스냅샷을 제공합니다.'])
   })
@@ -196,7 +196,7 @@ describe('OUTCOME Package dashboard', () => {
     const model = projectHeroModel(value)
     expect(model.name).toBe('OUTCOME')
     expect(model.outcome).toContain('인공지능')
-    expect(model.current).toContain('작업 단계')
+    expect(model.current).toContain('Stage One')
     expect(model.next).toBe('다음 단계 근거 없음')
     expect(model.freshness).toBe('근거 없음')
   })

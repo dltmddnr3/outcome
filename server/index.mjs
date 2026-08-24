@@ -78,7 +78,10 @@ export function createOutcomeServer(options = {}) {
     if (request.method === 'POST' && url.pathname === '/api/auth/logout') return publicReadOnly || !auth ? json(response, 405, { error: 'read_only' }) : json(response, 200, { authenticated: false }, { 'set-cookie': auth.cookie('', 0) })
     if (url.pathname.startsWith('/api/')) {
       if (!accessGranted) return json(response, 401, { error: 'authentication_required' })
-      if (request.method === 'GET' && url.pathname === '/api/dashboard') return json(response, 200, { dashboard: { ...projectPublicPackages(collectPackages()), build: sanitizeRemotePayload(buildReceipt) } })
+      if (request.method === 'GET' && url.pathname === '/api/dashboard') {
+        try { return json(response, 200, { dashboard: { ...projectPublicPackages(collectPackages()), build: sanitizeRemotePayload(buildReceipt) } }) }
+        catch { return json(response, 503, { error: 'project_registry_invalid' }) }
+      }
       if (request.method === 'GET' && url.pathname === '/api/dashboard/cherry-note') return json(response, 200, { dashboard: sanitizeRemotePayload(collect()) })
       return json(response, request.method === 'GET' ? 404 : 405, { error: request.method === 'GET' ? 'not_found' : 'read_only' })
     }

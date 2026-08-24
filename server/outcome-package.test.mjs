@@ -1,9 +1,9 @@
 import assert from 'node:assert/strict'
 import test from 'node:test'
-import { mkdtempSync, mkdirSync, utimesSync, writeFileSync } from 'node:fs'
-import { join } from 'node:path'
+import { mkdtempSync, mkdirSync, readFileSync, utimesSync, writeFileSync } from 'node:fs'
+import { isAbsolute, join, resolve } from 'node:path'
 import { tmpdir } from 'node:os'
-import { buildPackageModel, parseGateLedger, parseGithubConnector, projectPublicPackages } from './outcome-package.mjs'
+import { buildPackageModel, collectOutcomePackages, loadProjectRegistry, parseGateLedger, parseGithubConnector, projectPublicPackages } from './outcome-package.mjs'
 
 const map = (overrides = '') => `# Map\n\`\`\`yaml\nschema_version: 1\nproject_id: demo\ntitle: Demo\nphases:\n  - id: phase-one\n    title: Phase\n    purpose: Phase purpose\n    scopes:\n      - id: scope-one\n        title: Scope\n        purpose: Scope purpose\n        stages:\n          - id: stage-one\n            title: Stage\n            purpose: Stage purpose\n            depends_on: []\n            gates_file: GATES_STAGE.md\n            implementation_state: work_in_progress\n            evidence_closure_state: pending\n${overrides}\n\`\`\`\n`
 const contract = '- Project ID: `demo`\n- Project name: `Demo`\n- Outcome: Measured outcome\n- Acceptance authority: `Cherry`\n'
@@ -13,6 +13,60 @@ function fixture({ contractText = contract, mapText = map(), gateText = '- [x] G
   if (fileTime) for (const name of ['OUTCOME_CONTRACT.md', 'OUTCOME_MAP.md', ...(gateText === null ? [] : ['GATES_STAGE.md'])]) utimesSync(join(root, 'docs', name), fileTime, fileTime)
   return buildPackageModel({ root, contractFile: 'docs/OUTCOME_CONTRACT.md', mapFile: 'docs/OUTCOME_MAP.md', bindingRegistry: registry, now, staleAfterSeconds: 3600 })
 }
+
+function registryFixture(ids = ['alpha', 'beta', 'gamma']) {
+  const repositoryRoot = mkdtempSync(join(tmpdir(), 'outcome-registry-'))
+  const projects = ids.map((id) => {
+    const root = join(repositoryRoot, id); mkdirSync(root)
+    writeFileSync(join(root, 'CONTRACT.md'), `- Project ID: \`${id}\`\n- Project name: \`${id} source title\`\n- Outcome: ${id} source outcome\n- Acceptance authority: \`Cherry\`\n`)
+    writeFileSync(join(root, 'MAP.md'), map().replaceAll('demo', id).replace('title: Demo', `title: ${id} source title`).replace('title: Phase', `title: ${id} source phase`).replace('purpose: Phase purpose', `purpose: ${id} source phase purpose`).replace('title: Scope', `title: ${id} source scope`).replace('purpose: Scope purpose', `purpose: ${id} source scope purpose`).replace('title: Stage', `title: ${id} source stage`).replace('purpose: Stage purpose', `purpose: ${id} source stage purpose`).replace('GATES_STAGE.md', 'GATES.md'))
+    writeFileSync(join(root, 'GATES.md'), '- [ ] G1: source Gate')
+    return { root: id, contract_file: 'CONTRACT.md', map_file: 'MAP.md' }
+  })
+  const registryPath = join(repositoryRoot, 'registry.json'); writeFileSync(registryPath, JSON.stringify({ schema_version: 1, projects }))
+  return { repositoryRoot, registryPath, projects }
+}
+
+test('project registry default config preserves Cherry Note and OUTCOME through the validated loader', () => {
+  const definitions = loadProjectRegistry({ repositoryRoot: resolve('.') })
+  assert.equal(definitions.length, 2)
+  assert.deepEqual(definitions.map(({ contractFile, mapFile }) => [contractFile, mapFile]), [['OUTCOME_CONTRACT.md', 'OUTCOME_MAP.md'], ['docs/OUTCOME_CONTRACT.md', 'docs/OUTCOME_MAP.md']])
+  assert.equal(definitions.every(({ root }) => isAbsolute(root)), true)
+})
+
+test('project registry collects three isolated Package identities through one loader', () => {
+  const value = registryFixture(); const collected = collectOutcomePackages({ environment: { OUTCOME_PROJECT_REGISTRY: value.registryPath }, repositoryRoot: value.repositoryRoot })
+  assert.deepEqual(collected.projects.map((project) => project.project.id), ['alpha', 'beta', 'gamma'])
+  assert.equal(collected.projects.every((project) => project.progress.available === false && project.connectors.github.completionAuthority === false), true)
+  const absolute = JSON.parse(readFileSync(value.registryPath, 'utf8')); absolute.projects[0].root = join(value.repositoryRoot, 'alpha'); writeFileSync(value.registryPath, JSON.stringify(absolute))
+  assert.deepEqual(collectOutcomePackages({ environment: { OUTCOME_PROJECT_REGISTRY: value.registryPath }, repositoryRoot: value.repositoryRoot }).projects.map((project) => project.project.id), ['alpha', 'beta', 'gamma'])
+})
+
+test('registry rejects empty malformed schema duplicate entries project IDs absolute documents and traversal', () => {
+  const value = registryFixture(); const valid = JSON.parse(String(readFileSync(value.registryPath)))
+  const cases = [
+    [{ schema_version: 1, projects: [] }, /project_registry_projects_invalid/],
+    [{ schema_version: 2, projects: valid.projects }, /project_registry_schema_invalid/],
+    [{ schema_version: 1, projects: [...valid.projects, valid.projects[0]] }, /project_registry_duplicate_entry/],
+    [{ schema_version: 1, projects: [{ ...valid.projects[0], contract_file: '/tmp/CONTRACT.md' }] }, /project_registry_document_absolute/],
+    [{ schema_version: 1, projects: [{ ...valid.projects[0], map_file: '../MAP.md' }] }, /project_registry_document_traversal/],
+  ]
+  for (const [index, [body, expected]] of cases.entries()) { const path = join(value.repositoryRoot, `invalid-${index}.json`); writeFileSync(path, JSON.stringify(body)); assert.throws(() => loadProjectRegistry({ environment: { OUTCOME_PROJECT_REGISTRY: path }, repositoryRoot: value.repositoryRoot }), expected) }
+  writeFileSync(value.registryPath, ''); assert.throws(() => loadProjectRegistry({ environment: { OUTCOME_PROJECT_REGISTRY: value.registryPath }, repositoryRoot: value.repositoryRoot }), /project_registry_json_invalid/)
+  writeFileSync(value.registryPath, '{'); assert.throws(() => loadProjectRegistry({ environment: { OUTCOME_PROJECT_REGISTRY: value.registryPath }, repositoryRoot: value.repositoryRoot }), /project_registry_json_invalid/)
+  const duplicate = registryFixture(['same-a', 'same-b']); for (const id of ['same-a', 'same-b']) { writeFileSync(join(duplicate.repositoryRoot, id, 'CONTRACT.md'), contract.replaceAll('demo', 'same').replace('Demo', 'Same')); writeFileSync(join(duplicate.repositoryRoot, id, 'MAP.md'), map().replaceAll('demo', 'same').replace('GATES_STAGE.md', 'GATES.md')) }; assert.throws(() => loadProjectRegistry({ environment: { OUTCOME_PROJECT_REGISTRY: duplicate.registryPath }, repositoryRoot: duplicate.repositoryRoot }), /project_registry_duplicate_project_id/)
+})
+
+test('override registry error fails closed without default fallback', () => {
+  const value = registryFixture(); writeFileSync(value.registryPath, JSON.stringify({ schema_version: 1, projects: [] }))
+  const prior = process.env.OUTCOME_PROJECT_REGISTRY; process.env.OUTCOME_PROJECT_REGISTRY = value.registryPath
+  try { assert.throws(() => collectOutcomePackages({ repositoryRoot: value.repositoryRoot }), /project_registry_projects_invalid/) } finally { if (prior === undefined) delete process.env.OUTCOME_PROJECT_REGISTRY; else process.env.OUTCOME_PROJECT_REGISTRY = prior }
+})
+
+test('public portfolio projection never contains registry roots or document paths', () => {
+  const value = registryFixture(); const projected = projectPublicPackages(collectOutcomePackages({ environment: { OUTCOME_PROJECT_REGISTRY: value.registryPath }, repositoryRoot: value.repositoryRoot })); const text = JSON.stringify(projected)
+  assert.equal(text.includes(value.repositoryRoot), false); for (const token of ['CONTRACT.md', 'MAP.md', 'registry.json']) assert.equal(text.includes(token), false)
+})
 
 test('valid package parses contract map and referenced gates', () => { const model = fixture(); assert.equal(model.errors.length, 0); assert.equal(model.phases[0].scopes[0].stages[0].gate.total, 2) })
 test('missing package documents fail closed unknown', () => { const model = buildPackageModel({ root: '/missing', contractFile: 'none', mapFile: 'none' }); assert.equal(model.status, 'unknown'); assert.ok(model.errors.includes('contract_missing')) })

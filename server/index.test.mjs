@@ -68,6 +68,10 @@ test('public mode serves generic project packages without mixing project identit
   assert.equal(response.status, 200); assert.equal(body.dashboard.projects[0].project.id, 'outcome'); assert.equal(body.dashboard.projects[0].bindings[0].status, 'unbound')
 }))
 
+test('invalid project registry fails dashboard GET closed without fallback payload', async () => withPublicServer(() => dashboard, async (base) => {
+  const response = await fetch(`${base}/api/dashboard`); assert.equal(response.status, 503); assert.deepEqual(await response.json(), { error: 'project_registry_invalid' })
+}, () => { throw new Error('project_registry_schema_invalid') }))
+
 test('public mode rejects every dashboard mutation as read-only', async () => withPublicServer(() => dashboard, async (base) => {
   let checked = 0
   for (const path of ['/api/dashboard', '/api/dashboard/cherry-note', '/api/auth/login', '/api/auth/logout', '/api/unknown', '/cherry-note-dashboard']) for (const method of ['POST', 'PUT', 'PATCH', 'DELETE']) {

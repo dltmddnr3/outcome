@@ -1,6 +1,7 @@
 import { existsSync, readFileSync, statSync } from 'node:fs'
 import { execFileSync } from 'node:child_process'
 import { basename, dirname, isAbsolute, join, resolve } from 'node:path'
+import { fileURLToPath } from 'node:url'
 import YAML from 'yaml'
 import { sanitizeEvidenceText, sanitizeRemotePayload } from './cherry-note-dashboard.mjs'
 
@@ -11,6 +12,7 @@ const GIT_BRANCH = /^[A-Za-z0-9][A-Za-z0-9._/-]*$/
 const safeRead = (path) => { try { return readFileSync(path, 'utf8') } catch { return '' } }
 const field = (text, name) => text.match(new RegExp(`^- ${name}:\\s*\`?([^\\n\`]+)\`?`, 'mi'))?.[1]?.trim() ?? null
 const fencedYaml = (text) => text.match(/```yaml\s*\n([\s\S]*?)\n```/)?.[1] ?? null
+const OUTCOME_ROOT = fileURLToPath(new URL('..', import.meta.url))
 
 const githubRepository = (value) => {
   if (typeof value !== 'string') return null
@@ -246,11 +248,37 @@ export function buildPackageModel({ root, contractFile, mapFile, bindingRegistry
   }
 }
 
-export function collectOutcomePackages({ bindingRegistry = [], now = new Date(), projects } = {}) {
-  const definitions = projects ?? [
-    { root: '/Users/rosum/Documents/ChatGPT/Cherry Note', contractFile: 'OUTCOME_CONTRACT.md', mapFile: 'OUTCOME_MAP.md' },
-    { root: '/Users/rosum/Documents/ChatGPT/OUTCOME', contractFile: 'docs/OUTCOME_CONTRACT.md', mapFile: 'docs/OUTCOME_MAP.md' },
-  ]
+const registryError = (code) => { throw new Error(code) }
+const insideRoot = (root, candidate) => candidate === root || candidate.startsWith(`${root}/`)
+
+export function loadProjectRegistry({ environment = process.env, repositoryRoot = OUTCOME_ROOT } = {}) {
+  const registryPath = environment.OUTCOME_PROJECT_REGISTRY
+  const sourcePath = registryPath ? resolve(registryPath) : join(repositoryRoot, 'config', 'outcome-projects.json')
+  let value
+  try { value = JSON.parse(readFileSync(sourcePath, 'utf8')) } catch (error) { registryError(error instanceof SyntaxError ? 'project_registry_json_invalid' : 'project_registry_unavailable') }
+  if (!value || typeof value !== 'object' || Array.isArray(value) || value.schema_version !== 1) registryError('project_registry_schema_invalid')
+  if (!Array.isArray(value.projects) || value.projects.length === 0) registryError('project_registry_projects_invalid')
+  const fingerprints = new Set(); const projectIds = new Set()
+  return value.projects.map((entry) => {
+    if (!entry || typeof entry !== 'object' || Array.isArray(entry) || !['root', 'contract_file', 'map_file'].every((key) => typeof entry[key] === 'string' && entry[key].trim())) registryError('project_registry_entry_invalid')
+    const root = resolve(repositoryRoot, entry.root)
+    const documents = [entry.contract_file, entry.map_file]
+    if (documents.some(isAbsolute)) registryError('project_registry_document_absolute')
+    const [contractPath, mapPath] = documents.map((document) => resolve(root, document))
+    if (!insideRoot(root, contractPath) || !insideRoot(root, mapPath)) registryError('project_registry_document_traversal')
+    const definition = { root, contractFile: entry.contract_file, mapFile: entry.map_file }
+    const fingerprint = JSON.stringify([root, contractPath, mapPath])
+    if (fingerprints.has(fingerprint)) registryError('project_registry_duplicate_entry')
+    fingerprints.add(fingerprint)
+    const contract = parseOutcomeContract(safeRead(contractPath)); const parsedMap = parseOutcomeMap(safeRead(mapPath)); const projectId = contract.projectId ?? parsedMap.value?.project_id
+    if (projectId && projectIds.has(projectId)) registryError('project_registry_duplicate_project_id')
+    if (projectId) projectIds.add(projectId)
+    return definition
+  })
+}
+
+export function collectOutcomePackages({ bindingRegistry = [], now = new Date(), environment, repositoryRoot } = {}) {
+  const definitions = loadProjectRegistry({ environment, repositoryRoot })
   return { schemaVersion: 2, observedAt: now.toISOString(), projects: definitions.map((definition) => buildPackageModel({ ...definition, bindingRegistry, now })) }
 }
 
