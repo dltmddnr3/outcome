@@ -5,7 +5,7 @@ Observed: 2026-08-24 KST
 ## OUTCOME 저장소
 
 - 독립 Git 저장소 생성 완료
-- 현재 단계: Stage 8 C1 한글화 candidate `399ac9df5b2d` / tree `89f98036255f` / asset `index-DG3dIvuW.js`가 origin PID 62455에서 활성화돼 있지만 fresh UX & Product QA는 `NEEDS_REVISION`입니다. 한글 fallback·인증 오류·예외 계약 correction의 Builder C1K1–C1K6은 이 문서를 포함하는 후속 candidate에서 검증됐고, exact public 활성화·fresh QA C1K7과 Cherry C1·C2는 열려 있습니다. cumulative `false_completion_count=13`입니다.
+- 현재 단계: 한글화 correction `7222cf4d3a54` / tree `47b2353e5114` / asset `index-puw5_elB.js`가 origin PID 33615와 tunnel PID 88741에서 활성화돼 있습니다. Cherry의 진행 구조 피드백에 따른 dashboard composition redesign Builder R1–R9는 이 문서를 포함하는 후속 candidate에서 검증됐고, exact public 활성화·fresh QA R10과 Cherry C1·C2는 열려 있습니다. cumulative `false_completion_count=13`입니다.
 - dashboard UI, Cherry Note collector, authenticated read-only runtime, tests, styles, and package configuration are now in this repository
 - `/Users/rosum/Documents/ChatGPT/WhiteCastle Desk 2`의 기존 copy는 migration history/rollback reference이며 더 이상 intended product source가 아님
 - OUTCOME 자체 표준 입력:
@@ -63,11 +63,11 @@ Observed: 2026-08-24 KST
 - b57edd7 Release Audit의 R1/R2 Builder correction은 raw UUID/delimiter-less role ID sanitizer, API/HTML/bundle zero-hit 검사, actual origin PID self-bookkeeping, command+port/URL validated runtime status/stop, stale PID fail-closed runbook으로 구현·검증했습니다. 당시 tunnel PID record는 PID 76819로 검증 교정됐고 origin record는 Planner 재기동 전까지 stale로 fail-closed였습니다.
 - 9580c45 affected QA에서 `/tmp`, `/private/tmp`, `/var`, `/opt`, `/etc` absolute POSIX path class가 sanitizer와 public-boundary scanner 양쪽에서 누락된 control gap을 확인했습니다. 공개 projection에서 비표시 Gate evidence를 제거하거나 전체 path class를 fail-closed redaction해야 합니다.
 - R1B-1 correction은 UI가 소비하지 않는 `gate.gates[*].evidence`만 공개 projection에서 제거하고 Stage `axes.evidence`를 보존하며, POSIX path class와 live public surface scan을 추가했습니다. 해당 fresh affected QA 당시 origin PID 98804와 tunnel PID 76819가 검증됐고 local/public zero-hit을 확인했습니다.
-- 현재 한글화 exact candidate는 origin PID 62455와 tunnel PID 88741에서 public GET 200, local/public mutation 각각 24/24, local/public prohibited identifiers=0, remote desktop/mobile projects=2·selectedStages=18·unexpectedEnglish=0·geometry 0으로 확인됐습니다. Immutable source에는 처음부터 `index-DG3dIvuW.js`가 기록됐으며, activation 전 receipt/PID 문구가 current truth로 남았던 mismatch를 false-completion event 13으로 append-only 기록했습니다.
+- 현재 활성 한글화 correction은 `7222cf4d3a54` / `index-puw5_elB.js`, origin PID 33615와 tunnel PID 88741입니다. 후속 dashboard redesign은 live `dist/`를 건드리지 않는 isolated candidate build에서 projects=2·selectedStages=18·unexpectedEnglish=0·translationFallback=0·geometry 0으로 확인됐으며 exact public activation은 아직 수행하지 않았습니다. Activation evidence mismatch는 false-completion event 13으로 append-only 보존합니다.
 
 ## 다음 정확한 작업
 
-1. Planner: 이 문서를 포함하는 correction candidate를 isolated exact rebuild하고 origin만 교체한 뒤 기존 tunnel을 유지하며 receipt·public boundary·36상태를 재검증한다
-2. Fresh UX & Product QA: exact activated correction candidate의 한글화·30초 이해도·desktop/mobile을 독립 검증한다
+1. Planner: 이 문서를 포함하는 dashboard redesign candidate를 isolated exact rebuild하고 origin만 교체한 뒤 기존 tunnel을 유지하며 receipt·public boundary·36상태를 재검증한다
+2. Fresh UX & Product QA: exact activated redesign candidate의 Hero·NOW·funnel·rail·motion·기술 증거 접힘과 30초 이해도를 독립 검증한다
 3. Cherry: fresh QA 뒤 Stage 8 C1–C2에서 실제 공개 OUTCOME을 사용하고 30초 이해도 및 Local MVP closure를 별도로 수용한다
 4. Planner/Cherry: 별도 Gate에서 stable hosting, persistent hostname, access/abuse policy, service supervision과 SLA를 결정

@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { axisStateLabel, entityStateLabel, findStage, githubEvidenceItems, selectProject, sourceStateLabel, stageDetailSemantics, summarizeStage, type GithubConnector, type PackageProject, type PackageStage } from './OutcomeDashboard'
+import { axisStateLabel, currentHierarchy, deriveScopeState, deriveStageRailState, entityStateLabel, findStage, githubEvidenceItems, heroGateEvidence, projectHeroModel, selectedStageContext, selectLiveBinding, selectProject, sourceStateLabel, stageDetailSemantics, summarizeStage, type GithubConnector, type PackageProject, type PackageStage } from './OutcomeDashboard'
 import { activityLabelKo, axisLabelKo, gatePresentation, groupPresentation, hierarchyLabels, loginErrorPresentation, phasePresentation, projectOutcomePresentation, roleLabel, stagePresentation } from './outcomeKorean'
 
 const stage = (overrides: Partial<PackageStage> = {}): PackageStage => ({ id: 'stage-one', title: 'Stage One', purpose: 'Verify the result', dependsOn: [], gatePurpose: 'Stage One acceptance checklist', sourceState: 'present', state: 'active', gate: { gates: [{ id: 'G1', title: 'closed', closed: true, groupCode: 'G' }, { id: 'G2', title: 'remaining', closed: false, groupCode: 'G' }], groups: [{ code: 'G', name: '증거', closed: 1, total: 2 }], total: 2, closed: 1, available: true, sourceRef: 'GATES.md' }, axes: { implementation: 'active', test: 'pending', evidence: 'pending', independentQa: 'not_started', cherryAcceptance: 'pending', release: 'not_started' }, ...overrides })
@@ -44,5 +44,57 @@ describe('OUTCOME Package dashboard', () => {
     expect(loginErrorPresentation('invalid_credentials')).toBe('접근 암호가 올바르지 않습니다.')
     expect(loginErrorPresentation('too_many_attempts')).toBe('로그인 시도가 너무 많습니다. 잠시 후 다시 시도해 주세요.')
     expect(loginErrorPresentation('unexpected_backend_code')).toBe('로그인하지 못했습니다.')
+  })
+  it('현재 프로젝트 Hero 의미를 한 컨테이너에 고정한다', () => {
+    const value = project('outcome', 'OUTCOME')
+    const model = projectHeroModel(value)
+    expect(model.name).toBe('OUTCOME')
+    expect(model.outcome).toContain('인공지능')
+    expect(model.current).toContain('작업 단계')
+    expect(model.next).toBe('다음 단계 근거 없음')
+    expect(model.freshness).toBe('근거 없음')
+  })
+  it('Hero 완료 조건 fill은 현재 작업 단계 근거만 사용한다', () => {
+    expect(heroGateEvidence(stage({ gate: { gates: [], groups: [], total: 4, closed: 2, available: true, sourceRef: 'GATES.md' } }))).toEqual({ available: true, closed: 2, total: 4, scale: 0.5 })
+    expect(heroGateEvidence(stage({ gate: { gates: [], groups: [], total: 0, closed: 0, available: false, sourceRef: null } }))).toEqual({ available: false, closed: 0, total: 0, scale: null })
+  })
+  it('실시간 세션은 active와 fresh가 모두 맞는 역할 하나만 선택한다', () => {
+    const bindings = [
+      { role: 'planner', status: 'active', activity: null, observedAt: null, freshness: 'stale', historyCount: 0 },
+      { role: 'release_audit', status: 'idle', activity: null, observedAt: null, freshness: 'fresh', historyCount: 0 },
+      { role: 'builder', status: 'active', activity: null, observedAt: null, freshness: 'fresh', historyCount: 0 },
+      { role: 'ux_product_qa', status: 'active', activity: null, observedAt: null, freshness: 'fresh', historyCount: 0 },
+    ]
+    expect(selectLiveBinding(bindings)?.role).toBe('builder')
+  })
+  it('현재 큰 단계 범위 작업 단계 index를 Package 배열에서 계산한다', () => {
+    const value = project('outcome', 'OUTCOME')
+    const current = stage({ id: 'current-stage' })
+    value.phases = [
+      { id: 'phase-a', title: 'A', purpose: 'A', completion: null, scopes: [{ id: 'scope-a', title: 'A', purpose: 'A', stages: [stage({ id: 'done-stage', state: 'complete' })] }, { id: 'scope-b', title: 'B', purpose: 'B', stages: [stage({ id: 'prior-stage' }), current] }] },
+      { id: 'phase-b', title: 'B', purpose: 'B', completion: null, scopes: [] },
+    ]
+    value.current = { phaseId: 'phase-a', scopeId: 'scope-b', stageId: 'current-stage' }
+    expect(currentHierarchy(value)).toMatchObject({ phaseIndex: 1, phaseTotal: 2, scopeIndex: 2, scopeTotal: 2, stageIndex: 2, stageTotal: 2, stage: current })
+  })
+  it('Scope와 작업 단계 rail 상태를 원본 자식 상태와 current ID로만 계산한다', () => {
+    expect(deriveScopeState({ id: 'done', title: '', purpose: '', stages: [stage({ state: 'complete' })] }, 'other')).toBe('complete')
+    expect(deriveScopeState({ id: 'current', title: '', purpose: '', stages: [stage({ state: 'pending' })] }, 'current')).toBe('active')
+    expect(deriveScopeState({ id: 'later', title: '', purpose: '', stages: [stage({ state: 'queued' })] }, 'other')).toBe('pending')
+    expect(deriveScopeState({ id: 'empty', title: '', purpose: '', stages: [] }, 'other')).toBe('unknown')
+    expect(deriveStageRailState(stage({ id: 'done', state: 'complete' }), 'other')).toBe('complete')
+    expect(deriveStageRailState(stage({ id: 'current', state: 'pending' }), 'current')).toBe('active')
+    expect(deriveStageRailState(stage({ id: 'unknown', state: 'unknown' }), 'other')).toBe('unknown')
+    expect(deriveStageRailState(stage({ id: 'later', state: 'queued' }), 'other')).toBe('pending')
+  })
+  it('선택한 과거 작업 단계가 현재 funnel을 바꾸지 않는다', () => {
+    const value = project('outcome', 'OUTCOME')
+    const current = value.phases[0].scopes[0].stages[0]
+    value.phases[0].scopes[0].stages.unshift(stage({ id: 'historical-stage', state: 'complete' }))
+    const context = selectedStageContext(value, 'historical-stage')
+    expect(context.exploring).toBe(true)
+    expect(context.current?.stage.id).toBe(current.id)
+    expect(context.selected?.stage.id).toBe('historical-stage')
+    expect(context.hierarchy.stageIndex).toBe(2)
   })
 })

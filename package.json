@@ -10,6 +10,7 @@
     "dev": "vite --host 127.0.0.1",
     "start": "node server/index.mjs",
     "build": "tsc -b && vite build",
+    "build:isolated": "tsc -b && vite build --outDir .outcome-runtime/candidate-dist --emptyOutDir",
     "test": "vitest run && node --test server/*.test.mjs",
     "test:dashboard": "vitest run src/components",
     "test:collector": "node --test server/cherry-note-dashboard.test.mjs",

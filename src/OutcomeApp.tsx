@@ -28,7 +28,7 @@ export function OutcomeApp() {
   if (authenticated === null) return <main className="outcome-login"><section aria-live="polite"><p>OUTCOME</p><h1>인증 상태 확인 중</h1></section></main>
   if (!authenticated) return <Login onAuthenticated={() => setAuthenticated(true)} />
   return <main className="cn-standalone-shell">
-    <header className="cn-standalone-heading"><div><p>OUTCOME · 원본 근거 대시보드</p><h1>목적지까지, 지금 어디쯤인지</h1><span>Mac Mini 수집기 · {publicReadOnly ? 'Cherry 승인 공개 읽기 전용' : '인증된 읽기 전용 화면'}</span></div>{!publicReadOnly && <button className="cn-signout" onClick={() => void logout().finally(() => setAuthenticated(false))}>로그아웃</button>}</header>
+    {!publicReadOnly && <div className="cn-standalone-controls"><span>OUTCOME · 인증된 읽기 전용</span><button className="cn-signout" onClick={() => void logout().finally(() => setAuthenticated(false))}>로그아웃</button></div>}
     <OutcomeDashboard onUnauthorized={() => setAuthenticated(false)} />
   </main>
 }
