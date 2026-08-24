@@ -1,6 +1,6 @@
 {
   "schemaVersion": 2,
-  "observedAt": "2026-08-24T10:33:25.737Z",
+  "observedAt": "2026-08-24T11:49:40.981Z",
   "projects": [
     {
       "status": "valid",
@@ -1694,10 +1694,10 @@
     {
       "status": "valid",
       "errors": [],
-      "observedAt": "2026-08-24T10:33:21.746Z",
+      "observedAt": "2026-08-24T11:49:37.042Z",
       "sourceFreshness": {
         "state": "observed",
-        "observedAt": "2026-08-24T10:33:21.746Z"
+        "observedAt": "2026-08-24T11:49:37.042Z"
       },
       "project": {
         "id": "outcome",
@@ -1803,7 +1803,7 @@
                     "closed": 7,
                     "available": true,
                     "sourceRef": "GATES.md",
-                    "observedAt": "2026-08-23T14:19:36.531Z"
+                    "observedAt": "2026-08-24T11:26:34.192Z"
                   },
                   "sourceState": "present",
                   "state": "complete",
@@ -1949,7 +1949,7 @@
                     "closed": 12,
                     "available": true,
                     "sourceRef": "GATES.md",
-                    "observedAt": "2026-08-23T14:19:36.531Z"
+                    "observedAt": "2026-08-24T11:26:34.192Z"
                   },
                   "sourceState": "present",
                   "state": "complete",
@@ -2091,7 +2091,7 @@
                     "closed": 10,
                     "available": true,
                     "sourceRef": "GATES_OUTCOME_MVP.md",
-                    "observedAt": "2026-08-24T10:33:21.746Z"
+                    "observedAt": "2026-08-24T11:49:37.042Z"
                   },
                   "sourceState": "present",
                   "state": "complete",
@@ -2174,7 +2174,7 @@
                     "closed": 5,
                     "available": true,
                     "sourceRef": "GATES_OUTCOME_MVP.md",
-                    "observedAt": "2026-08-24T10:33:21.746Z"
+                    "observedAt": "2026-08-24T11:49:37.042Z"
                   },
                   "sourceState": "present",
                   "state": "complete",
@@ -2266,7 +2266,7 @@
                     "closed": 6,
                     "available": true,
                     "sourceRef": "GATES_OUTCOME_MVP.md",
-                    "observedAt": "2026-08-24T10:33:21.746Z"
+                    "observedAt": "2026-08-24T11:49:37.042Z"
                   },
                   "sourceState": "present",
                   "state": "complete",
@@ -2347,7 +2347,7 @@
                     "closed": 4,
                     "available": true,
                     "sourceRef": "GATES_OUTCOME_MVP.md",
-                    "observedAt": "2026-08-24T10:33:21.746Z"
+                    "observedAt": "2026-08-24T11:49:37.042Z"
                   },
                   "sourceState": "present",
                   "state": "complete",
@@ -2421,7 +2421,7 @@
                     "closed": 4,
                     "available": true,
                     "sourceRef": "GATES_OUTCOME_MVP.md",
-                    "observedAt": "2026-08-24T10:33:21.746Z"
+                    "observedAt": "2026-08-24T11:49:37.042Z"
                   },
                   "sourceState": "present",
                   "state": "complete",
@@ -2477,7 +2477,7 @@
                     "closed": 0,
                     "available": true,
                     "sourceRef": "GATES_OUTCOME_MVP.md",
-                    "observedAt": "2026-08-24T10:33:21.746Z"
+                    "observedAt": "2026-08-24T11:49:37.042Z"
                   },
                   "sourceState": "present",
                   "state": "active",
@@ -2601,7 +2601,100 @@
               "id": "outcome-phase-2-project-portfolio",
               "title": "Multi-project portfolio",
               "purpose": "OUTCOME, Cherry Note, Cherry Picker 등 등록 프로젝트를 같은 Package 의미로 전환·조회한다.",
-              "stages": []
+              "stages": [
+                {
+                  "id": "outcome-stage-project-portfolio-foundation",
+                  "title": "Registered Package portfolio foundation",
+                  "purpose": "명시적 레지스트리와 Package 표시 metadata로 세 번째 이후 프로젝트도 코드별 하드코딩 없이 같은 읽기 전용 결과 지도에 등록한다.",
+                  "dependsOn": [
+                    "outcome-stage-stable-snapshot-host"
+                  ],
+                  "expectedDurationMinutes": null,
+                  "gatePurpose": "Registered Package portfolio foundation acceptance checklist",
+                  "gate": {
+                    "gates": [
+                      {
+                        "id": "P1",
+                        "stageId": "outcome-stage-project-portfolio-foundation",
+                        "title": "프로젝트 레지스트리는 명시적 schema와 Package root/Contract/Map 입력을 가지며 기존 Cherry Note와 OUTCOME 기본 등록을 동일한 경로로 표현한다.",
+                        "closed": true,
+                        "groupCode": "P",
+                        "groupLabel": null,
+                        "proves": "implementation"
+                      },
+                      {
+                        "id": "P2",
+                        "stageId": "outcome-stage-project-portfolio-foundation",
+                        "title": "누락·형식 오류·중복 프로젝트·허용되지 않은 문서 경로는 fail closed하며 조용한 기본값 대체나 프로젝트 identity 혼합이 없다.",
+                        "closed": true,
+                        "groupCode": "P",
+                        "groupLabel": null,
+                        "proves": "test"
+                      },
+                      {
+                        "id": "P3",
+                        "stageId": "outcome-stage-project-portfolio-foundation",
+                        "title": "새 프로젝트의 Project·Phase·Scope·Stage 사용자 표시명과 목적은 Package source metadata에서 오며, 프로젝트별 코드 번역표 추가가 등록 조건이 아니다.",
+                        "closed": true,
+                        "groupCode": "P",
+                        "groupLabel": null,
+                        "proves": "implementation"
+                      },
+                      {
+                        "id": "P4",
+                        "stageId": "outcome-stage-project-portfolio-foundation",
+                        "title": "세 프로젝트 이상 fixture에서 프로젝트 전환, 현재 위치, Phase→Scope→Stage→Gate 탐색, 모바일 progressive drill-down이 각 Package identity를 보존한다.",
+                        "closed": true,
+                        "groupCode": "P",
+                        "groupLabel": null,
+                        "proves": "test"
+                      },
+                      {
+                        "id": "P5",
+                        "stageId": "outcome-stage-project-portfolio-foundation",
+                        "title": "로컬 레지스트리 경로와 source credential은 공개 snapshot/API/UI에 포함되지 않고, GET-only·mutation 405·completion authority false 경계를 유지한다.",
+                        "closed": true,
+                        "groupCode": "P",
+                        "groupLabel": null,
+                        "proves": "security"
+                      },
+                      {
+                        "id": "P6",
+                        "stageId": "outcome-stage-project-portfolio-foundation",
+                        "title": "exact candidate가 전체 회귀와 fresh affected UX & Product QA를 통과하고 고정 공개 주소에서 Git commit/tree/asset과 일치한다.",
+                        "closed": false,
+                        "groupCode": "P",
+                        "groupLabel": null,
+                        "proves": "evidence"
+                      }
+                    ],
+                    "groups": [
+                      {
+                        "code": "P",
+                        "name": "등록 프로젝트 포트폴리오 기반",
+                        "sourceName": "P",
+                        "total": 6,
+                        "closed": 5
+                      }
+                    ],
+                    "total": 6,
+                    "closed": 5,
+                    "available": true,
+                    "sourceRef": "GATES_PHASE2_PROJECT_PORTFOLIO_FOUNDATION.md",
+                    "observedAt": "2026-08-24T11:49:37.041Z"
+                  },
+                  "sourceState": "present",
+                  "state": "queued",
+                  "axes": {
+                    "implementation": "evidence_closed",
+                    "test": "evidence_closed",
+                    "evidence": "partially_evidenced",
+                    "independentQa": "not_sourced",
+                    "cherryAcceptance": "not_sourced",
+                    "release": "not_sourced"
+                  }
+                }
+              ]
             },
             {
               "id": "outcome-phase-2-account-service",
@@ -2696,7 +2789,7 @@
           "localCandidate": {
             "state": "available",
             "branch": "main",
-            "ahead": 1,
+            "ahead": 2,
             "behind": 0,
             "sync": "ahead"
           },
@@ -2719,7 +2812,11 @@
         "scopeId": "outcome-scope-acceptance",
         "stageId": "outcome-stage-8"
       },
-      "next": null,
+      "next": {
+        "phaseId": "outcome-phase-2",
+        "scopeId": "outcome-phase-2-project-portfolio",
+        "stageId": "outcome-stage-project-portfolio-foundation"
+      },
       "bindings": [
         {
           "role": "planner",
@@ -2776,7 +2873,7 @@
   ],
   "snapshot": {
     "boundary": "deployment_snapshot",
-    "capturedAt": "2026-08-24T10:33:25.737Z",
+    "capturedAt": "2026-08-24T11:49:40.981Z",
     "source": "sanitized_public_projection",
     "liveSessionRelay": false,
     "refreshBehavior": "new_deployment_required"
