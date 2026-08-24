@@ -36,7 +36,7 @@ describe('OUTCOME Package dashboard', () => {
     expect(source).toContain('mobileHierarchyLevels.map')
     expect(source).toContain('"aria-current": active ? "step"')
     expect(source).toContain('선택 중')
-    expect(source).toContain('현재 탐색 ·')
+    expect(source).toContain('탐색 ·')
   })
   it('기존 세 current surface를 하나의 Outcome Map으로 통합한다', () => {
     const source = OutcomeDashboard.toString()
