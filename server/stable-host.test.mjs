@@ -4,6 +4,7 @@ import { existsSync, readFileSync, writeFileSync } from 'node:fs'
 import test from 'node:test'
 import source from '../snapshot/outcome-package-source.json' with { type: 'json' }
 import { assertFinalizedReceipt, extractBuiltAsset, finalizeDeploymentSnapshot } from '../scripts/finalize-stable-snapshot.mjs'
+import { assertAutoDetectedNodeRuntime } from '../scripts/validate-vercel-config.mjs'
 
 if (process.env.OUTCOME_ASSERT_BUILT !== '1') {
   const fixture = finalizeDeploymentSnapshot({ source, commit: '1111111111111111111111111111111111111111', tree: '2222222222222222222222222222222222222222', asset: 'index-test.js' })
@@ -61,6 +62,9 @@ test('stable snapshot has no prohibited disclosure or Gate evidence fields', () 
 
 test('Vercel config preserves dashboard route fallback and built output contract', () => {
   const config = JSON.parse(readFileSync(new URL('../vercel.json', import.meta.url), 'utf8'))
+  assert.throws(() => assertAutoDetectedNodeRuntime({ functions: { 'api/index.mjs': { runtime: 'nodejs22.x' } } }), /auto-detection/)
+  assertAutoDetectedNodeRuntime(config)
+  assert.equal(JSON.stringify(config).includes('nodejs22.x'), false)
   assert.equal(config.outputDirectory, 'dist')
   assert.equal(config.rewrites.some((item) => item.source === '/api/:path*' && item.destination.includes('/api')), true)
   assert.equal(config.rewrites.some((item) => item.source === '/cherry-note-dashboard' && item.destination === '/index.html'), true)

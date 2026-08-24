@@ -2,11 +2,6 @@
   "$schema": "https://openapi.vercel.sh/vercel.json",
   "buildCommand": "npm run build:vercel",
   "outputDirectory": "dist",
-  "functions": {
-    "api/index.mjs": {
-      "runtime": "nodejs22.x"
-    }
-  },
   "rewrites": [
     { "source": "/api/:path*", "destination": "/api?path=:path*" },
     { "source": "/cherry-note-dashboard", "destination": "/index.html" }
