@@ -157,7 +157,15 @@ phases:
       - id: outcome-phase-2-account-service
         title: Account-based access
         purpose: 프로젝트별 가시성과 접근 권한을 계정 기반으로 관리한다.
-        stages: []
+        stages:
+          - id: outcome-stage-account-access-definition
+            title: 계정 접근 계약 정의
+            purpose: 공개 배포본과 인증된 비공개 작업공간의 사용자·권한·데이터·운영 경계를 구현 전에 Cherry 결정으로 고정한다.
+            depends_on: [outcome-stage-project-portfolio-foundation]
+            gates_file: GATES_PHASE2_ACCOUNT_ACCESS_DEFINITION.md#K1-K6
+            gate_groups:
+              - code: K
+                primary_label: 계정 접근 계약 결정
 
   - id: outcome-phase-3
     title: Phase 3 · Definition Pending
@@ -213,8 +221,8 @@ phases:
 ## 현재 위치
 
 - Current: `outcome-phase-1 / outcome-scope-acceptance / outcome-stage-8 · Cherry acceptance`
-- Next: `outcome-stage-project-portfolio-foundation · Phase 2 registered Package portfolio foundation`; Phase 1 owner-only closure boundary C1-C2 remains open in parallel.
-- Dashboard registration: Package-driven Cherry Note/OUTCOME UI, GitHub connector Gate M15, fresh UX & Product QA Q1–Q4, and separate fresh Release Audit A1–A4 are evidence-closed. Cherry acceptance C1–C2 remains open.
-- Future roadmap visibility: Phase 2, 4, 5는 Cherry가 이미 정한 목적을 source-visible roadmap container로 등록했다. Phase 3은 `Definition Pending`이며 어떤 진행도 추론하지 않는다. Future scopes에는 아직 Stage/Gate가 없어 모두 definition-pending이다.
+- Next: `outcome-stage-account-access-definition · Phase 2 account access contract definition`; Phase 1 owner-only closure boundary C1-C2 remains open in parallel.
+- Dashboard registration: Package-driven Cherry Note/OUTCOME UI, GitHub connector Gate M15, fresh UX & Product QA Q1–Q4, separate fresh Release Audit A1–A4, stable snapshot host S1–S6, and registered Package portfolio foundation P1–P6 are evidence-closed. Cherry acceptance C1–C2 remains open.
+- Future roadmap visibility: Phase 2의 account access definition은 K1–K6 Cherry 결정 대기 상태로 source-visible하다. Phase 4와 5는 roadmap container이며 Phase 3은 `Definition Pending`으로 어떤 진행도 추론하지 않는다.
 - `MVP_SCOPE_CLOSED`: false
 - `EXTERNAL_OUTCOME_COMPLETE`: false

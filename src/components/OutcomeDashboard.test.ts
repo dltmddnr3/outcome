@@ -134,6 +134,15 @@ describe('OUTCOME Package dashboard', () => {
     expect(structureStatusLabel('partial')).toBe('일부 완료')
     expect(structureStatusLabel('partial')).not.toContain('%')
   })
+  it('완료 Stage와 열린 Stage가 함께 있는 Phase는 Scope 정의 여부와 무관하게 일부 완료다', () => {
+    const value = project('outcome', 'OUTCOME'); value.current = null
+    value.phases = [{ id: 'outcome-phase-2', title: '', purpose: '', completion: null, scopes: [
+      { id: 'hosting', title: '', purpose: '', stages: [stage({ id: 'host', state: 'complete' })] },
+      { id: 'portfolio', title: '', purpose: '', stages: [stage({ id: 'portfolio', state: 'complete' })] },
+      { id: 'accounts', title: '', purpose: '', stages: [stage({ id: 'accounts', state: 'pending' })] },
+    ] }]
+    expect(structuralPhaseModel(value)[0]).toMatchObject({ status: 'partial', stages: 3, complete: 2 })
+  })
   it('Stage 행의 분수는 Gate 진행이 아니라 스테이지 위치로 명시한다', () => {
     const source = OutcomeDashboard.toString()
     expect(source).toContain('스테이지 위치')

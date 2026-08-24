@@ -1,6 +1,6 @@
 {
   "schemaVersion": 2,
-  "observedAt": "2026-08-24T11:53:26.714Z",
+  "observedAt": "2026-08-24T12:01:35.988Z",
   "projects": [
     {
       "status": "valid",
@@ -1694,10 +1694,10 @@
     {
       "status": "valid",
       "errors": [],
-      "observedAt": "2026-08-24T11:53:22.901Z",
+      "observedAt": "2026-08-24T12:00:57.361Z",
       "sourceFreshness": {
         "state": "observed",
-        "observedAt": "2026-08-24T11:53:22.901Z"
+        "observedAt": "2026-08-24T12:00:57.361Z"
       },
       "project": {
         "id": "outcome",
@@ -2700,7 +2700,100 @@
               "id": "outcome-phase-2-account-service",
               "title": "Account-based access",
               "purpose": "프로젝트별 가시성과 접근 권한을 계정 기반으로 관리한다.",
-              "stages": []
+              "stages": [
+                {
+                  "id": "outcome-stage-account-access-definition",
+                  "title": "계정 접근 계약 정의",
+                  "purpose": "공개 배포본과 인증된 비공개 작업공간의 사용자·권한·데이터·운영 경계를 구현 전에 Cherry 결정으로 고정한다.",
+                  "dependsOn": [
+                    "outcome-stage-project-portfolio-foundation"
+                  ],
+                  "expectedDurationMinutes": null,
+                  "gatePurpose": "계정 접근 계약 정의 acceptance checklist",
+                  "gate": {
+                    "gates": [
+                      {
+                        "id": "K1",
+                        "stageId": "outcome-stage-account-access-definition",
+                        "title": "Cherry가 1차 사용자 범위와 공개 화면·비공개 작업공간의 분리를 승인한다.",
+                        "closed": false,
+                        "groupCode": "K",
+                        "groupLabel": null,
+                        "proves": "cherry_decision"
+                      },
+                      {
+                        "id": "K2",
+                        "stageId": "outcome-stage-account-access-definition",
+                        "title": "인증 제공자, 소유자 식별, 접속 수명, 로그아웃·접속 철회, 요청 위조 방지와 계정 복구 계약이 승인된다.",
+                        "closed": false,
+                        "groupCode": "K",
+                        "groupLabel": null,
+                        "proves": "security"
+                      },
+                      {
+                        "id": "K3",
+                        "stageId": "outcome-stage-account-access-definition",
+                        "title": "작업공간 간 격리, 프로젝트 가시성, 최소 권한, 비밀정보 소유권과 감사 경계가 승인된다.",
+                        "closed": false,
+                        "groupCode": "K",
+                        "groupLabel": null,
+                        "proves": "security"
+                      },
+                      {
+                        "id": "K4",
+                        "stageId": "outcome-stage-account-access-definition",
+                        "title": "영속 저장소, 배포본 최신성, 삭제·내보내기, 보존 기간, 이전과 백업·복구 계약이 승인된다.",
+                        "closed": false,
+                        "groupCode": "K",
+                        "groupLabel": null,
+                        "proves": "architecture"
+                      },
+                      {
+                        "id": "K5",
+                        "stageId": "outcome-stage-account-access-definition",
+                        "title": "오남용 방지, 관측, 사고 대응, 비용 상한, 단계적 적용과 되돌리기 수용 조건이 승인된다.",
+                        "closed": false,
+                        "groupCode": "K",
+                        "groupLabel": null,
+                        "proves": "operations"
+                      },
+                      {
+                        "id": "K6",
+                        "stageId": "outcome-stage-account-access-definition",
+                        "title": "Cherry가 정확한 계정 접근 결과 계약을 승인하고 첫 구현 작업의 허용 범위를 연다.",
+                        "closed": false,
+                        "groupCode": "K",
+                        "groupLabel": null,
+                        "proves": "cherry_acceptance"
+                      }
+                    ],
+                    "groups": [
+                      {
+                        "code": "K",
+                        "name": "계정 접근 계약 결정",
+                        "sourceName": "K",
+                        "total": 6,
+                        "closed": 0
+                      }
+                    ],
+                    "total": 6,
+                    "closed": 0,
+                    "available": true,
+                    "sourceRef": "GATES_PHASE2_ACCOUNT_ACCESS_DEFINITION.md",
+                    "observedAt": "2026-08-24T12:00:57.361Z"
+                  },
+                  "sourceState": "present",
+                  "state": "queued",
+                  "axes": {
+                    "implementation": "not_sourced",
+                    "test": "not_sourced",
+                    "evidence": "pending",
+                    "independentQa": "not_sourced",
+                    "cherryAcceptance": "pending",
+                    "release": "not_sourced"
+                  }
+                }
+              ]
             }
           ]
         },
@@ -2812,7 +2905,11 @@
         "scopeId": "outcome-scope-acceptance",
         "stageId": "outcome-stage-8"
       },
-      "next": null,
+      "next": {
+        "phaseId": "outcome-phase-2",
+        "scopeId": "outcome-phase-2-account-service",
+        "stageId": "outcome-stage-account-access-definition"
+      },
       "bindings": [
         {
           "role": "planner",
@@ -2869,7 +2966,7 @@
   ],
   "snapshot": {
     "boundary": "deployment_snapshot",
-    "capturedAt": "2026-08-24T11:53:26.714Z",
+    "capturedAt": "2026-08-24T12:01:35.988Z",
     "source": "sanitized_public_projection",
     "liveSessionRelay": false,
     "refreshBehavior": "new_deployment_required"
