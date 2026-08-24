@@ -52,9 +52,9 @@ Authority: Cherry의 2026-08-24 세 이미지 기반 피드백과 `docs/STAGE8_C
   PROVES: regression_and_boundary
   CHECK: npm test && npm run test:security && npm run build:isolated && OUTCOME_CANDIDATE_DIST=.outcome-runtime/candidate-dist npm run test:browser && OUTCOME_CANDIDATE_DIST=.outcome-runtime/candidate-dist npm run check:public-boundary && npm run check:mutations && npm run check:scope && npm run check:runbook && git diff --check
   EVIDENCE: frontend `51/51`, Node `64/64`, security `16/16`, browser harness `8/8`; 4 viewports each `41` hierarchy selections / `18` Stage selections; isolated asset `index-BsgcKz8K.js`; public boundary prohibited identifiers `0`, mutation `24/24`, scope `17` paths, runbook/diff PASS.
-- [ ] H12: exact public candidate를 fresh independent UX & Product QA가 세 reference intent, hierarchy comprehension, truth, interaction, accessibility 기준으로 PASS한다.
+- [x] H12: exact public candidate를 fresh independent UX & Product QA가 세 reference intent, hierarchy comprehension, truth, interaction, accessibility 기준으로 PASS한다.
   PROVES: fresh_independent_qa
-  EVIDENCE: prior NEEDS_REVISION classes were corrected through `23f6800538a3e6289e370d542da9152c82fc3f0d`; fourth fresh H12 remains NEEDS_REVISION because interactive Phase option titles still clamp to two lines and clip Phase 4. Builder must not self-accept the next candidate.
+  EVIDENCE: fifth fresh isolated `gpt-5.6-sol · medium` reviewer independently passed exact public candidate `4b2ce172f5c6c3ac4c3a7688f9f6d35f8ffbc80a` / tree `6c803c68abd4ed531e921cfb60c70114ef56b114` / asset `index-BsgcKz8K.js`. Both projects, `6` Phases, `17` Scopes and `18` Stage/Gate branches passed truth, interaction, Korean comprehension, responsive, keyboard, contrast, reduced-motion, mutation and redaction checks. Frontend `51/51`, Node `64/64`, security `16/16`, browser guards `8/8`; blocked probes `0`; `false_completion_count=16`. Full evidence: `docs/STAGE8_CHERRY_INTERACTIVE_HIERARCHY_FRESH_UX_QA_4b2ce17.md`.
 - [ ] H13: Cherry가 공개 화면을 직접 사용하고 추가 디테일 또는 acceptance를 결정한다.
   PROVES: cherry_acceptance
   EVIDENCE: pending
