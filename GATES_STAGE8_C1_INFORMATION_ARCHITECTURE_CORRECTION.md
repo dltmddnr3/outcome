@@ -34,3 +34,18 @@ Authority: Cherry의 2026-08-24 bounded correction 승인. Builder는 제품 후
   CHECK: npm test && npm run test:security && npm run build:isolated && OUTCOME_CANDIDATE_DIST=.outcome-runtime/candidate-dist npm run test:browser && OUTCOME_CANDIDATE_DIST=.outcome-runtime/candidate-dist npm run check:public-boundary && npm run check:mutations && npm run check:scope && npm run check:runbook && git diff --check
   EXPECT: exit 0; browser 72/72; prohibited=0; mutations 24/24=405; public runtime untouched; false_completion_count=13
   EVIDENCE: frontend 44, Node 64, security 16, browser harness 3, 4 viewports × 18 selected Stages=72 states, isolated asset `index-CILj_dlQ.js`, public boundary prohibited=0, mutations 24/24=405, scope 17, runbook/diff PASS. Public runtime는 변경하지 않았다. `false_completion_count=13` 보존.
+- [x] IC7: 모든 Gate group이 generic/unlabeled이고 Stage aggregate 이외의 source-grounded decomposition을 제공하지 않으면 `그룹별 확인` 전체를 숨기며, source-labeled group은 그대로 표시한다.
+  PROVES: meaningful_group_decomposition_only
+  CHECK: npm run test:dashboard -- --testNamePattern='generic group은 Stage aggregate와 같으면 전체 section을 숨긴다'
+  EXPECT: generic-only aggregate duplicate hidden; unavailable hidden; source-labeled Stage33 groups retained with Korean primary/code secondary
+  EVIDENCE: `meaningfulGateGroups` red-first/green. 4 viewports 각각 18 selected Stages에서 `genericGroupSections=0`, source-labeled `sourceGroupStates=1`; Stage33 Korean primary 9 + secondary code 9 + 57 checks PASS.
+- [x] IC8: stale NOW 상태는 headline 또는 metadata 정확히 한 곳에만 표시하며 visibility와 timing/truth copy를 보존한다.
+  PROVES: single_stale_now_signal
+  CHECK: npm run test:dashboard -- --testNamePattern='오래된 NOW 상태는 headline과 metadata 중 한 곳에만 표시한다'
+  EXPECT: 관측 오래됨 count=1; activity and 세션 활동은 진행률이 아닙니다 remain visible
+  EVIDENCE: `nowPresentation` red-first에서 stale count 2를 재현한 뒤 headline 1곳으로 교정했다. 72-state browser에서 `staleNowCount<=1`; activity, source observation, timing fallback, `세션 활동은 진행률이 아닙니다`를 보존했다.
+- [x] IC9: 두 display-condition 교정 뒤 full frontend/Node/security/build/browser 72-state/public-boundary/mutation/scope/runbook/diff가 통과한다.
+  PROVES: second_correction_regression
+  CHECK: npm test && npm run test:security && npm run build:isolated && OUTCOME_CANDIDATE_DIST=.outcome-runtime/candidate-dist npm run test:browser && OUTCOME_CANDIDATE_DIST=.outcome-runtime/candidate-dist npm run check:public-boundary && npm run check:mutations && npm run check:scope && npm run check:runbook && git diff --check
+  EXPECT: exit 0; 72/72 states; Stage33 9 groups/57 checks; generic duplicate sections=0; stale NOW count=1; public runtime untouched; false_completion_count=13
+  EVIDENCE: frontend 45, Node 64, security 16, browser harness 3, 4 viewports × 18 selected Stages=72 states, isolated asset `index-CYdBJNLy.js`, public boundary prohibited=0, mutations 24/24=405, scope 17, runbook/diff PASS. Public runtime는 변경하지 않았다. `false_completion_count=13` 보존.

@@ -49,3 +49,20 @@
 - I11 fresh independent UX & Product QA: pending
 - I12 Cherry acceptance: pending
 - C1/C2, release approval, `MVP_SCOPE_CLOSED`, `EXTERNAL_OUTCOME_COMPLETE`: open
+
+## Second fresh QA display-condition correction
+
+- prior candidate: `ffd0aa9cebf6651b5f2fd0b8f62b714442717f76`
+- verdict: `NEEDS_REVISION`; prior four blockers closed, structural IA PASS
+- remaining defects: generic-only aggregate group repetition, stale NOW status double display
+- red-first: missing `meaningfulGateGroups`, unavailable source-labeled group projection, stale count 2를 각각 실패로 재현
+- correction: generic/unlabeled groups project to no primary section; only source-labeled groups render. stale status remains visible in headline exactly once and is removed from metadata.
+- targeted frontend: 2 passed
+- full frontend/Node/security: 45/64/16 passed
+- browser harness: 3 passed
+- browser: 4 viewports × 18 Stages = 72 states; each viewport `sourceGroupStates=1`, `genericGroupSections=0`, `staleNowCount<=1`
+- Stage33: Korean primary labels 9, secondary codes 9, source checks 57
+- isolated build: `index-CYdBJNLy.js`
+- public boundary prohibited identifiers=0; mutations 24/24=405; scope 17; runbook/diff PASS
+- public origin·Quick Tunnel·hostname: Builder mutation 0
+- `false_completion_count=13` 보존

@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { OutcomeDashboard, axisStateLabel, bindingObservationLabel, currentHierarchy, deriveScopeState, deriveStageRailState, detailContentPolicy, entityStateLabel, findStage, gateGroupPresentation, gateProgress, githubEvidenceItems, heroGateEvidence, hierarchyPlacement, nextStageOptionIndex, nowPresentation, projectHeroModel, selectedGateCount, selectedStageContext, selectLiveBinding, selectProject, sourceStateLabel, stageDetailSemantics, summarizeStage, timingPresentation, type Binding, type GithubConnector, type PackageProject, type PackageStage } from './OutcomeDashboard'
+import { OutcomeDashboard, axisStateLabel, bindingObservationLabel, currentHierarchy, deriveScopeState, deriveStageRailState, detailContentPolicy, entityStateLabel, findStage, gateGroupPresentation, gateProgress, githubEvidenceItems, heroGateEvidence, hierarchyPlacement, meaningfulGateGroups, nextStageOptionIndex, nowPresentation, projectHeroModel, selectedGateCount, selectedStageContext, selectLiveBinding, selectProject, sourceStateLabel, stageDetailSemantics, summarizeStage, timingPresentation, type Binding, type GithubConnector, type PackageProject, type PackageStage } from './OutcomeDashboard'
 import { activityLabelKo, axisLabelKo, gatePresentation, groupPresentation, hierarchyLabels, loginErrorPresentation, phasePresentation, projectOutcomePresentation, roleLabel, stagePresentation } from './outcomeKorean'
 
 const stage = (overrides: Partial<PackageStage> = {}): PackageStage => ({ id: 'stage-one', title: 'Stage One', purpose: 'Verify the result', dependsOn: [], gatePurpose: 'Stage One acceptance checklist', sourceState: 'present', state: 'active', gate: { gates: [{ id: 'G1', title: 'closed', closed: true, groupCode: 'G' }, { id: 'G2', title: 'remaining', closed: false, groupCode: 'G' }], groups: [{ code: 'G', name: '증거', closed: 1, total: 2 }], total: 2, closed: 1, available: true, sourceRef: 'GATES.md' }, axes: { implementation: 'active', test: 'pending', evidence: 'pending', independentQa: 'not_started', cherryAcceptance: 'pending', release: 'not_started' }, ...overrides })
@@ -48,6 +48,12 @@ describe('OUTCOME Package dashboard', () => {
   it('완료 조건 그룹은 source label과 code를 필요한 경우에만 표시한다', () => {
     expect(gateGroupPresentation('RA', 'RA')).toEqual({ primaryLabel: null, secondaryCode: null })
     expect(gateGroupPresentation('물리 수용 경계', 'P33A')).toEqual({ primaryLabel: '물리 수용 경계', secondaryCode: 'P33A' })
+  })
+  it('generic group은 Stage aggregate와 같으면 전체 section을 숨긴다', () => {
+    expect(meaningfulGateGroups([{ code: 'RA', name: 'RA', closed: 0, total: 2 }])).toEqual([])
+    expect(meaningfulGateGroups([])).toEqual([])
+    expect(meaningfulGateGroups([{ code: 'Y', name: '링크 미리보기', closed: 5, total: 5 }], false)).toEqual([])
+    expect(meaningfulGateGroups([{ code: 'Y', name: '링크 미리보기', closed: 5, total: 5 }])).toEqual([{ code: 'Y', name: '링크 미리보기', closed: 5, total: 5, primaryLabel: '링크 미리보기', secondaryCode: 'Y' }])
   })
   it('작업 단계 listbox는 이름 있는 group만 option을 소유한다', () => {
     const source = OutcomeDashboard.toString()
@@ -136,11 +142,10 @@ describe('OUTCOME Package dashboard', () => {
     ]
     expect(selectLiveBinding(bindings)?.role).toBe('builder')
   })
-  it('활동이 있는 오래된 NOW는 headline과 metadata에 관측 오래됨을 직접 표시한다', () => {
+  it('오래된 NOW 상태는 headline과 metadata 중 한 곳에만 표시한다', () => {
     const presentation = nowPresentation({ status: 'stale', activity: 'Stage 6 NEEDS_REVISION correction is active; fresh independent QA remains required', observedAt: '2026-08-24T00:00:00.000Z', source: 'runtime_registry' })
     expect(presentation.headline).toContain('6단계 수정 진행 중')
-    expect(presentation.headline).toContain('관측 오래됨')
-    expect(presentation.metadata).toContain('관측 오래됨')
+    expect(`${presentation.headline} ${presentation.metadata}`.match(/관측 오래됨/g)).toHaveLength(1)
     expect(presentation.metadata).toContain('세션 활동은 진행률이 아닙니다')
   })
   it('현재 큰 단계 범위 작업 단계 index를 Package 배열에서 계산한다', () => {

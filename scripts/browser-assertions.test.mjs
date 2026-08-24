@@ -23,6 +23,8 @@ const passingMeasurement = (gateRowTop = 1200) => ({
   liveSemantics: true,
   roleCopyPolish: true,
   heroPrimaryIdentity: true,
+  singleStaleNowSignal: true,
+  staleNowCount: 1,
   activityBand: true,
   unifiedFlow: true,
   funnelCounts: true,
@@ -38,6 +40,9 @@ const passingMeasurement = (gateRowTop = 1200) => ({
   detailGateTruth: true,
   currentDetailDedup: true,
   adaptiveGateGroups: true,
+  meaningfulGroupVisibility: true,
+  sourceGroupSectionCount: 0,
+  genericGroupSectionCount: 0,
   timingHonesty: true,
   noFabricatedProgress: true,
   contentPreservation: true,
@@ -57,6 +62,8 @@ test('IA assertions fail closed for duplicated progress or broken listbox semant
   assert.throws(() => assertDashboardMeasurement('desktop-1440x900/outcome/stage', { ...passingMeasurement(), detailGateTruth: false }), /detailGateTruth=false/)
   assert.throws(() => assertDashboardMeasurement('desktop-1440x900/outcome/stage', { ...passingMeasurement(), currentDetailDedup: false }), /currentDetailDedup=false/)
   assert.throws(() => assertDashboardMeasurement('mobile-390x844/outcome/stage', { ...passingMeasurement(), adaptiveGateGroups: false }), /adaptiveGateGroups=false/)
+  assert.throws(() => assertDashboardMeasurement('desktop-1440x900/outcome/stage', { ...passingMeasurement(), meaningfulGroupVisibility: false }), /meaningfulGroupVisibility=false/)
+  assert.throws(() => assertDashboardMeasurement('mobile-390x844/outcome/stage', { ...passingMeasurement(), singleStaleNowSignal: false }), /singleStaleNowSignal=false/)
 })
 
 test('IA assertions fail closed for tapered flow or disconnected Scope journey', () => {
