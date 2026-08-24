@@ -4,7 +4,7 @@ import { assertDashboardMeasurement, assertMobileStickyMeasurement } from './bro
 
 const passingMeasurement = () => ({
   documentOverflow: 0, clippedDescendants: [], ellipsisTruncation: [], viewportEscape: [], siblingIntersections: [], roleDescendantIntersections: [], roleStatusOverflow: [], undersizedText: [], lowContrastText: [], undersizedControls: [], unexpectedEnglish: [], translationFallback: [], activeAnimationCount: 0,
-  pageHeading: true, sequentialHeadings: true, compactHero: true, roleGeometry: true, heroGeometry: true, mobileMapFirstFold: true, mobileDomOrder: true, phaseLabelsFull: true, phaseBandTruth: true, phaseOptionTitlesFull: true, desktopPhaseListFirstFold: true, liveSemantics: true, structureTruth: true, oneMapSurface: true, roving: true, desktopColumns: true, mobileDrill: true, gateCountTruth: true, gaugeTruth: true, explorationTruth: true, groupTruth: true, singleStaleNowSignal: true, technicalCollapsed: true, technicalEvidence: true, noFabricatedProgress: true, firstFold: true,
+  pageHeading: true, sequentialHeadings: true, compactHero: true, roleGeometry: true, heroGeometry: true, mobileMapFirstFold: true, mobileDomOrder: true, phaseLabelsFull: true, phaseBandTruth: true, phaseOptionTitlesFull: true, desktopPhaseListFirstFold: true, liveSemantics: true, structureTruth: true, oneMapSurface: true, roving: true, desktopColumns: true, mobileDrill: true, gateCountTruth: true, gaugeTruth: true, explorationTruth: true, groupTruth: true, singleStaleNowSignal: true, snapshotBadgeTextTruth: true, technicalCollapsed: true, technicalEvidence: true, noFabricatedProgress: true, firstFold: true,
 })
 
 test('all contracted viewport names accept the interactive hierarchy measurement', () => {
@@ -49,4 +49,8 @@ test('interactive Phase options fail closed for vertical or horizontal title cli
   assert.throws(() => assertDashboardMeasurement('desktop-1440x900/outcome', { ...passingMeasurement(), phaseOptionTitlesFull: false }), /phaseOptionTitlesFull=false/)
   assert.throws(() => assertDashboardMeasurement('landscape-844x390/outcome', { ...passingMeasurement(), phaseOptionTitlesFull: false }), /phaseOptionTitlesFull=false/)
   assert.throws(() => assertDashboardMeasurement('desktop-1440x900/outcome', { ...passingMeasurement(), desktopPhaseListFirstFold: false }), /desktopPhaseListFirstFold=false/)
+})
+
+test('deployment snapshot badge fails closed below the 11px text contract', () => {
+  assert.throws(() => assertDashboardMeasurement('mobile-390x844/outcome', { ...passingMeasurement(), snapshotBadgeTextTruth: false, snapshotBadgeTextSizes: [10, 8] }), /snapshotBadgeTextTruth=false/)
 })
