@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { OutcomeDashboard, axisStateLabel, bindingObservationLabel, collapsedStageCount, currentHierarchy, defaultHierarchySelection, deriveScopeState, deriveStageRailState, detailContentPolicy, entityStateLabel, findStage, gateGroupPresentation, gateProgress, githubEvidenceItems, heroGateEvidence, hierarchyIsExploring, hierarchyPlacement, meaningfulGateGroups, nextStageOptionIndex, nowPresentation, projectHeroModel, resolveHierarchySelection, selectedGateCount, selectedStageContext, selectHierarchyPhase, selectHierarchyScope, selectLiveBinding, selectProject, sourceStateLabel, stageDetailSemantics, structuralPhaseModel, summarizeStage, timingPresentation, type Binding, type GithubConnector, type PackageProject, type PackageStage } from './OutcomeDashboard'
+import { OutcomeDashboard, axisStateLabel, bindingHeroLabel, bindingObservationLabel, collapsedStageCount, currentHierarchy, defaultHierarchySelection, deriveScopeState, deriveStageRailState, detailContentPolicy, entityStateLabel, findStage, gateGroupPresentation, gateProgress, githubEvidenceItems, heroGateEvidence, hierarchyIsExploring, hierarchyPlacement, meaningfulGateGroups, nextStageOptionIndex, nowPresentation, projectHeroModel, resolveHierarchySelection, selectedGateCount, selectedStageContext, selectHierarchyPhase, selectHierarchyScope, selectLiveBinding, selectProject, sourceStateLabel, stageDetailSemantics, structuralPhaseModel, summarizeStage, timingPresentation, type Binding, type GithubConnector, type PackageProject, type PackageStage } from './OutcomeDashboard'
 import { activityLabelKo, axisLabelKo, gatePresentation, groupPresentation, hierarchyLabels, loginErrorPresentation, phasePresentation, projectOutcomePresentation, roleLabel, stagePresentation } from './outcomeKorean'
 
 const stage = (overrides: Partial<PackageStage> = {}): PackageStage => ({ id: 'stage-one', title: 'Stage One', purpose: 'Verify the result', dependsOn: [], gatePurpose: 'Stage One acceptance checklist', sourceState: 'present', state: 'active', gate: { gates: [{ id: 'G1', title: 'closed', closed: true, groupCode: 'G' }, { id: 'G2', title: 'remaining', closed: false, groupCode: 'G' }], groups: [{ code: 'G', name: '증거', closed: 1, total: 2 }], total: 2, closed: 1, available: true, sourceRef: 'GATES.md' }, axes: { implementation: 'active', test: 'pending', evidence: 'pending', independentQa: 'not_started', cherryAcceptance: 'pending', release: 'not_started' }, ...overrides })
@@ -75,6 +75,15 @@ describe('OUTCOME Package dashboard', () => {
     const source = OutcomeDashboard.toString()
     expect(source).not.toContain('<small>프로젝트 식별자 · {project.project.id}</small>')
     expect(source).toContain('기술 증거 · 프로젝트 식별자')
+  })
+  it('Hero 역할 상태는 source 의미를 보존한 compact Korean으로 제한한다', () => {
+    const binding = (status: string, freshness: string): Binding => ({ role: 'builder', status, activity: null, boundAt: null, observedAt: null, freshness, historyCount: 0 })
+    expect(bindingHeroLabel(binding('active', 'fresh'))).toBe('진행 중 · 최근')
+    expect(bindingHeroLabel(binding('idle', 'stale'))).toBe('대기 중 · 오래됨')
+    expect(bindingHeroLabel(binding('stale', 'stale'))).toBe('관측 오래됨')
+    expect(bindingHeroLabel(binding('unbound', 'unknown'))).toBe('연결 없음')
+    expect(bindingHeroLabel(binding('unknown', 'stale'))).toBe('근거 없음 · 오래됨')
+    expect(bindingHeroLabel(binding('replaced', 'replaced'))).toBe('교체됨')
   })
   it('정보 구조 리뉴얼은 핵심 source-grounded 기능을 보존한다', () => {
     const source = OutcomeDashboard.toString()

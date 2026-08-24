@@ -4,7 +4,7 @@ Status: **BUILDER CANDIDATE — FRESH INDEPENDENT QA REQUIRED**
 
 Source pin: `bf033f60e86cd79a9a73a0539fac0f01c37d3374`
 
-false_completion_count: **13**
+false_completion_count: **14**
 
 ## Red-first correction
 
@@ -55,4 +55,17 @@ Prior public pin `40b04cc7b9f252edf4530d5dca26a56cb8c1b3f8` remains a fresh-QA `
 - Preserved all-state truth: each viewport traverses `41` hierarchy selections and `18` Stage selections; current signature drift, overflow, clipping, ellipsis, intersections, viewport escape, unexpected English and translation fallback are all `0`.
 - Verification: frontend `49/49`; Node `64/64`; security `16/16`; browser harness `5/5`; public boundary prohibited identifiers `0`; mutations `24/24 = 405 read_only`; scope `17` paths; runbook and diff checks PASS.
 - Isolated pre-commit asset: `index-CFEmkKrc.js`.
-- H12 fresh independent QA and H13 Cherry acceptance remain open. `false_completion_count=13` is unchanged.
+- At this first correction receipt, H12 fresh independent QA and H13 Cherry acceptance remained open and `false_completion_count=13`; the second verdict below supersedes that current count.
+
+## Second H12 NEEDS_REVISION correction receipt
+
+Fresh H12 on public pin `324ea12227fa7e39622b50f4b5e55186447bd441` remains `NEEDS_REVISION`: a long dynamic role status could take the intrinsic-width grid track and collapse the adjacent Korean role name into vertical overflow. This raises `false_completion_count` to `14`; the next Builder candidate is not independently accepted.
+
+- Red-first: browser measurement now requires every role name width `>=60px`, at most `2` text lines, content height within its row, status overflow `0`, and pairwise intersections across all visible role descendants `0`. The pre-correction candidate fails this geometry contract when the longer live binding state is observed.
+- Correction: Hero-only role status uses compact Korean while preserving the observed entity/freshness meaning; the grid reserves `minmax(60px,1fr)` for names and bounds status to `68px`. Technical evidence remains unchanged.
+- 390×844 role geometry, both projects: minimum name width `60.00px`; maximum name line count `2`; maximum name content height `27.50px`; row height `44.00px`; role descendant intersections `0`; status overflow `0`.
+- Regression geometry: desktop Hero `164.00px`; mobile Hero `347.44–357.50px`; 390×844 first Map option `721.80–735.33px`; scrollY `960` band top `0.00px`, current header `99.11–129.89px`; Phase label overflow `0`.
+- All-state: four viewports each traverse `41` hierarchy selections and `18` Stage selections with hierarchy/current separation, zero-Stage branches, keyboard, clipping, ellipsis, viewport escape, document overflow, unexpected English and translation fallback all preserved.
+- Verification: frontend `50/50`; Node `64/64`; security `16/16`; browser harness `6/6`; public boundary prohibited identifiers `0`; mutations `24/24 = 405 read_only`; scope `17` paths; runbook and diff checks PASS.
+- Isolated pre-commit asset: `index-Cd1mcz3s.js`.
+- H12 fresh independent QA, H13 Cherry acceptance, release and completion boundaries remain open. Public origin/tunnel/deploy were not changed.

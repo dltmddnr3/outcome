@@ -3,8 +3,8 @@ import test from 'node:test'
 import { assertDashboardMeasurement, assertMobileStickyMeasurement } from './browser-assertions.mjs'
 
 const passingMeasurement = () => ({
-  documentOverflow: 0, clippedDescendants: [], ellipsisTruncation: [], viewportEscape: [], siblingIntersections: [], undersizedText: [], lowContrastText: [], undersizedControls: [], unexpectedEnglish: [], translationFallback: [], activeAnimationCount: 0,
-  pageHeading: true, sequentialHeadings: true, compactHero: true, heroGeometry: true, mobileMapFirstFold: true, mobileDomOrder: true, phaseLabelsFull: true, liveSemantics: true, structureTruth: true, oneMapSurface: true, roving: true, desktopColumns: true, mobileDrill: true, gateCountTruth: true, gaugeTruth: true, explorationTruth: true, groupTruth: true, singleStaleNowSignal: true, technicalCollapsed: true, technicalEvidence: true, noFabricatedProgress: true, firstFold: true,
+  documentOverflow: 0, clippedDescendants: [], ellipsisTruncation: [], viewportEscape: [], siblingIntersections: [], roleDescendantIntersections: [], roleStatusOverflow: [], undersizedText: [], lowContrastText: [], undersizedControls: [], unexpectedEnglish: [], translationFallback: [], activeAnimationCount: 0,
+  pageHeading: true, sequentialHeadings: true, compactHero: true, roleGeometry: true, heroGeometry: true, mobileMapFirstFold: true, mobileDomOrder: true, phaseLabelsFull: true, liveSemantics: true, structureTruth: true, oneMapSurface: true, roving: true, desktopColumns: true, mobileDrill: true, gateCountTruth: true, gaugeTruth: true, explorationTruth: true, groupTruth: true, singleStaleNowSignal: true, technicalCollapsed: true, technicalEvidence: true, noFabricatedProgress: true, firstFold: true,
 })
 
 test('all contracted viewport names accept the interactive hierarchy measurement', () => {
@@ -32,4 +32,10 @@ test('mobile sticky context requires exact scroll retention and ordered visible 
   assert.doesNotThrow(() => assertMobileStickyMeasurement('mobile-390x844/outcome', passing))
   assert.throws(() => assertMobileStickyMeasurement('mobile-390x844/outcome', { ...passing, wrapperTop: -369.17, bandTop: -369.17, headerTop: -222.28 }), /wrapperTop=-369.17/)
   assert.throws(() => assertMobileStickyMeasurement('mobile-390x844/outcome', { ...passing, scrollY: 958 }), /scrollY=958/)
+})
+
+test('mobile role geometry fails closed for collapsed names, row escape, descendant intersections, and status overflow', () => {
+  assert.throws(() => assertDashboardMeasurement('mobile-390x844/cherry-note', { ...passingMeasurement(), roleGeometry: false }), /roleGeometry=false/)
+  assert.throws(() => assertDashboardMeasurement('mobile-390x844/cherry-note', { ...passingMeasurement(), roleDescendantIntersections: ['사용성·제품 검수/출시 감사'] }), /roleIntersections=/)
+  assert.throws(() => assertDashboardMeasurement('mobile-390x844/cherry-note', { ...passingMeasurement(), roleStatusOverflow: ['사용성·제품 검수:114x44->114x111'] }), /roleStatusOverflow=/)
 })
