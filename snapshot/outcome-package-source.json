@@ -1,6 +1,6 @@
 {
   "schemaVersion": 2,
-  "observedAt": "2026-08-24T10:02:31.138Z",
+  "observedAt": "2026-08-24T10:33:25.737Z",
   "projects": [
     {
       "status": "valid",
@@ -1694,10 +1694,10 @@
     {
       "status": "valid",
       "errors": [],
-      "observedAt": "2026-08-24T10:02:23.684Z",
+      "observedAt": "2026-08-24T10:33:21.746Z",
       "sourceFreshness": {
         "state": "observed",
-        "observedAt": "2026-08-24T10:02:23.684Z"
+        "observedAt": "2026-08-24T10:33:21.746Z"
       },
       "project": {
         "id": "outcome",
@@ -2091,7 +2091,7 @@
                     "closed": 10,
                     "available": true,
                     "sourceRef": "GATES_OUTCOME_MVP.md",
-                    "observedAt": "2026-08-24T10:02:23.684Z"
+                    "observedAt": "2026-08-24T10:33:21.746Z"
                   },
                   "sourceState": "present",
                   "state": "complete",
@@ -2174,7 +2174,7 @@
                     "closed": 5,
                     "available": true,
                     "sourceRef": "GATES_OUTCOME_MVP.md",
-                    "observedAt": "2026-08-24T10:02:23.684Z"
+                    "observedAt": "2026-08-24T10:33:21.746Z"
                   },
                   "sourceState": "present",
                   "state": "complete",
@@ -2266,7 +2266,7 @@
                     "closed": 6,
                     "available": true,
                     "sourceRef": "GATES_OUTCOME_MVP.md",
-                    "observedAt": "2026-08-24T10:02:23.684Z"
+                    "observedAt": "2026-08-24T10:33:21.746Z"
                   },
                   "sourceState": "present",
                   "state": "complete",
@@ -2347,7 +2347,7 @@
                     "closed": 4,
                     "available": true,
                     "sourceRef": "GATES_OUTCOME_MVP.md",
-                    "observedAt": "2026-08-24T10:02:23.684Z"
+                    "observedAt": "2026-08-24T10:33:21.746Z"
                   },
                   "sourceState": "present",
                   "state": "complete",
@@ -2421,7 +2421,7 @@
                     "closed": 4,
                     "available": true,
                     "sourceRef": "GATES_OUTCOME_MVP.md",
-                    "observedAt": "2026-08-24T10:02:23.684Z"
+                    "observedAt": "2026-08-24T10:33:21.746Z"
                   },
                   "sourceState": "present",
                   "state": "complete",
@@ -2477,7 +2477,7 @@
                     "closed": 0,
                     "available": true,
                     "sourceRef": "GATES_OUTCOME_MVP.md",
-                    "observedAt": "2026-08-24T10:02:23.684Z"
+                    "observedAt": "2026-08-24T10:33:21.746Z"
                   },
                   "sourceState": "present",
                   "state": "active",
@@ -2582,7 +2582,7 @@
                     "closed": 6,
                     "available": true,
                     "sourceRef": "GATES_PHASE2_STABLE_SNAPSHOT_HOST.md",
-                    "observedAt": "2026-08-24T09:55:59.375Z"
+                    "observedAt": "2026-08-24T10:03:13.574Z"
                   },
                   "sourceState": "present",
                   "state": "complete",
@@ -2776,7 +2776,7 @@
   ],
   "snapshot": {
     "boundary": "deployment_snapshot",
-    "capturedAt": "2026-08-24T10:02:31.138Z",
+    "capturedAt": "2026-08-24T10:33:25.737Z",
     "source": "sanitized_public_projection",
     "liveSessionRelay": false,
     "refreshBehavior": "new_deployment_required"
