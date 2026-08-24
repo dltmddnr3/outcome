@@ -151,7 +151,7 @@ Stage ID: `outcome-stage-8`
 
 - [ ] C1: Cherry uses OUTCOME and confirms both Cherry Note and OUTCOME current location and next action are understandable within 30 seconds.
   PROVES: cherry_acceptance
-  EVIDENCE: pending; Koreanization correction candidate `7222cf4d3a54` received fresh affected QA `PASS`, but Cherry requested a new progress-hierarchy composition before C1 re-evaluation. The active correction contract is `GATES_STAGE8_C1_DASHBOARD_REDESIGN.md`; C1 remains owner-only and open. Cumulative `false_completion_count=13` is preserved.
+  EVIDENCE: progress-hierarchy product candidate `0ad19c38e9b2` and verification correction `6cded0f272df` received final fresh affected QA `PASS` in `docs/STAGE8_C1_DASHBOARD_POLISHING_D1_1_FRESH_QA_6cded0f.md`. R10 is closed; R11 and C1 remain owner-only and open until Cherry uses the public dashboard and explicitly decides. Cumulative `false_completion_count=13` is preserved.
 - [ ] C2: Cherry explicitly accepts Local MVP closure; release or external completion remains a separate decision.
   PROVES: cherry_acceptance
   EVIDENCE: pending

@@ -49,9 +49,9 @@ Authority: Cherry의 2026-08-24 화면 피드백과 `docs/STAGE8_C1_DASHBOARD_RE
   CHECK: npm test && npm run test:security && npm run build:isolated && OUTCOME_CANDIDATE_DIST=.outcome-runtime/candidate-dist npm run check:public-boundary && npm run check:mutations && npm run check:scope && npm run check:runbook && git diff --check
   EXPECT: exit 0; unexpectedEnglish=0 translationFallback=0 false_completion_count=13
   EVIDENCE: frontend 28/28, Node 61/61, security 16/16, local candidate public boundary prohibited identifiers=0, mutation 24/24=405, scope/runbook PASS, isolated production build와 browser PASS입니다. cumulative false_completion_count=13입니다.
-- [ ] R10: exact candidate 활성화 후 fresh UX & Product QA가 두 프로젝트 30초 이해, motion, funnel, desktop/mobile을 독립 PASS한다.
+- [x] R10: exact candidate 활성화 후 fresh UX & Product QA가 두 프로젝트 30초 이해, motion, funnel, desktop/mobile을 독립 PASS한다.
   PROVES: independent_qa
-  EVIDENCE: pending
+  EVIDENCE: 제품 후보 `0ad19c38e9b2` / tree `391674734587` / asset `index-CCeEkpGH.js`를 공개 활성화한 뒤 fresh Claude Opus 세션 `6033eeab-5ade-4ac7-b39f-7d975559ea18`이 local/public 36/36 상태, D1–D3, 12/12 30초 task, motion/reduced-motion, 보안·읽기 전용 회귀를 독립 PASS했습니다. D1-1 verification guard는 `6cded0f272df`에서 actual local/remote mobile `1689px` reject와 `1688/1679/1646px` pass를 fault injection으로 확인했습니다. 근거는 `docs/STAGE8_C1_DASHBOARD_POLISHING_D1_1_FRESH_QA_6cded0f.md`입니다.
 - [ ] R11: fresh QA PASS 뒤 Cherry가 공개 화면을 사용하고 C1을 직접 결정한다.
   PROVES: cherry_acceptance
   EVIDENCE: pending
