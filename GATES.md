@@ -88,7 +88,7 @@ Outcome: A fresh OUTCOME session can understand the product, its evidence, its c
   EVIDENCE: R10_PASS
 
 - [x] R11: OUTCOME Map declares its Package schema and resolves every delivery Stage to the correct Gate file.
-  CHECK: rg -q "package_schema_version: 1" docs/OUTCOME_MAP.md && test "$(rg -c '^          - id: outcome-stage-' docs/OUTCOME_MAP.md)" -eq 8 && test "$(rg -c 'gates_file:' docs/OUTCOME_MAP.md)" -eq 8 && echo R11_PASS
+  CHECK: rg -q "package_schema_version: 1" docs/OUTCOME_MAP.md && test "$(rg -c '^          - id: outcome-stage-' docs/OUTCOME_MAP.md)" -eq 9 && test "$(rg -c 'gates_file:' docs/OUTCOME_MAP.md)" -eq 9 && echo R11_PASS
   EXPECT: R11_PASS
   EVIDENCE: R11_PASS
 

@@ -145,7 +145,15 @@ phases:
       - id: outcome-phase-2-project-portfolio
         title: Multi-project portfolio
         purpose: OUTCOME, Cherry Note, Cherry Picker 등 등록 프로젝트를 같은 Package 의미로 전환·조회한다.
-        stages: []
+        stages:
+          - id: outcome-stage-project-portfolio-foundation
+            title: Registered Package portfolio foundation
+            purpose: 명시적 레지스트리와 Package 표시 metadata로 세 번째 이후 프로젝트도 코드별 하드코딩 없이 같은 읽기 전용 결과 지도에 등록한다.
+            depends_on: [outcome-stage-stable-snapshot-host]
+            gates_file: GATES_PHASE2_PROJECT_PORTFOLIO_FOUNDATION.md#P1-P6
+            gate_groups:
+              - code: P
+                primary_label: 등록 프로젝트 포트폴리오 기반
       - id: outcome-phase-2-account-service
         title: Account-based access
         purpose: 프로젝트별 가시성과 접근 권한을 계정 기반으로 관리한다.
@@ -205,7 +213,7 @@ phases:
 ## 현재 위치
 
 - Current: `outcome-phase-1 / outcome-scope-acceptance / outcome-stage-8 · Cherry acceptance`
-- Next: `owner-only closure boundary · MVP_SCOPE_CLOSED after C1-C2`
+- Next: `outcome-stage-project-portfolio-foundation · Phase 2 registered Package portfolio foundation`; Phase 1 owner-only closure boundary C1-C2 remains open in parallel.
 - Dashboard registration: Package-driven Cherry Note/OUTCOME UI, GitHub connector Gate M15, fresh UX & Product QA Q1–Q4, and separate fresh Release Audit A1–A4 are evidence-closed. Cherry acceptance C1–C2 remains open.
 - Future roadmap visibility: Phase 2, 4, 5는 Cherry가 이미 정한 목적을 source-visible roadmap container로 등록했다. Phase 3은 `Definition Pending`이며 어떤 진행도 추론하지 않는다. Future scopes에는 아직 Stage/Gate가 없어 모두 definition-pending이다.
 - `MVP_SCOPE_CLOSED`: false
