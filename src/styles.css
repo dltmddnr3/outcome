@@ -78,6 +78,7 @@
   .oc-scope-rail article:last-child::after{display:none}
   .oc-scope-rail article>i{position:relative;z-index:1;background:#0d130e}
   .oc-scope-rail article>span{position:relative;z-index:1;width:100%;box-sizing:border-box;padding:7px 6px;border:1px solid transparent}
+  .oc-scope-rail article.active{border-color:transparent;background:transparent}
   .oc-scope-rail article.active>span{transform:translateY(-3px);border-color:#adff2f;border-radius:8px;background:#101810;box-shadow:0 0 12px rgba(173,255,47,.12)}
   .oc-scope-rail article.unknown>span{border-style:dashed}
 }

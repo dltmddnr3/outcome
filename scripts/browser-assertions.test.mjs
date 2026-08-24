@@ -35,6 +35,9 @@ const passingMeasurement = (gateRowTop) => ({
   timingHonesty: true,
   contentPreservation: true,
   scopeJourney: true,
+  scopeConnectorContinuity: true,
+  scopeConnectorGap: 0,
+  activeScopeWrapperBackgrounds: ['rgba(0, 0, 0, 0)'],
   liveSemantics: true,
   repeatingSemanticElements: 0,
   explorationHonest: true,
@@ -59,4 +62,8 @@ test('mobile boundary and current measurements pass', () => {
 
 test('desktop viewport does not receive the mobile 1688 budget', () => {
   assert.doesNotThrow(() => assertDashboardMeasurement('desktop-1440x900/cherry-note/stage', passingMeasurement(1689)))
+})
+
+test('desktop opaque Scope wrapper fails connector continuity', () => {
+  assert.throws(() => assertDashboardMeasurement('desktop-1440x900/cherry-note/stage', { ...passingMeasurement(1200), scopeConnectorContinuity: false, scopeConnectorGap: 0.02, activeScopeWrapperBackgrounds: ['rgb(21, 32, 20)'] }), /scopeConnectorContinuity=false.*rgb\(21, 32, 20\).*gap=0\.02/)
 })

@@ -49,6 +49,11 @@ Authority: Cherry의 2026-08-24 시각 리뉴얼 피드백과 `docs/STAGE8_C1_VI
   CHECK: npm test && npm run test:security && npm run build:isolated && OUTCOME_CANDIDATE_DIST=.outcome-runtime/candidate-dist npm run check:public-boundary && npm run check:mutations && npm run check:scope && npm run check:runbook && git diff --check
   EXPECT: exit 0; public prohibited hit 0; mutations 405; false_completion_count=13; C1/C2/R11 remain open
   EVIDENCE: frontend 35, Node 64, security 16, browser harness 3, public prohibited=0, mutation 24/24 405, scope/runbook/build/diff PASS
+- [x] D1-1: desktop/landscape Scope rail의 active wrapper가 투명하고, 직전 완료 connector의 계산된 끝점이 현재 node 시작점에 닿아 시각적으로 가려지지 않는다.
+  PROVES: continuous_scope_connector_visibility
+  CHECK: npm run build:isolated && OUTCOME_CANDIDATE_DIST=.outcome-runtime/candidate-dist npm run test:browser
+  EXPECT: desktop and landscape active wrapper background/border alpha=0; completed connector gap to current node<=1px across both projects and every selected Stage
+  EVIDENCE: red desktop 18/18 states background rgb(21,32,20), continuity=false despite 0.02px geometry gap; green desktop/landscape 36/36 wrapper alpha=0 and connector max gap 0.02px/0.00px, mobile surface preserved; browser harness 4/4 and 72/72 states PASS
 - [ ] V10: exact immutable candidate를 공개 URL에 활성화한 뒤 fresh UX & Product QA가 데스크톱·모바일의 30초 이해, 진행 진실성, 시간 fallback, motion을 독립 PASS한다.
   PROVES: fresh_independent_qa
   EVIDENCE: pending
