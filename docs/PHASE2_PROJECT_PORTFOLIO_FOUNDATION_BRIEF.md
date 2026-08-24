@@ -12,9 +12,9 @@ Cherry가 새 프로젝트를 OUTCOME Package로 등록하면 OUTCOME 코드를 
 
 ## Minimal repair contract
 
-1. Versioned project registry loader를 만든다. 기본 registry도 같은 loader를 통과하며 runtime override는 하나의 명시적 파일 경로만 허용한다.
-2. Registry entry는 Package root, Contract 상대 경로, Map 상대 경로를 선언한다. 상대 경로 탈출, 중복 entry/project ID, malformed schema는 전체를 fail closed한다.
-3. Package Map에 선택적 사용자 표시 metadata를 정의한다. 존재하면 Project/Phase/Scope/Stage 제목과 목적의 source authority이며, 없으면 기존 ID 매핑을 transitional fallback으로 유지한다.
+1. Versioned `config/outcome-projects.json`과 project registry loader를 만든다. 정확한 shape은 `{"schema_version":1,"projects":[{"root":"../Cherry Note","contract_file":"OUTCOME_CONTRACT.md","map_file":"OUTCOME_MAP.md"}]}`이며, `root`는 OUTCOME repository root 기준 상대 경로 또는 runtime-only absolute path다. 기본 registry도 같은 loader를 통과하고 runtime override는 `OUTCOME_PROJECT_REGISTRY`의 명시적 파일 하나만 허용한다.
+2. Registry entry는 Package root, Contract 상대 경로, Map 상대 경로를 선언한다. Contract/Map 절대 경로와 Package root 밖으로 나가는 상대 경로, 빈 projects, 중복 entry/project ID, malformed schema는 전체를 fail closed한다.
+3. 기존 Package Map의 `title`과 `purpose`를 Project/Phase/Scope/Stage 사용자 표시 source metadata로 사용한다. 알려진 기존 ID는 현재 한글 표현을 transitional override로 보존하지만, 새 프로젝트 ID는 코드 번역표 없이 source title/purpose로 렌더한다.
 4. 세 프로젝트 fixture로 collector·public projection·프로젝트 전환·모바일 1/4→4/4를 검증한다. fixture는 실제 제3 프로젝트 진행을 주장하지 않는다.
 5. 공개 snapshot은 registry root/path/credential을 제거하고 기존 receipt, sanitizer, mutation denial을 그대로 유지한다.
 
