@@ -9,10 +9,16 @@ const project = (id: string, title: string): PackageProject => ({ status: 'valid
 describe('OUTCOME Package dashboard', () => {
   it('역할 세션은 네 개의 간결한 행과 단일 활성 신호로 표시한다', () => {
     const source = OutcomeDashboard.toString()
-    expect(source).toContain('oc-hero-side')
+    expect(source).not.toContain('oc-hero-side')
     expect(source).toContain('oc-role-row')
     expect(source).not.toContain('oc-activity-band')
     expect(source).not.toContain('oc-now-timing')
+  })
+  it('모바일 primary DOM 순서는 identity freshness NOW roles structure current map을 따른다', () => {
+    const source = OutcomeDashboard.toString()
+    const tokens = ['oc-hero-title', 'oc-hero-meta', 'oc-now-summary', 'oc-bindings', 'oc-structure-band', 'oc-map-header', 'oc-map-columns']
+    expect(tokens.map((token) => source.indexOf(token))).toEqual([...tokens].map((_, index, values) => source.indexOf(values[index])).sort((left, right) => left - right))
+    expect(source).toContain('oc-hierarchy-sticky')
   })
   it('기존 세 current surface를 하나의 Outcome Map으로 통합한다', () => {
     const source = OutcomeDashboard.toString()

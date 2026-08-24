@@ -8,7 +8,7 @@ const phaseCopy: Record<string, [string, string]> = {
 }
 
 export const hierarchyLabels = ['프로젝트', '큰 단계', '범위', '작업 단계', '완료 조건'] as const
-export const projectOutcomePresentation = (id: string, value: string) => id === 'outcome' ? '여러 인공지능 역할과 작업이 만드는 활동을 프로젝트 결과 구조와 검증 근거에 연결해, Cherry가 현재 위치와 다음 경계를 30초 안에 이해하게 합니다.' : value
+export const projectOutcomePresentation = (id: string, value: string) => id === 'outcome' ? '인공지능 역할의 작업을 결과 구조와 근거에 연결해 현재 위치와 다음 경계를 보여줍니다.' : value
 
 const scopeCopy: Record<string, [string, string]> = {
   'scope-stage-33-physical-boundary': ['33단계 실제 사용 경계', '열려 있는 빌드 41 하단 셸 의견을 검증된 불변 후보와 Cherry의 실제 사용 판정으로 전환하되 피드는 시작하지 않습니다.'],

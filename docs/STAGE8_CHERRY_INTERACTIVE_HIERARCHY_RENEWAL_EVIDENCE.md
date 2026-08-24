@@ -42,3 +42,17 @@ false_completion_count: **13**
 - H13 Cherry acceptance: open.
 - C1/C2, release approval, `MVP_SCOPE_CLOSED`, `EXTERNAL_OUTCOME_COMPLETE`: open.
 - public origin/tunnel/deploy: untouched; Planner activation boundary.
+
+## H12 NEEDS_REVISION correction receipt
+
+Prior public pin `40b04cc7b9f252edf4530d5dca26a56cb8c1b3f8` remains a fresh-QA `NEEDS_REVISION`; this Builder correction does not rewrite or self-accept that verdict.
+
+- Red-first: the new all-state geometry guard failed the prior bytes on every desktop hierarchy selection with `heroGeometry=false`. The harness now also fails closed on an oversized mobile Hero, a first Map option below the viewport, wrong primary DOM order, clipped Phase labels, or a sticky wrapper/header displaced at scrollY `960`.
+- Hero: desktop `164.00px` for Cherry Note and OUTCOME; 390×844 `357.50px` / `347.44px`; 375×812 `357.50px` / `347.44px`.
+- First hierarchy option: 390×844 `721.80px` / `735.33px`; 375×812 `737.19px` / `735.33px`. Each is visible inside the first viewport.
+- Sticky context at scrollY `960`: structural band top `0.00px`; actual-current header top 390×844 `99.11px` / `129.89px`, 375×812 `114.50px` / `129.89px`.
+- Phase titles: maximum `scrollHeight - clientHeight = 0px` across both projects and all four viewports, including Phase 4.
+- Preserved all-state truth: each viewport traverses `41` hierarchy selections and `18` Stage selections; current signature drift, overflow, clipping, ellipsis, intersections, viewport escape, unexpected English and translation fallback are all `0`.
+- Verification: frontend `49/49`; Node `64/64`; security `16/16`; browser harness `5/5`; public boundary prohibited identifiers `0`; mutations `24/24 = 405 read_only`; scope `17` paths; runbook and diff checks PASS.
+- Isolated pre-commit asset: `index-CFEmkKrc.js`.
+- H12 fresh independent QA and H13 Cherry acceptance remain open. `false_completion_count=13` is unchanged.

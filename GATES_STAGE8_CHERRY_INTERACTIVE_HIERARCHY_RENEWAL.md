@@ -11,12 +11,12 @@ Authority: Cherry의 2026-08-24 세 이미지 기반 피드백과 `docs/STAGE8_C
   PROVES: compact_project_orientation
   CHECK: npm run test:dashboard -- --run
   EXPECT: no current Stage block, next boundary block, current Gate block, timing cards, or raw role detail in Hero
-  EVIDENCE: `src/components/OutcomeDashboard.tsx`의 compact Hero가 identity·purpose·NOW·freshness/refresh·4 role status만 소유하고, browser 4 viewport 전수에서 role rows=4, live<=1, English/fallback/geometry=0을 확인했다.
+  EVIDENCE: correction browser sweep measured desktop Hero `164.00px` for both projects and mobile Hero `347.44–357.50px`. Identity → freshness/refresh → NOW → four role rows is source DOM order; no current/Gate/timing detail moved into Hero.
 - [x] H3: Hero 하단 structural band가 모든 source-defined Phase를 categorical compartment로 보존하고 Phase 안의 Scope·정의된 Stage 상태를 표시하되 임의 aggregate percent를 만들지 않는다.
   PROVES: source_grounded_hierarchy_gradient
   CHECK: npm run test:dashboard -- --run
   EXPECT: every Phase remains visible even with zero Stage; complete Stage cells only are lime; current is a marker; definition-pending is neutral; no time/effort weighting
-  EVIDENCE: `structuralPhaseModel`과 `.oc-structure-band`가 OUTCOME 5개 Phase를 동일 categorical compartment로 렌더하고 complete Stage cell/current marker/zero-Stage hatch만 표시한다. Phase 2–5의 zero-Stage branch를 unit/browser 전수 검증했고 percent는 0개다.
+  EVIDENCE: structural band remains source-defined and percentage-free. Browser checks every Phase label's client/scroll height across both projects and four viewports; maximum overflow is `0px`, including `4단계 · OUTCOME 안에서 개발`.
 - [x] H4: 네 역할 세션은 Hero 우측에서 역할명과 관측 상태만 한 줄씩 표시하고 active signal은 최대 하나이며 상세 binding은 접힌 기술 증거에만 남는다.
   PROVES: compact_role_status
   CHECK: npm run test:dashboard -- --run
@@ -38,7 +38,7 @@ Authority: Cherry의 2026-08-24 세 이미지 기반 피드백과 `docs/STAGE8_C
 - [x] H8: Phase·Scope·Stage는 연결된 세 listbox column, Gate는 inspector이며 긴 완료 Stage branch는 disclosure로 접고 펼칠 수 있고 키보드 Arrow/Home/End와 column focus 이동이 유효하다.
   PROVES: accessible_progressive_disclosure
   CHECK: OUTCOME_CANDIDATE_DIST=.outcome-runtime/candidate-dist npm run test:browser
-  EVIDENCE: 세 listbox의 selected/tabstop은 각각 1개이고 current는 별도 aria-current다. ArrowUp/Down/Home/End 및 ArrowLeft/Right focus 이동, 3px focus outline contrast>=13.60을 browser에서 확인했다. 13-Stage fixture는 완료 prefix disclosure와 selected historical auto-expand를 검증한다.
+  EVIDENCE: mobile source DOM order is structural band → actual-current → active level, with identity/freshness/NOW/roles preceding it. Existing three-listbox roving tabindex and Arrow/Home/End/column focus tests pass; focus contrast remains `>=13.60`.
 - [x] H9: selected Stage Gate는 단일 상세에서 실제 closed/total, 목적, 남은 조건, source-labeled groups만 표시하고 generic aggregate·current Gate·boundary를 중복하지 않는다.
   PROVES: gate_is_stage_acceptance
   CHECK: npm run test:dashboard -- --run
@@ -47,14 +47,14 @@ Authority: Cherry의 2026-08-24 세 이미지 기반 피드백과 `docs/STAGE8_C
   PROVES: glanceable_responsive_hierarchy
   CHECK: OUTCOME_CANDIDATE_DIST=.outcome-runtime/candidate-dist npm run test:browser
   EXPECT: no document horizontal overflow, clipping, ellipsis, overlap; controls>=44px; contrast>=4.5; reduced motion
-  EVIDENCE: desktop 1440×900에서 Hero·current breadcrumb·5개 Phase band가 first fold에 보이고, mobile 390×844/375×812는 active hierarchy level=1만 표시한다. landscape 844×390까지 overflow/clipping/ellipsis/intersection/viewport escape=0, controls>=44, text>=11, contrast>=4.5다.
+  EVIDENCE: at 390×844 initial Map option top is `721.80px` Cherry Note / `735.33px` OUTCOME. At scrollY `960`, the single sticky wrapper holds structural band top `0.00px` and actual-current header top `99.11px` / `129.89px`. Four-viewport all-state geometry reports overflow/clipping/ellipsis/intersection/viewport escape `0`.
 - [x] H11: frontend, Node, security, browser all-state, isolated build, public boundary, mutation, scope, runbook과 diff checks가 통과한다.
   PROVES: regression_and_boundary
   CHECK: npm test && npm run test:security && npm run build:isolated && OUTCOME_CANDIDATE_DIST=.outcome-runtime/candidate-dist npm run test:browser && OUTCOME_CANDIDATE_DIST=.outcome-runtime/candidate-dist npm run check:public-boundary && npm run check:mutations && npm run check:scope && npm run check:runbook && git diff --check
-  EVIDENCE: frontend 48/48, Node 64/64, security 16/16, browser harness 3/3와 4 viewport×41 hierarchy selections PASS. isolated build `index-CZZV-0Xj.js`; public boundary prohibited identifiers=0; mutation 24/24=405; scope 17 paths, runbook, diff PASS.
+  EVIDENCE: frontend `49/49`, Node `64/64`, security `16/16`, browser harness `5/5`; four viewports each traverse `41` hierarchy selections / `18` Stage selections. Isolated build `index-CFEmkKrc.js`; public boundary prohibited identifiers `0`; mutation `24/24=405`; scope `17` paths, runbook and diff checks PASS.
 - [ ] H12: exact public candidate를 fresh independent UX & Product QA가 세 reference intent, hierarchy comprehension, truth, interaction, accessibility 기준으로 PASS한다.
   PROVES: fresh_independent_qa
-  EVIDENCE: pending
+  EVIDENCE: NEEDS_REVISION on public pin `40b04cc7b9f252edf4530d5dca26a56cb8c1b3f8`: Hero height/first viewport, sticky actual-current context and mobile DOM/focus order, and Phase label clipping require correction. Builder must not self-accept the corrected candidate.
 - [ ] H13: Cherry가 공개 화면을 직접 사용하고 추가 디테일 또는 acceptance를 결정한다.
   PROVES: cherry_acceptance
   EVIDENCE: pending
