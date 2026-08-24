@@ -2,7 +2,7 @@
 
 Outcome: exact public candidate `36b07cc2141bb00074c75664cfe615ae49911daa`의 fresh independent QA `NEEDS_REVISION`에서 확인된 정보 중복·완료 조건 수치·그룹 배치·listbox 소유권 결함만 교정하고, 기존 IA source truth와 공개 경계를 보존한다.
 
-Authority: Cherry의 2026-08-24 bounded correction 승인. Builder는 제품 후보와 검증 증거만 소유한다. 공개 runtime·Quick Tunnel은 변경하지 않는다. I11은 fresh QA 전까지 pending이며 I12/C1/C2/release/`MVP_SCOPE_CLOSED`/`EXTERNAL_OUTCOME_COMPLETE`는 open이다. `false_completion_count=13`을 보존한다.
+Authority: Cherry의 2026-08-24 bounded correction 승인. Builder는 제품 후보와 검증 증거만 소유한다. 공개 runtime·Quick Tunnel은 변경하지 않는다. I11은 final fresh QA PASS이며 I12/C1/C2/release/`MVP_SCOPE_CLOSED`/`EXTERNAL_OUTCOME_COMPLETE`는 open이다. `false_completion_count=13`을 보존한다.
 
 - [x] IC1: 선택 작업 단계 상세의 `완료 조건 확인`은 label을 `dt`에 두고 source-grounded `closed/total`을 `dd`에 표시하며, 근거가 없으면 명시적 unavailable 문구를 표시한다.
   PROVES: selected_gate_count_truth

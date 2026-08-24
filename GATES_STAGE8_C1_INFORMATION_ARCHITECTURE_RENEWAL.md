@@ -50,9 +50,9 @@ Authority: Cherry의 2026-08-24 세 이미지 비교 피드백과 `docs/STAGE8_C
   CHECK: npm test && npm run test:security && npm run build:isolated && OUTCOME_CANDIDATE_DIST=.outcome-runtime/candidate-dist npm run check:public-boundary && npm run check:mutations && npm run check:scope && npm run check:runbook && git diff --check
   EXPECT: exit 0; prohibited=0; mutation 405; false_completion_count=13
   EVIDENCE: frontend 39, Node 64, security 16, browser harness 3, local public boundary prohibited=0, mutations 24/24=405, scope 17 paths, runbook/build/diff PASS. `false_completion_count=13` 보존.
-- [ ] I11: exact public candidate에서 fresh independent UX & Product QA가 초안 대비 glanceability, 역할 축소, 통합 flow, master-detail, truth, desktop/mobile을 PASS한다.
+- [x] I11: exact public candidate에서 fresh independent UX & Product QA가 초안 대비 glanceability, 역할 축소, 통합 flow, master-detail, truth, desktop/mobile을 PASS한다.
   PROVES: fresh_independent_qa
-  EVIDENCE: exact public candidate `36b07cc2141bb00074c75664cfe615ae49911daa` / tree `a8692b2440fa7751b664166d2780c7340e54a430` / asset `index-B2epVH5T.js`의 첫 fresh QA는 `NEEDS_REVISION`이었다. correction candidate `ffd0aa9cebf6651b5f2fd0b8f62b714442717f76`의 second fresh QA에서 prior four blockers closed와 structural IA PASS를 확인했지만 generic group aggregate 반복과 stale NOW 중복으로 다시 `NEEDS_REVISION`이었다. 두 display condition을 bounded correction candidate에서 교정했으나 fresh QA 재검증 전이므로 pending을 유지한다.
+  EVIDENCE: final public candidate `6b1137379b434ca6f85750bc160d708aff0fcfd3` / tree `ecf70eab79a61c0400645cb8b7b7488d4fc59455` / asset `index-CYdBJNLy.js`를 fresh Claude Opus high session `cd0c7f8b-935f-4549-ba36-bc3caeea7bbf`이 독립 검증해 `PASS_INDEPENDENT_UX_PRODUCT_QA_ONLY_NOT_CHERRY_ACCEPTANCE`로 판정했다. 1440×900·390×844 × 18 Stage=36 live states에서 generic group 중복, NOW stale 중복, current invariant 위반, Gate list·boundary 중복, overflow·clipping·ellipsis가 모두 0이었고 compact 44px role rows, flat flow, desktop 300px/24px master-detail, mobile list→detail, keyboard/focus, one Gate gauge를 확인했다.
 - [ ] I12: fresh QA PASS 뒤 Cherry가 공개 화면을 직접 보고 C1 또는 추가 디테일을 결정한다.
   PROVES: cherry_acceptance
   EVIDENCE: pending
