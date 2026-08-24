@@ -4,7 +4,7 @@ import { assertDashboardMeasurement, assertMobileStickyMeasurement, assertSource
 
 const passingMeasurement = () => ({
   documentOverflow: 0, clippedDescendants: [], ellipsisTruncation: [], viewportEscape: [], siblingIntersections: [], roleDescendantIntersections: [], roleStatusOverflow: [], undersizedText: [], lowContrastText: [], undersizedControls: [], unexpectedEnglish: [], translationFallback: [], activeAnimationCount: 0,
-  pageHeading: true, sequentialHeadings: true, compactHero: true, roleGeometry: true, heroGeometry: true, mobileMapFirstFold: true, mobileDomOrder: true, mobileHierarchyTruth: true, currentStageActionTruth: true, phaseTabTruth: true, currentSelectionDistinctionTruth: true, phaseCurrentColorTruth: true, phaseProgressRowsAligned: true, phaseLabelsFull: true, phaseBandTruth: true, phaseOptionTitlesFull: true, desktopPhaseListFirstFold: true, liveSemantics: true, structureTruth: true, phaseCompletionTruth: true, stagePositionTruth: true, snapshotHeroTruth: true, oneMapSurface: true, roving: true, desktopColumns: true, mobileDrill: true, gateCountTruth: true, gaugeTruth: true, explorationTruth: true, groupTruth: true, singleStaleNowSignal: true, snapshotBadgeTextTruth: true, technicalCollapsed: true, technicalEvidence: true, noFabricatedProgress: true, firstFold: true,
+  pageHeading: true, sequentialHeadings: true, compactHero: true, roleGeometry: true, heroGeometry: true, mobileMapFirstFold: true, mobileDomOrder: true, mobileHierarchyTruth: true, currentStageActionTruth: true, phaseTabTruth: true, currentSelectionDistinctionTruth: true, folderHierarchyTruth: true, phaseCurrentColorTruth: true, phaseProgressRowsAligned: true, phaseLabelsFull: true, phaseBandTruth: true, phaseOptionTitlesFull: true, desktopPhaseListFirstFold: true, liveSemantics: true, structureTruth: true, phaseCompletionTruth: true, stagePositionTruth: true, snapshotHeroTruth: true, oneMapSurface: true, roving: true, desktopColumns: true, mobileDrill: true, gateCountTruth: true, gaugeTruth: true, explorationTruth: true, groupTruth: true, singleStaleNowSignal: true, snapshotBadgeTextTruth: true, technicalCollapsed: true, technicalEvidence: true, noFabricatedProgress: true, firstFold: true,
 })
 
 test('all contracted viewport names accept the interactive hierarchy measurement', () => {
@@ -36,6 +36,10 @@ test('Phase tabs fail closed when they wrap or confuse actual current with touch
   assert.throws(() => assertDashboardMeasurement('mobile/outcome', { ...passingMeasurement(), phaseTabTruth: false }), /phaseTabTruth=false/)
   assert.throws(() => assertDashboardMeasurement('mobile/outcome', { ...passingMeasurement(), currentSelectionDistinctionTruth: false }), /currentSelectionDistinctionTruth=false/)
   assert.throws(() => assertDashboardMeasurement('mobile/outcome', { ...passingMeasurement(), phaseCurrentColorTruth: false }), /phaseCurrentColorTruth=false/)
+})
+
+test('connected folder hierarchy fails closed when the selected Phase bridge or nested rails disappear', () => {
+  assert.throws(() => assertDashboardMeasurement('mobile/outcome', { ...passingMeasurement(), folderHierarchyTruth: false }), /folderHierarchyTruth=false/)
 })
 
 test('H12 geometry regressions fail closed for oversized Hero, hidden mobile Map, wrong DOM order, and clipped Phase labels', () => {
