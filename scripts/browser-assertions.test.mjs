@@ -4,7 +4,7 @@ import { assertDashboardMeasurement, assertMobileStickyMeasurement } from './bro
 
 const passingMeasurement = () => ({
   documentOverflow: 0, clippedDescendants: [], ellipsisTruncation: [], viewportEscape: [], siblingIntersections: [], roleDescendantIntersections: [], roleStatusOverflow: [], undersizedText: [], lowContrastText: [], undersizedControls: [], unexpectedEnglish: [], translationFallback: [], activeAnimationCount: 0,
-  pageHeading: true, sequentialHeadings: true, compactHero: true, roleGeometry: true, heroGeometry: true, mobileMapFirstFold: true, mobileDomOrder: true, phaseLabelsFull: true, liveSemantics: true, structureTruth: true, oneMapSurface: true, roving: true, desktopColumns: true, mobileDrill: true, gateCountTruth: true, gaugeTruth: true, explorationTruth: true, groupTruth: true, singleStaleNowSignal: true, technicalCollapsed: true, technicalEvidence: true, noFabricatedProgress: true, firstFold: true,
+  pageHeading: true, sequentialHeadings: true, compactHero: true, roleGeometry: true, heroGeometry: true, mobileMapFirstFold: true, mobileDomOrder: true, phaseLabelsFull: true, phaseBandTruth: true, liveSemantics: true, structureTruth: true, oneMapSurface: true, roving: true, desktopColumns: true, mobileDrill: true, gateCountTruth: true, gaugeTruth: true, explorationTruth: true, groupTruth: true, singleStaleNowSignal: true, technicalCollapsed: true, technicalEvidence: true, noFabricatedProgress: true, firstFold: true,
 })
 
 test('all contracted viewport names accept the interactive hierarchy measurement', () => {
@@ -38,4 +38,9 @@ test('mobile role geometry fails closed for collapsed names, row escape, descend
   assert.throws(() => assertDashboardMeasurement('mobile-390x844/cherry-note', { ...passingMeasurement(), roleGeometry: false }), /roleGeometry=false/)
   assert.throws(() => assertDashboardMeasurement('mobile-390x844/cherry-note', { ...passingMeasurement(), roleDescendantIntersections: ['사용성·제품 검수/출시 감사'] }), /roleIntersections=/)
   assert.throws(() => assertDashboardMeasurement('mobile-390x844/cherry-note', { ...passingMeasurement(), roleStatusOverflow: ['사용성·제품 검수:114x44->114x111'] }), /roleStatusOverflow=/)
+})
+
+test('structural band fails closed for source Phase count drift, phantom tracks, empty width, and label clipping', () => {
+  assert.throws(() => assertDashboardMeasurement('mobile-390x844/cherry-note', { ...passingMeasurement(), phaseBandTruth: false, phaseCount: 1, phaseCompartmentCount: 1, phaseTrackCount: 5, occupiedBandRatio: .1987 }), /phaseBandTruth=false/)
+  assert.throws(() => assertDashboardMeasurement('mobile-390x844/outcome', { ...passingMeasurement(), phaseLabelsFull: false, phaseCount: 5, phaseCompartmentCount: 5, phaseTrackCount: 5, occupiedBandRatio: .994 }), /phaseLabelsFull=false/)
 })

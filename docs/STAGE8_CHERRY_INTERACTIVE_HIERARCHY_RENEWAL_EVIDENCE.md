@@ -4,7 +4,7 @@ Status: **BUILDER CANDIDATE — FRESH INDEPENDENT QA REQUIRED**
 
 Source pin: `bf033f60e86cd79a9a73a0539fac0f01c37d3374`
 
-false_completion_count: **14**
+false_completion_count: **15**
 
 ## Red-first correction
 
@@ -68,4 +68,19 @@ Fresh H12 on public pin `324ea12227fa7e39622b50f4b5e55186447bd441` remains `NEED
 - All-state: four viewports each traverse `41` hierarchy selections and `18` Stage selections with hierarchy/current separation, zero-Stage branches, keyboard, clipping, ellipsis, viewport escape, document overflow, unexpected English and translation fallback all preserved.
 - Verification: frontend `50/50`; Node `64/64`; security `16/16`; browser harness `6/6`; public boundary prohibited identifiers `0`; mutations `24/24 = 405 read_only`; scope `17` paths; runbook and diff checks PASS.
 - Isolated pre-commit asset: `index-Cd1mcz3s.js`.
+- H12 fresh independent QA, H13 Cherry acceptance, release and completion boundaries remain open. Public origin/tunnel/deploy were not changed.
+
+## Third H12 NEEDS_REVISION correction receipt
+
+Fresh H12 on public pin `9e8d241eaed40da733af77547818810050f0511d` remains `NEEDS_REVISION`: mobile CSS fixed five structural tracks even when Cherry Note supplied one source Phase, leaving `80.13%` of the band as phantom track space. This raises `false_completion_count` to `15`; the next Builder candidate is not independently accepted.
+
+- Red-first: the browser harness now requires source Phase count = rendered compartments = non-zero grid tracks, occupied band width ratio `99–101%`, and fully visible Phase labels. The pre-correction candidate passes desktop but fails every 390×844 Cherry Note state with `phaseBandTruth=false`.
+- Correction: `phases.length` is projected through `--oc-phase-count`; structural grid uses that count at every viewport and the fixed mobile `repeat(5,...)` override is removed.
+- 390×844: Cherry Note `1/1`, occupied `330.00/332.00px` (`99.40%`); OUTCOME `5/5`, occupied `330.00/332.00px` (`99.40%`).
+- 375×812: Cherry Note `1/1`, occupied `315.00/317.00px` (`99.37%`); OUTCOME `5/5`, occupied `315.00/317.00px` (`99.37%`).
+- Desktop: Cherry Note `1/1`, OUTCOME `5/5`, both occupied `1280.00/1282.00px`; landscape occupied `749.38/751.38px`. Phantom compartments and Phase label overflow are `0`.
+- Regression geometry: desktop Hero `164.00px`; mobile Hero `347.44–357.50px`; role name width `>=60.00px`, max `2` lines, intersections/status overflow `0`; 390×844 first Map option `706.41px` / `735.33px`; scrollY `960` band top `0.00px`.
+- All-state: four viewports each traverse `41` hierarchy selections and `18` Stage selections with current separation, zero-Stage branches, Gate, keyboard, boundary, clipping, ellipsis, viewport escape, document overflow, English and fallback assertions preserved.
+- Verification: frontend `51/51`; Node `64/64`; security `16/16`; browser harness `7/7`; public boundary prohibited identifiers `0`; mutations `24/24 = 405 read_only`; scope `17` paths; runbook and diff checks PASS.
+- Isolated pre-commit asset: `index-C11-YHAt.js`.
 - H12 fresh independent QA, H13 Cherry acceptance, release and completion boundaries remain open. Public origin/tunnel/deploy were not changed.

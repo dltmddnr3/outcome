@@ -112,6 +112,11 @@ describe('OUTCOME Package dashboard', () => {
     value.current = { phaseId: 'phase-1', scopeId: 'scope-1', stageId: 'current-stage' }
     expect(structuralPhaseModel(value).map(({ status, stages }) => [status, stages])).toEqual([['current', 1], ['definition_pending', 0], ['definition_pending', 0], ['definition_pending', 0], ['definition_pending', 0]])
   })
+  it('structural band track 수는 fixed five가 아니라 source Phase count를 사용한다', () => {
+    const source = OutcomeDashboard.toString()
+    expect(source).toContain('--oc-phase-count')
+    expect(source).toContain('phases.length')
+  })
   it('긴 완료 branch만 disclosure 대상으로 접고 선택된 과거 Stage는 노출한다', () => {
     const stages = Array.from({ length: 13 }, (_, index) => stage({ id: `stage-${index + 1}`, state: index < 12 ? 'complete' : 'active' }))
     expect(collapsedStageCount(stages, false, 'stage-13')).toBe(12)
