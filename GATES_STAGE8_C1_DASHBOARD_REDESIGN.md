@@ -58,3 +58,23 @@ Authority: Cherry의 2026-08-24 화면 피드백과 `docs/STAGE8_C1_DASHBOARD_RE
 
 ABANDON: R10 Builder에게 exact public activation 또는 독립 UX & Product QA 실행·판정 권한이 없으므로 Planner 활성화 뒤 fresh QA가 수행해야 합니다.
 ABANDON: R11 C1은 fresh QA 뒤 Cherry의 실제 공개 화면 사용과 명시적 결정 전용입니다.
+
+## Fresh QA PASS 후 최소 polishing correction
+
+Authority: `docs/STAGE8_C1_DASHBOARD_REDESIGN_FRESH_UX_QA_97dcef3.md`의 비차단 D1–D3. 제품 의미와 공개 runtime은 변경하지 않으며 누적 `false_completion_count=13`을 보존한다.
+
+- [x] D1: 600px 이하에서 역할 카드와 Scope/Stage rail을 2열로 배치하고, 390×844 두 프로젝트의 현재 완료 조건 행 top을 각각 1688px 이하로 측정한다.
+  PROVES: mobile_two_viewport_comprehension
+  CHECK: npm run build:isolated && OUTCOME_CANDIDATE_DIST=.outcome-runtime/candidate-dist npm run test:browser
+  EXPECT: both mobile project gateRowTop<=1688; 36/36 states; clipped=0 intersections=0 viewportEscape=0 documentOverflow=0 ellipsis=0 controls>=44 contrast>=4.5
+  EVIDENCE: 390×844 전수에서 Cherry Note 1679px, OUTCOME 1646px로 측정했습니다. 2 projects × 18 Stages × 2 viewports 36/36 상태에서 clipped/intersections/viewportEscape/documentOverflow/ellipsis=0, controls>=44, contrast>=4.5를 확인했습니다.
+- [x] D2: Hero 프로젝트 이름이 유일한 page-level H1이며 이후 section heading이 H2부터 순차적으로 이어진다.
+  PROVES: sequential_document_outline
+  CHECK: npm run build:isolated && OUTCOME_CANDIDATE_DIST=.outcome-runtime/candidate-dist npm run test:browser
+  EXPECT: exactly one visible H1 in Hero; no heading-level skip
+  EVIDENCE: 브라우저 전수 검사에서 Hero visible H1 1개와 H1→H2→H3→H4의 level skip 0을 확인했습니다. Hero 시각 크기는 기존 28px/모바일 23px을 유지합니다.
+- [x] D3: NOW activity가 존재하면서 관측 상태가 stale이면 headline과 metadata가 모두 한글 freshness를 직접 표시하고 활동량을 진행률로 해석하지 않는다.
+  PROVES: stale_now_honesty
+  CHECK: npm run test:dashboard -- --testNamePattern='활동이 있는 오래된 NOW는 headline과 metadata에 관측 오래됨을 직접 표시한다'
+  EXPECT: stale activity remains visible; headline and metadata include 관측 오래됨; progress disclaimer remains
+  EVIDENCE: red-first `(0, nowPresentation) is not a function`에서 시작해 targeted 1/1과 frontend 29/29가 통과했습니다. stale activity headline과 metadata 양쪽에 `관측 오래됨`을 표시하고 `세션 활동은 진행률이 아닙니다`를 유지합니다.

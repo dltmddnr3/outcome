@@ -22,7 +22,7 @@ async function assertStage33PackageProjection(page) {
 }
 
 export async function measureDashboard(page) {
-  return page.evaluate(({ requiredGithubLabels }) => {
+  const result = await page.evaluate(({ requiredGithubLabels }) => {
     const root = document.querySelector('.oc-dashboard')
     const intentionallyHidden = (element) => Boolean(element.closest('.oc-visually-hidden'))
     const visible = (element) => { const box = element.getBoundingClientRect(); const style = getComputedStyle(element); return !intentionallyHidden(element) && box.width > 0 && box.height > 0 && style.display !== 'none' && style.visibility !== 'hidden' }
@@ -38,6 +38,7 @@ export async function measureDashboard(page) {
     const axisClips = [...document.querySelectorAll('.oc-axis strong')].filter(visible).flatMap((element) => element.scrollWidth > element.clientWidth + 1 || element.scrollHeight > element.clientHeight + 1 ? [element.textContent.trim()] : [])
     const viewportEscape = elements.flatMap((element) => { const box = rect(element); return box.left < -1 || box.right > document.documentElement.clientWidth + 1 ? [`${element.tagName.toLowerCase()}.${element.className || 'no-class'}:${Math.round(box.left)}-${Math.round(box.right)}`] : [] })
     const textElements = elements.filter((element) => !['SCRIPT', 'STYLE'].includes(element.tagName) && [...element.childNodes].some((node) => node.nodeType === Node.TEXT_NODE && node.textContent.trim()))
+    const ellipsisTruncation = textElements.filter((element) => { const style = getComputedStyle(element); return style.textOverflow === 'ellipsis' && element.scrollWidth > element.clientWidth + 1 }).map((element) => element.textContent.trim().replace(/\s+/g, ' ').slice(0, 70))
     const parseRgb = (value) => value.match(/[\d.]+/g)?.slice(0, 3).map(Number) ?? null
     const luminance = (rgb) => { const channels = rgb.map((channel) => { const value = channel / 255; return value <= .04045 ? value / 12.92 : ((value + .055) / 1.055) ** 2.4 }); return .2126 * channels[0] + .7152 * channels[1] + .0722 * channels[2] }
     const contrast = (first, second) => { const a = parseRgb(first); const b = parseRgb(second); if (!a || !b) return 0; const values = [luminance(a), luminance(b)].sort((x, y) => y - x); return (values[0] + .05) / (values[1] + .05) }
@@ -67,16 +68,24 @@ export async function measureDashboard(page) {
     const railSemantics = [...document.querySelectorAll('.oc-rail article')].every((item) => item.dataset.railState && item.querySelector('svg') && ['완료', '진행 중', '대기', '근거 없음'].includes(item.querySelector('small')?.textContent?.trim()))
     const heroGate = document.querySelector('.oc-hero-gate'); const heroFillSemantics = heroGate?.dataset.gateFill === 'available' ? document.querySelectorAll('.oc-hero-fill').length === 1 && heroGate.textContent.includes('프로젝트 전체 진행률이 아닙니다') : document.querySelectorAll('.oc-hero-fill').length === 0 && heroGate?.textContent.includes('완료 조건 근거 없음')
     const liveCards = [...document.querySelectorAll('.oc-bindings [data-live="true"]')]; const activeAnimationCount = liveCards.length; const liveSemantics = activeAnimationCount <= 1 && liveCards.every((card) => card.classList.contains('active') && card.classList.contains('is-live') && card.textContent.includes('최근 관측') && card.querySelector('.oc-live-bars'))
+    const now = document.querySelector('.oc-now-summary'); const nowStaleHonesty = Boolean(now?.dataset.nowStatus) && (now.dataset.nowStatus !== 'stale' || now.dataset.hasActivity !== 'true' || (now.querySelector('strong')?.textContent.includes('관측 오래됨') && now.querySelector('span')?.textContent.includes('관측 오래됨') && now.textContent.includes('세션 활동은 진행률이 아닙니다')))
+    const headings = [...document.querySelectorAll('h1,h2,h3,h4,h5,h6')]; const headingLevels = headings.map((heading) => Number(heading.tagName.slice(1))); const sequentialHeadings = headings.length > 0 && headingLevels[0] === 1 && headingLevels.every((level, index) => index === 0 || level <= headingLevels[index - 1] + 1); const heroHeading = document.querySelector('.oc-hero-title h1'); const pageHeading = document.querySelectorAll('.oc-dashboard h1').length === 1 && Boolean(heroHeading)
+    const columnCount = (element) => getComputedStyle(element).gridTemplateColumns.split(' ').filter(Boolean).length
+    const mobileTwoColumns = innerWidth > 600 || (columnCount(document.querySelector('.oc-bindings')) === 2 && [...document.querySelectorAll('.oc-rail')].every((rail) => columnCount(rail) === 2))
     const orderSelectors = ['.oc-topbar', '.oc-hero', '.oc-now-summary', '.oc-bindings', '.oc-funnel-phase', '.oc-funnel-scope', '.oc-funnel-stage', '.oc-funnel-gate', '.oc-current-stage', '.oc-selected-detail', '.oc-technical']; const orderTops = orderSelectors.map((selector) => rect(document.querySelector(selector)).top); const mobileAuthoritativeOrder = innerWidth > 600 || orderTops.every((top, index) => index === 0 || top >= orderTops[index - 1])
     const buildCommit = technicalText.match(/커밋 ([0-9a-f]{12})/i)?.[1] ?? null; const buildTree = technicalText.match(/트리 ([0-9a-f]{12})/i)?.[1] ?? null
-    return { projectId, currentStageId, selectedStageId, currentSignature: `${phase?.dataset.index}/${phase?.dataset.total}|${scope?.dataset.index}/${scope?.dataset.total}|${stage?.dataset.index}/${stage?.dataset.total}|${gate?.dataset.closed}/${gate?.dataset.total}`, documentOverflow: document.documentElement.scrollWidth - document.documentElement.clientWidth, clippedDescendants, axisClips, viewportEscape, siblingIntersections, undersizedText, lowContrastText, undersizedControls, currentNextReadable: readable('.oc-hero-orientation strong') && document.querySelectorAll('.oc-hero-orientation strong').length === 2, allStagesDiscoverable: [...document.querySelectorAll('.oc-stage-list > button')].every(visible), selectedStageExposed: document.querySelectorAll('.oc-stage-list button[aria-pressed="true"]').length === 1, sourceStatusText: [...document.querySelectorAll('.oc-topbar nav button')].every((element) => element.getAttribute('aria-label')?.includes('원본 묶음')), hero: Boolean(document.querySelector('.oc-hero h2') && document.querySelector('.oc-hero-orientation') && document.querySelector('.oc-hero-meta .cn-refresh')), standaloneHeadingAbsent: !document.querySelector('.cn-standalone-heading'), funnelCounts, funnelPurpose, funnelShape, railSemantics, heroFillSemantics, liveSemantics, activeAnimationCount, exploring, explorationHonest, technicalCollapsed: Boolean(details && !details.open), technicalEvidence: Boolean(buildCommit && buildTree && requiredGithubLabels.every((value) => technicalText.includes(value))), mobileAuthoritativeOrder, bottomShellState, detailState, detailSemantics, unexpectedEnglish, translationFallback }
+    return { projectId, currentStageId, selectedStageId, currentSignature: `${phase?.dataset.index}/${phase?.dataset.total}|${scope?.dataset.index}/${scope?.dataset.total}|${stage?.dataset.index}/${stage?.dataset.total}|${gate?.dataset.closed}/${gate?.dataset.total}`, gateRowTop: Math.round(rect(gate).top), documentOverflow: document.documentElement.scrollWidth - document.documentElement.clientWidth, clippedDescendants, axisClips, ellipsisTruncation, viewportEscape, siblingIntersections, undersizedText, lowContrastText, undersizedControls, currentNextReadable: readable('.oc-hero-orientation strong') && document.querySelectorAll('.oc-hero-orientation strong').length === 2, allStagesDiscoverable: [...document.querySelectorAll('.oc-stage-list > button')].every(visible), selectedStageExposed: document.querySelectorAll('.oc-stage-list button[aria-pressed="true"]').length === 1, sourceStatusText: [...document.querySelectorAll('.oc-topbar nav button')].every((element) => element.getAttribute('aria-label')?.includes('원본 묶음')), hero: Boolean(heroHeading && document.querySelector('.oc-hero-orientation') && document.querySelector('.oc-hero-meta .cn-refresh')), pageHeading, sequentialHeadings, mobileTwoColumns, nowStaleHonesty, standaloneHeadingAbsent: !document.querySelector('.cn-standalone-heading'), funnelCounts, funnelPurpose, funnelShape, railSemantics, heroFillSemantics, liveSemantics, activeAnimationCount, exploring, explorationHonest, technicalCollapsed: Boolean(details && !details.open), technicalEvidence: Boolean(buildCommit && buildTree && requiredGithubLabels.every((value) => technicalText.includes(value))), mobileAuthoritativeOrder, bottomShellState, detailState, detailSemantics, unexpectedEnglish, translationFallback }
   }, { requiredGithubLabels })
+  const scrollY = await page.evaluate(() => window.scrollY)
+  return { ...result, gateRowTop: result.gateRowTop + Math.round(scrollY) }
 }
 
 export function assertDashboardMeasurement(name, result) {
   const failures = []
   if (result.documentOverflow !== 0) failures.push(`documentOverflow=${result.documentOverflow}`)
   if (result.clippedDescendants.length) failures.push(`clipped=${result.clippedDescendants.join(',')}`)
+  if (result.ellipsisTruncation.length) failures.push(`ellipsis=${result.ellipsisTruncation.join(',')}`)
+  if (name.startsWith('mobile/') && result.gateRowTop > 1688) failures.push(`gateRowTop=${result.gateRowTop}`)
   if (result.viewportEscape.length) failures.push(`viewportEscape=${result.viewportEscape.join(',')}`)
   if (result.siblingIntersections.length) failures.push(`intersections=${result.siblingIntersections.join(',')}`)
   if (result.undersizedControls.length) failures.push(`undersizedControls=${result.undersizedControls.join(',')}`)
@@ -84,7 +93,7 @@ export function assertDashboardMeasurement(name, result) {
   if (result.lowContrastText.length) failures.push(`lowContrastText=${result.lowContrastText.join(',')}`)
   if (result.unexpectedEnglish.length) failures.push(`unexpectedEnglish=${result.unexpectedEnglish.join(',')}`)
   if (result.translationFallback.length) failures.push(`translationFallback=${result.translationFallback.join(',')}`)
-  for (const key of ['currentNextReadable', 'allStagesDiscoverable', 'selectedStageExposed', 'sourceStatusText', 'hero', 'standaloneHeadingAbsent', 'funnelCounts', 'funnelPurpose', 'funnelShape', 'railSemantics', 'heroFillSemantics', 'liveSemantics', 'explorationHonest', 'technicalCollapsed', 'technicalEvidence', 'mobileAuthoritativeOrder', 'bottomShellState', 'detailSemantics']) if (!result[key]) failures.push(`${key}=false`)
+  for (const key of ['currentNextReadable', 'allStagesDiscoverable', 'selectedStageExposed', 'sourceStatusText', 'hero', 'pageHeading', 'sequentialHeadings', 'mobileTwoColumns', 'nowStaleHonesty', 'standaloneHeadingAbsent', 'funnelCounts', 'funnelPurpose', 'funnelShape', 'railSemantics', 'heroFillSemantics', 'liveSemantics', 'explorationHonest', 'technicalCollapsed', 'technicalEvidence', 'mobileAuthoritativeOrder', 'bottomShellState', 'detailSemantics']) if (!result[key]) failures.push(`${key}=false`)
   if (result.activeAnimationCount > 1) failures.push(`activeAnimationCount=${result.activeAnimationCount}`)
   if (failures.length) throw new Error(`${name} failed: ${failures.join(' | ')}`)
 }
@@ -104,7 +113,7 @@ async function assertReducedMotion(page, name) {
 export async function verifyAllDashboardStates(page, viewportName) {
   await page.getByText('큰 단계에서 완료 조건까지', { exact: true }).waitFor()
   const projectButtons = page.locator('.oc-topbar nav button'); if (await projectButtons.count() !== 2) throw new Error(`${viewportName}: expected two projects`)
-  let measuredStates = 0; let minimumFocusContrast = Infinity; let maximumActiveAnimations = 0; const failures = []; const axisClipStages = new Set(); let axisClipCount = 0
+  let measuredStates = 0; let minimumFocusContrast = Infinity; let maximumActiveAnimations = 0; const failures = []; const axisClipStages = new Set(); let axisClipCount = 0; const gateRowTops = []
   for (let projectIndex = 0; projectIndex < 2; projectIndex += 1) {
     await projectButtons.nth(projectIndex).click()
     const projectId = await page.locator('.oc-dashboard').getAttribute('data-project-id'); const stageButtons = page.locator('.oc-stage-list > button'); const stageCount = await stageButtons.count(); if (stageCount < 1) throw new Error(`${viewportName}/${projectId}: 작업 단계가 없습니다`)
@@ -113,7 +122,7 @@ export async function verifyAllDashboardStates(page, viewportName) {
     for (let stageIndex = 0; stageIndex < stageCount; stageIndex += 1) {
       await stageButtons.nth(stageIndex).click(); await page.locator('.oc-stage-list > button[aria-pressed="true"]').waitFor()
       const stageId = (await page.locator('.oc-selected-detail > header small').first().textContent())?.replace(/^작업 단계 상세 ·\s*/, '').trim() || `index-${stageIndex}`
-      const result = await measureDashboard(page); currentSignature ??= result.currentSignature; if (result.currentSignature !== currentSignature) failures.push(`${viewportName}/${projectId}/${stageId}: current funnel changed during exploration`)
+      const result = await measureDashboard(page); currentSignature ??= result.currentSignature; if (stageIndex === 0) gateRowTops.push(`${projectId}:${result.gateRowTop}`); if (result.currentSignature !== currentSignature) failures.push(`${viewportName}/${projectId}/${stageId}: current funnel changed during exploration`)
       maximumActiveAnimations = Math.max(maximumActiveAnimations, result.activeAnimationCount)
       if (result.axisClips.length) { axisClipStages.add(`${projectId}/${stageId}`); axisClipCount += result.axisClips.length }
       try { assertDashboardMeasurement(`${viewportName}/${projectId}/${stageId}`, result) } catch (error) { failures.push(String(error.message)) }
@@ -123,5 +132,5 @@ export async function verifyAllDashboardStates(page, viewportName) {
   }
   try { await assertReducedMotion(page, viewportName) } catch (error) { failures.push(String(error.message)) }
   if (failures.length) throw new Error(`${viewportName}: measured projects=2 selectedStages=${measuredStates}; axisClips=${axisClipCount} across ${axisClipStages.size} selectedStages; ${failures.join(' || ')}`)
-  console.log(`${viewportName}: projects=2 selectedStages=${measuredStates} funnelCounts=true technicalCollapsed=true activeAnimation<=${maximumActiveAnimations} reducedMotionStatic=true unexpectedEnglish=0 translationFallback=0 clipped=0 intersections=0 viewportEscape=0 documentOverflow=0 controls>=44 text>=11 textContrast>=4.5 mobileOrder=true focusContrast>=${minimumFocusContrast.toFixed(2)}`)
+  console.log(`${viewportName}: projects=2 selectedStages=${measuredStates} gateRowTops=${gateRowTops.join(',')} funnelCounts=true technicalCollapsed=true activeAnimation<=${maximumActiveAnimations} reducedMotionStatic=true unexpectedEnglish=0 translationFallback=0 clipped=0 ellipsis=0 intersections=0 viewportEscape=0 documentOverflow=0 controls>=44 text>=11 textContrast>=4.5 mobileOrder=true focusContrast>=${minimumFocusContrast.toFixed(2)}`)
 }

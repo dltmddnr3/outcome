@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { axisStateLabel, currentHierarchy, deriveScopeState, deriveStageRailState, entityStateLabel, findStage, githubEvidenceItems, heroGateEvidence, projectHeroModel, selectedStageContext, selectLiveBinding, selectProject, sourceStateLabel, stageDetailSemantics, summarizeStage, type GithubConnector, type PackageProject, type PackageStage } from './OutcomeDashboard'
+import { axisStateLabel, currentHierarchy, deriveScopeState, deriveStageRailState, entityStateLabel, findStage, githubEvidenceItems, heroGateEvidence, nowPresentation, projectHeroModel, selectedStageContext, selectLiveBinding, selectProject, sourceStateLabel, stageDetailSemantics, summarizeStage, type GithubConnector, type PackageProject, type PackageStage } from './OutcomeDashboard'
 import { activityLabelKo, axisLabelKo, gatePresentation, groupPresentation, hierarchyLabels, loginErrorPresentation, phasePresentation, projectOutcomePresentation, roleLabel, stagePresentation } from './outcomeKorean'
 
 const stage = (overrides: Partial<PackageStage> = {}): PackageStage => ({ id: 'stage-one', title: 'Stage One', purpose: 'Verify the result', dependsOn: [], gatePurpose: 'Stage One acceptance checklist', sourceState: 'present', state: 'active', gate: { gates: [{ id: 'G1', title: 'closed', closed: true, groupCode: 'G' }, { id: 'G2', title: 'remaining', closed: false, groupCode: 'G' }], groups: [{ code: 'G', name: '증거', closed: 1, total: 2 }], total: 2, closed: 1, available: true, sourceRef: 'GATES.md' }, axes: { implementation: 'active', test: 'pending', evidence: 'pending', independentQa: 'not_started', cherryAcceptance: 'pending', release: 'not_started' }, ...overrides })
@@ -66,6 +66,13 @@ describe('OUTCOME Package dashboard', () => {
       { role: 'ux_product_qa', status: 'active', activity: null, observedAt: null, freshness: 'fresh', historyCount: 0 },
     ]
     expect(selectLiveBinding(bindings)?.role).toBe('builder')
+  })
+  it('활동이 있는 오래된 NOW는 headline과 metadata에 관측 오래됨을 직접 표시한다', () => {
+    const presentation = nowPresentation({ status: 'stale', activity: 'Stage 6 NEEDS_REVISION correction is active; fresh independent QA remains required', observedAt: '2026-08-24T00:00:00.000Z', source: 'runtime_registry' })
+    expect(presentation.headline).toContain('6단계 수정 진행 중')
+    expect(presentation.headline).toContain('관측 오래됨')
+    expect(presentation.metadata).toContain('관측 오래됨')
+    expect(presentation.metadata).toContain('세션 활동은 진행률이 아닙니다')
   })
   it('현재 큰 단계 범위 작업 단계 index를 Package 배열에서 계산한다', () => {
     const value = project('outcome', 'OUTCOME')
