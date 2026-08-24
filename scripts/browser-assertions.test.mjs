@@ -2,7 +2,7 @@ import assert from 'node:assert/strict'
 import test from 'node:test'
 import { assertDashboardMeasurement } from './browser-assertions.mjs'
 
-const passingMeasurement = (gateRowTop) => ({
+const passingMeasurement = (gateRowTop = 1200) => ({
   gateRowTop,
   documentOverflow: 0,
   clippedDescendants: [],
@@ -15,55 +15,41 @@ const passingMeasurement = (gateRowTop) => ({
   unexpectedEnglish: [],
   translationFallback: [],
   activeAnimationCount: 0,
-  currentNextReadable: true,
-  allStagesDiscoverable: true,
-  selectedStageExposed: true,
-  sourceStatusText: true,
-  hero: true,
   pageHeading: true,
   sequentialHeadings: true,
-  mobileTwoColumns: true,
-  nowStaleHonesty: true,
-  standaloneHeadingAbsent: true,
+  heroGateContract: true,
+  noDuplicateProgress: true,
+  compactRoles: true,
+  liveSemantics: true,
+  activityBand: true,
+  unifiedFlow: true,
   funnelCounts: true,
   funnelPurpose: true,
-  funnelShape: true,
-  railSemantics: true,
-  heroFillSemantics: true,
-  currentGateTruth: true,
   placementOnly: true,
-  timingHonesty: true,
-  contentPreservation: true,
   scopeJourney: true,
-  scopeConnectorContinuity: true,
-  scopeConnectorGap: 0,
-  activeScopeWrapperBackgrounds: ['rgba(0, 0, 0, 0)'],
-  liveSemantics: true,
-  repeatingSemanticElements: 0,
+  explorerSemantics: true,
+  explorerGeometry: true,
+  allStagesDiscoverable: true,
   explorationHonest: true,
+  detailSemantics: true,
+  timingHonesty: true,
+  noFabricatedProgress: true,
+  contentPreservation: true,
   technicalCollapsed: true,
   technicalEvidence: true,
   mobileAuthoritativeOrder: true,
-  bottomShellState: true,
-  detailSemantics: true,
 })
 
-test('local and remote mobile viewport names reject gate row top 1689', () => {
-  for (const name of ['mobile-390x844/cherry-note/stage', 'remote-mobile-390x844/outcome/stage']) {
-    assert.throws(() => assertDashboardMeasurement(name, passingMeasurement(1689)), /gateRowTop=1689/)
-  }
+test('all contracted viewport names accept a complete IA measurement', () => {
+  for (const name of ['desktop-1440x900/cherry-note/stage', 'mobile-390x844/outcome/stage', 'phone-375x812/outcome/stage', 'landscape-844x390/cherry-note/stage']) assert.doesNotThrow(() => assertDashboardMeasurement(name, passingMeasurement()))
 })
 
-test('mobile boundary and current measurements pass', () => {
-  assert.doesNotThrow(() => assertDashboardMeasurement('mobile-390x844/cherry-note/stage', passingMeasurement(1688)))
-  assert.doesNotThrow(() => assertDashboardMeasurement('mobile-390x844/cherry-note/stage', passingMeasurement(1679)))
-  assert.doesNotThrow(() => assertDashboardMeasurement('remote-mobile-390x844/outcome/stage', passingMeasurement(1646)))
+test('IA assertions fail closed for duplicated progress or broken listbox semantics', () => {
+  assert.throws(() => assertDashboardMeasurement('desktop-1440x900/outcome/stage', { ...passingMeasurement(), noDuplicateProgress: false }), /noDuplicateProgress=false/)
+  assert.throws(() => assertDashboardMeasurement('mobile-390x844/outcome/stage', { ...passingMeasurement(), explorerSemantics: false }), /explorerSemantics=false/)
 })
 
-test('desktop viewport does not receive the mobile 1688 budget', () => {
-  assert.doesNotThrow(() => assertDashboardMeasurement('desktop-1440x900/cherry-note/stage', passingMeasurement(1689)))
-})
-
-test('desktop opaque Scope wrapper fails connector continuity', () => {
-  assert.throws(() => assertDashboardMeasurement('desktop-1440x900/cherry-note/stage', { ...passingMeasurement(1200), scopeConnectorContinuity: false, scopeConnectorGap: 0.02, activeScopeWrapperBackgrounds: ['rgb(21, 32, 20)'] }), /scopeConnectorContinuity=false.*rgb\(21, 32, 20\).*gap=0\.02/)
+test('IA assertions fail closed for tapered flow or disconnected Scope journey', () => {
+  assert.throws(() => assertDashboardMeasurement('desktop-1440x900/outcome/stage', { ...passingMeasurement(), unifiedFlow: false }), /unifiedFlow=false/)
+  assert.throws(() => assertDashboardMeasurement('mobile-390x844/outcome/stage', { ...passingMeasurement(), scopeJourney: false }), /scopeJourney=false/)
 })

@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { OutcomeDashboard, axisStateLabel, currentHierarchy, deriveScopeState, deriveStageRailState, entityStateLabel, findStage, gateProgress, githubEvidenceItems, heroGateEvidence, hierarchyPlacement, nowPresentation, projectHeroModel, selectedStageContext, selectLiveBinding, selectProject, sourceStateLabel, stageDetailSemantics, summarizeStage, timingPresentation, type Binding, type GithubConnector, type PackageProject, type PackageStage } from './OutcomeDashboard'
+import { OutcomeDashboard, axisStateLabel, currentHierarchy, deriveScopeState, deriveStageRailState, entityStateLabel, findStage, gateProgress, githubEvidenceItems, heroGateEvidence, hierarchyPlacement, nextStageOptionIndex, nowPresentation, projectHeroModel, selectedStageContext, selectLiveBinding, selectProject, sourceStateLabel, stageDetailSemantics, summarizeStage, timingPresentation, type Binding, type GithubConnector, type PackageProject, type PackageStage } from './OutcomeDashboard'
 import { activityLabelKo, axisLabelKo, gatePresentation, groupPresentation, hierarchyLabels, loginErrorPresentation, phasePresentation, projectOutcomePresentation, roleLabel, stagePresentation } from './outcomeKorean'
 
 const stage = (overrides: Partial<PackageStage> = {}): PackageStage => ({ id: 'stage-one', title: 'Stage One', purpose: 'Verify the result', dependsOn: [], gatePurpose: 'Stage One acceptance checklist', sourceState: 'present', state: 'active', gate: { gates: [{ id: 'G1', title: 'closed', closed: true, groupCode: 'G' }, { id: 'G2', title: 'remaining', closed: false, groupCode: 'G' }], groups: [{ code: 'G', name: '증거', closed: 1, total: 2 }], total: 2, closed: 1, available: true, sourceRef: 'GATES.md' }, axes: { implementation: 'active', test: 'pending', evidence: 'pending', independentQa: 'not_started', cherryAcceptance: 'pending', release: 'not_started' }, ...overrides })
@@ -7,6 +7,36 @@ const github = (overrides: Partial<GithubConnector> = {}): GithubConnector => ({
 const project = (id: string, title: string): PackageProject => ({ status: 'valid', errors: [], observedAt: null, project: { id, name: title, outcome: `${title} outcome`, acceptanceAuthority: 'Cherry' }, connectors: { github: github() }, phases: [{ id: `${id}-phase`, title: 'Phase', purpose: 'Phase purpose', completion: null, scopes: [{ id: `${id}-scope`, title: 'Scope', purpose: 'Scope purpose', stages: [stage({ id: `${id}-stage` })] }] }], current: { phaseId: `${id}-phase`, scopeId: `${id}-scope`, stageId: `${id}-stage` }, next: null, bindings: [], now: { status: 'unbound', activity: null, observedAt: null, source: 'runtime_registry' }, progress: { available: false, reason: 'no_cross_stage_aggregate' } })
 
 describe('OUTCOME Package dashboard', () => {
+  it('역할 세션은 네 개의 간결한 행과 단일 활성 신호로 표시한다', () => {
+    const source = OutcomeDashboard.toString()
+    expect(source).toContain('oc-activity-band')
+    expect(source).toContain('oc-role-row')
+    expect(source).not.toContain('oc-live-glow')
+  })
+  it('현재 원본 흐름은 하나의 통합 진행 surface로 유지된다', () => {
+    const source = OutcomeDashboard.toString()
+    expect(source).toContain('oc-flow-summary')
+    expect(source).toContain('oc-flow-levels')
+    expect(source).not.toContain('oc-current-stage-rail')
+  })
+  it('작업 단계 목록 선택은 우측 상세만 바꾸고 실제 현재 위치를 유지한다', () => {
+    expect(nextStageOptionIndex('ArrowDown', 1, 4)).toBe(2)
+    expect(nextStageOptionIndex('ArrowUp', 0, 4)).toBe(3)
+    expect(nextStageOptionIndex('Home', 3, 4)).toBe(0)
+    expect(nextStageOptionIndex('End', 0, 4)).toBe(3)
+    expect(nextStageOptionIndex('Enter', 2, 4)).toBeNull()
+    const source = OutcomeDashboard.toString()
+    expect(source).toContain('role="listbox"')
+    expect(source).toContain('role="option"')
+    expect(source).toContain('aria-selected')
+    expect(source).not.toContain('aria-pressed')
+  })
+  it('정보 구조 리뉴얼은 핵심 source-grounded 기능을 보존한다', () => {
+    const source = OutcomeDashboard.toString()
+    for (const token of ['oc-hero-gate', 'oc-gate-gauge', 'oc-now-summary', 'oc-current-flow', 'oc-stage-explorer', 'oc-selected-detail', 'oc-technical']) expect(source).toContain(token)
+    expect(source).not.toContain('oc-hero-fill')
+    expect(source).not.toContain('oc-confirmed')
+  })
   it('핵심 정보 영역을 시각 리뉴얼 뒤에도 보존한다', () => {
     const source = OutcomeDashboard.toString()
     for (const token of ['oc-hero', 'oc-now-summary', 'oc-bindings', 'oc-current-flow', 'oc-current-stage', 'oc-selected-detail', 'oc-technical']) expect(source).toContain(token)
@@ -64,6 +94,7 @@ describe('OUTCOME Package dashboard', () => {
   })
   it('현재 작업 단계 퍼센트는 완료 조건 closed total만 사용한다', () => {
     expect(gateProgress(stage({ gate: { gates: [], groups: [], total: 4, closed: 2, available: true, sourceRef: 'GATES.md' } }))).toEqual({ available: true, closed: 2, total: 4, percent: 50, scale: 0.5 })
+    expect(gateProgress(stage({ gate: { gates: [], groups: [], total: 8, closed: 0, available: true, sourceRef: 'GATES.md' } }))).toEqual({ available: true, closed: 0, total: 8, percent: 0, scale: 0 })
     expect(gateProgress(stage({ gate: { gates: [], groups: [], total: 0, closed: 0, available: false, sourceRef: null } }))).toEqual({ available: false, closed: 0, total: 0, percent: null, scale: null })
   })
   it('실시간 세션은 active와 fresh가 모두 맞는 역할 하나만 선택한다', () => {
