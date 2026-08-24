@@ -4,7 +4,7 @@ import { assertDashboardMeasurement, assertMobileStickyMeasurement } from './bro
 
 const passingMeasurement = () => ({
   documentOverflow: 0, clippedDescendants: [], ellipsisTruncation: [], viewportEscape: [], siblingIntersections: [], roleDescendantIntersections: [], roleStatusOverflow: [], undersizedText: [], lowContrastText: [], undersizedControls: [], unexpectedEnglish: [], translationFallback: [], activeAnimationCount: 0,
-  pageHeading: true, sequentialHeadings: true, compactHero: true, roleGeometry: true, heroGeometry: true, mobileMapFirstFold: true, mobileDomOrder: true, phaseLabelsFull: true, phaseBandTruth: true, liveSemantics: true, structureTruth: true, oneMapSurface: true, roving: true, desktopColumns: true, mobileDrill: true, gateCountTruth: true, gaugeTruth: true, explorationTruth: true, groupTruth: true, singleStaleNowSignal: true, technicalCollapsed: true, technicalEvidence: true, noFabricatedProgress: true, firstFold: true,
+  pageHeading: true, sequentialHeadings: true, compactHero: true, roleGeometry: true, heroGeometry: true, mobileMapFirstFold: true, mobileDomOrder: true, phaseLabelsFull: true, phaseBandTruth: true, phaseOptionTitlesFull: true, desktopPhaseListFirstFold: true, liveSemantics: true, structureTruth: true, oneMapSurface: true, roving: true, desktopColumns: true, mobileDrill: true, gateCountTruth: true, gaugeTruth: true, explorationTruth: true, groupTruth: true, singleStaleNowSignal: true, technicalCollapsed: true, technicalEvidence: true, noFabricatedProgress: true, firstFold: true,
 })
 
 test('all contracted viewport names accept the interactive hierarchy measurement', () => {
@@ -43,4 +43,10 @@ test('mobile role geometry fails closed for collapsed names, row escape, descend
 test('structural band fails closed for source Phase count drift, phantom tracks, empty width, and label clipping', () => {
   assert.throws(() => assertDashboardMeasurement('mobile-390x844/cherry-note', { ...passingMeasurement(), phaseBandTruth: false, phaseCount: 1, phaseCompartmentCount: 1, phaseTrackCount: 5, occupiedBandRatio: .1987 }), /phaseBandTruth=false/)
   assert.throws(() => assertDashboardMeasurement('mobile-390x844/outcome', { ...passingMeasurement(), phaseLabelsFull: false, phaseCount: 5, phaseCompartmentCount: 5, phaseTrackCount: 5, occupiedBandRatio: .994 }), /phaseLabelsFull=false/)
+})
+
+test('interactive Phase options fail closed for vertical or horizontal title clipping and lost desktop first-fold visibility', () => {
+  assert.throws(() => assertDashboardMeasurement('desktop-1440x900/outcome', { ...passingMeasurement(), phaseOptionTitlesFull: false }), /phaseOptionTitlesFull=false/)
+  assert.throws(() => assertDashboardMeasurement('landscape-844x390/outcome', { ...passingMeasurement(), phaseOptionTitlesFull: false }), /phaseOptionTitlesFull=false/)
+  assert.throws(() => assertDashboardMeasurement('desktop-1440x900/outcome', { ...passingMeasurement(), desktopPhaseListFirstFold: false }), /desktopPhaseListFirstFold=false/)
 })

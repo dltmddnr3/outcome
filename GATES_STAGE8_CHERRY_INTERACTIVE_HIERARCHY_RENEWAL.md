@@ -2,7 +2,7 @@
 
 Outcome: Cherry가 하나의 큰 Outcome Map 안에서 전체 Phase를 보고, Phase → Scope → Stage → Gate를 직접 선택하며 과거·현재·예정을 오해 없이 탐색한다. Hero는 프로젝트 정체성과 source-grounded 구조 진행만 남기고, 현재 실제 위치는 탐색 선택과 분리한다.
 
-Authority: Cherry의 2026-08-24 세 이미지 기반 피드백과 `docs/STAGE8_CHERRY_INTERACTIVE_HIERARCHY_RENEWAL_BRIEF.md`. Fable은 입력·출력 0의 실행 장애로 사용하지 못했고, Cherry가 `gpt-5.6-sol · medium` 대체를 명시 승인했다. `MVP_SCOPE_CLOSED`, `EXTERNAL_OUTCOME_COMPLETE`, release approval과 Cherry acceptance는 이 작업으로 닫지 않는다. 세 번째 fresh H12의 single-Phase phantom tracks 누락을 반영해 `false_completion_count=15`를 보존한다.
+Authority: Cherry의 2026-08-24 세 이미지 기반 피드백과 `docs/STAGE8_CHERRY_INTERACTIVE_HIERARCHY_RENEWAL_BRIEF.md`. Fable은 입력·출력 0의 실행 장애로 사용하지 못했고, Cherry가 `gpt-5.6-sol · medium` 대체를 명시 승인했다. `MVP_SCOPE_CLOSED`, `EXTERNAL_OUTCOME_COMPLETE`, release approval과 Cherry acceptance는 이 작업으로 닫지 않는다. 네 번째 fresh H12의 interactive Phase option title clipping 누락을 반영해 `false_completion_count=16`을 보존한다.
 
 - [x] H1: 이미지 1–3과 현재 공개 UI의 차이를 분석하고 Hero 축소, 역할 상태 통합, source-grounded gradient, 단일 interactive hierarchy surface의 정보 구조를 고정한다.
   PROVES: design_before_implementation
@@ -30,7 +30,7 @@ Authority: Cherry의 2026-08-24 세 이미지 기반 피드백과 `docs/STAGE8_C
   PROVES: full_hierarchy_navigation
   CHECK: OUTCOME_CANDIDATE_DIST=.outcome-runtime/candidate-dist npm run test:browser
   EXPECT: dynamic counts; OUTCOME 5 Phase rows; Cherry Note only source-defined phases; empty future hierarchy says definition pending
-  EVIDENCE: 4 viewport마다 두 프로젝트의 Phase·Scope·Stage 41개 hierarchy selection과 18개 Stage selection을 전수했다. OUTCOME Phase=5/Stage=8, Cherry Note Phase=1/Stage=10이며 zero-Stage branch는 `스테이지 정의 대기`로 남는다.
+  EVIDENCE: interactive Phase option title은 3줄을 허용하고 Phase row는 `82px` 최소 높이를 갖는다. 전수 측정에서 OUTCOME Phase 4를 포함한 option strong은 desktop/landscape `51/51px`, mobile `17/17px`, horizontal overflow/ellipsis `0`이며 source Phase `5`개를 모두 표시한다.
 - [x] H7: Phase/Scope/Stage 탐색 선택은 실제 current breadcrumb, structural band, NOW와 role status를 변경하지 않으며 Gate inspector만 선택 Stage의 불변 source data를 표시한다.
   PROVES: exploration_current_separation
   CHECK: OUTCOME_CANDIDATE_DIST=.outcome-runtime/candidate-dist npm run test:browser
@@ -47,14 +47,14 @@ Authority: Cherry의 2026-08-24 세 이미지 기반 피드백과 `docs/STAGE8_C
   PROVES: glanceable_responsive_hierarchy
   CHECK: OUTCOME_CANDIDATE_DIST=.outcome-runtime/candidate-dist npm run test:browser
   EXPECT: no document horizontal overflow, clipping, ellipsis, overlap; controls>=44px; contrast>=4.5; reduced motion
-  EVIDENCE: prior geometry is preserved: desktop Hero `164.00px`; mobile Hero `347.44–357.50px`; role min width `60.00px`, max `2` lines, intersections/overflow `0`; 390×844 first Map option Cherry Note `706.41px`, OUTCOME `735.33px`; scrollY `960` band top `0.00px`; Phase label overflow `0`.
+  EVIDENCE: OUTCOME desktop 마지막 Phase bottom `894.39px <= 900px`, Map column `184/232/336/528px`; 390×844 첫 option Cherry Note `706.41px`, OUTCOME `735.33px < 844px`. mobile sticky band top `0px`, role name `>=60px`, source Phase band `1/1`·`5/5`를 보존했고 전 viewport clipping/ellipsis/intersection/overflow `0`이다.
 - [x] H11: frontend, Node, security, browser all-state, isolated build, public boundary, mutation, scope, runbook과 diff checks가 통과한다.
   PROVES: regression_and_boundary
   CHECK: npm test && npm run test:security && npm run build:isolated && OUTCOME_CANDIDATE_DIST=.outcome-runtime/candidate-dist npm run test:browser && OUTCOME_CANDIDATE_DIST=.outcome-runtime/candidate-dist npm run check:public-boundary && npm run check:mutations && npm run check:scope && npm run check:runbook && git diff --check
-  EVIDENCE: frontend `51/51`, Node `64/64`, security `16/16`, browser harness `7/7`; four viewports each traverse `41` hierarchy selections / `18` Stage selections. Isolated build `index-C11-YHAt.js`; public boundary prohibited identifiers `0`; mutation `24/24=405`; scope `17` paths, runbook and diff checks PASS.
+  EVIDENCE: frontend `51/51`, Node `64/64`, security `16/16`, browser harness `8/8`; 4 viewports each `41` hierarchy selections / `18` Stage selections; isolated asset `index-BsgcKz8K.js`; public boundary prohibited identifiers `0`, mutation `24/24`, scope `17` paths, runbook/diff PASS.
 - [ ] H12: exact public candidate를 fresh independent UX & Product QA가 세 reference intent, hierarchy comprehension, truth, interaction, accessibility 기준으로 PASS한다.
   PROVES: fresh_independent_qa
-  EVIDENCE: first and second NEEDS_REVISION classes were corrected by `324ea12227fa7e39622b50f4b5e55186447bd441` and `9e8d241eaed40da733af77547818810050f0511d`; third fresh H12 remains NEEDS_REVISION because fixed five-column mobile CSS creates phantom compartments for a one-Phase project. Builder must not self-accept the next candidate.
+  EVIDENCE: prior NEEDS_REVISION classes were corrected through `23f6800538a3e6289e370d542da9152c82fc3f0d`; fourth fresh H12 remains NEEDS_REVISION because interactive Phase option titles still clamp to two lines and clip Phase 4. Builder must not self-accept the next candidate.
 - [ ] H13: Cherry가 공개 화면을 직접 사용하고 추가 디테일 또는 acceptance를 결정한다.
   PROVES: cherry_acceptance
   EVIDENCE: pending

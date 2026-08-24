@@ -4,7 +4,7 @@ Status: **BUILDER CANDIDATE — FRESH INDEPENDENT QA REQUIRED**
 
 Source pin: `bf033f60e86cd79a9a73a0539fac0f01c37d3374`
 
-false_completion_count: **15**
+false_completion_count: **16**
 
 ## Red-first correction
 
@@ -83,4 +83,18 @@ Fresh H12 on public pin `9e8d241eaed40da733af77547818810050f0511d` remains `NEED
 - All-state: four viewports each traverse `41` hierarchy selections and `18` Stage selections with current separation, zero-Stage branches, Gate, keyboard, boundary, clipping, ellipsis, viewport escape, document overflow, English and fallback assertions preserved.
 - Verification: frontend `51/51`; Node `64/64`; security `16/16`; browser harness `7/7`; public boundary prohibited identifiers `0`; mutations `24/24 = 405 read_only`; scope `17` paths; runbook and diff checks PASS.
 - Isolated pre-commit asset: `index-C11-YHAt.js`.
+- H12 fresh independent QA, H13 Cherry acceptance, release and completion boundaries remain open. Public origin/tunnel/deploy were not changed.
+
+## Fourth H12 NEEDS_REVISION correction receipt
+
+Fresh H12 on public pin `23f6800538a3e6289e370d542da9152c82fc3f0d` remains `NEEDS_REVISION`: the interactive OUTCOME Phase 4 option title had `51px` content inside a `34px` client box on desktop and landscape, clipping its third line by `17px`. This raises `false_completion_count` to `16`; this correction remains a Builder candidate until new independent QA.
+
+- Red-first: the shipped browser harness now inspects every `.oc-map-phase [role=option] strong` in every hierarchy selection. Exact prior product bytes failed OUTCOME desktop states with `phaseOptionTitlesFull=false`; the guard rejects vertical or horizontal overflow, ellipsis, and loss of desktop Phase 5 first-fold visibility.
+- Correction: only Phase option rows receive `min-height:82px` and their title clamp allows `3` lines. Scope/Stage rows, structural band, Map columns and mobile hierarchy behavior are unchanged.
+- Title geometry: all desktop/landscape Phase options have `clientHeight=scrollHeight=51px`; all 390×844 and 375×812 options have `17/17px`. Horizontal overflow and ellipsis are `0` in all states.
+- First-fold regression: OUTCOME desktop Phase 5 bottom is `894.39px <= 900px`; Map columns remain `184/232/336/528px`. Mobile first option is Cherry Note `706.41px` and OUTCOME `735.33px`, both `<844px`.
+- Preserved geometry: desktop Hero `164px`; mobile structural band Cherry Note `1/1` and OUTCOME `5/5`; scrollY `960` band top `0px`; role name `>=60px`, max `2` lines; clipping, ellipsis, intersections, viewport escape and document overflow are `0` across all four viewports.
+- All-state: each viewport traverses `41` hierarchy selections and `18` Stage selections with actual-current separation, zero-Stage branches, Gate truth, keyboard behavior, unexpected English and translation fallback preserved.
+- Verification: frontend `51/51`; Node `64/64`; security `16/16`; browser harness `8/8`; public boundary prohibited identifiers `0`; mutations `24/24 = 405 read_only`; scope `17` paths; runbook and diff checks PASS.
+- Isolated pre-commit asset: `index-BsgcKz8K.js`.
 - H12 fresh independent QA, H13 Cherry acceptance, release and completion boundaries remain open. Public origin/tunnel/deploy were not changed.
