@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { OutcomeDashboard, axisStateLabel, bindingObservationLabel, currentHierarchy, deriveScopeState, deriveStageRailState, detailContentPolicy, entityStateLabel, findStage, gateGroupPresentation, gateProgress, githubEvidenceItems, heroGateEvidence, hierarchyPlacement, meaningfulGateGroups, nextStageOptionIndex, nowPresentation, projectHeroModel, selectedGateCount, selectedStageContext, selectLiveBinding, selectProject, sourceStateLabel, stageDetailSemantics, summarizeStage, timingPresentation, type Binding, type GithubConnector, type PackageProject, type PackageStage } from './OutcomeDashboard'
+import { OutcomeDashboard, axisStateLabel, bindingObservationLabel, collapsedStageCount, currentHierarchy, defaultHierarchySelection, deriveScopeState, deriveStageRailState, detailContentPolicy, entityStateLabel, findStage, gateGroupPresentation, gateProgress, githubEvidenceItems, heroGateEvidence, hierarchyIsExploring, hierarchyPlacement, meaningfulGateGroups, nextStageOptionIndex, nowPresentation, projectHeroModel, resolveHierarchySelection, selectedGateCount, selectedStageContext, selectHierarchyPhase, selectHierarchyScope, selectLiveBinding, selectProject, sourceStateLabel, stageDetailSemantics, structuralPhaseModel, summarizeStage, timingPresentation, type Binding, type GithubConnector, type PackageProject, type PackageStage } from './OutcomeDashboard'
 import { activityLabelKo, axisLabelKo, gatePresentation, groupPresentation, hierarchyLabels, loginErrorPresentation, phasePresentation, projectOutcomePresentation, roleLabel, stagePresentation } from './outcomeKorean'
 
 const stage = (overrides: Partial<PackageStage> = {}): PackageStage => ({ id: 'stage-one', title: 'Stage One', purpose: 'Verify the result', dependsOn: [], gatePurpose: 'Stage One acceptance checklist', sourceState: 'present', state: 'active', gate: { gates: [{ id: 'G1', title: 'closed', closed: true, groupCode: 'G' }, { id: 'G2', title: 'remaining', closed: false, groupCode: 'G' }], groups: [{ code: 'G', name: '증거', closed: 1, total: 2 }], total: 2, closed: 1, available: true, sourceRef: 'GATES.md' }, axes: { implementation: 'active', test: 'pending', evidence: 'pending', independentQa: 'not_started', cherryAcceptance: 'pending', release: 'not_started' }, ...overrides })
@@ -9,15 +9,16 @@ const project = (id: string, title: string): PackageProject => ({ status: 'valid
 describe('OUTCOME Package dashboard', () => {
   it('역할 세션은 네 개의 간결한 행과 단일 활성 신호로 표시한다', () => {
     const source = OutcomeDashboard.toString()
-    expect(source).toContain('oc-activity-band')
+    expect(source).toContain('oc-hero-side')
     expect(source).toContain('oc-role-row')
-    expect(source).not.toContain('oc-live-glow')
+    expect(source).not.toContain('oc-activity-band')
+    expect(source).not.toContain('oc-now-timing')
   })
-  it('현재 원본 흐름은 하나의 통합 진행 surface로 유지된다', () => {
+  it('기존 세 current surface를 하나의 Outcome Map으로 통합한다', () => {
     const source = OutcomeDashboard.toString()
-    expect(source).toContain('oc-flow-summary')
-    expect(source).toContain('oc-flow-levels')
-    expect(source).not.toContain('oc-current-stage-rail')
+    expect(source).toContain('oc-outcome-map')
+    expect(source).toContain('oc-map-columns')
+    for (const removed of ['oc-current-flow', 'oc-current-stage', 'oc-stage-explorer', 'oc-selected-detail']) expect(source).not.toContain(removed)
   })
   it('작업 단계 목록 선택은 우측 상세만 바꾸고 실제 현재 위치를 유지한다', () => {
     expect(nextStageOptionIndex('ArrowDown', 1, 4)).toBe(2)
@@ -26,8 +27,8 @@ describe('OUTCOME Package dashboard', () => {
     expect(nextStageOptionIndex('End', 0, 4)).toBe(3)
     expect(nextStageOptionIndex('Enter', 2, 4)).toBeNull()
     const source = OutcomeDashboard.toString()
-    expect(source).toContain('role="listbox"')
-    expect(source).toContain('role="option"')
+    expect(source).toContain('role: "listbox"')
+    expect(source).toContain('role: "option"')
     expect(source).toContain('aria-selected')
     expect(source).not.toContain('aria-pressed')
   })
@@ -36,14 +37,14 @@ describe('OUTCOME Package dashboard', () => {
     expect(selectedGateCount(stage({ gate: { gates: [], groups: [], total: 0, closed: 0, available: false, sourceRef: null } }))).toBe('완료 조건 근거 없음')
     expect(selectedGateCount(stage({ state: 'complete', gate: { gates: [], groups: [], total: 10, closed: 10, available: true, sourceRef: 'GATES.md' } }))).toBe('10/10')
   })
-  it('현재 선택 상세는 완료 조건과 경계를 중복하지 않는다', () => {
+  it('Gate inspector는 완료 조건과 경계를 한 번만 소유한다', () => {
     expect(detailContentPolicy(false)).toEqual({ showTitle: false, showPurpose: false, showBoundary: false, showGateList: false })
     expect(detailContentPolicy(true)).toEqual({ showTitle: true, showPurpose: true, showBoundary: true, showGateList: true })
     const source = OutcomeDashboard.toString()
-    expect(source).toContain('data-current-boundary')
-    expect(source).toContain('data-selected-boundary')
-    expect(source).toContain('data-current-gates')
-    expect(source).toContain('data-selected-gates')
+    expect(source).toContain('oc-gate-inspector')
+    expect(source).toContain('oc-detail-boundary')
+    expect(source).toContain('oc-inspector-gates')
+    expect(source).not.toContain('data-current-gates')
   })
   it('완료 조건 그룹은 source label과 code를 필요한 경우에만 표시한다', () => {
     expect(gateGroupPresentation('RA', 'RA')).toEqual({ primaryLabel: null, secondaryCode: null })
@@ -55,10 +56,12 @@ describe('OUTCOME Package dashboard', () => {
     expect(meaningfulGateGroups([{ code: 'Y', name: '링크 미리보기', closed: 5, total: 5 }], false)).toEqual([])
     expect(meaningfulGateGroups([{ code: 'Y', name: '링크 미리보기', closed: 5, total: 5 }])).toEqual([{ code: 'Y', name: '링크 미리보기', closed: 5, total: 5, primaryLabel: '링크 미리보기', secondaryCode: 'Y' }])
   })
-  it('작업 단계 listbox는 이름 있는 group만 option을 소유한다', () => {
+  it('Phase Scope Stage는 각각 이름 있는 listbox와 roving option을 갖는다', () => {
     const source = OutcomeDashboard.toString()
-    expect(source).toMatch(/groupLabelId[\s\S]{0,600}role: "group"[\s\S]{0,200}"aria-labelledby": groupLabelId/)
-    expect(source).not.toContain('className="oc-stage-group" key={group.scope.id} aria-label=')
+    expect(source.match(/role: "listbox"/g)).toHaveLength(3)
+    expect(source).toContain('tabIndex: selected ? 0 : -1')
+    expect(source).toContain('event.key === "ArrowRight"')
+    expect(source).toContain('event.key === "ArrowLeft"')
   })
   it('역할 관측과 프로젝트 식별자는 primary에서 중복되지 않는다', () => {
     expect(bindingObservationLabel({ role: 'builder', status: 'stale', activity: null, boundAt: null, observedAt: null, freshness: 'stale', historyCount: 0 })).toBe('관측 오래됨')
@@ -69,13 +72,36 @@ describe('OUTCOME Package dashboard', () => {
   })
   it('정보 구조 리뉴얼은 핵심 source-grounded 기능을 보존한다', () => {
     const source = OutcomeDashboard.toString()
-    for (const token of ['oc-hero-gate', 'oc-gate-gauge', 'oc-now-summary', 'oc-current-flow', 'oc-stage-explorer', 'oc-selected-detail', 'oc-technical']) expect(source).toContain(token)
+    for (const token of ['oc-structure-band', 'oc-gate-gauge', 'oc-now-summary', 'oc-outcome-map', 'oc-gate-inspector', 'oc-technical']) expect(source).toContain(token)
+    expect(source).not.toContain('oc-hero-gate')
     expect(source).not.toContain('oc-hero-fill')
     expect(source).not.toContain('oc-confirmed')
   })
   it('핵심 정보 영역을 시각 리뉴얼 뒤에도 보존한다', () => {
     const source = OutcomeDashboard.toString()
-    for (const token of ['oc-hero', 'oc-now-summary', 'oc-bindings', 'oc-current-flow', 'oc-current-stage', 'oc-selected-detail', 'oc-technical']) expect(source).toContain(token)
+    for (const token of ['oc-hero', 'oc-now-summary', 'oc-bindings', 'oc-structure-band', 'oc-outcome-map', 'oc-gate-inspector', 'oc-technical']) expect(source).toContain(token)
+  })
+  it('탐색 selection은 actual current와 분리되고 zero-Stage branch를 보존한다', () => {
+    const value = project('outcome', 'OUTCOME')
+    value.phases.push({ id: 'future-phase', title: 'Future', purpose: 'Future', completion: null, scopes: [{ id: 'future-scope', title: 'Future', purpose: 'Future', stages: [] }] })
+    expect(defaultHierarchySelection(value)).toEqual({ phaseId: 'outcome-phase', scopeId: 'outcome-scope', stageId: 'outcome-stage' })
+    const future = selectHierarchyPhase(value, 'future-phase')
+    expect(future).toEqual({ phaseId: 'future-phase', scopeId: 'future-scope', stageId: null })
+    expect(resolveHierarchySelection(value, future).stage).toBeNull()
+    expect(hierarchyIsExploring(value, future)).toBe(true)
+    expect(value.current?.stageId).toBe('outcome-stage')
+  })
+  it('OUTCOME의 다섯 Phase와 Stage 없는 future branch를 구조 상태로 계산한다', () => {
+    const value = project('outcome', 'OUTCOME')
+    value.phases = Array.from({ length: 5 }, (_, index) => ({ id: `phase-${index + 1}`, title: '', purpose: '', completion: null, scopes: [{ id: `scope-${index + 1}`, title: '', purpose: '', stages: index === 0 ? [stage({ id: 'current-stage' })] : [] }] }))
+    value.current = { phaseId: 'phase-1', scopeId: 'scope-1', stageId: 'current-stage' }
+    expect(structuralPhaseModel(value).map(({ status, stages }) => [status, stages])).toEqual([['current', 1], ['definition_pending', 0], ['definition_pending', 0], ['definition_pending', 0], ['definition_pending', 0]])
+  })
+  it('긴 완료 branch만 disclosure 대상으로 접고 선택된 과거 Stage는 노출한다', () => {
+    const stages = Array.from({ length: 13 }, (_, index) => stage({ id: `stage-${index + 1}`, state: index < 12 ? 'complete' : 'active' }))
+    expect(collapsedStageCount(stages, false, 'stage-13')).toBe(12)
+    expect(collapsedStageCount(stages, false, 'stage-2')).toBe(0)
+    expect(collapsedStageCount(stages, true, 'stage-13')).toBe(0)
   })
   it('project switch keeps Package truth isolated', () => { const projects = [project('cherry-note', 'Cherry Note'), project('outcome', 'OUTCOME')]; expect(selectProject(projects, 'outcome')?.project.outcome).toBe('OUTCOME outcome'); expect(selectProject(projects, 'cherry-note')?.project.outcome).toBe('Cherry Note outcome') })
   it('purpose funnel resolves Phase Scope and Stage from one project', () => { const value = project('outcome', 'OUTCOME'); const found = findStage(value, 'outcome-stage'); expect([found?.phase.purpose, found?.scope.purpose, found?.stage.purpose]).toEqual(['Phase purpose', 'Scope purpose', 'Verify the result']) })

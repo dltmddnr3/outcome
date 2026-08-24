@@ -1,6 +1,10 @@
 const phaseCopy: Record<string, [string, string]> = {
   'phase-1-mvp-closure': ['1단계 · 최소 제품 마무리', '실제 사용 경계, 불변 근거, 독립 검수와 Cherry 승인을 거쳐 기록·정리·재발견 최소 제품을 마무리합니다.'],
   'outcome-phase-1': ['1단계 · 로컬 최소 제품', 'Cherry Note와 OUTCOME을 같은 표준 계약으로 추적하는 독립 로컬 대시보드를 Cherry가 실제 사용할 수 있는 상태로 닫습니다.'],
+  'outcome-phase-2': ['2단계 · 공개 다중 프로젝트 서비스', '여러 프로젝트를 계정 기반 공개 서비스에서 안전하게 전환하고 조회합니다.'],
+  'outcome-phase-3': ['3단계 · 목적 정의 대기', 'Cherry가 제품 목적을 결정하기 전까지 기능과 진행을 추론하지 않습니다.'],
+  'outcome-phase-4': ['4단계 · OUTCOME 안에서 개발', '외부 작업 화면 없이 OUTCOME 안에서 프로젝트 생성, 역할 구성과 개발 흐름을 수행합니다.'],
+  'outcome-phase-5': ['5단계 · 결과 우선 생성', '원하는 목적지를 명확히 찾고 필요한 실행 구조를 결과에 맞게 구성합니다.'],
 }
 
 export const hierarchyLabels = ['프로젝트', '큰 단계', '범위', '작업 단계', '완료 조건'] as const
@@ -13,6 +17,17 @@ const scopeCopy: Record<string, [string, string]> = {
   'outcome-scope-contract': ['계약 기반', '모든 프로젝트가 같은 의미로 등록되도록 계약, 위계, 완료 조건과 역할 경계를 고정합니다.'],
   'outcome-scope-runtime': ['독립 실행 환경과 범용 추적', '기존 대시보드를 OUTCOME으로 분리하고 프로젝트 문서와 역할 연결을 일반화해 MacBook과 모바일에서도 안전하게 읽습니다.'],
   'outcome-scope-acceptance': ['독립 승인', '구현자와 분리된 검증과 Cherry의 실제 사용으로 로컬 최소 제품 결과를 닫습니다.'],
+  'outcome-phase-2-public-hosting': ['안정적인 공개 전달', '임시 연결이 아닌 안정 주소와 운영 경계를 정의합니다.'],
+  'outcome-phase-2-project-portfolio': ['다중 프로젝트 모음', '등록 프로젝트를 같은 원본 묶음 의미로 전환하고 조회합니다.'],
+  'outcome-phase-2-account-service': ['계정 기반 접근', '프로젝트별 가시성과 접근 권한을 계정 기반으로 관리합니다.'],
+  'outcome-phase-3-definition': ['목적 정의 대기', '3단계의 목적, 범위, 스테이지와 완료 조건을 Cherry와 정의합니다.'],
+  'outcome-phase-4-project-creation': ['프로젝트와 원본 묶음 생성', 'OUTCOME에서 프로젝트와 표준 원본 묶음을 직접 만듭니다.'],
+  'outcome-phase-4-role-sessions': ['네 역할 작업 구성', '기획, 구현, 사용성·제품 검수와 출시 감사 작업을 프로젝트에 연결합니다.'],
+  'outcome-phase-4-linked-chat': ['연결 작업 대화와 제어', 'OUTCOME 안에서 역할별 작업 지시와 결과 대화를 수행합니다.'],
+  'outcome-phase-4-full-development': ['전체 개발 작업 공간', '외부 작업 화면 없이 개발 흐름을 완결합니다.'],
+  'outcome-phase-5-destination': ['목적지 발견', '프로젝트 시작 전에 원하는 결과와 성공 조건을 명확히 파악합니다.'],
+  'outcome-phase-5-question-200': ['질문 200', '질문을 통해 목적, 사용자, 제약과 완료 조건을 결과 계약으로 만듭니다.'],
+  'outcome-phase-5-composition': ['고정 역할을 넘는 구성', '필요한 역할, 도구와 실행 단위를 결과에 맞게 구성합니다.'],
 }
 
 const stageCopy: Record<string, [string, string]> = {

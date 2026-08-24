@@ -2,71 +2,23 @@ import assert from 'node:assert/strict'
 import test from 'node:test'
 import { assertDashboardMeasurement } from './browser-assertions.mjs'
 
-const passingMeasurement = (gateRowTop = 1200) => ({
-  gateRowTop,
-  documentOverflow: 0,
-  clippedDescendants: [],
-  ellipsisTruncation: [],
-  viewportEscape: [],
-  siblingIntersections: [],
-  undersizedControls: [],
-  undersizedText: [],
-  lowContrastText: [],
-  unexpectedEnglish: [],
-  translationFallback: [],
-  activeAnimationCount: 0,
-  pageHeading: true,
-  sequentialHeadings: true,
-  heroGateContract: true,
-  noDuplicateProgress: true,
-  compactRoles: true,
-  liveSemantics: true,
-  roleCopyPolish: true,
-  heroPrimaryIdentity: true,
-  singleStaleNowSignal: true,
-  staleNowCount: 1,
-  activityBand: true,
-  unifiedFlow: true,
-  funnelCounts: true,
-  funnelPurpose: true,
-  placementOnly: true,
-  scopeJourney: true,
-  explorerSemantics: true,
-  listboxOwnership: true,
-  explorerGeometry: true,
-  allStagesDiscoverable: true,
-  explorationHonest: true,
-  detailSemantics: true,
-  detailGateTruth: true,
-  currentDetailDedup: true,
-  adaptiveGateGroups: true,
-  meaningfulGroupVisibility: true,
-  sourceGroupSectionCount: 0,
-  genericGroupSectionCount: 0,
-  timingHonesty: true,
-  noFabricatedProgress: true,
-  contentPreservation: true,
-  technicalCollapsed: true,
-  technicalEvidence: true,
-  mobileAuthoritativeOrder: true,
+const passingMeasurement = () => ({
+  documentOverflow: 0, clippedDescendants: [], ellipsisTruncation: [], viewportEscape: [], siblingIntersections: [], undersizedText: [], lowContrastText: [], undersizedControls: [], unexpectedEnglish: [], translationFallback: [], activeAnimationCount: 0,
+  pageHeading: true, sequentialHeadings: true, compactHero: true, liveSemantics: true, structureTruth: true, oneMapSurface: true, roving: true, desktopColumns: true, mobileDrill: true, gateCountTruth: true, gaugeTruth: true, explorationTruth: true, groupTruth: true, singleStaleNowSignal: true, technicalCollapsed: true, technicalEvidence: true, noFabricatedProgress: true, firstFold: true,
 })
 
-test('all contracted viewport names accept a complete IA measurement', () => {
-  for (const name of ['desktop-1440x900/cherry-note/stage', 'mobile-390x844/outcome/stage', 'phone-375x812/outcome/stage', 'landscape-844x390/cherry-note/stage']) assert.doesNotThrow(() => assertDashboardMeasurement(name, passingMeasurement()))
+test('all contracted viewport names accept the interactive hierarchy measurement', () => {
+  for (const name of ['desktop-1440x900/outcome/stage', 'mobile-390x844/outcome/stage', 'phone-375x812/cherry-note/stage', 'landscape-844x390/cherry-note/stage']) assert.doesNotThrow(() => assertDashboardMeasurement(name, passingMeasurement()))
 })
 
-test('IA assertions fail closed for duplicated progress or broken listbox semantics', () => {
-  assert.throws(() => assertDashboardMeasurement('desktop-1440x900/outcome/stage', { ...passingMeasurement(), noDuplicateProgress: false }), /noDuplicateProgress=false/)
-  assert.throws(() => assertDashboardMeasurement('mobile-390x844/outcome/stage', { ...passingMeasurement(), explorerSemantics: false }), /explorerSemantics=false/)
-  assert.throws(() => assertDashboardMeasurement('desktop-1440x900/outcome/stage', { ...passingMeasurement(), listboxOwnership: false }), /listboxOwnership=false/)
-  assert.throws(() => assertDashboardMeasurement('desktop-1440x900/outcome/stage', { ...passingMeasurement(), detailGateTruth: false }), /detailGateTruth=false/)
-  assert.throws(() => assertDashboardMeasurement('desktop-1440x900/outcome/stage', { ...passingMeasurement(), currentDetailDedup: false }), /currentDetailDedup=false/)
-  assert.throws(() => assertDashboardMeasurement('mobile-390x844/outcome/stage', { ...passingMeasurement(), adaptiveGateGroups: false }), /adaptiveGateGroups=false/)
-  assert.throws(() => assertDashboardMeasurement('desktop-1440x900/outcome/stage', { ...passingMeasurement(), meaningfulGroupVisibility: false }), /meaningfulGroupVisibility=false/)
-  assert.throws(() => assertDashboardMeasurement('mobile-390x844/outcome/stage', { ...passingMeasurement(), singleStaleNowSignal: false }), /singleStaleNowSignal=false/)
+test('hierarchy assertions fail closed for duplicate surfaces, false gauge, and selection drift', () => {
+  assert.throws(() => assertDashboardMeasurement('desktop/outcome', { ...passingMeasurement(), oneMapSurface: false }), /oneMapSurface=false/)
+  assert.throws(() => assertDashboardMeasurement('desktop/outcome', { ...passingMeasurement(), gaugeTruth: false }), /gaugeTruth=false/)
+  assert.throws(() => assertDashboardMeasurement('mobile/outcome', { ...passingMeasurement(), explorationTruth: false }), /explorationTruth=false/)
 })
 
-test('IA assertions fail closed for tapered flow or disconnected Scope journey', () => {
-  assert.throws(() => assertDashboardMeasurement('desktop-1440x900/outcome/stage', { ...passingMeasurement(), unifiedFlow: false }), /unifiedFlow=false/)
-  assert.throws(() => assertDashboardMeasurement('mobile-390x844/outcome/stage', { ...passingMeasurement(), scopeJourney: false }), /scopeJourney=false/)
+test('responsive assertions fail closed for wrong columns, stacked mobile levels, or clipped descendants', () => {
+  assert.throws(() => assertDashboardMeasurement('desktop/outcome', { ...passingMeasurement(), desktopColumns: false }), /desktopColumns=false/)
+  assert.throws(() => assertDashboardMeasurement('mobile/outcome', { ...passingMeasurement(), mobileDrill: false }), /mobileDrill=false/)
+  assert.throws(() => assertDashboardMeasurement('mobile/outcome', { ...passingMeasurement(), clippedDescendants: ['inner'] }), /clipped=inner/)
 })

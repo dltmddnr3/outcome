@@ -23,7 +23,7 @@ try {
     const html = localAssets ? readFileSync(join(candidateDist, 'index.html'), 'utf8') : await (await fetch(`${base}/cherry-note-dashboard`)).text()
     const assetPaths = [...html.matchAll(/(?:src|href)="(\/assets\/[^"]+)"/g)].map((match) => match[1])
     const bundle = (await Promise.all(assetPaths.map((path) => localAssets ? readFileSync(join(candidateDist, path), 'utf8') : fetch(`${base}${path}`).then((response) => response.text())))).join('\n')
-    const page = await browser.newPage(); await page.goto(`${base}/cherry-note-dashboard`); await page.getByText('현재 원본 흐름', { exact: true }).waitFor(); const renderedUI = await page.locator('body').innerText(); await page.close()
+    const page = await browser.newPage(); await page.goto(`${base}/cherry-note-dashboard`); await page.getByText('결과 지도', { exact: true }).waitFor(); const renderedUI = await page.locator('body').innerText(); await page.close()
     const surfaces = { api, html, bundle, renderedUI }
     const hits = Object.entries(surfaces).flatMap(([surface, text]) => Object.entries(patterns).flatMap(([name, pattern]) => pattern.test(text) ? [`${label}:${surface}:${name}`] : []))
     if (hits.length) throw new Error(`public redaction failures: ${hits.join(', ')}`)
