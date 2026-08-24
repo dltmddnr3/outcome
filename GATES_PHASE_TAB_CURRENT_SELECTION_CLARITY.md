@@ -27,8 +27,8 @@
   - EXPECT: exit 0
   - EVIDENCE: frontend 57 + Node 78 = 135 tests PASS, production build PASS. 375x812, 390x844, 844x390, 1440x900에서 clipped/intersections/viewportEscape/documentOverflow 모두 0, reducedMotionStatic=true.
 
-- [ ] P5 공개 고정 주소 반영
+- [x] P5 공개 고정 주소 반영
   - GitHub HEAD=origin/main, 공개 영수증 commit/tree/asset 일치, GET 200, mutation 405, prohibited hit 0이다.
   - CHECK: `OUTCOME_CANDIDATE_DIST=dist OUTCOME_PUBLIC_URL=https://outcome-five.vercel.app npm run check:public-boundary && OUTCOME_PUBLIC_URL=https://outcome-five.vercel.app npm run test:remote-browser && OUTCOME_PUBLIC_URL=https://outcome-five.vercel.app npm run check:mutations`
   - EXPECT: exit 0
-  - EVIDENCE: pending
+  - EVIDENCE: production `dpl_9LwQLghzyUs7DisCKyL1uVEuobQi` READY 및 fixed alias 정상. public prohibited=0, remote desktop/mobile 전체 계층 PASS, public mutation 24/24=405·read_only JSON 20/20.
