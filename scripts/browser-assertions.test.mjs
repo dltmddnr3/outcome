@@ -4,7 +4,7 @@ import { assertDashboardMeasurement, assertMobileStickyMeasurement, assertSource
 
 const passingMeasurement = () => ({
   documentOverflow: 0, clippedDescendants: [], ellipsisTruncation: [], viewportEscape: [], siblingIntersections: [], roleDescendantIntersections: [], roleStatusOverflow: [], undersizedText: [], lowContrastText: [], undersizedControls: [], unexpectedEnglish: [], translationFallback: [], activeAnimationCount: 0,
-  pageHeading: true, sequentialHeadings: true, compactHero: true, roleGeometry: true, heroGeometry: true, mobileMapFirstFold: true, mobileDomOrder: true, mobileHierarchyTruth: true, phaseLabelsFull: true, phaseBandTruth: true, phaseOptionTitlesFull: true, desktopPhaseListFirstFold: true, liveSemantics: true, structureTruth: true, phaseCompletionTruth: true, stagePositionTruth: true, snapshotHeroTruth: true, oneMapSurface: true, roving: true, desktopColumns: true, mobileDrill: true, gateCountTruth: true, gaugeTruth: true, explorationTruth: true, groupTruth: true, singleStaleNowSignal: true, snapshotBadgeTextTruth: true, technicalCollapsed: true, technicalEvidence: true, noFabricatedProgress: true, firstFold: true,
+  pageHeading: true, sequentialHeadings: true, compactHero: true, roleGeometry: true, heroGeometry: true, mobileMapFirstFold: true, mobileDomOrder: true, mobileHierarchyTruth: true, currentStageActionTruth: true, phaseProgressRowsAligned: true, phaseLabelsFull: true, phaseBandTruth: true, phaseOptionTitlesFull: true, desktopPhaseListFirstFold: true, liveSemantics: true, structureTruth: true, phaseCompletionTruth: true, stagePositionTruth: true, snapshotHeroTruth: true, oneMapSurface: true, roving: true, desktopColumns: true, mobileDrill: true, gateCountTruth: true, gaugeTruth: true, explorationTruth: true, groupTruth: true, singleStaleNowSignal: true, snapshotBadgeTextTruth: true, technicalCollapsed: true, technicalEvidence: true, noFabricatedProgress: true, firstFold: true,
 })
 
 test('all contracted viewport names accept the interactive hierarchy measurement', () => {
@@ -25,6 +25,11 @@ test('responsive assertions fail closed for wrong columns, stacked mobile levels
 
 test('mobile hierarchy clarity fails closed when the fourth tab or visible active marker is absent', () => {
   assert.throws(() => assertDashboardMeasurement('mobile/outcome', { ...passingMeasurement(), mobileHierarchyTruth: false }), /mobileHierarchyTruth=false/)
+})
+
+test('current-stage return action and Phase progress rows fail closed when absent or misaligned', () => {
+  assert.throws(() => assertDashboardMeasurement('mobile/outcome', { ...passingMeasurement(), currentStageActionTruth: false }), /currentStageActionTruth=false/)
+  assert.throws(() => assertDashboardMeasurement('mobile/outcome', { ...passingMeasurement(), phaseProgressRowsAligned: false }), /phaseProgressRowsAligned=false/)
 })
 
 test('H12 geometry regressions fail closed for oversized Hero, hidden mobile Map, wrong DOM order, and clipped Phase labels', () => {
