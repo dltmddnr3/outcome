@@ -21,6 +21,22 @@
 
 실행 직전 기준선이 한 항목이라도 달라지면 중단하고 이 절을 새 불변 영수증으로 갱신한다. 현재 공개 기준선과 별도 미리보기 후보를 혼합하지 않는다.
 
+## Git/Vercel 자동 Production 배포 경계
+
+`2026-08-25 KST` 실측에서 이 Vercel 프로젝트는 GitHub `main`을 Production branch로 추적했고, `main` push가 즉시 새 Production deployment와 공개 별칭 갱신을 만들었다. 따라서 HP1 동안의 문서-only push도 Production 불변 조건을 위반한다.
+
+- Production 기준선이 복구되기 전에는 Clerk·Vercel의 추가 외부 변경과 `main` push를 모두 중단한다.
+- HP1 영수증·Gate 문서 커밋은 로컬에 고정하되, Production branch control 결정 전에는 원격 `main`에 push하지 않는다.
+- Preview 후보는 Production branch가 아닌 별도 Git branch 또는 명시적 Preview deployment로만 만든다.
+- 장기 기본안은 GitHub `release`를 Vercel Production branch로 분리하고 `main`을 Preview branch로 운용하는 것이다. 이 변경은 rollback과도, HP1 승인과도 별개의 외부 설정 결정이다.
+- `release` branch 생성·보호, Vercel Production branch 변경, 자동 도메인 할당 변경, 자동 deployment 비활성화 중 어느 것도 Cherry의 정확한 별도 승인 전에는 실행하지 않는다.
+
+공식 근거:
+
+- Vercel Git 연동은 production branch push를 Production deployment로 만들며 다른 branch push를 Preview로 만든다: <https://vercel.com/docs/git>
+- Production branch는 Project Settings의 Production environment → Branch Tracking에서 다른 branch로 변경할 수 있다: <https://vercel.com/docs/git#production-branch>
+- 과거 Production deployment로의 instant rollback은 rebuild 없이 domain alias를 이전 배포에 다시 연결한다: <https://vercel.com/docs/deployments/promoting-a-deployment#instant-rollback>
+
 ## 승인 전 조건
 
 다음 조건이 모두 충족되기 전에는 외부 작업을 시작하지 않는다.

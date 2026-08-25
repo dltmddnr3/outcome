@@ -44,6 +44,7 @@
 - P2: `OPEN · PARTIAL EVIDENCE ONLY`
 - P3-P6: `LOCKED`
 - rollback: `Cherry 별도 승인 대기`
+- 재발 방지 결정: `docs/PHASE2_VERCEL_PRODUCTION_BRANCH_CONTROL_DECISION.md`의 `RECOVERY`와 `BRANCH_CONTROL`을 분리 승인
 - rollback 이후 필수 확인: 이전 Production 별칭 복구, 공개 커밋·트리·에셋, `200/405`, 금지 식별자 `0`, Clerk Development 단일 소유자 경계 재검증
 - `HOSTED_IDENTITY_PREVIEW_ONLY`: `false`
 - `EXTERNAL_OUTCOME_COMPLETE`: `false`
