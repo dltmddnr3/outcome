@@ -2,7 +2,7 @@ import { FormEvent, useEffect, useState } from 'react'
 import { OutcomeDashboard } from './components/OutcomeDashboard'
 import { AccountWorkspace, accountWorkspaceStateCopy, type AccountWorkspaceState } from './components/AccountWorkspace'
 import { loginErrorPresentation } from './components/outcomeKorean'
-import { fetchPrivateAccessConfig, fetchPrivateWorkspace, fetchSession, login, logout } from './lib/api'
+import { beginPrivateSession, endPrivateSession, fetchPrivateAccessConfig, fetchPrivateWorkspace, fetchSession, login, logout, type PrivateWorkspaceView } from './lib/api'
 
 const privateErrorState = (reason: unknown): AccountWorkspaceState => {
   const code = reason instanceof Error ? reason.message : ''
@@ -20,13 +20,16 @@ const privateResultState = (value: { workspace: { viewState?: string } }): Accou
 
 function PrivateWorkspaceEntry() {
   const [state, setState] = useState<AccountWorkspaceState>('loading')
-  useEffect(() => {
-    void fetchPrivateAccessConfig()
+  const [workspace, setWorkspace] = useState<PrivateWorkspaceView | undefined>()
+  const [transitionError, setTransitionError] = useState<string | null>(null)
+  const load = () => fetchPrivateAccessConfig()
       .then((config) => config.enabled ? fetchPrivateWorkspace() : Promise.reject(new Error('private_workspace_unavailable')))
-      .then((value) => setState(privateResultState(value)))
-      .catch((reason) => setState(privateErrorState(reason)))
-  }, [])
-  return <AccountWorkspace state={state} />
+      .then((value) => { setWorkspace(value.workspace); setState(privateResultState(value)) })
+      .catch((reason) => { setWorkspace(undefined); setState(privateErrorState(reason)); throw reason })
+  useEffect(() => { void load().catch(() => undefined) }, [])
+  const authenticate = async (provider: 'google' | 'email_code') => { setState('loading'); setTransitionError(null); try { await beginPrivateSession(provider); await load() } catch { setTransitionError('검증용 인증 전환을 완료하지 못했습니다.'); setState('login') } }
+  const signOut = async () => { setState('loading'); setTransitionError(null); try { await endPrivateSession(); setWorkspace(undefined); setState('login') } catch { setTransitionError('로그아웃을 완료하지 못했습니다.'); setState('unavailable') } }
+  return <AccountWorkspace state={state} workspace={workspace} onLogin={authenticate} onLogout={signOut} transitionError={transitionError} />
 }
 
 function Login({ onAuthenticated }: { onAuthenticated: () => void }) {

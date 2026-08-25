@@ -54,3 +54,35 @@ test('local runtime routes private config and HttpOnly provider session without 
     assert.deepEqual(await mutation.json(), { error: 'read_only' })
   } finally { server.close(); await once(server, 'close') }
 })
+
+test('private login and logout require an explicit injected adapter and never expose its token', async () => {
+  const denied = createOutcomeServer({ publicReadOnly: true, accountAccess: service })
+  denied.listen(0, '127.0.0.1'); await once(denied, 'listening')
+  try {
+    const response = await fetch(`http://127.0.0.1:${denied.address().port}/api/private/auth/login`, { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ provider: 'google' }) })
+    assert.equal(response.status, 405)
+    assert.deepEqual(await response.json(), { error: 'read_only' })
+  } finally { denied.close(); await once(denied, 'close') }
+
+  const transitions = []
+  const server = createOutcomeServer({ publicReadOnly: true, accountAccess: service, secureCookies: false, privateTransitionAdapter: {
+    begin: async ({ provider }) => { transitions.push(['begin', provider]); return { token: 'valid' } },
+    end: async ({ token }) => { transitions.push(['end', token]); return { state: 'signed_out' } },
+  } })
+  server.listen(0, '127.0.0.1'); await once(server, 'listening')
+  const base = `http://127.0.0.1:${server.address().port}`
+  try {
+    const login = await fetch(`${base}/api/private/auth/login`, { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ provider: 'google' }) })
+    assert.equal(login.status, 200)
+    const loginBody = await login.json()
+    assert.deepEqual(loginBody, { state: 'authenticated', mode: 'injected_adapter' })
+    assert.equal(JSON.stringify(loginBody).includes('valid'), false)
+    const cookie = login.headers.get('set-cookie')
+    assert.match(cookie, /__session=valid;.*HttpOnly;.*SameSite=Strict/)
+    assert.equal((await fetch(`${base}/api/private/workspace`, { headers: { cookie } })).status, 200)
+    const logout = await fetch(`${base}/api/private/auth/logout`, { method: 'POST', headers: { cookie } })
+    assert.equal(logout.status, 200)
+    assert.match(logout.headers.get('set-cookie'), /Max-Age=0/)
+    assert.deepEqual(transitions, [['begin', 'google'], ['end', 'valid']])
+  } finally { server.close(); await once(server, 'close') }
+})

@@ -255,5 +255,24 @@
 .account-workspace__notice{margin-top:20px!important;padding-top:16px;border-top:1px solid #344234}
 .account-workspace footer{display:flex;max-width:960px;align-items:center;justify-content:space-between;gap:12px;margin:0 auto;color:#aeb7ad;font-size:12px}
 .account-workspace footer code{color:#dfffb2}
+.account-workspace__header-actions{display:flex;align-items:center;gap:10px}
+.account-workspace__adapter-note{flex-basis:100%;font-size:12px!important}
+.account-workspace__transition-error{margin-top:14px!important;color:#ff9f95!important}
+.account-workspace__ready{max-width:960px;margin:0 auto;padding:20px;border:1px solid #344234;border-radius:16px;background:#0d150e}
+.account-workspace__projects{display:flex;flex-wrap:wrap;gap:8px;margin-bottom:16px}
+.account-workspace__projects button[aria-pressed=true],.account-workspace__hierarchy button[aria-selected=true]{border-color:#adff2f;background:#203019;color:#efffde}
+.account-workspace__position{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:1px;margin-bottom:16px;border:1px solid #344234;background:#344234}
+.account-workspace__position p{display:grid;gap:4px;min-width:0;margin:0;padding:12px;background:#101a11;color:#c5d0c3;overflow-wrap:anywhere}
+.account-workspace__position strong{color:#adff2f;font-size:12px}.account-workspace__position span{font-size:13px}
+.account-workspace__hierarchy{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:10px}
+.account-workspace__hierarchy>section{min-width:0;padding:12px;border:1px solid #344234;border-radius:10px}
+.account-workspace__hierarchy h3{margin:0 0 8px;color:#dfffb2;font-size:13px}
+.account-workspace__hierarchy button{display:flex;width:100%;min-width:0;align-items:center;justify-content:space-between;gap:6px;margin-top:6px;padding:7px 9px;text-align:left;overflow-wrap:anywhere}
+.account-workspace__hierarchy button em{flex:none;color:#adff2f;font-size:11px;font-style:normal}
+.account-workspace__gates ol{display:grid;gap:6px;margin:0;padding:0;list-style:none}
+.account-workspace__gates li{display:grid;grid-template-columns:auto minmax(0,1fr);gap:4px 7px;padding:8px;border:1px solid #344234;border-radius:8px;overflow-wrap:anywhere}
+.account-workspace__gates li b{color:#adff2f;font-size:11px}.account-workspace__gates li span{font-size:12px}.account-workspace__gates li em{grid-column:2;color:#aeb7ad;font-size:11px;font-style:normal}
+body:has(.account-workspace){min-width:0}
 @media(max-width:600px){.account-workspace{padding:20px 16px}.account-workspace__header{align-items:flex-start}.account-workspace__mode{padding:0 12px}.account-workspace__state{margin:28px auto}.account-workspace__actions{display:grid}.account-workspace__actions button{width:100%}.account-workspace footer{align-items:flex-start;flex-direction:column}}
+@media(max-width:600px){.account-workspace,.account-workspace *{min-width:0}.account-workspace{padding:12px 8px;overflow-wrap:anywhere}.account-workspace__header{flex-direction:column}.account-workspace__header-actions{width:100%;flex-wrap:wrap}.account-workspace__state{margin:16px auto;padding:16px 12px}.account-workspace__state h2{font-size:24px}.account-workspace__ready{padding:12px 8px}.account-workspace__position{grid-template-columns:1fr}.account-workspace__hierarchy{grid-template-columns:1fr}.account-workspace__hierarchy button em{white-space:normal}.account-workspace footer code{overflow-wrap:anywhere}}
 @media(prefers-reduced-motion:reduce){.account-workspace *{scroll-behavior:auto;transition:none!important;animation:none!important}}

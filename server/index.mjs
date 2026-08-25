@@ -53,6 +53,7 @@ export function createOutcomeServer(options = {}) {
   const collectPackages = options.collectPackages ?? (() => collectOutcomePackages({ bindingRegistry: loadBindingRegistry() }))
   const buildReceipt = options.buildReceipt ?? readBuildReceipt(root)
   const accountAccess = options.accountAccess
+  const privateTransitionAdapter = options.privateTransitionAdapter
   const operationsGuard = options.operationsGuard
   const failures = new Map()
   return createServer(async (request, response) => {
@@ -66,6 +67,22 @@ export function createOutcomeServer(options = {}) {
     if (url.pathname.startsWith('/api/private/')) {
       const rate = operationsGuard?.allowRequest({ path: url.pathname, source: request.socket.remoteAddress ?? 'unknown' }) ?? { allowed: true }
       if (!rate.allowed) return json(response, 429, { error: 'rate_limited', retryAfter: rate.retryAfter }, { 'retry-after': String(rate.retryAfter) })
+      if (url.pathname === '/api/private/auth/login' || url.pathname === '/api/private/auth/logout') {
+        if (request.method !== 'POST' || !accountAccess || !privateTransitionAdapter) return json(response, 405, { error: 'read_only' })
+        const secure = options.secureCookies ?? process.env.NODE_ENV === 'production'
+        const cookie = (token, maxAge) => `__session=${token}; Path=/; HttpOnly; SameSite=Strict; Max-Age=${maxAge}${secure ? '; Secure' : ''}`
+        try {
+          if (url.pathname.endsWith('/login')) {
+            const body = await readBody(request)
+            if (!['google', 'email_code'].includes(body.provider)) return json(response, 400, { error: 'provider_not_allowed' })
+            const transition = await privateTransitionAdapter.begin({ provider: body.provider })
+            if (!transition?.token) return json(response, 503, { error: 'authentication_unavailable' })
+            return json(response, 200, { state: 'authenticated', mode: 'injected_adapter' }, { 'set-cookie': cookie(transition.token, 604_800) })
+          }
+          await privateTransitionAdapter.end({ token: cookieValue(request, '__session') })
+          return json(response, 200, { state: 'signed_out', mode: 'injected_adapter' }, { 'set-cookie': cookie('', 0) })
+        } catch { return json(response, 503, { error: 'authentication_unavailable' }) }
+      }
       const value = await handlePrivateAccessRequest({ method: request.method, pathname: url.pathname, token: cookieValue(request, '__session'), service: accountAccess })
       return json(response, value.status, value.body)
     }
