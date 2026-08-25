@@ -58,9 +58,9 @@
 ## P3 직접 검증 대기
 
 - 실행 절차: `docs/PHASE2_HOSTED_IDENTITY_P3_DIRECT_PROBE.md`
-- Google 로그인: `사용자 계정 선택 대기`
+- Google 로그인: `PASS · Account Portal signed-in 상태와 Clerk Google social account를 교차 확인 · 사용자 수 1 유지`
 - email code 대체 로그인: `미실행`
-- Apple 연결 전용: `설정 활성 · 실제 연결 미실행`
+- Apple 연결 전용: `설정 활성 · 인증된 Account 화면에서만 Connect Apple account 메뉴 확인 · Apple 사용자 인증 대기`
 - Apple 직접 가입·로그인: `설정 비활성 · 로그아웃 상태 직접 확인 미실행`
 - 다른 사용자 거부: `미실행`
 - 로그아웃·세션 철회: `미실행`
