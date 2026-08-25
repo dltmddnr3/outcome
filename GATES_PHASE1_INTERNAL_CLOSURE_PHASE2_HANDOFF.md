@@ -22,5 +22,5 @@ Outcome: Cherry의 2026-08-25 내부사용 종료 승인을 Phase 1 Local MVP에
   CHECK: npm test && npm run build
   EXPECT: exit 0
   EVIDENCE: frontend 57/57, Node 78/78, production build exit 0; local mutation POST/PUT/PATCH/DELETE=405 and public-boundary prohibited identifiers=0.
-- [ ] H6: 공개 배포 API가 Phase 2 현재 위치, Phase 1 완료, mutation 405와 prohibited hit 0을 보존한다.
-  EVIDENCE: pending
+- [x] H6: 공개 배포 API가 Phase 2 현재 위치, Phase 1 완료, mutation 405와 prohibited hit 0을 보존한다.
+  EVIDENCE: Cherry-approved Vercel Git connection produced READY production deployment `dpl_F5mNP356pEj1HNk744Ymo3VTnRe5` from `main` candidate `b2cc343b6845`. Fixed page/API/health returned 200; the public receipt matched commit `b2cc343b6845`, tree `26b839ece16a`, asset `index-ClJ2FGRo.js`; OUTCOME status=valid, Stage 8=2/2, current Stage=Phase 2 account access definition, K1-K6=0/6; API and page POST/PUT/PATCH/DELETE were 405; prohibited identifiers=0. Vercel observability reported no functional error and one non-blocking Node `url.parse()` deprecation warning not present in OUTCOME source.
