@@ -1,6 +1,6 @@
 # OUTCOME Phase 3 · Codex Adapter Technical Spike Builder Brief
 
-State: `DISPATCH_READY · AWAITING_PRIVATE_BUILDER_BINDING`
+State: `DISPATCH_READY · PRIVATE_TARGET_CHERRY_CONFIRMED · SEND_RECEIPT_PENDING`
 
 This brief is prepared but not sent. The actual Builder session ID belongs only in the private runtime registry and must not be added to Package documents, Git, logs, screenshots or public payloads.
 
@@ -10,8 +10,8 @@ Determine whether a supported Codex interface can safely observe an existing ses
 
 ## Immutable input
 
-- repository source pin: commit `48ee26acdfd05204194f1b46472323e153a5e407`
-- tree: `db938b2060a5c4633ee286adc445cbc7acfe3a24`
+- repository source pin: commit `7f8f1f08f5f552b919cf8b5f7486b5fbf286ba9e`
+- tree: `a7422da7dffe9b06543a47eebd4e1c9de29e07b4`
 - handoff: `docs/PHASE3_CODEX_RELAY_IMPLEMENTATION_HANDOFF.md`
 - product contract: `docs/PHASE3_EXISTING_SESSION_OPERATIONS_CONTRACT.md`
 - Gate: `GATES_PHASE3_CODEX_ADAPTER_TECHNICAL_SPIKE.md#S1-S6`
@@ -70,4 +70,4 @@ Natural-language completion without the artifacts above is not evidence. A GO op
 
 ## Dispatch prerequisite
 
-Before sending this brief, Planner must resolve an active private `project=OUTCOME, role=Builder` binding and record the binding version outside Git. Until then the state remains `AWAITING_PRIVATE_BUILDER_BINDING`; do not infer or reuse a historical session ID.
+Cherry confirmed the previously designated OUTCOME-dedicated thread as the bootstrap Builder target. Planner must verify that private thread is accessible on the Mac mini, send this brief once, and keep its raw identifier outside Git. This manual assignment is `MANUAL_BOOTSTRAP_NOT_RELAY_PROOF`; do not promote it to a Phase 3 product binding or first routed-task evidence.

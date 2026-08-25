@@ -16,6 +16,12 @@ Decision set P3-PROOF-1: APPROVED
 - `local picker explicit bind`: raw locator는 Mac mini local picker 안에서만 읽고 Cherry가 project+role을 확인한 뒤에만 binding한다.
 - `offline reject and draft-only`: Mac mini offline/stale 상태에서는 submit을 거부하고 browser-local draft만 보존하며 자동 replay하지 않는다.
 
+Decision set P3-BOOTSTRAP-1: APPROVED
+
+- `Mac mini execution`: Technical Spike Builder 작업은 확인된 Mac mini host에서만 실행한다.
+- `previously designated OUTCOME Builder`: Cherry가 이전에 지정한 OUTCOME 전용 thread를 Builder target으로 확인했다. raw target identifier는 private app/runtime에만 두고 문서·Git·public receipt에 기록하지 않는다.
+- `manual bootstrap is not relay proof`: Planner가 purpose-built Codex thread message로 exact brief를 한 번 전달하고 private receipt를 확인한다. 이 수동 전달은 `MANUAL_BOOTSTRAP_NOT_RELAY_PROOF`이며 T1-T7 또는 first routed task proof를 닫지 않는다.
+
 Cherry는 2026-08-25 KST 직전 세 추천안에 `추천안 적용`으로 답했다. 이 승인은 본 architecture와 initial Builder spike handoff 작성만 허용하며 실제 Codex 접근, binding, observation, message dispatch, hosted queue/resource/secret 생성, product implementation, push/deploy/release를 허용하지 않는다.
 
 ## Immutable input

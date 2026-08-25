@@ -139,4 +139,14 @@ Cherry가 후속 세 추천안에 다시 `추천안 적용`으로 답했다.
 
 이 결정은 first proof 행동 계약과 Technical Spike Builder brief를 dispatch-ready로 작성할 권한만 연다. 실제 picker 실행, session enumeration/binding, Builder assignment, Codex observation/message dispatch와 파일·외부 mutation은 승인하지 않는다.
 
+## Technical Spike Bootstrap 결정 · 2026-08-25 KST
+
+Cherry가 다음 세 추천안에 `추천안 적용`으로 답했다.
+
+- Technical Spike 실행 호스트는 Mac mini
+- 이전에 지정한 OUTCOME 전용 세션을 Builder target으로 사용하되 역할 확인 후 private binding
+- automated relay가 없으므로 Planner가 exact brief를 수동 전달하고 receipt를 남기며 이 전달은 Phase 3 relay proof로 계산하지 않음
+
+이 결정은 확인된 private Builder thread로 Technical Spike brief 한 건을 전달할 권한만 연다. 실제 session enumeration, OUTCOME product binding, provider/resource mutation, push/deploy/release는 승인하지 않는다.
+
 Notion·Linear connector가 이 작업 환경에 연결되어 있지 않으므로 이 로컬 패킷은 decision-ready 초안일 뿐 외부 PRD·task completion을 주장하지 않는다.
