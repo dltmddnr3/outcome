@@ -23,8 +23,8 @@ Outcome: 별도 external mutation 없이 Clerk/Supabase hosted preview를 안전
 - [x] B7: exact base/candidate commit·tree, dependency rationale, env-name inventory, rollout/rollback, result counts와 limitations가 immutable evidence에 기록된다.
   PROVES: evidence
   EVIDENCE: `docs/PHASE2_ACCOUNT_ACCESS_HOSTED_PREVIEW_CODE_READINESS_EVIDENCE.md`; candidate commit/tree/asset resolved post-commit in Builder handoff.
-- [ ] B8: Parent 재검증 후 결과가 `CODE_READY_ONLY`로 끝나며 HP1 external mutation, QA, Audit, Cherry acceptance, release와 Phase completion을 주장하지 않는다.
+- [x] B8: Parent 재검증 후 결과가 `CODE_READY_ONLY`로 끝나며 HP1 external mutation, QA, Audit, Cherry acceptance, release와 Phase completion을 주장하지 않는다.
   PROVES: evidence
-  EVIDENCE: pending
+  EVIDENCE: Parent independently verified exact candidate `da490c27486859b0ea72da085d0295ca2629962a`, tree `74aa4dd89a01bd0bff47ffb2b8bd1918df046a9e`: hosted boundary 7/7; account Node 25/25 + UI/API 7/7; frontend 66/66 + Node 104/104; security 28/28; account browser 3 viewports × 9 states; generic/stable browser 4 viewports; mutations 32/32=405; prohibited identifiers 0; scope/runbook and isolated/Vercel builds PASS. Result is `CODE_READY_ONLY`; no HP1 external mutation, QA/Audit verdict, Cherry acceptance, release or completion was claimed.
 
 ABANDON: Clerk/Google/Apple/Supabase/Vercel account, resource, secret, environment, provider, domain, DNS, paid plan, deployment, release 또는 production data mutation은 이 Gate 범위가 아니다.

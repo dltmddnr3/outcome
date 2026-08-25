@@ -190,10 +190,58 @@ phases:
             gate_groups:
               - code: A
                 primary_label: 독립 출시 감사
+          - id: outcome-stage-account-access-hosted-preview-preparation
+            title: Hosted preview 실행 계약
+            purpose: 실제 provider/data mutation을 code readiness, development identity, hosted data, production enablement로 분리하고 receipt·rollback 경계를 고정한다.
+            depends_on: [outcome-stage-account-access-release-audit]
+            gates_file: GATES_PHASE2_ACCOUNT_ACCESS_HOSTED_PREVIEW_PREPARATION.md#H1-H6
+            gate_groups:
+              - code: H
+                primary_label: Hosted preview 실행 계약
+          - id: outcome-stage-account-access-hosted-preview-code-readiness
+            title: Hosted preview 코드 준비
+            purpose: 외부 resource나 secret 없이 real provider/store binding을 위한 credential-free fail-closed product candidate를 만든다.
+            depends_on: [outcome-stage-account-access-hosted-preview-preparation]
+            gates_file: GATES_PHASE2_ACCOUNT_ACCESS_HOSTED_PREVIEW_CODE_READINESS.md#B1-B8
+            gate_groups:
+              - code: B
+                primary_label: Credential-free 코드 준비
+          - id: outcome-stage-account-access-hosted-identity-preview
+            title: 개발 인증 직접 검수
+            purpose: Cherry 승인 아래 Clerk development identity와 Vercel Preview에서 Google·email·linked Apple 로그인·로그아웃을 직접 검증한다.
+            depends_on: [outcome-stage-account-access-hosted-preview-code-readiness]
+            gates_file: GATES_PHASE2_ACCOUNT_ACCESS_HOSTED_IDENTITY_PREVIEW.md#P1-P6
+            gate_groups:
+              - code: P
+                primary_label: Hosted identity preview
+          - id: outcome-stage-account-access-hosted-data-preview
+            title: Hosted data 격리 검증
+            purpose: 별도 승인된 isolated Supabase preview에서 synthetic Package data, real RLS, lifecycle과 restore를 검증한다.
+            depends_on: [outcome-stage-account-access-hosted-identity-preview]
+            gates_file: GATES_PHASE2_ACCOUNT_ACCESS_HOSTED_DATA_PREVIEW.md#D1-D7
+            gate_groups:
+              - code: D
+                primary_label: Hosted data preview
+          - id: outcome-stage-account-access-hosted-preview-ux-product-qa
+            title: Hosted preview 사용성·제품 검수
+            purpose: fresh reviewer가 real identity와 hosted data candidate의 MacBook/mobile public-private journey를 독립 반증한다.
+            depends_on: [outcome-stage-account-access-hosted-data-preview]
+            gates_file: GATES_PHASE2_ACCOUNT_ACCESS_HOSTED_PREVIEW_UX_PRODUCT_QA.md#Q1-Q4
+            gate_groups:
+              - code: Q
+                primary_label: Hosted preview 독립 검수
+          - id: outcome-stage-account-access-hosted-preview-release-audit
+            title: Hosted preview 출시 감사
+            purpose: 별도 fresh auditor가 동일 hosted candidate의 auth, RLS/data, privacy, cost, runtime과 rollback을 검증한다.
+            depends_on: [outcome-stage-account-access-hosted-preview-ux-product-qa]
+            gates_file: GATES_PHASE2_ACCOUNT_ACCESS_HOSTED_PREVIEW_RELEASE_AUDIT.md#A1-A4
+            gate_groups:
+              - code: A
+                primary_label: Hosted preview 독립 감사
           - id: outcome-stage-account-access-cherry-acceptance
             title: 계정 접근 Cherry 승인
             purpose: 두 독립 검증을 통과한 exact candidate를 Cherry가 MacBook과 mobile에서 직접 판정한다.
-            depends_on: [outcome-stage-account-access-release-audit]
+            depends_on: [outcome-stage-account-access-hosted-preview-release-audit]
             gates_file: GATES_PHASE2_ACCOUNT_ACCESS_CHERRY_ACCEPTANCE.md#C1-C4
             gate_groups:
               - code: C
@@ -252,10 +300,10 @@ phases:
 
 ## 현재 위치
 
-- Current: `outcome-phase-2 / outcome-phase-2-account-service / outcome-stage-account-access-cherry-acceptance · Cherry account access acceptance`
-- Next: `hosted-preview external-mutation authorization decision`; 현재 disabled candidate의 C2를 억지로 닫지 않고, credential-free HP0 code readiness와 Cherry가 별도 승인해야 하는 HP1 Clerk development preview를 분리한다. independent QA와 Release Audit은 현재 candidate에 대해서만 통과했으며 Cherry 실제 승인과 외부 mutation은 각각 open이다.
+- Current: `outcome-phase-2 / outcome-phase-2-account-service / outcome-stage-account-access-hosted-identity-preview · HP1 development identity preview`
+- Next: `P1 · hosted-preview external-mutation authorization decision`; HP0 credential-free code readiness는 Parent 검증으로 닫혔고, Cherry가 HP1 Clerk development instance·one-owner·Preview-only binding/deployment을 명시적으로 승인하기 전에는 external mutation을 시작하지 않는다.
 - Dashboard registration: Package-driven Cherry Note/OUTCOME UI, GitHub connector Gate M15, fresh UX & Product QA Q1–Q4, separate fresh Release Audit A1–A4, Cherry acceptance C1–C2, stable snapshot host S1–S6, and registered Package portfolio foundation P1–P6 are evidence-closed.
 - Phase 1 closure boundary: 2026-08-25 KST Cherry가 내부사용 Local MVP 종료를 승인했다. 외부 공개 수준 MVP와 release approval은 이 결정에 포함되지 않는다.
-- Future roadmap visibility: Phase 2의 account access definition `K6 6/6`, provider-neutral implementation `I1-I8 8/8`, UX correction `B1-B6 6/6`, fresh UX/Product re-QA `Q1-Q4 4/4`, Release browser correction `R1-R5 5/5`, fresh Release re-Audit `A1-A4 4/4`는 현재 disabled candidate의 증거로 닫혔다. Cherry acceptance `C1-C4 1/4`가 현재 경계이며 hosted-preview authorization packet `H1-H6 6/6`은 준비 완료다. HP0 code readiness `B1-B8 0/8`은 credential-free Builder slice이고 HP1 Clerk development preview, HP2 hosted data preview, HP3 production enablement는 각각 별도 외부 mutation 결정이다. Supabase/Clerk preview, Phase 2 전체, Phase 4와 5는 완료가 아니며 Phase 3은 `Definition Pending`이다.
+- Future roadmap visibility: Phase 2의 account access definition `K6 6/6`, provider-neutral disabled implementation `I1-I8 8/8`, prior fresh UX/Product re-QA `Q1-Q4 4/4`, prior Release re-Audit `A1-A4 4/4`, hosted-preview execution contract `H1-H6 6/6`과 HP0 code readiness `B1-B8 8/8`은 각각의 exact candidate 증거로 닫혔다. HP1 hosted identity `P1-P6 0/6`가 현재 경계이고 HP2 hosted data `D1-D7 0/7`, hosted fresh QA `Q1-Q4 0/4`, hosted fresh Audit `A1-A4 0/4`, Cherry acceptance `C1-C4 0/4`는 locked/open이다. 이전 disabled candidate의 QA/Audit은 HP0+ 후보 C1에 재사용하지 않는다. HP3 production enablement, Phase 2 전체, Phase 4와 5는 완료가 아니며 Phase 3은 `Definition Pending`이다.
 - `MVP_SCOPE_CLOSED`: true
 - `EXTERNAL_OUTCOME_COMPLETE`: false

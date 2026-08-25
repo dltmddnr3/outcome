@@ -1,15 +1,16 @@
 # Phase 2 · Account Access Cherry Acceptance Guide
 
-Status: `CHERRY REVIEW REQUIRED · C1 1/4`
+Status: `SUPERSEDED CANDIDATE · C1-C4 0/4`
 
 Public candidate: `https://outcome-five.vercel.app`
 
-## Evidence already closed
+## Historical evidence · disabled predecessor only
 
-- Fresh UX/Product re-QA: `PASS_UX_PRODUCT_QA_ONLY`
-- Separate fresh Release re-Audit: `PASS_RELEASE_AUDIT_ONLY`
+- Fresh UX/Product re-QA: `PASS_UX_PRODUCT_QA_ONLY` for the disabled predecessor.
+- Separate fresh Release re-Audit: `PASS_RELEASE_AUDIT_ONLY` for the disabled predecessor.
 - Public dashboard is read-only; account/private config is intentionally disabled; mutations remain 405.
 - Real Clerk/Google/Apple/Supabase resources, secrets and hosted private data were not created.
+- HP0 changed the candidate code after those reports. New hosted-preview QA/Audit evidence is required before C1 can close again.
 
 ## Cherry direct review
 

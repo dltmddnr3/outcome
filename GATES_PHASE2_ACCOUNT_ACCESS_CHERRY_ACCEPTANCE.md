@@ -2,9 +2,9 @@
 
 Outcome: independent QA와 separate Release Audit를 통과한 exact candidate를 Cherry가 MacBook과 mobile에서 직접 확인하고 account-access 결과에 대한 소유자 판정을 내린다.
 
-- [x] C1: exact candidate가 fresh UX & Product QA PASS와 separate Release Audit PASS를 모두 가진다.
+- [ ] C1: exact candidate가 fresh UX & Product QA PASS와 separate Release Audit PASS를 모두 가진다.
   PROVES: cherry_acceptance
-  EVIDENCE: fresh UX/Product re-QA report SHA-256 `e997efc96ac5c204fb8c0a922c4887bda0204011ec61ce2105bd296cd7566225` is `PASS_UX_PRODUCT_QA_ONLY`; fresh Release re-Audit report SHA-256 `49c2460ca61af975d5ae4e310f10cd9d5fe7bb0e4e923da49a77fb8a69d8706c` is `PASS_RELEASE_AUDIT_ONLY`. Between their pins, account product/UI/server/migration bytes did not change; the later correction is browser harness and evidence routing only, and the release auditor verified the exact public candidate.
+  EVIDENCE: superseded_by_hp0_code_candidate `da490c27486859b0ea72da085d0295ca2629962a`. The prior fresh UX/Product re-QA and Release re-Audit remain valid evidence for the disabled predecessor only and cannot close the new hosted-preview candidate. Fresh HP1+HP2 UX/Product QA and separate Release Audit are pending.
 - [ ] C2: Cherry가 MacBook과 mobile에서 public/private 전환, 로그인·로그아웃·접속 거부, 두 프로젝트 탐색과 오류/복구 상태를 직접 수용한다.
   PROVES: cherry_acceptance
   EVIDENCE: pending
