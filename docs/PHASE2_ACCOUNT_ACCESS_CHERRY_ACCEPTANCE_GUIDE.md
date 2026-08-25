@@ -28,5 +28,6 @@ The deployed public candidate cannot demonstrate real login/logout because the p
 
 - C2 may close only if Cherry accepts the directly observable disabled-public journey plus the disclosed synthetic login/logout evidence as this Stage's intended scope.
 - If Cherry requires a directly touchable login/logout preview before acceptance, C2 remains open and a separately authorized preview/provider Stage must be defined; do not reinterpret current evidence.
+- The decision-ready execution boundary is `docs/PHASE2_ACCOUNT_ACCESS_HOSTED_PREVIEW_AUTHORIZATION.md`: HP0 prepares credential-free code, while HP1 Clerk development identity, HP2 hosted Supabase data and HP3 production enablement each require separate authority.
 - C3 requires Cherry's explicit account-access Stage closure approval.
 - C4 requires Cherry to confirm that public-service release and `EXTERNAL_OUTCOME_COMPLETE` remain separate/open.

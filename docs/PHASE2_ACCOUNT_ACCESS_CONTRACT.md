@@ -356,3 +356,14 @@ No role may self-promote its own result. A QA PASS grants only its named downstr
 ## Builder entry condition
 
 K1-K6 definition decisions are now evidence-closed. Builder work may start only from the exact pushed Planner handoff in `docs/PHASE2_ACCOUNT_ACCESS_BUILDER_HANDOFF.md`; it must use the named allowed paths, red-first isolation tests, secret boundary, migration/rollback, preview verification, fresh UX & Product QA, and separate Release Audit. This authorization does not create provider installation, production resource/secret/database/domain mutation, deployment, release, live collector relay, dispatch, project creation or billing authority by implication.
+
+## Hosted preview continuation boundary · prepared, not authorized
+
+The disabled provider-neutral candidate has passed fresh UX/Product re-QA and a separate fresh Release re-Audit, but it cannot provide Cherry with a directly touchable real login/logout journey. The next decision packet is `docs/PHASE2_ACCOUNT_ACCESS_HOSTED_PREVIEW_AUTHORIZATION.md`.
+
+- HP0 is credential-free repository readiness under a new exact Builder handoff.
+- HP1 is a Clerk development identity preview and requires explicit external mutation authority.
+- HP2 is an isolated hosted Supabase data preview and requires a later separate authority.
+- HP3 covers production provider/data/host enablement and remains a release-adjacent external mutation decision.
+
+Any HP0+ change produces a new candidate. Existing QA/Audit pins cannot be reused to close Cherry acceptance C1-C4; fresh UX & Product QA, a separate fresh Release Audit and Cherry physical acceptance must run again. Public-service release, Phase 2 completion and `EXTERNAL_OUTCOME_COMPLETE` remain open.

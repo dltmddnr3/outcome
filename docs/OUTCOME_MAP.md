@@ -253,9 +253,9 @@ phases:
 ## 현재 위치
 
 - Current: `outcome-phase-2 / outcome-phase-2-account-service / outcome-stage-account-access-cherry-acceptance · Cherry account access acceptance`
-- Next: `C2 · Cherry direct MacBook/mobile public-private, login/logout/deny, two-project and error/recovery review`; independent QA와 Release Audit은 통과했지만 Cherry 실제 승인과 외부 mutation은 각각 open이다.
+- Next: `hosted-preview external-mutation authorization decision`; 현재 disabled candidate의 C2를 억지로 닫지 않고, credential-free HP0 code readiness와 Cherry가 별도 승인해야 하는 HP1 Clerk development preview를 분리한다. independent QA와 Release Audit은 현재 candidate에 대해서만 통과했으며 Cherry 실제 승인과 외부 mutation은 각각 open이다.
 - Dashboard registration: Package-driven Cherry Note/OUTCOME UI, GitHub connector Gate M15, fresh UX & Product QA Q1–Q4, separate fresh Release Audit A1–A4, Cherry acceptance C1–C2, stable snapshot host S1–S6, and registered Package portfolio foundation P1–P6 are evidence-closed.
 - Phase 1 closure boundary: 2026-08-25 KST Cherry가 내부사용 Local MVP 종료를 승인했다. 외부 공개 수준 MVP와 release approval은 이 결정에 포함되지 않는다.
-- Future roadmap visibility: Phase 2의 account access definition `K6 6/6`, provider-neutral implementation `I1-I8 8/8`, UX correction `B1-B6 6/6`, fresh UX/Product re-QA `Q1-Q4 4/4`, Release browser correction `R1-R5 5/5`, fresh Release re-Audit `A1-A4 4/4`는 증거로 닫혔다. Cherry acceptance `C1-C4 1/4`가 현재 경계다. Supabase/Clerk preview, Phase 2 전체, Phase 4와 5는 완료가 아니며 Phase 3은 `Definition Pending`이다.
+- Future roadmap visibility: Phase 2의 account access definition `K6 6/6`, provider-neutral implementation `I1-I8 8/8`, UX correction `B1-B6 6/6`, fresh UX/Product re-QA `Q1-Q4 4/4`, Release browser correction `R1-R5 5/5`, fresh Release re-Audit `A1-A4 4/4`는 현재 disabled candidate의 증거로 닫혔다. Cherry acceptance `C1-C4 1/4`가 현재 경계이며 hosted-preview authorization packet `H1-H6 6/6`은 준비 완료다. HP0 code readiness `B1-B8 0/8`은 credential-free Builder slice이고 HP1 Clerk development preview, HP2 hosted data preview, HP3 production enablement는 각각 별도 외부 mutation 결정이다. Supabase/Clerk preview, Phase 2 전체, Phase 4와 5는 완료가 아니며 Phase 3은 `Definition Pending`이다.
 - `MVP_SCOPE_CLOSED`: true
 - `EXTERNAL_OUTCOME_COMPLETE`: false
