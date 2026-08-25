@@ -4,7 +4,7 @@ Outcome: fresh release auditor가 동일 exact candidate의 auth, authorization,
 
 - [ ] A1: auditor identity, exact Git/build/migration/snapshot pins와 UX/Product QA input이 유효하다.
   PROVES: release_audit
-  EVIDENCE: pending
+  EVIDENCE: `PRELIGHT_HOLD` · exact candidate/build/migration/snapshot/QA pins are recorded in `docs/PHASE2_ACCOUNT_ACCESS_RELEASE_AUDIT_PREFLIGHT.md`, but the required canonical Linear receipt, control acknowledgement and exact role-core registry pin are absent. No auditor was started and no value was fabricated.
 - [ ] A2: auth/session/CSRF, RLS/deny, secret/redaction, retention/export/deletion/restore와 provider outage가 fail-closed로 검증된다.
   PROVES: security
   EVIDENCE: pending
