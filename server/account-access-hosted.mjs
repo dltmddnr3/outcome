@@ -1,6 +1,6 @@
 import { AccountAccessError, createAccountAccessService } from './account-access.mjs'
-import { createClerkClient } from '@clerk/backend'
-import { TokenVerificationErrorReason } from '@clerk/backend/errors'
+import { createClerkClient, verifyToken } from '@clerk/backend'
+import { TokenVerificationError, TokenVerificationErrorReason } from '@clerk/backend/errors'
 
 const DAY_MS = 86_400_000
 const ALLOWED_PROJECTS = Object.freeze(['cherry-note', 'outcome'])
@@ -88,41 +88,41 @@ export function createClerkHostedAuthProvider({ gateway, ownerSubject, now = Dat
   }
 }
 
-const sessionTokenFromRequest = (request) => request.headers.get('cookie')?.split(';').map((item) => item.trim().split('=')).find(([key]) => key === '__session')?.[1] ?? ''
-const clerkIdentity = async ({ client, auth }) => {
-  if (!auth?.isAuthenticated || !auth.userId || !auth.sessionId || !auth.sessionClaims) return null
-  const session = await client.sessions.getSession(auth.sessionId)
+const clerkIdentity = async ({ client, claims }) => {
+  if (typeof claims?.sub !== 'string' || !claims.sub || typeof claims?.sid !== 'string' || !claims.sid || !Number.isFinite(claims.iat) || !Number.isFinite(claims.exp)) return null
+  const session = await client.sessions.getSession(claims.sid)
   return {
-    subject: auth.userId,
-    sessionId: auth.sessionId,
-    issuedAt: Number(auth.sessionClaims.iat) * 1_000,
-    expiresAt: Number(auth.sessionClaims.exp) * 1_000,
-    revoked: session?.status !== 'active' || session?.userId !== auth.userId,
+    subject: claims.sub,
+    sessionId: claims.sid,
+    issuedAt: claims.iat * 1_000,
+    expiresAt: claims.exp * 1_000,
+    revoked: session?.status !== 'active' || session?.userId !== claims.sub,
     linkedProviders: [],
   }
 }
 
-export function createClerkBackendGateway({ environment = {}, clerkClientFactory = createClerkClient } = {}) {
-  if (!readHostedIdentityConfiguration(environment).enabled || typeof clerkClientFactory !== 'function') throw new Error('hosted_identity_configuration_missing')
+export function createClerkBackendGateway({ environment = {}, clerkClientFactory = createClerkClient, tokenVerifier = verifyToken } = {}) {
+  if (!readHostedIdentityConfiguration(environment).enabled || typeof clerkClientFactory !== 'function' || typeof tokenVerifier !== 'function') throw new Error('hosted_identity_configuration_missing')
   const bindings = readBindings(environment, HOSTED_IDENTITY_ENV)
   const client = clerkClientFactory({ secretKey: bindings.clerkSecretKey, publishableKey: bindings.clerkPublishableKey })
-  if (!client?.authenticateRequest || !client?.sessions?.getSession || !client?.sessions?.revokeSession || !client?.sessions?.getSessionList) throw new Error('clerk_runtime_invalid')
-  const authenticate = async (request) => {
-    const token = sessionTokenFromRequest(request)
+  if (!client?.sessions?.getSession || !client?.sessions?.revokeSession || !client?.sessions?.getSessionList) throw new Error('clerk_runtime_invalid')
+  const authenticate = async (token) => {
     if (!token) return null
-    const state = await client.authenticateRequest(request, { authorizedParties: [bindings.privateAllowedOrigin], acceptsToken: 'session_token' })
-    const identity = await clerkIdentity({ client, auth: state.toAuth() })
-    const sdkReason = safeClerkAuthReason(state.reason)
-    if (!identity && sdkReason) {
+    let verifiedClaims
+    try {
+      verifiedClaims = await tokenVerifier(token, { secretKey: bindings.clerkSecretKey, authorizedParties: [bindings.privateAllowedOrigin] })
+    } catch (cause) {
+      if (!(cause instanceof TokenVerificationError)) throw cause
       const error = accountError('authentication_required', 401)
-      error.sdkReason = sdkReason
+      const sdkReason = safeClerkAuthReason(cause.reason)
+      if (sdkReason) error.sdkReason = sdkReason
       throw error
     }
-    return identity
+    return clerkIdentity({ client, claims: verifiedClaims })
   }
   return {
     authenticationOptions: { acceptsToken: 'session_token', authorizedParties: [bindings.privateAllowedOrigin] },
-    verifySession: (token) => authenticate(new Request(`${bindings.privateAllowedOrigin}/api/private/session`, { headers: { cookie: `__session=${token}` } })),
+    verifySession: authenticate,
     revokeSession: ({ sessionId }) => client.sessions.revokeSession(sessionId),
     async revokeAllSessions({ subject }) {
       const sessions = await client.sessions.getSessionList({ userId: subject })
@@ -190,10 +190,10 @@ export function createHostedPreviewRuntime({ environment = {}, providerGateway, 
   }
 }
 
-export function createHostedIdentityRuntime({ environment = {}, clerkClientFactory = createClerkClient, now = Date.now } = {}) {
+export function createHostedIdentityRuntime({ environment = {}, clerkClientFactory = createClerkClient, tokenVerifier = verifyToken, now = Date.now } = {}) {
   if (!readHostedIdentityConfiguration(environment).enabled) return null
   const bindings = readBindings(environment, HOSTED_IDENTITY_ENV)
-  const gateway = createClerkBackendGateway({ environment, clerkClientFactory })
+  const gateway = createClerkBackendGateway({ environment, clerkClientFactory, tokenVerifier })
   const provider = createClerkHostedAuthProvider({ gateway, ownerSubject: bindings.ownerSubject, now })
   const store = {
     async membershipsForSubject() { throw accountError('private_workspace_unavailable', 503) },

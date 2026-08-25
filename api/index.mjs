@@ -59,7 +59,7 @@ const privateSessionDiagnostic = (logger, input, error, configuredOrigin) => {
   try { logger?.info?.('outcome_private_session', { authSource: input.authSource, ...tokenState, ...(sdkReason ? { sdkReason } : {}), ...safeError }) } catch {}
 }
 
-export function createStableHostRequestHandler({ environment = process.env, runtimeFactory = createHostedIdentityRuntime, clerkClientFactory, logger } = {}) {
+export function createStableHostRequestHandler({ environment = process.env, runtimeFactory = createHostedIdentityRuntime, clerkClientFactory, clerkTokenVerifier, logger } = {}) {
   const configured = readHostedIdentityConfiguration(environment).enabled
   const configuredOrigin = typeof environment?.[HOSTED_IDENTITY_ENV.privateAllowedOrigin] === 'string' ? environment[HOSTED_IDENTITY_ENV.privateAllowedOrigin].trim() : ''
   const validRuntime = (value) => value?.allowedOrigin === configuredOrigin
@@ -70,7 +70,7 @@ export function createStableHostRequestHandler({ environment = process.env, runt
   let runtimePromise
   const selectedRuntime = async () => {
     if (!configured || typeof runtimeFactory !== 'function') return null
-    runtimePromise ??= Promise.resolve().then(() => runtimeFactory({ environment, clerkClientFactory })).then((value) => validRuntime(value) ? value : null).catch(() => null)
+    runtimePromise ??= Promise.resolve().then(() => runtimeFactory({ environment, clerkClientFactory, tokenVerifier: clerkTokenVerifier })).then((value) => validRuntime(value) ? value : null).catch(() => null)
     return runtimePromise
   }
   return async ({ method = 'GET', pathname = '/', headers = {}, body, origin } = {}) => {
