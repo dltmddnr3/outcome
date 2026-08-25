@@ -117,16 +117,23 @@ test('private session diagnostics expose only auth-source and safe error enums',
   const logger = { info: (...items) => diagnostics.push(items) }
   const runtimeFactory = ({ environment }) => createHostedIdentityRuntime({ environment, clerkClientFactory: clerkClientFactory(), now })
   const request = createStableHostRequestHandler({ environment: identityEnvironment, runtimeFactory, logger })
+  const encoded = (value) => Buffer.from(JSON.stringify(value)).toString('base64url')
+  const jwt = `${encoded({ alg: 'RS256', kid: 'sensitive-key-id' })}.${encoded({ azp: identityEnvironment.OUTCOME_PRIVATE_ALLOWED_ORIGIN, exp: 4_102_444_800, iat: 1, sub: 'sensitive-subject', sid: 'sensitive-session' })}.sensitive-signature`
+  const invalidClaimsJwt = `${encoded({ alg: 'RS256' })}.${encoded({ azp: 'https://wrong-origin.invalid', exp: 1, iat: 4_102_444_800 })}.other-signature`
 
   assert.equal((await request({ method: 'GET', pathname: '/api/private/session', headers: { authorization: 'Bearer secret-diagnostic-token' } })).status, 401)
   assert.equal((await request({ method: 'GET', pathname: '/api/private/session', headers: { cookie: '__session=secret-cookie-token' } })).status, 401)
   assert.equal((await request({ method: 'GET', pathname: '/api/private/session' })).status, 401)
+  assert.equal((await request({ method: 'GET', pathname: '/api/private/session', headers: { authorization: `Bearer ${jwt}` } })).status, 401)
+  assert.equal((await request({ method: 'GET', pathname: '/api/private/session', headers: { authorization: `Bearer ${invalidClaimsJwt}` } })).status, 401)
 
   assert.deepEqual(diagnostics, [
-    ['outcome_private_session', { authSource: 'bearer', errorCode: 'authentication_required', status: 401 }],
-    ['outcome_private_session', { authSource: 'cookie', errorCode: 'authentication_required', status: 401 }],
-    ['outcome_private_session', { authSource: 'none', errorCode: 'authentication_required', status: 401 }],
+    ['outcome_private_session', { authSource: 'bearer', tokenShape: 'other', errorCode: 'authentication_required', status: 401 }],
+    ['outcome_private_session', { authSource: 'cookie', tokenShape: 'other', errorCode: 'authentication_required', status: 401 }],
+    ['outcome_private_session', { authSource: 'none', tokenShape: 'other', errorCode: 'authentication_required', status: 401 }],
+    ['outcome_private_session', { authSource: 'bearer', tokenShape: 'jwt3', azpMatchesConfiguredOrigin: true, expFuture: true, iatNotFuture: true, errorCode: 'authentication_required', status: 401 }],
+    ['outcome_private_session', { authSource: 'bearer', tokenShape: 'jwt3', azpMatchesConfiguredOrigin: false, expFuture: false, iatNotFuture: false, errorCode: 'authentication_required', status: 401 }],
   ])
   const serialized = JSON.stringify(diagnostics)
-  assert.doesNotMatch(serialized, /secret|token|cookie=|authorization|subject|session[_-]?id/i)
+  assert.doesNotMatch(serialized, /sensitive|secret|signature|preview\.invalid|wrong-origin|4102444800|authorization|subject|session[_-]?id|kid|\bsub\b|\bsid\b|\bazp\b|\bexp\b|\biat\b/i)
 })

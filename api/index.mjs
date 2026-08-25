@@ -32,12 +32,30 @@ const PRIVATE_SESSION_ERROR_STATUS = Object.freeze({
   owner_mismatch: 403,
   authentication_unavailable: 503,
 })
-const privateSessionDiagnostic = (logger, input, error) => {
+const privateTokenDiagnostic = (token, configuredOrigin, currentTime = Date.now()) => {
+  const segments = String(token).split('.')
+  if (segments.length !== 3 || segments.some((segment) => !segment)) return { tokenShape: 'other' }
+  const state = { tokenShape: 'jwt3' }
+  try {
+    if (segments[1].length > 8_192) return state
+    const claims = JSON.parse(Buffer.from(segments[1], 'base64url').toString('utf8'))
+    if (!claims || typeof claims !== 'object' || Array.isArray(claims)) return state
+    const nowSeconds = currentTime / 1_000
+    return {
+      ...state,
+      azpMatchesConfiguredOrigin: typeof claims.azp === 'string' && claims.azp === configuredOrigin,
+      expFuture: Number.isFinite(claims.exp) && claims.exp > nowSeconds,
+      iatNotFuture: Number.isFinite(claims.iat) && claims.iat <= nowSeconds,
+    }
+  } catch { return state }
+}
+const privateSessionDiagnostic = (logger, input, error, configuredOrigin) => {
   const knownStatus = error instanceof AccountAccessError ? PRIVATE_SESSION_ERROR_STATUS[error.code] : undefined
   const safeError = knownStatus === error?.status
     ? { errorCode: error.code, status: knownStatus }
     : { errorCode: 'private_workspace_unavailable', status: 503 }
-  try { logger?.info?.('outcome_private_session', { authSource: input.authSource, ...safeError }) } catch {}
+  const tokenState = privateTokenDiagnostic(input.token, configuredOrigin)
+  try { logger?.info?.('outcome_private_session', { authSource: input.authSource, ...tokenState, ...safeError }) } catch {}
 }
 
 export function createStableHostRequestHandler({ environment = process.env, runtimeFactory = createHostedIdentityRuntime, clerkClientFactory, logger } = {}) {
@@ -65,7 +83,7 @@ export function createStableHostRequestHandler({ environment = process.env, runt
         await hosted.service.authenticate(sessionInput.token)
         return result(200, { authenticated: true, owner: true })
       } catch (error) {
-        privateSessionDiagnostic(logger, sessionInput, error)
+        privateSessionDiagnostic(logger, sessionInput, error, configuredOrigin)
         return error?.status ? result(error.status, { error: error.code }) : result(503, { error: 'private_workspace_unavailable' })
       }
     }
