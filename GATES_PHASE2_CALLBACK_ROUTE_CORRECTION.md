@@ -14,7 +14,7 @@ Outcome: Vercel Preview에서 Google 로그인과 인증 후 Apple 연결 콜백
   CHECK: npm run test:security
   EXPECT: exit 0
   EVIDENCE: `npm run test:security` 29/29 PASS, stable snapshot projects=2/prohibited=0/Gate evidence=0, client env boundary leaks=0. 전체 `npm test` frontend 78/78, Node 112/112 PASS. `npm run build:vercel` PASS, stable-host 9/9 PASS.
-- [ ] C4: exact Preview 후보가 READY이고 두 콜백 경로가 Vercel 404가 아닌 OUTCOME HTML을 반환한다.
-  EVIDENCE: pending
+- [x] C4: exact Preview 후보가 READY이고 두 콜백 경로가 Vercel 404가 아닌 OUTCOME HTML을 반환한다.
+  EVIDENCE: commit `aadac57a2997cf0512a5605c930417fdb1e06cae` / deployment `dpl_ChSioyuH3Wb1LsqD9UVYtVqJBoFV` / branch alias가 Preview `READY`. `/workspace/sso-callback`은 live `200 text/html`, title `OUTCOME`, asset `index-BQhQu5vc.js`를 반환했다. Chrome의 `/workspace/apple-callback` 직접 탐색은 Vercel 404가 아니라 OUTCOME callback 처리 후 Clerk Development sign-in으로 전환됐다.
 
 ABANDON: Production, Supabase, DNS·도메인, 출시, P5/P6 완료, Phase 완료와 `EXTERNAL_OUTCOME_COMPLETE`는 이 교정 범위가 아니다.

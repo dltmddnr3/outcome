@@ -98,3 +98,15 @@ P4 판정: `PASS`. Preview는 Vercel 인증 보호 아래 있으며 실제 MacBo
 - 잔여: 맥북 Google 재로그인 복구·email code·만료·철회·인증 제공자 장애, 모바일 시스템 브라우저 전체 행렬은 미실행이다.
 
 P5는 잔여 행렬이 남아 있어 `OPEN`이다. 이 재검증은 P6, HP1 완료, HP2, 독립 검수, 출시 감사, Cherry 승인, 출시 또는 `EXTERNAL_OUTCOME_COMPLETE`를 닫지 않는다.
+
+## P5 모바일 콜백 404 교정
+
+- 실패 관측: `2026-08-26 KST` 모바일 시스템 브라우저의 Google 로그인 완료 후 `/workspace/sso-callback`에서 Vercel `404 NOT_FOUND`가 직접 관측됐다.
+- 원인: `vercel.json`은 `/workspace`만 SPA fallback으로 연결하고 실제 Google·Apple 콜백 경로는 연결하지 않았다.
+- 실패 우선: callback rewrite assertion 추가 후 `server/stable-host.test.mjs` 8/9, 새 assertion 실패.
+- 교정 후보: commit `aadac57a2997cf0512a5605c930417fdb1e06cae` · deployment `dpl_ChSioyuH3Wb1LsqD9UVYtVqJBoFV` · Preview `READY`.
+- 변경: `/workspace/sso-callback`과 `/workspace/apple-callback`을 `/index.html`로 연결했다. API·기존 workspace·공개 dashboard routing은 변경하지 않았다.
+- 회귀: focused 9/9, security 29/29, frontend 78/78, Node 112/112, Vercel build와 built stable-host 9/9 PASS.
+- live routing: Google callback은 `200 text/html`, title `OUTCOME`, asset `index-BQhQu5vc.js`; Apple callback 직접 탐색은 Vercel 404가 아니라 OUTCOME callback 처리 후 Clerk Development sign-in으로 전환됐다.
+
+이 교정은 콜백 전달만 증명한다. 모바일 실제 Google 로그인 완료 후 준비 상태 복귀와 나머지 P5 행렬은 다시 실측해야 하므로 P5는 `OPEN`이다.
