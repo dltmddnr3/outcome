@@ -8,9 +8,9 @@ Outcome: Cherry가 승인한 개발 환경에서 정확히 한 명의 canonical 
 - [x] P2: 클러크 개발 환경이 초대 전용·단일 소유자·조직 및 임의 가입 없음으로 생성되고 민감정보를 가린 영수증이 고정된다.
   PROVES: security
   EVIDENCE: `2026-08-25 KST` Clerk `Development`에서 `Invite-only`, 조직 기능 비활성, Google 개발 공용 연결, email code 활성, Apple 직접 로그인 비활성, 수락된 사용자 정확히 1명과 대기 초대 0건을 브라우저로 재관측했다. Cherry가 승인한 instant rollback 후 공개 Production은 `9cbf834196e3982a7822c422a9a9b18a74d66692` / `d33a2cf61157c369e4121f4e38fd3ada97a24038` / `index-B_ICbkfO.js`로 복구됐고 SHA-256 `54d268338617ff60bf341ec9663905985420a851a3c0ab4c3643991a51b7f7b0`, 화면/API `200`, mutation `405/405/405/405`, 금지 Clerk 식별자 탐지 `0`을 직접 재검증했다. 이메일·사용자·애플리케이션·인스턴스 식별자와 키 값은 기록하지 않았다. 상세: `docs/PHASE2_ACCOUNT_ACCESS_HOSTED_IDENTITY_EXECUTION_RECEIPT.md`.
-- [ ] P3: 구글 공용 개발 로그인, 이메일 코드 대체 경로, 인증 후 애플 연결만 허용, 다른 사용자 거부와 권한 철회가 직접 검증된다.
+- [x] P3: 구글 공용 개발 로그인, 이메일 코드 대체 경로, 인증 후 애플 연결만 허용, 다른 사용자 거부와 권한 철회가 직접 검증된다.
   PROVES: implementation
-  EVIDENCE: pending
+  EVIDENCE: `2026-08-25 KST` Account Portal에서 Google 로그인과 새로고침 유지, 로그아웃 뒤 동일 소유자의 email code 로그인과 세션 유지, 인증된 Account 화면에서만 Apple 연결 후 사용자 `1`·social account `2` 유지, 로그아웃 sign-in 화면의 Apple 직접 로그인 비노출, 초대받지 않은 다른 Google 계정 시도의 일반 sign-in 복귀와 사용자 `1`·대기 초대 `0` 유지, Clerk 모든 기기 세션 철회 뒤 기존 Account Portal의 sign-in 강제를 직접 검증했다. 이메일·계정명·사진·사용자/세션/애플리케이션/인스턴스 식별자·OAuth/email code·토큰·쿠키는 영수증에 기록하지 않았다. 상세: `docs/PHASE2_ACCOUNT_ACCESS_HOSTED_IDENTITY_EXECUTION_RECEIPT.md`와 `docs/PHASE2_HOSTED_IDENTITY_P3_DIRECT_PROBE.md`.
 - [ ] P4: 버셀 미리보기 전용 연결값과 변경 불가 미리보기 배포가 생성되고 운영 주소와 설정은 비활성 상태를 유지한다.
   PROVES: evidence
   EVIDENCE: pending
