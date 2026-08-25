@@ -67,6 +67,63 @@ Official provider references reviewed on 2026-08-25 KST:
 
 Comparison boundary: Supabase remains a candidate for K4 durable data and tenant-row isolation. It is not selected for K2 because its browser session maintenance requires browser access to the refresh token, adding a larger auth/session integration surface than the owner-only v1 needs.
 
+## K3 workspace isolation recommendation · not approved
+
+Recommendation: keep authentication, workspace membership, project visibility, operator authority, and public snapshot access as separate decisions. A valid Clerk session proves identity only; it never grants a project by itself.
+
+### Capability boundary
+
+| Actor | Allowed in the first implementation Stage | Explicitly denied |
+| --- | --- | --- |
+| Anonymous public visitor | Sanitized public snapshot GET | Private workspace, private project metadata, membership, raw Gate evidence, every mutation |
+| Canonical Cherry owner | Read-only private workspace and explicitly bound projects | Unbound projects, membership/admin UI, Gate/approval/release mutation, dispatch |
+| Private operator | Provision or revoke the one owner and manage provider/runtime secrets through approved external consoles | Using the OUTCOME dashboard as an implicit admin or completion surface |
+| Runtime/collector | No private account capability in v1 | Reusing Cherry's browser session, cross-PC relay, autonomous project registration |
+
+A later sync service requires its own machine identity, least-privilege scope, rotation and audit contract. It cannot inherit owner access by implication.
+
+### Workspace and project authorization
+
+- Verify the Clerk session token on every private request and derive the canonical Clerk user ID server-side.
+- Resolve `Clerk user ID → active workspace membership → workspace ID` on the server. A client-provided workspace ID is a selector only and never an authority.
+- Scope every private project read by both server-derived workspace ID and an explicit active project binding. Guessing or changing a project ID cannot widen visibility.
+- Recommended initial private allowlist: Cherry Note and OUTCOME only. NOL AX, Cherry Picker and any other Package require a later explicit registration receipt.
+- Google, Apple and email code remain linked credentials for the same canonical owner. A new Clerk user, Apple Private Relay identity, email mismatch or unlinked social subject receives no workspace membership.
+- Missing, stale, revoked, duplicate or conflicting membership fails closed. An authenticated private-route failure never falls back to another workspace or silently substitutes the public project set.
+- v1 has one `owner-viewer` capability: private read only. No team role, invitation, organization, write capability or role editor exists.
+
+### Required negative authorization tests
+
+1. Anonymous request to every private route is denied.
+2. The canonical owner can read each explicitly bound project and no other project.
+3. A guessed project ID, client-swapped workspace ID and cross-workspace binding are denied.
+4. Revoked/stale membership and a valid but different Clerk user are denied immediately according to the approved freshness source.
+5. A separately created Apple relay identity or unlinked Google identity cannot inherit the owner workspace.
+6. Missing secret, invalid token, provider outage and membership-source conflict fail closed without leaking whether a private project exists.
+7. Public snapshot access remains separately sanitized and read-only; it is never used as a private authorization fallback.
+
+### Secret ownership
+
+- Clerk publishable key is the only browser-visible provider configuration.
+- Clerk secret key, Google client secret, Apple Services ID/private key/Key ID, exact owner email and canonical owner ID are private operator-owned runtime values.
+- Private values live only in approved provider/Vercel environment storage. They never use a `VITE_` public prefix and never enter Git, Package documents, snapshots, browser bundles, screenshots, logs or Gate evidence.
+- Cherry owns approval of creation and rotation. Builder may wire named environment contracts only after K1-K6 closure; it never receives or records raw credentials in handoff evidence.
+- Rotation invalidates or replaces affected credentials, revokes impacted sessions where applicable, redeploys the pinned environment, and produces a redacted receipt. Exact rotation cadence belongs to K5.
+
+### Audit boundary
+
+Record only security-relevant event types: authentication outcome and provider category, authorization denial reason code, owner provision/revocation, workspace/project binding change, session revocation, secret-rotation receipt, and deployed contract version.
+
+Never log raw email, OAuth authorization code, access/refresh/session token, session ID, provider subject, Apple private key, client secret, local path, raw Gate evidence or private project payload. Retention, export/deletion and alert thresholds remain K4-K5 decisions; K3 does not imply an audit database.
+
+Official references reviewed on 2026-08-25 KST:
+
+- OWASP authorization: https://cheatsheetseries.owasp.org/cheatsheets/Authorization_Cheat_Sheet.html
+- OWASP logging: https://cheatsheetseries.owasp.org/cheatsheets/Logging_Cheat_Sheet.html
+- Clerk session verification: https://clerk.com/docs/guides/sessions/manual-jwt-verification
+- Clerk session tokens: https://clerk.com/docs/guides/sessions/session-tokens
+- Clerk environment variables: https://clerk.com/docs/guides/development/clerk-environment-variables
+
 ## Surface contract
 
 ### Public snapshot
@@ -111,7 +168,7 @@ Comparison boundary: Supabase remains a candidate for K4 durable data and tenant
 3. **Approved with K1:** keep the current public sanitized snapshot publicly reachable beside the private workspace.
 4. Approve collected account fields, retention window, deletion/export process, and audit retention.
 5. Approve storage/hosting region, operational owner, recovery objective, and monthly cost ceiling.
-6. Name the first projects permitted in the private workspace and provide their Package root/source authority separately.
+6. Approve or revise the K3 recommendation: one owner-viewer workspace, server-derived membership, Cherry Note/OUTCOME-only private allowlist, capability matrix, negative authorization tests, secret ownership and audit boundary.
 
 ## Builder entry condition
 
