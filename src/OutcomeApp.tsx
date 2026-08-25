@@ -1,7 +1,33 @@
 import { FormEvent, useEffect, useState } from 'react'
 import { OutcomeDashboard } from './components/OutcomeDashboard'
+import { AccountWorkspace, accountWorkspaceStateCopy, type AccountWorkspaceState } from './components/AccountWorkspace'
 import { loginErrorPresentation } from './components/outcomeKorean'
-import { fetchSession, login, logout } from './lib/api'
+import { fetchPrivateAccessConfig, fetchPrivateWorkspace, fetchSession, login, logout } from './lib/api'
+
+const privateErrorState = (reason: unknown): AccountWorkspaceState => {
+  const code = reason instanceof Error ? reason.message : ''
+  if (code === 'authentication_required') return 'login'
+  if (code === 'session_expired' || code === 'session_revoked') return 'session_expired'
+  if (code === 'membership_conflict') return 'conflict'
+  if (code === 'owner_mismatch' || code === 'membership_inactive' || code === 'project_access_denied') return 'access_denied'
+  return 'unavailable'
+}
+
+const privateResultState = (value: { workspace: { viewState?: string } }): AccountWorkspaceState => {
+  const state = value.workspace.viewState
+  return state && state in accountWorkspaceStateCopy ? state as AccountWorkspaceState : 'ready'
+}
+
+function PrivateWorkspaceEntry() {
+  const [state, setState] = useState<AccountWorkspaceState>('loading')
+  useEffect(() => {
+    void fetchPrivateAccessConfig()
+      .then((config) => config.enabled ? fetchPrivateWorkspace() : Promise.reject(new Error('private_workspace_unavailable')))
+      .then((value) => setState(privateResultState(value)))
+      .catch((reason) => setState(privateErrorState(reason)))
+  }, [])
+  return <AccountWorkspace state={state} />
+}
 
 function Login({ onAuthenticated }: { onAuthenticated: () => void }) {
   const [password, setPassword] = useState('')
@@ -21,7 +47,7 @@ function Login({ onAuthenticated }: { onAuthenticated: () => void }) {
   </section></main>
 }
 
-export function OutcomeApp() {
+function DashboardEntry() {
   const [authenticated, setAuthenticated] = useState<boolean | null>(null)
   const [publicReadOnly, setPublicReadOnly] = useState(false)
   useEffect(() => { void fetchSession().then((session) => { setPublicReadOnly(Boolean(session.publicReadOnly)); setAuthenticated(session.authenticated || Boolean(session.publicReadOnly)) }).catch(() => setAuthenticated(false)) }, [])
@@ -31,4 +57,8 @@ export function OutcomeApp() {
     {!publicReadOnly && <div className="cn-standalone-controls"><span>OUTCOME · 인증된 읽기 전용</span><button className="cn-signout" onClick={() => void logout().finally(() => setAuthenticated(false))}>로그아웃</button></div>}
     <OutcomeDashboard onUnauthorized={() => setAuthenticated(false)} />
   </main>
+}
+
+export function OutcomeApp() {
+  return window.location.pathname === '/workspace' ? <PrivateWorkspaceEntry /> : <DashboardEntry />
 }

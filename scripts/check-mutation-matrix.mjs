@@ -2,7 +2,7 @@ import { once } from 'node:events'
 import { fileURLToPath } from 'node:url'
 import { createOutcomeServer } from '../server/index.mjs'
 
-const paths = ['/api/dashboard', '/api/dashboard/cherry-note', '/api/auth/login', '/api/auth/logout', '/api/unknown', '/cherry-note-dashboard']
+const paths = ['/api/dashboard', '/api/dashboard/cherry-note', '/api/auth/login', '/api/auth/logout', '/api/private/config', '/api/private/workspace', '/api/unknown', '/cherry-note-dashboard']
 const methods = ['POST', 'PUT', 'PATCH', 'DELETE']
 const canonicalBody = '{"error":"read_only"}'
 
@@ -29,7 +29,7 @@ export async function checkMutationMatrix(base, label, fetchImpl = fetch) {
     else if (!text.trim()) emptyPageBodies += 1
     count += 1
   }
-  console.log(`${label} mutation ${count}/24 = 405; API read_only JSON=${apiBodies}/20; empty page boundary=${emptyPageBodies}/4`)
+  console.log(`${label} mutation ${count}/32 = 405; API read_only JSON=${apiBodies}/28; empty page boundary=${emptyPageBodies}/4`)
   return { count, apiBodies, emptyPageBodies }
 }
 

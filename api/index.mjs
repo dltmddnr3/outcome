@@ -1,4 +1,5 @@
 import snapshot from './deployment-snapshot.mjs'
+import { privateAccessPublicConfig } from '../server/account-access-api.mjs'
 
 const result = (status, body) => ({ status, body })
 
@@ -7,6 +8,8 @@ export function handleStableHostRequest({ method = 'GET', pathname = '/' } = {})
   if (pathname === '/api/dashboard') return result(200, { dashboard: snapshot })
   if (pathname === '/api/auth/session') return result(200, { authenticated: false, publicReadOnly: true })
   if (pathname === '/api/health') return result(200, { status: 'available', access: 'public_read_only', source: 'deployment_snapshot' })
+  if (pathname === '/api/private/config') return result(200, privateAccessPublicConfig(false))
+  if (pathname === '/api/private/workspace') return result(401, { error: 'authentication_required' })
   return result(404, { error: 'not_found' })
 }
 const requestPath = (request) => {

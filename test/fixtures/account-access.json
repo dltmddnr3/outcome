@@ -1,0 +1,16 @@
+{
+  "workspaces": [
+    { "id": "workspace-cherry", "state": "active" },
+    { "id": "workspace-deny-probe", "state": "active" }
+  ],
+  "memberships": [
+    { "subject": "synthetic-owner", "workspaceId": "workspace-cherry", "role": "owner-viewer", "state": "active" },
+    { "subject": "synthetic-deny-probe", "workspaceId": "workspace-deny-probe", "role": "owner-viewer", "state": "active" }
+  ],
+  "projects": [
+    { "id": "cherry-note", "workspaceId": "workspace-cherry", "state": "active", "projection": { "project": { "id": "cherry-note", "name": "Cherry Note" } } },
+    { "id": "outcome", "workspaceId": "workspace-cherry", "state": "active", "projection": { "project": { "id": "outcome", "name": "OUTCOME" } } },
+    { "id": "unregistered-probe", "workspaceId": "workspace-cherry", "state": "active", "projection": { "project": { "id": "unregistered-probe", "name": "Synthetic only" } } },
+    { "id": "cross-workspace-probe", "workspaceId": "workspace-deny-probe", "state": "active", "projection": { "project": { "id": "cross-workspace-probe", "name": "Synthetic only" } } }
+  ]
+}

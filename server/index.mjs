@@ -6,6 +6,7 @@ import { extname, join, normalize, resolve } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { collectCherryNoteDashboard, sanitizeRemotePayload } from './cherry-note-dashboard.mjs'
 import { collectOutcomePackages, loadBindingRegistry, projectPublicPackages } from './outcome-package.mjs'
+import { handlePrivateAccessRequest } from './account-access-api.mjs'
 import { cleanupPidRecord, writePidRecord } from './runtime-process.mjs'
 
 const projectRoot = resolve(fileURLToPath(new URL('..', import.meta.url)))
@@ -51,6 +52,8 @@ export function createOutcomeServer(options = {}) {
   const collect = options.collect ?? (() => collectCherryNoteDashboard())
   const collectPackages = options.collectPackages ?? (() => collectOutcomePackages({ bindingRegistry: loadBindingRegistry() }))
   const buildReceipt = options.buildReceipt ?? readBuildReceipt(root)
+  const accountAccess = options.accountAccess
+  const operationsGuard = options.operationsGuard
   const failures = new Map()
   return createServer(async (request, response) => {
     response.setHeader('x-content-type-options', 'nosniff'); response.setHeader('x-frame-options', 'DENY'); response.setHeader('referrer-policy', 'no-referrer'); response.setHeader('permissions-policy', 'camera=(), microphone=(), geolocation=()')
@@ -60,6 +63,12 @@ export function createOutcomeServer(options = {}) {
     const accessGranted = publicReadOnly || authenticated
     if (request.method === 'GET' && url.pathname === '/api/health') return json(response, 200, { status: 'available', access: publicReadOnly ? 'public_read_only' : 'authentication_required' })
     if (request.method === 'GET' && url.pathname === '/api/auth/session') return json(response, 200, { authenticated, publicReadOnly })
+    if (url.pathname.startsWith('/api/private/')) {
+      const rate = operationsGuard?.allowRequest({ path: url.pathname, source: request.socket.remoteAddress ?? 'unknown' }) ?? { allowed: true }
+      if (!rate.allowed) return json(response, 429, { error: 'rate_limited', retryAfter: rate.retryAfter }, { 'retry-after': String(rate.retryAfter) })
+      const value = await handlePrivateAccessRequest({ method: request.method, pathname: url.pathname, token: cookieValue(request, '__session'), service: accountAccess })
+      return json(response, value.status, value.body)
+    }
     if (request.method === 'POST' && url.pathname === '/api/auth/login') {
       if (publicReadOnly || !auth) return json(response, 405, { error: 'read_only' })
       const address = request.socket.remoteAddress ?? 'unknown'; const attempt = failures.get(address) ?? { count: 0, blockedUntil: 0 }

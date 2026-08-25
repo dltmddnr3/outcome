@@ -237,3 +237,21 @@
 @media(max-width:759px){.oc-topbar{align-items:flex-start;gap:8px}.oc-snapshot-badge{max-width:154px}}
 
 @media(prefers-reduced-motion:reduce){.oc-map-column button,.oc-gate-gauge>i{transition:none}}
+
+.account-workspace{min-height:100vh;padding:clamp(20px,5vw,72px);background:#081009;color:#f2f6ef}
+.account-workspace__header{display:flex;align-items:center;justify-content:space-between;gap:20px;max-width:960px;margin:0 auto;padding-bottom:24px;border-bottom:1px solid #344234}
+.account-workspace__header h1{margin:6px 0 0;font-size:clamp(26px,4vw,48px);line-height:1.05}
+.account-workspace__eyebrow,.account-workspace__state-code{color:#adff2f;font:700 12px ui-monospace,monospace;letter-spacing:.12em;text-transform:uppercase}
+.account-workspace__mode{display:grid;min-height:44px;place-items:center;padding:0 16px;border:1px solid #557044;border-radius:999px;color:#dfffb2;font-weight:700;white-space:nowrap}
+.account-workspace__state{max-width:960px;margin:clamp(28px,7vw,80px) auto;padding:clamp(20px,4vw,44px);border:1px solid #344234;border-radius:16px;background:linear-gradient(135deg,#152311,#0d150e 58%)}
+.account-workspace__state h2{margin:12px 0 8px;font-size:clamp(24px,3.5vw,40px)}
+.account-workspace__state p{max-width:680px;margin:0;color:#c5d0c3;font-size:16px;line-height:1.6}
+.account-workspace__actions{display:flex;flex-wrap:wrap;align-items:center;gap:10px;margin-top:28px}
+.account-workspace button{min-height:44px;padding:0 18px;border:1px solid #7da84c;border-radius:8px;background:#1b2b16;color:#efffde;font-weight:800;cursor:pointer}
+.account-workspace button:focus-visible{outline:3px solid #adff2f;outline-offset:3px}
+.account-workspace__actions span{color:#aeb7ad;font-size:13px}
+.account-workspace__notice{margin-top:20px!important;padding-top:16px;border-top:1px solid #344234}
+.account-workspace footer{display:flex;max-width:960px;align-items:center;justify-content:space-between;gap:12px;margin:0 auto;color:#aeb7ad;font-size:12px}
+.account-workspace footer code{color:#dfffb2}
+@media(max-width:600px){.account-workspace{padding:20px 16px}.account-workspace__header{align-items:flex-start}.account-workspace__mode{padding:0 12px}.account-workspace__state{margin:28px auto}.account-workspace__actions{display:grid}.account-workspace__actions button{width:100%}.account-workspace footer{align-items:flex-start;flex-direction:column}}
+@media(prefers-reduced-motion:reduce){.account-workspace *{scroll-behavior:auto;transition:none!important;animation:none!important}}

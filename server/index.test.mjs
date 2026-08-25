@@ -74,11 +74,11 @@ test('invalid project registry fails dashboard GET closed without fallback paylo
 
 test('public mode rejects every dashboard mutation as read-only', async () => withPublicServer(() => dashboard, async (base) => {
   let checked = 0
-  for (const path of ['/api/dashboard', '/api/dashboard/cherry-note', '/api/auth/login', '/api/auth/logout', '/api/unknown', '/cherry-note-dashboard']) for (const method of ['POST', 'PUT', 'PATCH', 'DELETE']) {
+  for (const path of ['/api/dashboard', '/api/dashboard/cherry-note', '/api/auth/login', '/api/auth/logout', '/api/private/config', '/api/private/workspace', '/api/unknown', '/cherry-note-dashboard']) for (const method of ['POST', 'PUT', 'PATCH', 'DELETE']) {
     const response = await fetch(`${base}${path}`, { method, headers: { 'content-type': 'application/json' }, body: '{}' })
     assert.equal(response.status, 405, `${method} ${path}`); assert.deepEqual(await response.json(), { error: 'read_only' }); checked += 1
   }
-  assert.equal(checked, 24)
+  assert.equal(checked, 32)
 }))
 
 test('public mode removes prohibited fields and values from serialized payload', async () => withPublicServer(() => ({ ...dashboard, local_path: '/Users/cherry/private', token: 'secret', session_id: 'private', nested: { full_hash: 'a'.repeat(40), title: 'safe' } }), async (base) => {
