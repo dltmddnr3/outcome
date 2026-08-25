@@ -30,8 +30,8 @@ Outcome: OUTCOME과 Cherry Note를 Cherry 계정의 비공개 프로젝트로 �
   CHECK: `npm run test:account-access-browser`
   EXPECT: exit 0
   EVIDENCE: `npm run test:account-access-browser`가 1440×900·390×844·375×812에서 project controls `2`, hierarchy `페이즈|범위|스테이지|완료 조건`, actual-current `3`, project switch, actual-vs-selected 분리, touch target `>=44`, horizontal overflow `0`, mobile 200% zoom overflow `0`으로 통과했다.
-- [ ] N7: exact Preview candidate가 배포되고 로그인 owner `2 projects`, 익명 `0 project payload`, Production 불변과 rollback이 비민감 영수증으로 고정된다.
+- [x] N7: exact Preview candidate가 배포되고 로그인 owner `2 projects`, 익명 `0 project payload`, Production 불변과 rollback이 비민감 영수증으로 고정된다.
   PROVES: hosted_preview
-  EVIDENCE: pending
+  EVIDENCE: Preview `dpl_G9nyg3VrjPjGdMGRYikDEVGafCbm`가 commit `18b6bf3177126852e48893b552705e4da39d8d4a`, tree `7f5ff8b0ae53c840debc51bd490e36a00529a040`, asset `index-BcWVLxtg.js`로 `READY`다. 안정 별칭의 실제 Chrome owner session은 project controls `2`와 이름 `Cherry Note`, `OUTCOME`만 표시했다. 별도 익명 GET `/workspace`, `/api/dashboard`, `/cherry-note-dashboard`는 모두 Vercel 보호 경계 `302`, 응답 body `15 bytes`, project payload marker hit `0`이었다. Production `https://outcome-five.vercel.app`은 private config `enabled=false`, 기존 assets `index-B_ICbkfO.js`와 `index-t6iIeZVW.css`로 불변이다. rollback은 이전 READY Preview `dpl_CzSR76NAgr7XUFZu6185SfeC2cgF`이며 Production 전환은 수행하지 않았다.
 
 ABANDON: Production 전환, Supabase, Clerk 설정 변경, DNS/domain, 새 사용자·프로젝트 생성, release, Phase 2 완료와 `EXTERNAL_OUTCOME_COMPLETE`는 이 Stage 범위가 아니다.
