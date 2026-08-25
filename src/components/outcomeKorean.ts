@@ -50,7 +50,7 @@ const stageCopy: Record<string, [string, string]> = {
   'outcome-stage-7': ['출시 감사', '고정 후보의 독립 실행, 개인정보, 원본 격리, 빌드와 되돌리기 준비도를 감사합니다.'],
   'outcome-stage-8': ['Cherry 승인', 'Cherry가 OUTCOME으로 Cherry Note와 OUTCOME의 현재 위치와 다음 행동을 30초 안에 판단합니다.'],
   'outcome-stage-stable-snapshot-host': ['안정적인 배포 스냅샷 호스트', '로컬 원본과 임시 연결 없이 고정 보안 웹 주소에서 정제된 프로젝트 스냅샷을 제공합니다.'],
-  'outcome-stage-project-portfolio-foundation': ['등록 원본 묶음 포트폴리오 기반', '명시적 등록부와 원본 묶음 표시 정보로 세 번째 이후 프로젝트도 코드별 고정값 없이 같은 읽기 전용 결과 지도에 등록합니다.'],
+  'outcome-stage-project-portfolio-foundation': ['등록 원본 묶음 포트폴리오 기반', '명시적 등록부와 원본 묶음 표시 정보로 세 번째 이후 프로젝트도 코드별 고정값 없이 같은 읽기 전용 프로젝트 여정에 등록합니다.'],
   'outcome-stage-account-access-definition': ['계정 접근 계약 정의', '공개 배포본과 인증된 비공개 작업공간의 사용자·권한·데이터·운영 경계를 구현 전에 Cherry 결정으로 고정합니다.'],
   'outcome-stage-account-access-implementation': ['계정 접근 구현 후보', '승인된 계정 접근 계약을 로컬·미리보기에서 검증 가능한 읽기 전용 후보와 재현 가능한 근거로 구현합니다.'],
   'outcome-stage-account-access-ux-product-qa': ['계정 접근 사용성·제품 검수', '구현자와 분리된 새 검수자가 정확한 후보의 공개·비공개 사용자 여정과 원본 사실을 반증합니다.'],

@@ -47,13 +47,15 @@ describe('OUTCOME Package dashboard', () => {
     expect(source).toContain('선택 중')
     expect(source).toContain('탐색 ·')
   })
-  it('기존 세 current surface를 하나의 Outcome Map으로 통합한다', () => {
+  it('기존 세 current surface를 하나의 프로젝트 여정으로 통합한다', () => {
     const source = OutcomeDashboard.toString()
     expect(source).toContain('oc-workbench')
     expect(source).toContain('oc-chat-placeholder')
     expect(source).toContain('세션 채팅')
     expect(source).toContain('연결 준비 중')
     expect(source).toContain('data-default-open')
+    expect(source).toContain('프로젝트 여정')
+    expect(source).not.toContain('결과 지도')
     expect(source).toContain('oc-outcome-map')
     expect(source).toContain('oc-map-columns')
     for (const removed of ['oc-current-flow', 'oc-current-stage', 'oc-stage-explorer', 'oc-selected-detail']) expect(source).not.toContain(removed)
