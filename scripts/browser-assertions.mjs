@@ -139,7 +139,7 @@ async function assertGlobalNavigationContract(page, name) {
   } else {
     const trigger = page.locator('.oc-nav-trigger'); const size = await trigger.boundingBox()
     if (!size || size.width < 43.5 || size.height < 43.5) throw new Error(`${name}: menu target below 44px`)
-    await trigger.focus(); await trigger.press('Enter'); await page.locator('.oc-global-nav').waitFor({ state: 'visible' })
+    await trigger.focus(); await trigger.press('Enter'); await page.locator('.oc-global-nav').waitFor({ state: 'visible' }); await page.waitForFunction(() => document.activeElement?.classList.contains('oc-nav-close'))
     const opened = await page.evaluate(() => ({ overflow: document.body.style.overflow, inert: document.querySelector('.oc-dashboard-content')?.inert, focused: document.activeElement?.classList.contains('oc-nav-close') }))
     if (opened.overflow !== 'hidden' || !opened.inert || !opened.focused) throw new Error(`${name}: drawer modal boundary failed ${JSON.stringify(opened)}`)
     await page.keyboard.press('Escape'); await page.locator('.oc-global-nav').waitFor({ state: 'hidden' })
@@ -147,6 +147,9 @@ async function assertGlobalNavigationContract(page, name) {
     await trigger.click(); await page.locator('.oc-nav-backdrop').click(); await page.locator('.oc-global-nav').waitFor({ state: 'hidden' })
     if (!await trigger.evaluate((element) => element === document.activeElement)) throw new Error(`${name}: backdrop did not restore trigger focus`)
   }
+  await ensureGlobalNavigationOpen(page); await page.locator('.oc-global-sections a[href="#oc-technical-evidence"]').click(); await page.waitForFunction(() => location.hash === '#oc-technical-evidence' && document.querySelector('.oc-technical')?.open)
+  const technicalSummary = page.locator('.oc-technical summary'); if (!await technicalSummary.evaluate((element) => element === document.activeElement)) throw new Error(`${name}: technical evidence destination was not revealed and focused`)
+  await technicalSummary.press('Enter'); await page.waitForFunction(() => !document.querySelector('.oc-technical')?.open)
   await ensureGlobalNavigationOpen(page); await page.locator('.oc-global-sections a[href="#oc-outcome-map"]').click(); await page.waitForFunction(() => location.hash === '#oc-outcome-map')
   if (await page.locator('.oc-global-sections a[href="#oc-outcome-map"]').getAttribute('aria-current') !== 'location') throw new Error(`${name}: section aria-current missing`)
   await ensureGlobalNavigationOpen(page); await page.locator('.oc-global-sections a[href="#oc-current-work"]').click(); await page.waitForFunction(() => location.hash === '#oc-current-work')

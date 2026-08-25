@@ -16,6 +16,7 @@ describe('OUTCOME Package dashboard', () => {
     ])
     const source = OutcomeDashboard.toString()
     for (const token of ['oc-global-nav', 'oc-nav-trigger', 'oc-nav-backdrop', 'oc-main-content', '본문으로 건너뛰기', 'aria-modal', 'event.key', 'Escape', 'document.body.style.overflow', 'menuButtonRef.current?.focus']) expect(source).toContain(token)
+    for (const token of ['revealGlobalSection', 'technicalEvidence.open = true', 'querySelector("summary")', 'summary")?.focus']) expect(source).toContain(token)
   })
   it('고정 호스트 스냅샷은 실시간 연결과 구분되어 표시된다', () => {
     expect(snapshotPresentation({ boundary: 'deployment_snapshot', capturedAt: '2026-08-24T09:00:00.000Z', source: 'sanitized_public_projection', liveSessionRelay: false, refreshBehavior: 'new_deployment_required' })).toEqual({ label: '배포 스냅샷', detail: '실시간 세션 연결 대기 · 새 배포 시 갱신', sourceLabel: '패키지 구조 정상', timePrefix: '스냅샷 생성', refreshLabel: '배포 스냅샷 다시 불러오기' })
