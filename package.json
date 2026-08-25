@@ -24,7 +24,7 @@
     "test:redaction": "node --test --test-name-pattern='redacts|public mode removes' server/index.test.mjs",
     "test:browser": "node --test scripts/browser-assertions.test.mjs && node scripts/browser-check.mjs",
     "test:portfolio-browser": "node scripts/portfolio-browser-check.mjs",
-    "test:account-access": "node --test server/account-access.test.mjs server/account-access-api.test.mjs && vitest run src/components/AccountWorkspace.test.tsx",
+    "test:account-access": "node --test server/account-access.test.mjs server/account-access-api.test.mjs server/account-access-postgres.test.mjs && vitest run src/components/AccountWorkspace.test.tsx",
     "test:account-access-browser": "node scripts/account-access-browser-check.mjs",
     "test:remote-browser": "node scripts/remote-browser-check.mjs",
     "check:scope": "node scripts/check-scope.mjs",
@@ -39,6 +39,7 @@
     "yaml": "^2.9.0"
   },
   "devDependencies": {
+    "@electric-sql/pglite": "^0.5.7",
     "@playwright/test": "^1.55.0",
     "@types/react": "^19.1.10",
     "@types/react-dom": "^19.1.7",

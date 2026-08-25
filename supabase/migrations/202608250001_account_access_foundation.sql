@@ -16,7 +16,8 @@ create table outcome_private.workspace_memberships (
   state text not null check (state in ('active', 'revoked')),
   created_at timestamptz not null default now(),
   updated_at timestamptz not null default now(),
-  primary key (workspace_id, identity_subject)
+  primary key (workspace_id, identity_subject),
+  unique (identity_subject)
 );
 
 create table outcome_private.projects (
@@ -139,7 +140,7 @@ using (identity_subject = auth.jwt() ->> 'sub' and role = 'owner-viewer' and sta
 create policy binding_owner_read on outcome_private.project_bindings for select to authenticated
 using (exists (
   select 1 from outcome_private.workspace_memberships membership
-  where membership.workspace_id = workspace_id
+  where membership.workspace_id = outcome_private.project_bindings.workspace_id
     and membership.identity_subject = auth.jwt() ->> 'sub'
     and membership.role = 'owner-viewer'
     and membership.state = 'active'

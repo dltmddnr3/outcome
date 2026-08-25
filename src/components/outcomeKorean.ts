@@ -51,6 +51,11 @@ const stageCopy: Record<string, [string, string]> = {
   'outcome-stage-8': ['Cherry 승인', 'Cherry가 OUTCOME으로 Cherry Note와 OUTCOME의 현재 위치와 다음 행동을 30초 안에 판단합니다.'],
   'outcome-stage-stable-snapshot-host': ['안정적인 배포 스냅샷 호스트', '로컬 원본과 임시 연결 없이 고정 보안 웹 주소에서 정제된 프로젝트 스냅샷을 제공합니다.'],
   'outcome-stage-project-portfolio-foundation': ['등록 원본 묶음 포트폴리오 기반', '명시적 등록부와 원본 묶음 표시 정보로 세 번째 이후 프로젝트도 코드별 고정값 없이 같은 읽기 전용 결과 지도에 등록합니다.'],
+  'outcome-stage-account-access-definition': ['계정 접근 계약 정의', '공개 배포본과 인증된 비공개 작업공간의 사용자·권한·데이터·운영 경계를 구현 전에 Cherry 결정으로 고정합니다.'],
+  'outcome-stage-account-access-implementation': ['계정 접근 구현 후보', '승인된 계정 접근 계약을 로컬·미리보기에서 검증 가능한 읽기 전용 후보와 재현 가능한 근거로 구현합니다.'],
+  'outcome-stage-account-access-ux-product-qa': ['계정 접근 사용성·제품 검수', '구현자와 분리된 새 검수자가 정확한 후보의 공개·비공개 사용자 여정과 원본 사실을 반증합니다.'],
+  'outcome-stage-account-access-release-audit': ['계정 접근 출시 감사', '별도 신규 감사자가 같은 후보의 인증, 행 수준 보안, 개인정보·데이터, 운영, 비용, 실행 환경과 되돌리기를 검증합니다.'],
+  'outcome-stage-account-access-cherry-acceptance': ['계정 접근 Cherry 승인', '두 독립 검증을 통과한 정확한 후보를 Cherry가 MacBook과 모바일에서 직접 판정합니다.'],
 }
 
 const gateCopy: Record<string, string> = {
@@ -85,6 +90,26 @@ const gateCopy: Record<string, string> = {
   'outcome-stage-project-portfolio-foundation:P4': '세 프로젝트 이상 검증 묶음에서 전환·현재 위치·위계 탐색과 모바일 단계 탐색이 각 프로젝트 식별자를 보존하는지 확인합니다.',
   'outcome-stage-project-portfolio-foundation:P5': '로컬 등록 경로와 인증 정보가 공개 결과에 포함되지 않고 읽기 전용·변경 차단·완료 권한 없음 경계를 유지하는지 확인합니다.',
   'outcome-stage-project-portfolio-foundation:P6': '정확한 후보가 전체 회귀와 새 사용성·제품 검수를 통과하고 고정 공개 주소의 버전 관리·트리·에셋과 일치하는지 확인합니다.',
+  'outcome-stage-account-access-implementation:I1': '정확한 구현 작업 지시, 기준 커밋, 허용 경로와 제외 범위를 고정합니다.',
+  'outcome-stage-account-access-implementation:I2': '공개 화면·API·상태 확인과 변경 요청 405 차단, 정제 및 배포 영수증 동작이 그대로 유지되는지 확인합니다.',
+  'outcome-stage-account-access-implementation:I3': '구글 우선, 연결된 애플 접근, 이메일 인증 코드 대체 흐름과 접속·로그아웃·철회·복구 실패 상태를 실패 우선 검사로 검증합니다.',
+  'outcome-stage-account-access-implementation:I4': '서버가 소유자와 작업공간 소속을 판정하고, 두 프로젝트 허용 목록과 작업공간 간 접근 차단을 실제 행 수준 보안으로 검증합니다.',
+  'outcome-stage-account-access-implementation:I5': '추가 전용 배포본과 현재 포인터, 이전, 보존·내보내기·삭제·복구 계약을 합성 검증 자료로 확인합니다.',
+  'outcome-stage-account-access-implementation:I6': '요청 제한, 정제된 측정·경보, 비용 경계, 사고 영수증과 안전한 되돌리기 연결을 검증합니다.',
+  'outcome-stage-account-access-implementation:I7': 'MacBook과 모바일에서 로그인부터 안전한 제한 상태까지 모든 화면과 접근성을 검증합니다.',
+  'outcome-stage-account-access-implementation:I8': '정확한 후보 커밋·트리·에셋, 검사, 이전, 합성 자료, 적용·되돌리기와 변경 파일 영수증을 불변 인계로 전달합니다.',
+  'outcome-stage-account-access-ux-product-qa:Q1': '검수자 식별자와 정확한 후보·인계 고정값이 구현자와 분리되어 있는지 확인합니다.',
+  'outcome-stage-account-access-ux-product-qa:Q2': '로그인 없는 공개 여정과 Cherry 전용 비공개 로그인·로그아웃·만료·접근 거부·오류 여정을 MacBook과 모바일에서 검증합니다.',
+  'outcome-stage-account-access-ux-product-qa:Q3': '프로젝트 표시 범위, 현재 위치와 탐색 위치, 오래됨·충돌·비어 있음·안전 제한 상태와 접근성을 검증합니다.',
+  'outcome-stage-account-access-ux-product-qa:Q4': '검수 보고서는 사용성·제품 검수만 통과 또는 실패로 끝나며 출시 감사·Cherry 승인·출시 권한을 주장하지 않습니다.',
+  'outcome-stage-account-access-release-audit:A1': '감사자 식별자, 정확한 버전 관리·빌드·이전·배포본 고정값과 사용성·제품 검수 입력이 유효한지 확인합니다.',
+  'outcome-stage-account-access-release-audit:A2': '인증·접속·요청 위조 방지, 행 수준 접근 차단, 비밀정보 정제, 보존·내보내기·삭제·복구와 제공자 장애가 안전하게 차단되는지 검증합니다.',
+  'outcome-stage-account-access-release-audit:A3': '요청 제한, 관측·경보, 비용 상한, 사고 대응, 단계적 적용과 되돌리기 영수증을 재현합니다.',
+  'outcome-stage-account-access-release-audit:A4': '감사 보고서는 출시 감사만 통과 또는 실패로 끝나며 Cherry 승인, 운영 자원 변경과 출시 승인을 주장하지 않습니다.',
+  'outcome-stage-account-access-cherry-acceptance:C1': '정확한 후보에 새 사용성·제품 검수 통과와 별도 출시 감사 통과가 모두 있는지 확인합니다.',
+  'outcome-stage-account-access-cherry-acceptance:C2': 'Cherry가 MacBook과 모바일에서 공개·비공개 전환, 로그인·로그아웃·접근 거부, 두 프로젝트 탐색과 오류·복구 상태를 직접 수용합니다.',
+  'outcome-stage-account-access-cherry-acceptance:C3': 'Cherry가 계정 접근 결과 스테이지의 마감을 명시적으로 승인합니다.',
+  'outcome-stage-account-access-cherry-acceptance:C4': '공개 서비스 출시와 외부 결과 완료는 별도 결정으로 열려 있음을 확인합니다.',
 }
 
 const stateCopy: Record<string, string> = {

@@ -10,10 +10,10 @@ Outcome: 승인된 K1-K6 계약을 벗어나지 않는 Cherry-only authenticated
   EVIDENCE: public boundary prohibited hits 0; mutation matrix 32/32=405 and API read_only JSON 28/28; security suite 28 passed; stable GET contract remains sanitized and private workspace denies when disabled.
 - [ ] I3: Google primary, Apple linked access, email-code fallback의 provider-neutral auth boundary와 session/logout/revoke/recovery failure states가 red-first tests로 구현된다.
   PROVES: implementation
-  EVIDENCE: provider-neutral synthetic auth tests cover Google primary, Apple linked-only, email-code recovery, seven-day maximum, logout, revoke, expiry and provider outage; 16 account Node tests passed.
+  EVIDENCE: provider-neutral synthetic auth tests cover Google primary, Apple linked-only, email-code recovery, seven-day maximum, logout, revoke, expiry and provider outage; 17 account Node tests passed including the exact local PostgreSQL migration/RLS matrix.
 - [ ] I4: server-derived owner/workspace membership, two-project allowlist, RLS contract와 forged/cross-workspace deny tests가 구현된다.
   PROVES: security
-  EVIDENCE: BLOCKED for actual Postgres/RLS execution because Docker daemon is unavailable and no service start was authorized. Static migration contract and two-workspace synthetic deny tests pass but do not close I4.
+  EVIDENCE: exact pinned migration executes on PGlite 0.5.7/PostgreSQL 18.3 with actual authenticated/anon roles, forced RLS on eight tables, one-subject/one-workspace v1 uniqueness, owner-only reads and duplicate/anonymous/unknown/revoked/write denial. This closes local I4 implementation proof only; it is not Supabase or Clerk preview proof.
 - [ ] I5: append-only snapshot/current pointer, migration, retention/export/deletion/restore contract가 synthetic fixtures로 검증된다.
   PROVES: implementation
   EVIDENCE: append-only/current-pointer validation, unchanged evidence time under session activity, 30-day deletion hook and redacted export pass synthetic tests; migration and fixture SHA-256 receipts are recorded in the implementation evidence.
@@ -25,6 +25,6 @@ Outcome: 승인된 K1-K6 계약을 벗어나지 않는 Cherry-only authenticated
   EVIDENCE: account browser passed MacBook/mobile for nine settled states plus loading, 200% zoom, keyboard focus, reduced motion, touch >=44 px and zero overflow/intersection; Korean-first static state tests 3 passed.
 - [ ] I8: exact candidate commit/tree/asset, tests, migrations, synthetic fixtures, rollout/rollback과 changed-files receipt가 immutable handoff로 전달된다.
   PROVES: evidence
-  EVIDENCE: immutable candidate commit/tree/asset is issued in the post-commit Builder handoff; changed files, commands, migrations, rollout, rollback and limitations are recorded in docs/PHASE2_ACCOUNT_ACCESS_IMPLEMENTATION_EVIDENCE.md. Result remains BLOCKED, not QA or release authority.
+  EVIDENCE: immutable candidate commit/tree/asset is issued in the post-commit Builder handoff; changed files, commands, migrations, rollout, rollback and limitations are recorded in docs/PHASE2_ACCOUNT_ACCESS_IMPLEMENTATION_EVIDENCE.md. Canonical mobile stable-browser Hero geometry remains blocked; result is not QA or release authority.
 
 ABANDON: production provider/resource/secret/database/domain mutation, additional projects/users, write features, session relay/dispatch와 release는 포함하지 않는다.
