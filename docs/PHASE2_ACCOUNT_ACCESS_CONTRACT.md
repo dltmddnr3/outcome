@@ -1,6 +1,6 @@
 # Phase 2 · Account Access Outcome Contract
 
-Status: `DRAFT · CHERRY DECISION REQUIRED`
+Status: `K1 APPROVED · K2-K6 CHERRY DECISION REQUIRED`
 Updated: 2026-08-25 KST
 
 Decision boundary: `NO_ACCOUNT_IMPLEMENTATION_BEFORE_CHERRY_DECISION`
@@ -18,7 +18,7 @@ Cherry가 고정 공개 주소의 정제된 결과 지도는 계속 안전하게
 
 ## Recommended v1 boundary
 
-Recommendation: start with a **Cherry-only private workspace** behind one verified owner identity while preserving the current public sanitized snapshot as a separate read-only surface.
+Approved K1 boundary: start with a **Cherry-only private workspace** behind one verified owner identity while preserving the current public sanitized snapshot as a separate read-only surface.
 
 Why this is the smallest useful step:
 
@@ -27,6 +27,39 @@ Why this is the smallest useful step:
 3. It allows the data model to carry a tenant/workspace key from day one without claiming that multi-tenant sharing is implemented.
 
 Deferred alternative: a general multi-tenant account service with invitations, member roles, shared projects, organization ownership, billing, and support operations. This requires a separate approved Stage after the owner-only workspace is proven.
+
+## K2 provider recommendation · not approved
+
+Recommendation: use **Clerk email verification code (passwordless OTP)** for the first Cherry-only private workspace. Keep password login, Google OAuth, social login, self-signup, invitations, organizations, multi-user membership, and provider installation deferred.
+
+Why this is the smallest fit:
+
+1. Clerk supports email verification codes without storing an OUTCOME password. The code is valid for 10 minutes and the prebuilt flow applies a 30-second resend cooldown.
+2. Email code entry works without relying on Google OAuth inside the GPT/mobile in-app browser. Google sign-in is therefore deferred until its browser handoff can be proven in the actual feedback environments.
+3. Clerk provides a seven-day default maximum session lifetime and explicit per-session revocation. A custom inactivity timeout or custom lifetime is a later cost-and-policy decision, not implied here.
+4. Clerk uses `SameSite=Lax` session cookies and requires that navigation/GET never cause mutation. Its provider-domain client credential is `HttpOnly`; the app-domain session token is short-lived and is not `HttpOnly`, so OUTCOME must not claim that every provider cookie is `HttpOnly`.
+
+K2 remains open until Cherry separately approves all of the following:
+
+- Provider: Clerk production instance with email verification code only.
+- Owner identity: one exact verified Cherry email, supplied later through private runtime configuration and never written to Git, Package documents, snapshots, logs, or the public dashboard.
+- Access creation: no public sign-up route; the sole owner is provisioned through an approved private operator step.
+- Session: seven-day maximum lifetime for v1; no custom inactivity timeout in the first implementation.
+- Logout and revocation: local sign-out plus operator-visible revocation of every active session for the owner.
+- Request protection: `SameSite=Lax`, no mutation on GET/navigation, server-side identity verification, and explicit Origin/CSRF/idempotency controls before any later state-changing route.
+- Recovery: regain access only through control of the same verified email; if email control is lost, access stays denied until Cherry approves an operator recovery procedure. No password reset exists in this passwordless v1.
+
+Official provider references reviewed on 2026-08-25 KST:
+
+- Clerk sign-in options: https://clerk.com/docs/guides/configure/auth-strategies/sign-up-sign-in-options
+- Clerk email code flow: https://clerk.com/docs/guides/development/custom-flows/authentication/email-sms-otp
+- Clerk session options: https://clerk.com/docs/guides/secure/session-options
+- Clerk session revocation: https://clerk.com/docs/reference/backend/sessions/revoke-session
+- Clerk CSRF protection: https://clerk.com/docs/guides/secure/best-practices/csrf-protection
+- Clerk cookie and token model: https://clerk.com/docs/guides/how-clerk-works/overview
+- Supabase SSR comparison: https://supabase.com/docs/guides/auth/server-side/advanced-guide
+
+Comparison boundary: Supabase remains a candidate for K4 durable data and tenant-row isolation. It is not selected for K2 because its browser session maintenance requires browser access to the refresh token, adding a larger auth/session integration surface than the owner-only v1 needs.
 
 ## Surface contract
 
@@ -48,7 +81,7 @@ Deferred alternative: a general multi-tenant account service with invitations, m
 ## Required security and privacy contract
 
 - Auth provider and credential handling must be approved before integration; OUTCOME never stores provider passwords.
-- Session cookies are secure, HTTP-only, same-site, bounded in lifetime, revocable, and rotated after authentication.
+- Long-lived session credentials are provider-held and `HttpOnly` where the approved provider architecture supports it. Any app-domain bearer/session token must be short-lived, `Secure`, `SameSite=Lax`, never persisted in local storage by OUTCOME code, bounded by the approved session lifetime, revocable, and rotated by the provider.
 - State-changing routes remain absent in the first Stage; any later mutation requires explicit CSRF protection, re-authentication for sensitive actions, idempotency, and audit evidence.
 - Every private query is scoped by server-derived workspace identity; client-provided workspace/project IDs cannot grant access.
 - Tenant isolation is proven with negative cross-workspace tests even while v1 has one owner.
@@ -67,13 +100,13 @@ Deferred alternative: a general multi-tenant account service with invitations, m
 
 ## Cherry decisions required
 
-1. Approve or revise the recommended Cherry-only owner workspace before general multi-tenant sharing.
-2. Approve the identity provider and exact owner sign-in identity/domain.
-3. Decide whether the current public sanitized snapshot remains publicly reachable beside the private workspace.
+1. **Approved 2026-08-25 KST:** Cherry-only owner workspace beside the public sanitized snapshot; self-signup and invitations disabled.
+2. Approve or revise the K2 recommendation: Clerk email verification code, exact private owner identity, seven-day maximum session, revocation, CSRF boundary, and recovery procedure.
+3. **Approved with K1:** keep the current public sanitized snapshot publicly reachable beside the private workspace.
 4. Approve collected account fields, retention window, deletion/export process, and audit retention.
 5. Approve storage/hosting region, operational owner, recovery objective, and monthly cost ceiling.
 6. Name the first projects permitted in the private workspace and provide their Package root/source authority separately.
 
 ## Builder entry condition
 
-Builder work may start only after K1-K6 in `GATES_PHASE2_ACCOUNT_ACCESS_DEFINITION.md` are evidence-closed by Cherry decisions. The first implementation contract must then name provider, environment, exact allowed paths, red-first isolation tests, secret boundary, migration/rollback, preview verification, fresh UX & Product QA, and separate Release Audit. It must not add live collector relay, dispatch, project creation, billing, or release mutation by implication.
+Builder work may start only after K1-K6 in `GATES_PHASE2_ACCOUNT_ACCESS_DEFINITION.md` are evidence-closed by Cherry decisions. K1 approval alone does not authorize provider installation or product code. The first implementation contract must then name provider, environment, exact allowed paths, red-first isolation tests, secret boundary, migration/rollback, preview verification, fresh UX & Product QA, and separate Release Audit. It must not add live collector relay, dispatch, project creation, billing, or release mutation by implication.

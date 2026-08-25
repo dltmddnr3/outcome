@@ -4,9 +4,9 @@ Outcome: 계정 구현을 시작하기 전에 공개 배포본과 인증된 비�
 
 Decision contract: `docs/PHASE2_ACCOUNT_ACCESS_CONTRACT.md` (추천 초안이며 Gate evidence가 아님)
 
-- [ ] K1: Cherry가 1차 사용자 범위와 공개 화면·비공개 작업공간의 분리를 승인한다.
+- [x] K1: Cherry가 1차 사용자 범위와 공개 화면·비공개 작업공간의 분리를 승인한다.
   PROVES: cherry_decision
-  EVIDENCE: pending
+  EVIDENCE: 2026-08-25 KST Cherry가 `네 의견대로 진행`으로 추천안인 `공개 정제 스냅샷 유지 + Cherry 단독 private workspace + self-signup/invitation 비활성`을 승인했다. 이 결정은 K1에만 적용되며 K2-K6, provider 설치, 계정 생성과 구현을 승인하지 않는다.
 - [ ] K2: 인증 제공자, 소유자 식별, 접속 수명, 로그아웃·접속 철회, 요청 위조 방지와 계정 복구 계약이 승인된다.
   PROVES: security
   EVIDENCE: pending

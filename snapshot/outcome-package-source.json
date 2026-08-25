@@ -1,6 +1,6 @@
 {
   "schemaVersion": 2,
-  "observedAt": "2026-08-24T23:58:58.382Z",
+  "observedAt": "2026-08-25T00:12:41.765Z",
   "projects": [
     {
       "status": "conflict",
@@ -1696,10 +1696,10 @@
     {
       "status": "valid",
       "errors": [],
-      "observedAt": "2026-08-24T23:48:56.100Z",
+      "observedAt": "2026-08-25T00:12:22.372Z",
       "sourceFreshness": {
         "state": "observed",
-        "observedAt": "2026-08-24T23:48:56.100Z"
+        "observedAt": "2026-08-25T00:12:22.372Z"
       },
       "project": {
         "id": "outcome",
@@ -2718,7 +2718,7 @@
                         "id": "K1",
                         "stageId": "outcome-stage-account-access-definition",
                         "title": "Cherry가 1차 사용자 범위와 공개 화면·비공개 작업공간의 분리를 승인한다.",
-                        "closed": false,
+                        "closed": true,
                         "groupCode": "K",
                         "groupLabel": null,
                         "proves": "cherry_decision"
@@ -2775,21 +2775,21 @@
                         "name": "계정 접근 계약 결정",
                         "sourceName": "K",
                         "total": 6,
-                        "closed": 0
+                        "closed": 1
                       }
                     ],
                     "total": 6,
-                    "closed": 0,
+                    "closed": 1,
                     "available": true,
                     "sourceRef": "GATES_PHASE2_ACCOUNT_ACCESS_DEFINITION.md",
-                    "observedAt": "2026-08-24T23:48:56.100Z"
+                    "observedAt": "2026-08-25T00:12:22.372Z"
                   },
                   "sourceState": "present",
                   "state": "active",
                   "axes": {
                     "implementation": "not_sourced",
                     "test": "not_sourced",
-                    "evidence": "pending",
+                    "evidence": "partially_evidenced",
                     "independentQa": "not_sourced",
                     "cherryAcceptance": "pending",
                     "release": "not_sourced"
@@ -2964,7 +2964,7 @@
   ],
   "snapshot": {
     "boundary": "deployment_snapshot",
-    "capturedAt": "2026-08-24T23:58:58.382Z",
+    "capturedAt": "2026-08-25T00:12:41.765Z",
     "source": "sanitized_public_projection",
     "liveSessionRelay": false,
     "refreshBehavior": "new_deployment_required"
