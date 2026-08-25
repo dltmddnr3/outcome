@@ -200,9 +200,9 @@ phases:
                 primary_label: 호스팅 미리보기 실행 계약
           - id: outcome-stage-account-access-hosted-preview-code-readiness
             title: 호스팅 미리보기 코드 준비
-            purpose: 외부 자원이나 비밀값 없이 실제 인증·저장소 연결을 위한 무자격증명·실패 시 차단 제품 후보를 만든다.
+            purpose: 외부 자원이나 비밀값 없이 개발 인증과 호스팅 데이터를 분리하고, 수파베이스 없이도 HP1 인증만 검증 가능한 실패 시 차단 제품 후보를 만든다.
             depends_on: [outcome-stage-account-access-hosted-preview-preparation]
-            gates_file: GATES_PHASE2_ACCOUNT_ACCESS_HOSTED_PREVIEW_CODE_READINESS.md#B1-B8
+            gates_file: GATES_PHASE2_ACCOUNT_ACCESS_HOSTED_PREVIEW_CODE_READINESS.md#B1-B12
             gate_groups:
               - code: B
                 primary_label: 무자격증명 코드 준비
@@ -300,10 +300,10 @@ phases:
 
 ## 현재 위치
 
-- Current: `outcome-phase-2 / outcome-phase-2-account-service / outcome-stage-account-access-hosted-identity-preview · HP1 development identity preview`
-- Next: `P1 · hosted-preview external-mutation authorization decision`; HP0 credential-free code readiness는 Parent 검증으로 닫혔고, Cherry가 HP1 Clerk development instance·one-owner·Preview-only binding/deployment을 명시적으로 승인하기 전에는 external mutation을 시작하지 않는다.
+- Current: `outcome-phase-2 / outcome-phase-2-account-service / outcome-stage-account-access-hosted-preview-code-readiness · HP1 identity runtime separation correction`
+- Next: `B9 · identity-only runtime separation`; 현재 Vercel 진입점이 수파베이스 없는 HP1 인증 실행기를 선택하지 못하는 구조 불일치를 먼저 닫고 Parent가 `IDENTITY_CODE_READY_ONLY`를 검증하기 전에는 HP1 외부 변경 승인을 실행하지 않는다.
 - Dashboard registration: Package-driven Cherry Note/OUTCOME UI, GitHub connector Gate M15, fresh UX & Product QA Q1–Q4, separate fresh Release Audit A1–A4, Cherry acceptance C1–C2, stable snapshot host S1–S6, and registered Package portfolio foundation P1–P6 are evidence-closed.
 - Phase 1 closure boundary: 2026-08-25 KST Cherry가 내부사용 Local MVP 종료를 승인했다. 외부 공개 수준 MVP와 release approval은 이 결정에 포함되지 않는다.
-- Future roadmap visibility: Phase 2의 account access definition `K6 6/6`, provider-neutral disabled implementation `I1-I8 8/8`, prior fresh UX/Product re-QA `Q1-Q4 4/4`, prior Release re-Audit `A1-A4 4/4`, hosted-preview execution contract `H1-H6 6/6`과 HP0 code readiness `B1-B8 8/8`은 각각의 exact candidate 증거로 닫혔다. HP1 hosted identity `P1-P6 0/6`가 현재 경계이고 HP2 hosted data `D1-D7 0/7`, hosted fresh QA `Q1-Q4 0/4`, hosted fresh Audit `A1-A4 0/4`, Cherry acceptance `C1-C4 0/4`는 locked/open이다. 이전 disabled candidate의 QA/Audit은 HP0+ 후보 C1에 재사용하지 않는다. HP3 production enablement, Phase 2 전체, Phase 4와 5는 완료가 아니며 Phase 3은 `Definition Pending`이다.
+- Future roadmap visibility: Phase 2의 account access definition `K6 6/6`, provider-neutral disabled implementation `I1-I8 8/8`, prior fresh UX/Product re-QA `Q1-Q4 4/4`, prior Release re-Audit `A1-A4 4/4`, hosted-preview execution contract `H1-H6 6/6`과 초기 HP0 code readiness `B1-B8 8/8`은 각각의 exact candidate 증거로 닫혔다. 사전 점검에서 HP1 인증 경계가 HP2 수파베이스 계약과 결합된 사실이 확인되어 B9-B12 `0/4`가 현재 보정 경계다. HP1 hosted identity `P1-P6 0/6`, HP2 hosted data `D1-D7 0/7`, hosted fresh QA `Q1-Q4 0/4`, hosted fresh Audit `A1-A4 0/4`, Cherry acceptance `C1-C4 0/4`는 locked/open이다. 이전 disabled candidate의 QA/Audit은 이후 후보 C1에 재사용하지 않는다. HP3 production enablement, Phase 2 전체, Phase 4와 5는 완료가 아니며 Phase 3은 `Definition Pending`이다.
 - `MVP_SCOPE_CLOSED`: true
 - `EXTERNAL_OUTCOME_COMPLETE`: false

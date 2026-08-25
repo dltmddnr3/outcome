@@ -1,6 +1,6 @@
 # Phase 2 · Account Access Hosted Preview Authorization
 
-Status: `HP0 PUBLIC BASELINE VERIFIED · HP1 DECISION READY · NO EXTERNAL MUTATION AUTHORIZED`
+Status: `HP0 PUBLIC BASELINE VERIFIED · IDENTITY RUNTIME CORRECTION REQUIRED · NO EXTERNAL MUTATION AUTHORIZED`
 
 Prepared: 2026-08-25 KST
 
@@ -18,6 +18,8 @@ Purpose: 현재 비공개 기능이 비활성인 공개 기준선의 검증 결�
 - 이전 사용성·제품 재검수와 출시 재감사는 비활성 선행 후보와 격리된 합성 전환만 증명한다. HP0 이후 현재 후보의 실제 외부 로그인, 제공자 쿠키, 호스팅 행 단위 접근 제어, 복원, 방화벽, 경보 또는 비용 통제를 증명하지 않는다.
 
 Consequence: 선행 후보의 C1 증거는 현재 HP0 이후 후보에 재사용되지 않으며 C1-C4는 0/4로 열려 있다. HP1 또는 HP2 외부 변경은 다시 새 후보를 만들고, 새 사용성·제품 검수와 별도 출시 감사 및 새 Cherry 승인 영수증을 요구한다.
+
+Post-baseline correction: 승인 실행 사전 점검에서 현재 `readHostedPreviewConfiguration()`이 HP1 인증 선택에도 `OUTCOME_SUPABASE_URL`과 `OUTCOME_SUPABASE_PUBLISHABLE_KEY`를 요구하고, 실제 Vercel 기본 진입점이 `runtimeFactory`를 주입하지 않는 사실이 확인됐다. 따라서 HP1 외부 자원을 먼저 만들지 않는다. B9-B12가 인증 전용 실행 경계와 기본 비활성 회귀를 닫고 Parent가 `IDENTITY_CODE_READY_ONLY`를 검증한 뒤에만 아래 HP1 승인 문구를 실행 가능 상태로 승격한다.
 
 ## Recommended progression
 
@@ -153,11 +155,11 @@ Vercel bindings are project-scoped and Preview-only in HP1/HP2. A changed enviro
 
 ## Decision now required from Cherry
 
-Recommended next authority is HP1 only after HP0 is independently verified. The exact decision text is:
+Recommended next authority is HP1 only after B9-B12 identity runtime correction is independently verified. The exact decision text is:
 
 > `HP1 승인: OUTCOME Clerk development instance, Invite-only one-owner setup, shared development Google/Apple connections, email code, Vercel Preview-only env and Preview deployment creation을 승인. Production provider, Supabase, paid plan, domain/DNS, release는 미승인.`
 
-Until that statement or an equally exact approval exists: `NO_EXTERNAL_MUTATION`, Cherry acceptance C2-C4 stay open, release stays open, Phase 2 stays open and `EXTERNAL_OUTCOME_COMPLETE=false`.
+Until B9-B12 are verified and that statement or an equally exact approval exists: `NO_EXTERNAL_MUTATION`, Cherry acceptance C1-C4 stay open, release stays open, Phase 2 stays open and `EXTERNAL_OUTCOME_COMPLETE=false`.
 
 ## Official references checked
 
