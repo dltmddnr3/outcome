@@ -15,6 +15,7 @@ describe('OUTCOME Package dashboard', () => {
     const source = OutcomeDashboard.toString()
     for (const token of ['oc-global-nav', 'oc-nav-trigger', 'oc-nav-backdrop', 'oc-main-content', '본문으로 건너뛰기', 'aria-modal', 'event.key', 'Escape', 'document.body.style.overflow', 'menuButtonRef.current?.focus', 'oc-new-project', 'oc-project-search', 'projectQuery', '일치하는 프로젝트가 없습니다.', 'oc-project-row', 'oc-project-menu', 'oc-management', 'oc-nav-account', '로그인 또는 계정 관리']) expect(source).toContain(token)
     expect(source).not.toContain('선택됨')
+    expect(source).toContain('"data-selected": selected')
     for (const obsolete of ['globalNavigationItems', 'activeSection', 'revealGlobalSection']) expect(source).not.toContain(obsolete)
   })
   it('고정 호스트 스냅샷은 실시간 연결과 구분되어 표시된다', () => {

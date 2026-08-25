@@ -297,7 +297,8 @@ body:has(.account-workspace){min-width:0}
 .oc-projects>header{display:flex;align-items:center;justify-content:space-between;padding:0 10px 7px;color:#919a90}
 .oc-projects>header strong,.oc-projects>header small{font-size:11px;font-weight:600}
 .oc-project-switcher,.oc-management{display:grid;gap:3px}
-.oc-project-row{display:grid;grid-template-columns:minmax(0,1fr) 44px;gap:2px;min-width:0}
+.oc-project-row{display:grid;grid-template-columns:minmax(0,1fr) 44px;gap:2px;min-width:0;border-radius:7px}
+.oc-project-row[data-selected=true]{background:#151a15;box-shadow:inset 2px 0 #adff2f}
 .oc-project-select,.oc-project-menu{display:flex;min-width:0;min-height:44px;align-items:center;gap:8px;padding:7px 9px;border:1px solid transparent;border-radius:7px;background:transparent;color:#c8d1c6;text-align:left}
 .oc-project-select{font-size:13px;font-weight:500}
 .oc-project-select>i{width:7px;height:7px;flex:none;border:1px solid #697569;border-radius:50%;background:#697569}
@@ -306,7 +307,7 @@ body:has(.account-workspace){min-width:0}
 .oc-project-select small{flex:none;color:#dfffb2;font-size:11px;font-weight:700}
 .oc-project-menu{display:grid;place-items:center;padding:5px;color:#929b90}
 .oc-project-empty{margin:0;padding:12px 10px;color:#929b90;font-size:11px;line-height:1.45}
-.oc-project-select[aria-current=page]{border-color:transparent;background:#151a15;color:#f2f6ef;box-shadow:inset 2px 0 #adff2f}
+.oc-project-select[aria-current=page]{border-color:transparent;background:transparent;color:#f2f6ef;box-shadow:none}
 .oc-project-select[aria-current=page]>i{border-color:#adff2f;background:#adff2f}
 .oc-project-select[aria-current=page]>span:not(.oc-visually-hidden){font-weight:650}
 .oc-project-select:hover,.oc-management a:hover,.oc-nav-account:hover{background:#141b14;color:#f2f6ef}
@@ -357,9 +358,11 @@ body:has(.account-workspace){min-width:0}
 .oc-project-select,.oc-management a,.oc-nav-account,.oc-map-column button[role=option],.oc-mobile-level button,.account-workspace button,.outcome-login button,.outcome-login input{transition:background-color var(--oc-motion) ease-out,border-color var(--oc-motion) ease-out,color var(--oc-motion) ease-out,opacity var(--oc-motion) ease-out}
 .oc-project-select:hover,.oc-management a:hover,.oc-nav-account:hover,.oc-map-column button[role=option]:hover{background:var(--oc-surface-raised)}
 .oc-project-select:active,.oc-management a:active,.oc-nav-account:active,.oc-map-column button[role=option]:active{opacity:.78}
-.oc-project-select[aria-current=page]{border-color:transparent;background:#151a15;color:var(--oc-text)}
+.oc-project-select[aria-current=page]{border-color:transparent;background:transparent;color:var(--oc-text)}
 .oc-map-column button[role=option][aria-selected=true]{border-color:var(--oc-rule-strong);background:#151a15;color:var(--oc-text)}
-.oc-project-select[aria-current=page],.oc-map-column button[role=option][aria-current=step]{box-shadow:inset 2px 0 var(--oc-accent)}
+.oc-map-column button[role=option][aria-current=step]{box-shadow:inset 2px 0 var(--oc-accent)}
+.oc-project-row[data-selected=true]{background:#151a15;box-shadow:inset 2px 0 var(--oc-accent)}
+.oc-project-row[data-selected=true]>.oc-project-select,.oc-project-row[data-selected=true]>.oc-project-menu,.oc-project-row[data-selected=true]>.oc-project-select:hover{background:transparent}
 .oc-project-select:focus-visible,.oc-management a:focus-visible,.oc-nav-account:focus-visible,.oc-nav-trigger:focus-visible,.oc-nav-close:focus-visible,.oc-map-column button[role=option]:focus-visible,.oc-stage-disclosure:focus-visible,.oc-mobile-level button:focus-visible,.oc-mobile-breadcrumb button:focus-visible,.account-workspace button:focus-visible,.outcome-login button:focus-visible,.outcome-login input:focus-visible{outline:3px solid var(--oc-accent);outline-offset:2px}
 .oc-dashboard :where(h1,h2,h3,h4),.account-workspace :where(h1,h2,h3),.outcome-login h1{color:var(--oc-text);letter-spacing:-.025em}
 .oc-dashboard h1{font-size:32px;line-height:1.1;font-weight:650}
