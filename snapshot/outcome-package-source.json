@@ -1,6 +1,6 @@
 {
   "schemaVersion": 2,
-  "observedAt": "2026-08-25T03:50:56.253Z",
+  "observedAt": "2026-08-25T03:57:18.622Z",
   "projects": [
     {
       "status": "conflict",
@@ -1696,10 +1696,10 @@
     {
       "status": "valid",
       "errors": [],
-      "observedAt": "2026-08-25T03:50:45.994Z",
+      "observedAt": "2026-08-25T03:57:08.253Z",
       "sourceFreshness": {
         "state": "observed",
-        "observedAt": "2026-08-25T03:50:45.994Z"
+        "observedAt": "2026-08-25T03:57:08.253Z"
       },
       "project": {
         "id": "outcome",
@@ -2920,7 +2920,7 @@
                         "id": "Q1",
                         "stageId": "outcome-stage-account-access-ux-product-qa",
                         "title": "reviewer identity와 exact candidate/handoff pins가 Builder와 분리되어 있다.",
-                        "closed": false,
+                        "closed": true,
                         "groupCode": "Q",
                         "groupLabel": null,
                         "proves": "independent_qa"
@@ -2929,7 +2929,7 @@
                         "id": "Q2",
                         "stageId": "outcome-stage-account-access-ux-product-qa",
                         "title": "public no-login journey와 Cherry-only private login/logout/expiry/deny/error journeys가 MacBook과 mobile에서 검증된다.",
-                        "closed": false,
+                        "closed": true,
                         "groupCode": "Q",
                         "groupLabel": null,
                         "proves": "test"
@@ -2938,7 +2938,7 @@
                         "id": "Q3",
                         "stageId": "outcome-stage-account-access-ux-product-qa",
                         "title": "project visibility, hierarchy/current-vs-selected truth, stale/conflict/empty/degraded states와 accessibility가 검증된다.",
-                        "closed": false,
+                        "closed": true,
                         "groupCode": "Q",
                         "groupLabel": null,
                         "proves": "test"
@@ -2947,7 +2947,7 @@
                         "id": "Q4",
                         "stageId": "outcome-stage-account-access-ux-product-qa",
                         "title": "QA report가 PASS_UX_PRODUCT_QA_ONLY 또는 FAIL로 끝나며 Release Audit·Cherry acceptance·release authority를 주장하지 않는다.",
-                        "closed": false,
+                        "closed": true,
                         "groupCode": "Q",
                         "groupLabel": null,
                         "proves": "independent_qa"
@@ -2959,21 +2959,21 @@
                         "name": "독립 사용성·제품 검수",
                         "sourceName": "Q",
                         "total": 4,
-                        "closed": 0
+                        "closed": 4
                       }
                     ],
                     "total": 4,
-                    "closed": 0,
+                    "closed": 4,
                     "available": true,
                     "sourceRef": "GATES_PHASE2_ACCOUNT_ACCESS_UX_PRODUCT_QA.md",
-                    "observedAt": "2026-08-25T03:28:54.013Z"
+                    "observedAt": "2026-08-25T03:57:08.253Z"
                   },
                   "sourceState": "present",
-                  "state": "active",
+                  "state": "complete",
                   "axes": {
                     "implementation": "not_sourced",
-                    "test": "pending",
-                    "evidence": "pending",
+                    "test": "evidence_closed",
+                    "evidence": "evidence_closed",
                     "independentQa": "not_sourced",
                     "cherryAcceptance": "not_sourced",
                     "release": "not_sourced"
@@ -3043,7 +3043,7 @@
                     "observedAt": "2026-08-25T02:25:32.362Z"
                   },
                   "sourceState": "present",
-                  "state": "locked",
+                  "state": "active",
                   "axes": {
                     "implementation": "not_sourced",
                     "test": "not_sourced",
@@ -3216,9 +3216,9 @@
           "localCandidate": {
             "state": "available",
             "branch": "main",
-            "ahead": 0,
+            "ahead": 1,
             "behind": 0,
-            "sync": "synced"
+            "sync": "ahead"
           },
           "published": {
             "state": "connected",
@@ -3237,12 +3237,12 @@
       "current": {
         "phaseId": "outcome-phase-2",
         "scopeId": "outcome-phase-2-account-service",
-        "stageId": "outcome-stage-account-access-ux-product-qa"
+        "stageId": "outcome-stage-account-access-release-audit"
       },
       "next": {
         "phaseId": "outcome-phase-2",
         "scopeId": "outcome-phase-2-account-service",
-        "stageId": "outcome-stage-account-access-release-audit"
+        "stageId": "outcome-stage-account-access-cherry-acceptance"
       },
       "bindings": [
         {
@@ -3300,7 +3300,7 @@
   ],
   "snapshot": {
     "boundary": "deployment_snapshot",
-    "capturedAt": "2026-08-25T03:50:56.253Z",
+    "capturedAt": "2026-08-25T03:57:18.622Z",
     "source": "sanitized_public_projection",
     "liveSessionRelay": false,
     "refreshBehavior": "new_deployment_required"
