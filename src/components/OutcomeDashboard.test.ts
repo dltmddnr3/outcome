@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { OutcomeDashboard, axisStateLabel, bindingHeroLabel, bindingObservationLabel, collapsedStageCount, currentHierarchy, defaultHierarchySelection, deriveScopeState, deriveStageRailState, detailContentPolicy, entityStateLabel, findStage, gateGroupPresentation, gateProgress, githubEvidenceItems, globalNavigationItems, heroGateEvidence, hierarchyIsExploring, hierarchyPlacement, meaningfulGateGroups, mobileHierarchyLevels, nextStageOptionIndex, nowPresentation, projectHeroModel, resolveHierarchySelection, selectedGateCount, selectedStageContext, selectHierarchyPhase, selectHierarchyScope, selectLiveBinding, selectProject, snapshotPresentation, sourceStateLabel, stageDetailSemantics, structuralPhaseModel, structureStatusLabel, summarizeStage, timingPresentation, type Binding, type GithubConnector, type PackageProject, type PackageStage } from './OutcomeDashboard'
+import { OutcomeDashboard, axisStateLabel, bindingHeroLabel, bindingObservationLabel, collapsedStageCount, currentHierarchy, defaultHierarchySelection, deriveScopeState, deriveStageRailState, detailContentPolicy, entityStateLabel, findStage, gateGroupPresentation, gateProgress, githubEvidenceItems, heroGateEvidence, hierarchyIsExploring, hierarchyPlacement, meaningfulGateGroups, mobileHierarchyLevels, nextStageOptionIndex, nowPresentation, projectHeroModel, resolveHierarchySelection, selectedGateCount, selectedStageContext, selectHierarchyPhase, selectHierarchyScope, selectLiveBinding, selectProject, snapshotPresentation, sourceStateLabel, stageDetailSemantics, structuralPhaseModel, structureStatusLabel, summarizeStage, timingPresentation, workspaceManagementItems, type Binding, type GithubConnector, type PackageProject, type PackageStage } from './OutcomeDashboard'
 import { activityLabelKo, axisLabelKo, gatePresentation, groupPresentation, hierarchyLabels, loginErrorPresentation, phasePresentation, projectOutcomePresentation, roleLabel, stagePresentation } from './outcomeKorean'
 
 const stage = (overrides: Partial<PackageStage> = {}): PackageStage => ({ id: 'stage-one', title: 'Stage One', purpose: 'Verify the result', dependsOn: [], gatePurpose: 'Stage One acceptance checklist', sourceState: 'present', state: 'active', gate: { gates: [{ id: 'G1', title: 'closed', closed: true, groupCode: 'G' }, { id: 'G2', title: 'remaining', closed: false, groupCode: 'G' }], groups: [{ code: 'G', name: '증거', closed: 1, total: 2 }], total: 2, closed: 1, available: true, sourceRef: 'GATES.md' }, axes: { implementation: 'active', test: 'pending', evidence: 'pending', independentQa: 'not_started', cherryAcceptance: 'pending', release: 'not_started' }, ...overrides })
@@ -7,16 +7,14 @@ const github = (overrides: Partial<GithubConnector> = {}): GithubConnector => ({
 const project = (id: string, title: string): PackageProject => ({ status: 'valid', errors: [], observedAt: null, project: { id, name: title, outcome: `${title} outcome`, acceptanceAuthority: 'Cherry' }, connectors: { github: github() }, phases: [{ id: `${id}-phase`, title: 'Phase', purpose: 'Phase purpose', completion: null, scopes: [{ id: `${id}-scope`, title: 'Scope', purpose: 'Scope purpose', stages: [stage({ id: `${id}-stage` })] }] }], current: { phaseId: `${id}-phase`, scopeId: `${id}-scope`, stageId: `${id}-stage` }, next: null, bindings: [], now: { status: 'unbound', activity: null, observedAt: null, source: 'runtime_registry' }, progress: { available: false, reason: 'no_cross_stage_aggregate' } })
 
 describe('OUTCOME Package dashboard', () => {
-  it('왼쪽 탐색은 프로젝트 전환과 네 개의 전역 목적지만 제공한다', () => {
-    expect(globalNavigationItems).toEqual([
-      { id: 'current-work', label: '현재 작업', href: '#oc-current-work' },
-      { id: 'outcome-map', label: '결과 지도', href: '#oc-outcome-map' },
-      { id: 'technical-evidence', label: '기술 증거', href: '#oc-technical-evidence' },
-      { id: 'private-workspace', label: '비공개 워크스페이스', href: '/workspace' },
+  it('왼쪽 레일은 프로젝트 작업공간과 정직한 준비 중 기능만 제공한다', () => {
+    expect(workspaceManagementItems).toEqual([
+      { id: 'archive', label: '보관함', disabled: true },
+      { id: 'connections', label: '연결 관리', disabled: true },
     ])
     const source = OutcomeDashboard.toString()
-    for (const token of ['oc-global-nav', 'oc-nav-trigger', 'oc-nav-backdrop', 'oc-main-content', '본문으로 건너뛰기', 'aria-modal', 'event.key', 'Escape', 'document.body.style.overflow', 'menuButtonRef.current?.focus']) expect(source).toContain(token)
-    for (const token of ['revealGlobalSection', 'technicalEvidence.open = true', 'querySelector("summary")', 'summary")?.focus']) expect(source).toContain(token)
+    for (const token of ['oc-global-nav', 'oc-nav-trigger', 'oc-nav-backdrop', 'oc-main-content', '본문으로 건너뛰기', 'aria-modal', 'event.key', 'Escape', 'document.body.style.overflow', 'menuButtonRef.current?.focus', 'oc-new-project', 'oc-project-search', 'projectQuery', '일치하는 프로젝트가 없습니다.', 'oc-project-row', 'oc-project-menu', 'oc-management', 'oc-nav-account', '로그인 또는 계정 관리']) expect(source).toContain(token)
+    for (const obsolete of ['globalNavigationItems', 'activeSection', 'revealGlobalSection']) expect(source).not.toContain(obsolete)
   })
   it('고정 호스트 스냅샷은 실시간 연결과 구분되어 표시된다', () => {
     expect(snapshotPresentation({ boundary: 'deployment_snapshot', capturedAt: '2026-08-24T09:00:00.000Z', source: 'sanitized_public_projection', liveSessionRelay: false, refreshBehavior: 'new_deployment_required' })).toEqual({ label: '배포 스냅샷', detail: '실시간 세션 연결 대기 · 새 배포 시 갱신', sourceLabel: '패키지 구조 정상', timePrefix: '스냅샷 생성', refreshLabel: '배포 스냅샷 다시 불러오기' })

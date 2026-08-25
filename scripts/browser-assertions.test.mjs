@@ -4,7 +4,7 @@ import { assertDashboardMeasurement, assertMobileStickyMeasurement, assertSource
 
 const passingMeasurement = () => ({
   documentOverflow: 0, clippedDescendants: [], ellipsisTruncation: [], viewportEscape: [], siblingIntersections: [], roleDescendantIntersections: [], roleStatusOverflow: [], undersizedText: [], lowContrastText: [], undersizedControls: [], unexpectedEnglish: [], translationFallback: [], activeAnimationCount: 0, heroHeight: 352,
-  pageHeading: true, sequentialHeadings: true, compactHero: true, roleGeometry: true, heroGeometry: true, mobileMapFirstFold: true, mobileDomOrder: true, mobileHierarchyTruth: true, globalNavigationTruth: true, refinedVisualSystemTruth: true, currentStageActionTruth: true, singleProgressRailTruth: true, phaseNavigationUniqueTruth: true, currentSelectionDistinctionTruth: true, folderHierarchyTruth: true, phaseCurrentMarkerTruth: true, phaseLabelsFull: true, phaseBandTruth: true, phaseOptionTitlesFull: true, desktopPhaseListFirstFold: true, liveSemantics: true, structureTruth: true, phaseCompletionTruth: true, stagePositionTruth: true, snapshotHeroTruth: true, oneMapSurface: true, roving: true, desktopColumns: true, mobileDrill: true, gateCountTruth: true, gaugeTruth: true, explorationTruth: true, groupTruth: true, singleStaleNowSignal: true, snapshotBadgeTextTruth: true, technicalCollapsed: true, technicalEvidence: true, noFabricatedProgress: true, firstFold: true,
+  pageHeading: true, sequentialHeadings: true, compactHero: true, roleGeometry: true, heroGeometry: true, mobileMapFirstFold: true, mobileDomOrder: true, mobileHierarchyTruth: true, workspaceSidebarTruth: true, refinedVisualSystemTruth: true, currentStageActionTruth: true, singleProgressRailTruth: true, phaseNavigationUniqueTruth: true, currentSelectionDistinctionTruth: true, folderHierarchyTruth: true, phaseCurrentMarkerTruth: true, phaseLabelsFull: true, phaseBandTruth: true, phaseOptionTitlesFull: true, desktopPhaseListFirstFold: true, liveSemantics: true, structureTruth: true, phaseCompletionTruth: true, stagePositionTruth: true, snapshotHeroTruth: true, oneMapSurface: true, roving: true, desktopColumns: true, mobileDrill: true, gateCountTruth: true, gaugeTruth: true, explorationTruth: true, groupTruth: true, singleStaleNowSignal: true, snapshotBadgeTextTruth: true, technicalCollapsed: true, technicalEvidence: true, noFabricatedProgress: true, firstFold: true,
 })
 
 test('all contracted viewport names accept the interactive hierarchy measurement', () => {
@@ -27,8 +27,8 @@ test('mobile hierarchy clarity fails closed when the fourth tab or visible activ
   assert.throws(() => assertDashboardMeasurement('mobile/outcome', { ...passingMeasurement(), mobileHierarchyTruth: false }), /mobileHierarchyTruth=false/)
 })
 
-test('global navigation fails closed when rail or drawer semantics disappear', () => {
-  assert.throws(() => assertDashboardMeasurement('desktop/outcome', { ...passingMeasurement(), globalNavigationTruth: false }), /globalNavigationTruth=false/)
+test('workspace sidebar fails closed when its IA or truthful disabled boundary disappears', () => {
+  assert.throws(() => assertDashboardMeasurement('desktop/outcome', { ...passingMeasurement(), workspaceSidebarTruth: false }), /workspaceSidebarTruth=false/)
   assert.throws(() => assertDashboardMeasurement('desktop/outcome', { ...passingMeasurement(), refinedVisualSystemTruth: false }), /refinedVisualSystemTruth=false/)
 })
 

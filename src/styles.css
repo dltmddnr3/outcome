@@ -277,29 +277,46 @@ body:has(.account-workspace){min-width:0}
 @media(max-width:600px){.account-workspace,.account-workspace *{min-width:0}.account-workspace{padding:12px 8px;overflow-wrap:anywhere}.account-workspace__header{flex-direction:column}.account-workspace__header-actions{width:100%;flex-wrap:wrap}.account-workspace__state{margin:16px auto;padding:16px 12px}.account-workspace__state h2{font-size:24px}.account-workspace__ready{padding:12px 8px}.account-workspace__position{grid-template-columns:1fr}.account-workspace__hierarchy{grid-template-columns:1fr}.account-workspace__hierarchy button em{white-space:normal}.account-workspace footer code{overflow-wrap:anywhere}}
 @media(prefers-reduced-motion:reduce){.account-workspace *{scroll-behavior:auto;transition:none!important;animation:none!important}}
 
-/* OUTCOME global navigation: project and section routing only. */
-.oc-dashboard{display:grid;width:min(1600px,100%);grid-template-columns:224px minmax(0,1fr);padding:0;overflow:visible}
+/* OUTCOME workspace sidebar: project switching and truthful future capability boundaries. */
+.oc-dashboard{display:grid;width:min(1600px,100%);grid-template-columns:248px minmax(0,1fr);padding:0;overflow:visible}
 .cn-standalone-shell:has(.oc-dashboard){padding:0}
 .oc-dashboard-content{min-width:0;padding:0 36px 32px}
-.oc-global-nav{position:sticky;z-index:12;top:0;display:flex;height:100vh;min-width:0;flex-direction:column;gap:18px;padding:18px 14px;border-right:1px solid #303a30;background:#0b110c;color:#f2f6ef}
+.oc-global-nav{position:sticky;z-index:12;top:0;display:flex;height:100vh;min-width:0;flex-direction:column;gap:12px;padding:16px 12px;border-right:1px solid #303a30;background:#0b110c;color:#f2f6ef}
 .oc-global-nav>header{display:flex;min-height:44px;align-items:center;justify-content:space-between;gap:8px}
-.oc-nav-brand{display:flex;align-items:center;gap:9px;color:#f4f7f1;letter-spacing:.03em}
+.oc-nav-brand{display:flex;align-items:center;gap:9px;color:#f4f7f1;font-size:12px;letter-spacing:.03em}
 .oc-nav-brand svg{color:#adff2f}
-.oc-nav-context{display:grid;gap:3px;padding:0 10px}
-.oc-nav-context small{color:#8f9a8e;font-size:11px}
-.oc-nav-context strong{overflow:hidden;color:#edf2eb;font-size:14px;text-overflow:ellipsis;white-space:nowrap}
-.oc-project-switcher,.oc-global-sections{display:grid;gap:4px}
-.oc-project-switcher{padding-bottom:16px;border-bottom:1px solid #303a30}
-.oc-project-switcher button,.oc-global-sections a{display:flex;min-width:0;min-height:44px;align-items:center;gap:9px;padding:8px 10px;border:1px solid transparent;border-radius:7px;background:transparent;color:#c8d1c6;text-align:left;text-decoration:none;cursor:pointer}
-.oc-project-switcher button>i{width:7px;height:7px;flex:none;border:1px solid #697569;border-radius:50%;background:#697569}
-.oc-project-switcher button>i.valid{border-color:#8fcb3e;background:#adff2f}
-.oc-project-switcher button>span,.oc-global-sections a>span{min-width:0;flex:1}
-.oc-project-switcher button>span{overflow:visible;text-overflow:clip;white-space:normal}
-.oc-global-sections a>span{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
-.oc-project-switcher button small,.oc-global-sections a small{flex:none;padding:2px 5px;border:1px solid #6d8a51;border-radius:3px;color:#dfffb2;font-size:11px;font-weight:700}
-.oc-project-switcher button[aria-current=page],.oc-global-sections a[aria-current=location]{border-color:#526148;background:#172016;color:#f2f6ef;font-weight:700}
-.oc-project-switcher button:hover,.oc-global-sections a:hover{background:#141b14;color:#f2f6ef}
-.oc-project-switcher button:focus-visible,.oc-global-sections a:focus-visible,.oc-nav-trigger:focus-visible,.oc-nav-close:focus-visible{outline:3px solid #adff2f;outline-offset:2px}
+.oc-nav-workspace{display:grid;min-height:0;align-content:start;gap:12px;overflow-y:auto;overscroll-behavior:contain}
+.oc-new-project,.oc-management button,.oc-management a,.oc-nav-account{display:flex;width:100%;min-width:0;min-height:44px;align-items:center;gap:9px;padding:8px 10px;border:1px solid transparent;border-radius:7px;background:transparent;color:#c8d1c6;text-align:left;text-decoration:none}
+.oc-new-project{border-color:#394239;background:#111611;font-size:13px;font-weight:500}
+.oc-new-project>span,.oc-management :is(button,a)>span{min-width:0;flex:1}
+.oc-new-project small,.oc-management small,.oc-project-menu span{color:#929b90;font-size:11px;font-weight:500;white-space:nowrap}
+.oc-new-project:disabled,.oc-management button:disabled,.oc-project-menu:disabled{cursor:not-allowed;opacity:1}
+.oc-project-search{display:grid;grid-template-columns:18px minmax(0,1fr);align-items:center;gap:8px;min-height:44px;padding:0 10px;border:1px solid #303a30;border-radius:7px;background:#0b0f0b;color:#929b90}
+.oc-project-search input{width:100%;min-width:0;border:0;outline:0;background:transparent;color:#e5e9e2;font-size:13px}
+.oc-project-search input::placeholder{color:#858e84}
+.oc-project-search:focus-within{border-color:#657263;outline:2px solid #adff2f;outline-offset:1px}
+.oc-projects{padding:10px 0 12px;border-bottom:1px solid #303a30}
+.oc-projects>header{display:flex;align-items:center;justify-content:space-between;padding:0 10px 7px;color:#919a90}
+.oc-projects>header strong,.oc-projects>header small{font-size:11px;font-weight:600}
+.oc-project-switcher,.oc-management{display:grid;gap:3px}
+.oc-project-row{display:grid;grid-template-columns:minmax(0,1fr) 62px;gap:2px;min-width:0}
+.oc-project-select,.oc-project-menu{display:flex;min-width:0;min-height:44px;align-items:center;gap:8px;padding:7px 9px;border:1px solid transparent;border-radius:7px;background:transparent;color:#c8d1c6;text-align:left}
+.oc-project-select{font-size:13px;font-weight:500}
+.oc-project-select>i{width:7px;height:7px;flex:none;border:1px solid #697569;border-radius:50%;background:#697569}
+.oc-project-select>i.valid{border-color:#8fcb3e;background:#adff2f}
+.oc-project-select>span:not(.oc-visually-hidden){min-width:0;flex:1;overflow:visible;text-overflow:clip;white-space:normal}
+.oc-project-select small{flex:none;color:#dfffb2;font-size:11px;font-weight:700}
+.oc-project-menu{display:grid;grid-template-columns:18px 1fr;gap:3px;padding:5px;color:#929b90}
+.oc-project-menu span{white-space:normal}
+.oc-project-empty{margin:0;padding:12px 10px;color:#929b90;font-size:11px;line-height:1.45}
+.oc-project-select[aria-current=page]{border-color:#526148;background:#172016;color:#f2f6ef;font-weight:700;box-shadow:inset 2px 0 #adff2f}
+.oc-project-select:hover,.oc-management a:hover,.oc-nav-account:hover{background:#141b14;color:#f2f6ef}
+.oc-management{padding-top:2px}.oc-management :is(button,a){font-size:13px;font-weight:500}
+.oc-management svg,.oc-new-project svg,.oc-project-menu svg,.oc-nav-account svg,.oc-project-search svg{width:18px;height:18px;flex:none}
+.oc-nav-account{flex:none;margin-top:auto;border-top:1px solid #303a30;border-radius:0;padding-top:13px;padding-bottom:13px}
+.oc-nav-account>span{display:grid;min-width:0;gap:2px}
+.oc-nav-account strong{font-size:12px}.oc-nav-account small{color:#929b90;font-size:11px}
+.oc-project-select:focus-visible,.oc-management a:focus-visible,.oc-nav-account:focus-visible,.oc-nav-trigger:focus-visible,.oc-nav-close:focus-visible{outline:3px solid #adff2f;outline-offset:2px}
 .oc-nav-trigger,.oc-nav-close,.oc-nav-backdrop{display:none}
 .oc-skip-link{position:fixed;z-index:60;top:8px;left:8px;min-height:44px;padding:11px 14px;border:2px solid #adff2f;border-radius:6px;background:#091009;color:#fff;font-weight:800;text-decoration:none;visibility:hidden;transform:translateY(-160%)}
 .oc-skip-link:focus{visibility:visible;transform:translateY(0)}
@@ -320,7 +337,6 @@ body:has(.account-workspace){min-width:0}
 @media(max-width:759px){
   .oc-dashboard-content{padding-right:16px;padding-left:16px}
   .oc-topbar{margin-right:-16px;margin-left:-16px;padding-right:16px;padding-left:16px;align-items:center}
-  .oc-nav-context strong{font-size:15px}
 }
 
 @media(prefers-reduced-motion:reduce){.oc-global-nav{transition:none}.oc-skip-link{scroll-behavior:auto}}
@@ -340,13 +356,12 @@ body:has(.account-workspace){min-width:0}
 .oc-technical summary{min-height:44px;border-radius:var(--oc-radius-md)}
 .oc-snapshot-badge,.oc-source,.oc-nav-trigger,.oc-nav-close,.oc-show-current-button,.oc-stage-disclosure{border-radius:var(--oc-radius-md);background:var(--oc-surface-raised);box-shadow:none}
 .oc-snapshot-badge{border-color:var(--oc-rule-strong)}
-.oc-project-switcher button,.oc-global-sections a,.oc-map-column button[role=option],.oc-mobile-level button,.account-workspace button,.outcome-login button,.outcome-login input{transition:background-color var(--oc-motion) ease-out,border-color var(--oc-motion) ease-out,color var(--oc-motion) ease-out,opacity var(--oc-motion) ease-out}
-.oc-project-switcher button:hover,.oc-global-sections a:hover,.oc-map-column button[role=option]:hover{background:var(--oc-surface-raised)}
-.oc-project-switcher button:active,.oc-global-sections a:active,.oc-map-column button[role=option]:active{opacity:.78}
-.oc-project-switcher button[aria-current=page],.oc-global-sections a[aria-current=location],.oc-map-column button[role=option][aria-selected=true]{border-color:var(--oc-rule-strong);background:#151a15;color:var(--oc-text)}
-.oc-project-switcher button[aria-current=page],.oc-map-column button[role=option][aria-current=step]{box-shadow:inset 2px 0 var(--oc-accent)}
-.oc-global-sections a[aria-current=location]::after{padding:2px 5px;border:1px solid var(--oc-rule-strong);border-radius:var(--oc-radius-sm);color:var(--oc-accent);content:"현재";font-size:11px;font-weight:700}
-.oc-project-switcher button:focus-visible,.oc-global-sections a:focus-visible,.oc-nav-trigger:focus-visible,.oc-nav-close:focus-visible,.oc-map-column button[role=option]:focus-visible,.oc-stage-disclosure:focus-visible,.oc-mobile-level button:focus-visible,.oc-mobile-breadcrumb button:focus-visible,.account-workspace button:focus-visible,.outcome-login button:focus-visible,.outcome-login input:focus-visible{outline:3px solid var(--oc-accent);outline-offset:2px}
+.oc-project-select,.oc-management a,.oc-nav-account,.oc-map-column button[role=option],.oc-mobile-level button,.account-workspace button,.outcome-login button,.outcome-login input{transition:background-color var(--oc-motion) ease-out,border-color var(--oc-motion) ease-out,color var(--oc-motion) ease-out,opacity var(--oc-motion) ease-out}
+.oc-project-select:hover,.oc-management a:hover,.oc-nav-account:hover,.oc-map-column button[role=option]:hover{background:var(--oc-surface-raised)}
+.oc-project-select:active,.oc-management a:active,.oc-nav-account:active,.oc-map-column button[role=option]:active{opacity:.78}
+.oc-project-select[aria-current=page],.oc-map-column button[role=option][aria-selected=true]{border-color:var(--oc-rule-strong);background:#151a15;color:var(--oc-text)}
+.oc-project-select[aria-current=page],.oc-map-column button[role=option][aria-current=step]{box-shadow:inset 2px 0 var(--oc-accent)}
+.oc-project-select:focus-visible,.oc-management a:focus-visible,.oc-nav-account:focus-visible,.oc-nav-trigger:focus-visible,.oc-nav-close:focus-visible,.oc-map-column button[role=option]:focus-visible,.oc-stage-disclosure:focus-visible,.oc-mobile-level button:focus-visible,.oc-mobile-breadcrumb button:focus-visible,.account-workspace button:focus-visible,.outcome-login button:focus-visible,.outcome-login input:focus-visible{outline:3px solid var(--oc-accent);outline-offset:2px}
 .oc-dashboard :where(h1,h2,h3,h4),.account-workspace :where(h1,h2,h3),.outcome-login h1{color:var(--oc-text);letter-spacing:-.025em}
 .oc-dashboard h1{font-size:32px;line-height:1.1;font-weight:650}
 .oc-dashboard h2{font-size:18px;line-height:1.3;font-weight:650}
