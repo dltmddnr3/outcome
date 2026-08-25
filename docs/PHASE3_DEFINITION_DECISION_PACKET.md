@@ -117,4 +117,16 @@ Cherry가 Q1–Q3을 결정하면 그 응답을 source로 Phase 3 Outcome Contra
 
 현재 residual unknowns: Phase 3 구현 인계 전에 별도 결정할 provider/session adapter 범위, private control-plane 실행 위치, 고위험 지시의 Cherry 재확인 정책.
 
+## 구현 인계 결정 · 2026-08-25 KST
+
+Cherry가 후속 세 추천안에도 `추천안 적용`으로 답했다.
+
+- first adapter: Codex-only; Claude는 provider-neutral 호환 경계만 보존
+- private control plane: Mac mini가 raw binding, credential, observation과 dispatch를 소유하고 Vercel/private workspace는 public-safe projection과 encrypted envelope만 중계
+- high-risk authority: push·deploy·release·credential·billing·delete·external mutation은 exact target·intent digest·rollback을 확인한 만료형 single-use Cherry 재승인 필수
+
+이 결정은 `docs/PHASE3_CODEX_RELAY_IMPLEMENTATION_HANDOFF.md`와 Codex adapter technical spike Stage 정의를 허용한다. 실제 Codex 접근, message dispatch, provider/resource mutation, 구현 시작, push/deploy/release는 승인하지 않는다.
+
+구현 인계 residual unknowns: Codex supported interface 실사 결과와 exact Builder private session binding. 둘은 제품 방향 질문이 아니라 technical spike evidence와 private runtime assignment로 해결한다.
+
 Notion·Linear connector가 이 작업 환경에 연결되어 있지 않으므로 이 로컬 패킷은 decision-ready 초안일 뿐 외부 PRD·task completion을 주장하지 않는다.

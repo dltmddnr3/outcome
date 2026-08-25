@@ -296,10 +296,18 @@ phases:
         title: Private session registry
         purpose: 프로젝트와 Planner·Builder·UX & Product QA·Release Audit의 실제 기존 세션 binding을 비공개 단일 source로 관리한다.
         stages:
+          - id: outcome-stage-phase3-codex-adapter-spike
+            title: Codex adapter technical spike
+            purpose: Codex existing session observation·instruction delivery의 supported interface, auth·terms·limit·cost와 safe fallback을 증명한다.
+            depends_on: []
+            gates_file: GATES_PHASE3_CODEX_ADAPTER_TECHNICAL_SPIKE.md#S1-S6
+            gate_groups:
+              - code: S
+                primary_label: Codex 연결 기술 실사
           - id: outcome-stage-phase3-private-session-registry
             title: Private role-session registry candidate
             purpose: binding schema, uniqueness, lifecycle, secret redaction, audit와 rollback을 immutable candidate로 증명한다.
-            depends_on: []
+            depends_on: [outcome-stage-phase3-codex-adapter-spike]
             gates_file: GATES_PHASE3_PRIVATE_SESSION_REGISTRY.md#R1-R6
             gate_groups:
               - code: R
@@ -412,6 +420,6 @@ phases:
 - Next: `P2 · Clerk Development 구성`; Cherry가 HP1을 Clerk Development + Vercel Preview로 정확히 승인해 P1은 닫혔다. Production·Supabase·DNS·도메인·출시는 계속 미승인이며, P2는 개발 환경·수동 단일 소유자·임의 가입 차단·조직 미사용을 직접 확인해야 닫힌다.
 - Dashboard registration: Package-driven Cherry Note/OUTCOME UI, GitHub connector Gate M15, fresh UX & Product QA Q1–Q4, separate fresh Release Audit A1–A4, Cherry acceptance C1–C2, stable snapshot host S1–S6, and registered Package portfolio foundation P1–P6 are evidence-closed.
 - Phase 1 closure boundary: 2026-08-25 KST Cherry가 내부사용 Local MVP 종료를 승인했다. 외부 공개 수준 MVP와 release approval은 이 결정에 포함되지 않는다.
-- Future roadmap visibility: Phase 2의 account access definition `K6 6/6`, provider-neutral disabled implementation `I1-I8 8/8`, prior fresh UX/Product re-QA `Q1-Q4 4/4`, prior Release re-Audit `A1-A4 4/4`, hosted-preview execution contract `H1-H6 6/6`, browser-viable public-redacted code readiness `B1-B12 12/12`, hosted-data 실행 사전준비 `E1-E8 8/8`, HP3 운영 활성화 결정 사전준비 `R1-R8 8/8`은 각각의 exact candidate 또는 문서 증거로 닫혔다. HP1 hosted identity는 승인만 확보된 `P1-P6 1/6`, HP2 hosted data `D1-D7 0/7`, hosted fresh QA `Q1-Q4 0/4`, hosted fresh Audit `A1-A4 0/4`, hosted Cherry acceptance `C1-C4 0/4`, HP3 운영 자원 준비·새 QA·새 Audit·Cherry 운영 후보 승인·운영 활성화는 합계 `0/24`로 locked/open이다. 두 사전준비 완료는 HP1 완료, HP2·HP3 승인, 운영 활성화나 출시를 대신하지 않는다. 이전 candidate의 QA/Audit은 다음 provider/data/domain candidate에 재사용하지 않는다. production hierarchy 등록은 추적 가시성만 제공하며 실행 권한이 아니다. Phase 3 목적·Planner-only 경로·첫 proof는 Cherry 승인으로 계약화됐지만 current가 아니며 Phase 3 실행 Gate `0/37`은 모두 locked/open이다. public-service release와 Phase 2 전체, Phase 3 실행, Phase 4와 5는 완료가 아니다.
+- Future roadmap visibility: Phase 2의 account access definition `K6 6/6`, provider-neutral disabled implementation `I1-I8 8/8`, prior fresh UX/Product re-QA `Q1-Q4 4/4`, prior Release re-Audit `A1-A4 4/4`, hosted-preview execution contract `H1-H6 6/6`, browser-viable public-redacted code readiness `B1-B12 12/12`, hosted-data 실행 사전준비 `E1-E8 8/8`, HP3 운영 활성화 결정 사전준비 `R1-R8 8/8`은 각각의 exact candidate 또는 문서 증거로 닫혔다. HP1 hosted identity는 승인만 확보된 `P1-P6 1/6`, HP2 hosted data `D1-D7 0/7`, hosted fresh QA `Q1-Q4 0/4`, hosted fresh Audit `A1-A4 0/4`, hosted Cherry acceptance `C1-C4 0/4`, HP3 운영 자원 준비·새 QA·새 Audit·Cherry 운영 후보 승인·운영 활성화는 합계 `0/24`로 locked/open이다. 두 사전준비 완료는 HP1 완료, HP2·HP3 승인, 운영 활성화나 출시를 대신하지 않는다. 이전 candidate의 QA/Audit은 다음 provider/data/domain candidate에 재사용하지 않는다. production hierarchy 등록은 추적 가시성만 제공하며 실행 권한이 아니다. Phase 3 목적·Planner-only 경로·첫 proof와 Codex-first/Mac mini/high-risk 재확인 구현 전제는 Cherry 승인으로 계약화됐지만 current가 아니며 Phase 3 실행 Gate `0/43`은 모두 locked/open이다. public-service release와 Phase 2 전체, Phase 3 실행, Phase 4와 5는 완료가 아니다.
 - `MVP_SCOPE_CLOSED`: true
 - `EXTERNAL_OUTCOME_COMPLETE`: false

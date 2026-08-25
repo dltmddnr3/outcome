@@ -59,7 +59,7 @@ Status: **Phase 1 internal-use Local MVP accepted · external public MVP not acc
 - Approval: 2026-08-25 KST Cherry `추천안 적용`
 - Purpose: 여러 PC와 외부 Codex/Claude에 이미 존재하는 역할 세션을 project-scoped private binding으로 연결·관찰하고 Planner-only 경로로 업무를 전달해 결과·증거 영수증을 회수한다.
 - Canonical detail: `docs/PHASE3_EXISTING_SESSION_OPERATIONS_CONTRACT.md`
-- Execution boundary: Phase 2가 current이고 Phase 3 실행 Gate는 `0/37`; 계약 승인은 Phase 3 entry, 구현, session binding/message dispatch, QA/Audit/Cherry acceptance, release 또는 external completion이 아니다.
+- Execution boundary: Phase 2가 current이고 Phase 3 실행 Gate는 `0/43`; 계약·구현 인계 승인은 Phase 3 entry, 구현, session binding/message dispatch, QA/Audit/Cherry acceptance, release 또는 external completion이 아니다.
 
 ## 1. 누구를 위한 제품인가
 

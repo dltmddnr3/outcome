@@ -59,14 +59,15 @@ Entry condition:
 
 Completion conditions:
 
+- Codex Adapter Technical Spike S1–S6가 supported interface와 GO/NO-GO evidence로 닫힌다.
 - Private Session Registry R1–R6가 immutable candidate evidence로 닫힌다.
 - Multi-PC Observation Relay O1–O6가 실제 두 관찰 위치와 stale/offline 증거로 닫힌다.
 - Planner Work Routing T1–T7이 단일 지시와 duplicate/timeout/wrong-binding 반증으로 닫힌다.
 - Evidence Continuity E1–E6가 receipt/result/Gate 분리와 rebind recovery로 닫힌다.
 - fresh UX & Product QA Q1–Q4, 별도 fresh Release Audit A1–A4, Cherry physical acceptance C1–C4가 동일 immutable candidate를 순서대로 닫는다.
-- Phase 3 실행 Gate 37개가 실제 증거로 모두 닫혀도 release와 `EXTERNAL_OUTCOME_COMPLETE`는 별도 Cherry 결정이다.
+- Phase 3 실행 Gate 43개가 실제 증거로 모두 닫혀도 release와 `EXTERNAL_OUTCOME_COMPLETE`는 별도 Cherry 결정이다.
 
-Definition evidence는 Phase 3 실행 진행률로 계산하지 않는다. 현재 Phase 3 실행 상태는 `0/37`이며 Phase 2가 current인 동안 Phase 3은 locked future phase다.
+Definition evidence와 구현 인계 문서는 Phase 3 실행 진행률로 계산하지 않는다. 현재 Phase 3 실행 상태는 `0/43`이며 Phase 2가 current인 동안 Phase 3은 locked future phase다.
 
 ## Scope와 Stage
 
@@ -74,8 +75,13 @@ Definition evidence는 Phase 3 실행 진행률로 계산하지 않는다. 현�
 
 목적: 프로젝트와 네 역할의 실제 기존 세션 binding을 비공개 단일 source로 관리한다.
 
+- Stage: Codex adapter technical spike
+- Gate: `GATES_PHASE3_CODEX_ADAPTER_TECHNICAL_SPIKE.md#S1-S6`
+- 완료 의미: supported observation/dispatch interface, auth·limit·terms·cost·fallback과 GO/NO-GO가 primary evidence로 닫힘
+
 - Stage: Private role-session registry candidate
 - Gate: `GATES_PHASE3_PRIVATE_SESSION_REGISTRY.md#R1-R6`
+- depends_on: Codex adapter technical spike
 - 완료 의미: binding schema, uniqueness, lifecycle, secret/redaction, audit와 negative validation이 candidate 증거로 닫힘
 
 ### Scope 2 · Multi-PC Observation Relay
@@ -196,12 +202,13 @@ QA PASS는 Audit이나 Cherry acceptance가 아니며, Audit PASS도 release 또
 - negative probes: missing/wrong/replaced binding, duplicate idempotency key, offline/stale, timeout, receipt mismatch, public secret/session ID leak
 - forbidden: release, Gate 자기 폐쇄, provider/resource/billing/domain mutation, 실제 제품 데이터 변경
 
-## 다음 구조 결정 전제
+## 승인된 구현 전제
 
-실제 implementation handoff 전에 다음 세 항목을 별도 Cherry 결정으로 고정해야 한다.
-
-1. 지원할 provider/session adapter의 첫 범위
-2. private registry·routing ledger·observation relay의 실행 위치
-3. 되돌리기 어려운 지시 또는 외부 mutation의 Cherry 재확인 정책
+- first adapter는 Codex-only다.
+- Mac mini가 private registry·routing ledger·observation relay·Codex adapter를 소유한다.
+- Vercel/private workspace는 public-safe projection과 end-to-end encrypted envelope만 중계한다.
+- high-risk operation은 exact target·intent digest·rollback에 묶인 만료형 single-use Cherry 재확인을 요구한다.
+- exact implementation contract와 initial spike handoff는 `docs/PHASE3_CODEX_RELAY_IMPLEMENTATION_HANDOFF.md`를 따른다.
+- Codex supported interface가 아직 증명되지 않았으므로 S1-S6 전에 registry/router 구현을 시작하지 않는다.
 
 Notion과 Linear connector가 현재 환경에 연결되어 있지 않으므로 이 로컬 계약은 source-controlled canonical draft지만 외부 PRD/실행 티켓 완료를 주장하지 않는다.
