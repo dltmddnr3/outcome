@@ -16,8 +16,8 @@ Outcome: Cherry의 승인을 K2 인증 계약에만 적용해 Google·Apple·ema
   CHECK: rg -q 'Next: `K3' docs/OUTCOME_MAP.md && rg -q 'K2 2/6 승인' docs/OUTCOME_MAP.md && rg -q '`EXTERNAL_OUTCOME_COMPLETE`: false' docs/OUTCOME_MAP.md && echo D4_PASS
   EXPECT: D4_PASS
   EVIDENCE: `docs/OUTCOME_MAP.md` Current Stage 유지, Next K3, K2 2/6, external false.
-- [ ] D5: snapshot parser, tests, build, exact public receipt, mutation 405와 prohibited hit 0을 검증한다.
-  EVIDENCE: local candidate PASS · snapshot projects=2/prohibited=0/Gate evidence fields=0/K2 2/6; frontend 57/57; Node 78/78; Vercel build + stable-host 7/7; scope PASS. Exact public receipt와 remote mutation/redaction은 배포 후 pending.
+- [x] D5: snapshot parser, tests, build, exact public receipt, mutation 405와 prohibited hit 0을 검증한다.
+  EVIDENCE: local snapshot projects=2/prohibited=0/Gate evidence fields=0/K2 2/6; frontend 57/57; Node 78/78; Vercel build + stable-host 7/7; scope PASS. Production `dpl_DuN99jdWvSg6rsXZehyzcnpLv3u2` READY; fixed URL page/API/health 200; receipt commit `b6d17173b626`, tree `7221d5278ab7`, asset `index-ClJ2FGRo.js`; public mutation 24/24=405; API/HTML/bundle/rendered UI prohibited identifiers=0; K3-K6 open.
 
 ABANDON: Clerk/provider 설치, Google OAuth client, Apple Services ID/private key, owner email·secret 설정, database/domain/product code mutation은 이 승인 기록에서 수행하지 않는다.
 ABANDON: K3-K6, 외부 공개 수준 MVP, release approval, `EXTERNAL_OUTCOME_COMPLETE`는 open이다.
