@@ -10,9 +10,9 @@ Decision contract: `docs/PHASE2_ACCOUNT_ACCESS_CONTRACT.md` (추천 초안이며
 - [x] K2: 인증 제공자, 소유자 식별, 접속 수명, 로그아웃·접속 철회, 요청 위조 방지와 계정 복구 계약이 승인된다.
   PROVES: security
   EVIDENCE: 2026-08-25 KST Cherry가 `승인 진행`으로 Clerk 기반 `Google primary + Apple linked access + email verification code fallback`, 단일 canonical owner, seven-day session, logout/revocation, CSRF와 recovery 계약을 승인했다. 실제 owner email/provider user ID는 private runtime/bootstrap 값이며 Git·Package·snapshot·log·public UI에 기록하지 않는다. 이 결정은 K2에만 적용되며 K3-K6와 provider/OAuth/secret 구현을 승인하지 않는다.
-- [ ] K3: 작업공간 간 격리, 프로젝트 가시성, 최소 권한, 비밀정보 소유권과 감사 경계가 승인된다.
+- [x] K3: 작업공간 간 격리, 프로젝트 가시성, 최소 권한, 비밀정보 소유권과 감사 경계가 승인된다.
   PROVES: security
-  EVIDENCE: pending
+  EVIDENCE: 2026-08-25 KST Cherry가 직전 K3 recommendation 승인 요청에 `연속진행`으로 답해 단일 owner-viewer, server-derived workspace membership, Cherry Note/OUTCOME allowlist, deny-by-default negative tests, private secret ownership과 redacted audit boundary를 승인했다. 이 결정은 K3에만 적용되며 K4-K6와 provider/database/product mutation을 승인하지 않는다.
 - [ ] K4: 영속 저장소, 배포본 최신성, 삭제·내보내기, 보존 기간, 이전과 백업·복구 계약이 승인된다.
   PROVES: architecture
   EVIDENCE: pending

@@ -1,6 +1,6 @@
 # Phase 2 · Account Access Outcome Contract
 
-Status: `K1-K2 APPROVED · K3-K6 CHERRY DECISION REQUIRED`
+Status: `K1-K3 APPROVED · K4-K6 CHERRY DECISION REQUIRED`
 Updated: 2026-08-25 KST
 
 Decision boundary: `NO_ACCOUNT_IMPLEMENTATION_BEFORE_K1_K6`
@@ -67,9 +67,9 @@ Official provider references reviewed on 2026-08-25 KST:
 
 Comparison boundary: Supabase remains a candidate for K4 durable data and tenant-row isolation. It is not selected for K2 because its browser session maintenance requires browser access to the refresh token, adding a larger auth/session integration surface than the owner-only v1 needs.
 
-## K3 workspace isolation recommendation · not approved
+## Approved K3 workspace isolation contract
 
-Recommendation: keep authentication, workspace membership, project visibility, operator authority, and public snapshot access as separate decisions. A valid Clerk session proves identity only; it never grants a project by itself.
+Approved 2026-08-25 KST: keep authentication, workspace membership, project visibility, operator authority, and public snapshot access as separate decisions. A valid Clerk session proves identity only; it never grants a project by itself.
 
 ### Capability boundary
 
@@ -124,6 +124,74 @@ Official references reviewed on 2026-08-25 KST:
 - Clerk session tokens: https://clerk.com/docs/guides/sessions/session-tokens
 - Clerk environment variables: https://clerk.com/docs/guides/development/clerk-environment-variables
 
+## K4 durable data recommendation · not approved
+
+Recommendation: use **Supabase managed Postgres Pro in Northeast Asia (Seoul, `ap-northeast-2`)** as the durable account/workspace/project/snapshot source. Keep the fixed Vercel public dashboard as a deployment-pinned sanitized projection, not as the database authority.
+
+Why Pro is the minimum operational recommendation: managed Pro projects receive daily backups with the latest seven days available. Free projects require operator-maintained exports and do not provide the same managed restore evidence. PITR is deferred until the write rate or public multi-user risk justifies its compute/add-on cost.
+
+### State ownership and minimum schema
+
+| State | Owner | Required behavior |
+| --- | --- | --- |
+| `workspaces` | OUTCOME database | One v1 Cherry workspace; stable internal ID, lifecycle state, timestamps |
+| `workspace_memberships` | OUTCOME database | Canonical Clerk user ID to workspace relationship; one active `owner-viewer` in v1 |
+| `projects` and `project_bindings` | OUTCOME database | Explicit Package identity, workspace binding, visibility and lifecycle; no path/credential authority in browser data |
+| `package_snapshots` | OUTCOME database | Append-only Package projection with schema version, source digest, observed/captured time and validation state |
+| current snapshot pointer | `projects` | Updated transactionally only after a complete validated snapshot insert |
+| `deployment_receipts` | OUTCOME database | Immutable snapshot ID + Git commit/tree + built asset + deployment ID/created time; never completion authority |
+| deletion ledger | OUTCOME database | Request, access-revoked time, purge deadline, purge receipt and restore re-delete marker |
+
+Security boundary:
+
+- Configure Supabase's current Clerk third-party authentication integration; do not use the deprecated shared-JWT-secret/JWT-template integration.
+- Browser reads use the Supabase publishable key plus the verified Clerk session token. The Supabase secret/service-role key is server-only and never enters a `VITE_` variable or browser bundle.
+- Exposed tables/views require explicit Data API exposure/grants and RLS. `TO authenticated` alone is insufficient: every policy must match the validated Clerk subject to an active workspace membership and the requested project binding.
+- Anonymous receives no private-table grants. Service-role ingestion is a separate server-side capability with exact project binding checks and no user-facing reuse.
+- Views use invoker security or remain in an unexposed schema. No public `SECURITY DEFINER` function is introduced to bypass policy failures.
+
+### Snapshot freshness and deployment projection
+
+1. A sync attempt writes a new append-only snapshot only after Package parsing, identity, hierarchy, Gate-source and redaction validation succeed.
+2. The project `current_snapshot_id` changes in the same transaction. A partial or failed ingest leaves the prior pointer intact and records failure separately.
+3. Every private response exposes `observed_at`, `captured_at`, snapshot ID/schema version and freshness state. Session/NOW activity never refreshes Package evidence.
+4. A public deployment selects one validated snapshot, sanitizes it, and binds its immutable snapshot ID to Git commit/tree/asset and Vercel deployment receipt.
+5. A failed sync or deploy never relabels old data as current. The UI keeps the last valid snapshot with explicit stale/error state.
+6. v1 refresh authority is the approved private operator or an explicitly invoked read-only ingestion job. Live multi-PC relay and autonomous polling remain deferred.
+
+### Retention, export and deletion recommendation
+
+- Active workspace/project identity and current snapshot: retained while active.
+- Superseded private Package snapshots: retain 90 days, except a snapshot referenced by a deployment receipt or acceptance evidence.
+- Deployment receipts and their referenced sanitized snapshots: retain while the project is active and for 365 days after project removal.
+- On-demand owner export: versioned JSON archive containing workspace/project registration, allowed account metadata, Package snapshots, deployment receipts and deletion ledger. Exclude secrets, raw provider tokens, session identifiers and operator credentials.
+- Deletion request: revoke private access immediately, create a 30-day recoverable deletion ledger entry, then hard-delete workspace membership, project bindings and unretained snapshots.
+- After hard deletion, data may remain only in provider backups until the seven-day managed backup window expires. Any restore must replay the deletion ledger before service reopening so deleted data is not resurrected.
+- Exact security-audit retention remains K5; K4 covers durable product/account/snapshot data only.
+
+### Migration and recovery recommendation
+
+- Schema is reproduced exclusively from reviewed, timestamped SQL under `supabase/migrations/`; production Dashboard edits are drift and must be captured or rejected before the next change.
+- Each change runs locally with `supabase db reset`, generates current types, executes RLS negative tests, and previews remote application with `supabase db push --dry-run` before an approved production push.
+- Before a destructive or irreversible production migration, take a logical dump and record its encrypted private location and checksum. Never run `db reset --linked` against production.
+- Rollback uses a reviewed compensating migration when data-compatible; otherwise restore the closest backup and replay accepted migrations plus the deletion ledger.
+- OUTCOME operational objectives for v1: `RPO ≤ 24h`, `RTO ≤ 8h`. These are acceptance targets, not a Supabase SLA.
+- Restore evidence is required before external MVP: restore into an isolated non-production project, replay migrations/deletion ledger, validate row counts and snapshot/receipt referential integrity, and record elapsed time. Repeat quarterly after launch and before any high-risk migration.
+
+Fail closed: missing Clerk integration, missing Supabase secret, RLS/policy conflict, schema-version mismatch, stale membership, failed transaction, backup unavailable or restore verification failure prevents private workspace service or deployment promotion; it never substitutes the public snapshot as authenticated data.
+
+Official references reviewed on 2026-08-25 KST:
+
+- Supabase Clerk integration: https://supabase.com/docs/guides/auth/third-party/clerk
+- Supabase backups/PITR: https://supabase.com/docs/guides/platform/backups
+- Supabase regions: https://supabase.com/docs/guides/platform/regions
+- Supabase local migration workflow: https://supabase.com/docs/guides/local-development/cli-workflows
+- Supabase Data API security: https://supabase.com/docs/guides/api/securing-your-api
+- Supabase RLS: https://supabase.com/docs/guides/database/postgres/row-level-security
+- Supabase changelog: https://supabase.com/changelog.md
+
+Changelog boundary: the 2026 Data API change means new tables are not assumed to be exposed automatically; grants/exposure and RLS are both explicit. Current management-log, extension pinning and self-hosted gateway breaking changes do not alter this managed-Postgres recommendation.
+
 ## Surface contract
 
 ### Public snapshot
@@ -168,8 +236,9 @@ Official references reviewed on 2026-08-25 KST:
 3. **Approved with K1:** keep the current public sanitized snapshot publicly reachable beside the private workspace.
 4. Approve collected account fields, retention window, deletion/export process, and audit retention.
 5. Approve storage/hosting region, operational owner, recovery objective, and monthly cost ceiling.
-6. Approve or revise the K3 recommendation: one owner-viewer workspace, server-derived membership, Cherry Note/OUTCOME-only private allowlist, capability matrix, negative authorization tests, secret ownership and audit boundary.
+6. **Approved 2026-08-25 KST:** one owner-viewer workspace, server-derived membership, Cherry Note/OUTCOME-only private allowlist, capability matrix, negative authorization tests, secret ownership and audit boundary.
+7. Approve or revise the K4 recommendation: Supabase Pro Seoul, durable schema ownership, append-only snapshots, 90/365-day retention, 30-day deletion window, JSON export, managed backups, migration/restore procedure and RPO/RTO targets.
 
 ## Builder entry condition
 
-Builder work may start only after K1-K6 in `GATES_PHASE2_ACCOUNT_ACCESS_DEFINITION.md` are evidence-closed by Cherry decisions. K1-K2 approval alone does not authorize provider installation or product code. The first implementation contract must then name provider, environment, exact allowed paths, red-first isolation tests, secret boundary, migration/rollback, preview verification, fresh UX & Product QA, and separate Release Audit. It must not add live collector relay, dispatch, project creation, billing, or release mutation by implication.
+Builder work may start only after K1-K6 in `GATES_PHASE2_ACCOUNT_ACCESS_DEFINITION.md` are evidence-closed by Cherry decisions. K1-K3 approval alone does not authorize provider installation or product code. The first implementation contract must then name provider, environment, exact allowed paths, red-first isolation tests, secret boundary, migration/rollback, preview verification, fresh UX & Product QA, and separate Release Audit. It must not add live collector relay, dispatch, project creation, billing, or release mutation by implication.

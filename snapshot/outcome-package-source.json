@@ -1,6 +1,6 @@
 {
   "schemaVersion": 2,
-  "observedAt": "2026-08-25T00:22:56.528Z",
+  "observedAt": "2026-08-25T00:42:51.213Z",
   "projects": [
     {
       "status": "conflict",
@@ -1696,10 +1696,10 @@
     {
       "status": "valid",
       "errors": [],
-      "observedAt": "2026-08-25T00:22:42.477Z",
+      "observedAt": "2026-08-25T00:42:34.085Z",
       "sourceFreshness": {
         "state": "observed",
-        "observedAt": "2026-08-25T00:22:42.477Z"
+        "observedAt": "2026-08-25T00:42:34.085Z"
       },
       "project": {
         "id": "outcome",
@@ -2736,7 +2736,7 @@
                         "id": "K3",
                         "stageId": "outcome-stage-account-access-definition",
                         "title": "작업공간 간 격리, 프로젝트 가시성, 최소 권한, 비밀정보 소유권과 감사 경계가 승인된다.",
-                        "closed": false,
+                        "closed": true,
                         "groupCode": "K",
                         "groupLabel": null,
                         "proves": "security"
@@ -2775,14 +2775,14 @@
                         "name": "계정 접근 계약 결정",
                         "sourceName": "K",
                         "total": 6,
-                        "closed": 2
+                        "closed": 3
                       }
                     ],
                     "total": 6,
-                    "closed": 2,
+                    "closed": 3,
                     "available": true,
                     "sourceRef": "GATES_PHASE2_ACCOUNT_ACCESS_DEFINITION.md",
-                    "observedAt": "2026-08-25T00:22:42.477Z"
+                    "observedAt": "2026-08-25T00:42:34.085Z"
                   },
                   "sourceState": "present",
                   "state": "active",
@@ -2964,7 +2964,7 @@
   ],
   "snapshot": {
     "boundary": "deployment_snapshot",
-    "capturedAt": "2026-08-25T00:22:56.528Z",
+    "capturedAt": "2026-08-25T00:42:51.213Z",
     "source": "sanitized_public_projection",
     "liveSessionRelay": false,
     "refreshBehavior": "new_deployment_required"
