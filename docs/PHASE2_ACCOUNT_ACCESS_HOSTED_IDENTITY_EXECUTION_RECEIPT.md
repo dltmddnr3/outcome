@@ -59,8 +59,8 @@
 
 - 실행 절차: `docs/PHASE2_HOSTED_IDENTITY_P3_DIRECT_PROBE.md`
 - Google 로그인: `PASS · Account Portal signed-in 상태와 Clerk Google social account를 교차 확인 · 사용자 수 1 유지`
-- email code 대체 로그인: `로그아웃 상태 email 입력 대기`
+- email code 대체 로그인: `PASS · 로그아웃 뒤 동일 소유자가 email code로 로그인하고 새로고침 뒤 세션 유지 확인`
 - Apple 연결 전용: `PASS · 인증된 Account 화면에서 연결 완료 · Clerk social account 2개(Google·Apple)와 사용자 수 1 교차 확인`
 - Apple 직접 가입·로그인: `PASS · 로그아웃 뒤 sign-in 화면에서 Google·email만 노출되고 Apple 선택지 없음`
 - 다른 사용자 거부: `미실행`
-- 로그아웃·세션 철회: `로그아웃 PASS · 서버 세션 철회 미실행`
+- 로그아웃·세션 철회: `PASS · 사용자 로그아웃 뒤 sign-in 복귀 · Clerk 모든 기기 세션 철회 뒤 기존 Account Portal 새로고침에서 sign-in 강제`
