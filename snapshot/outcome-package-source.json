@@ -3,22 +3,1643 @@
   "observedAt": "2026-08-25T02:13:47.110Z",
   "projects": [
     {
-      "status": "unknown",
+      "status": "conflict",
       "errors": [
-        "contract_missing",
-        "map_missing",
-        "contract_project_id_missing",
-        "contract_project_name_missing",
-        "contract_outcome_missing",
-        "contract_acceptance_authority_missing",
-        "map_yaml_missing"
+        "current_stage_gate_closed_conflict"
       ],
-      "project": {
-        "id": "unknown",
-        "name": "Unknown project",
-        "outcome": null
+      "observedAt": "2026-08-24T15:35:24.793Z",
+      "sourceFreshness": {
+        "state": "observed",
+        "observedAt": "2026-08-24T15:35:24.793Z"
       },
-      "phases": [],
+      "project": {
+        "id": "cherry-note",
+        "name": "Cherry Note",
+        "outcome": "생각과 자료가 계속 쌓이는 사용자가 실제 iPhone에서 자신의 내용을 즉시 기록하고, 필요한 수준으로 정리하고, 앱을 종료·재실행한 뒤에도 다시 찾아 활용할 수 있다.",
+        "acceptanceAuthority": "Cherry"
+      },
+      "phases": [
+        {
+          "id": "phase-1-mvp-closure",
+          "title": "Phase 1 MVP Closure",
+          "purpose": "Close the capture-organize-rediscover MVP through physical boundaries, immutable evidence, independent QA and Cherry acceptance.",
+          "completion": "MVP_SCOPE_CLOSED",
+          "scopes": [
+            {
+              "id": "scope-stage-33-physical-boundary",
+              "title": "Stage 33 Physical Boundary",
+              "purpose": "Convert the open build-41 bottom-shell feedback into a verified immutable candidate and Cherry physical verdict without starting Feed.",
+              "stages": [
+                {
+                  "id": "stage-33-engineering-build-41",
+                  "title": "Stage 33 Engineering and Build 41 Evidence",
+                  "purpose": "Preserve the exact engineering and internal distribution baseline that precedes physical acceptance.",
+                  "dependsOn": [],
+                  "expectedDurationMinutes": null,
+                  "gatePurpose": "Stage 33 Engineering and Build 41 Evidence acceptance checklist",
+                  "gate": {
+                    "gates": [
+                      {
+                        "id": "Y1",
+                        "stageId": "stage-33-engineering-build-41",
+                        "title": "youtu.be, youtube watch/mobile/music, Shorts, embed, and live URL variants resolve one validated video ID; malformed/non-YouTube inputs do not.",
+                        "closed": true,
+                        "groupCode": "Y",
+                        "groupLabel": "YouTube addition gates (written before product mutation)",
+                        "proves": null
+                      },
+                      {
+                        "id": "Y2",
+                        "stageId": "stage-33-engineering-build-41",
+                        "title": "Existing enrichment persists a real video title and safe thumbnail URL on the Link while a nonblank user-authored Note title remains byte-identical.",
+                        "closed": true,
+                        "groupCode": "Y",
+                        "groupLabel": "YouTube addition gates (written before product mutation)",
+                        "proves": null
+                      },
+                      {
+                        "id": "Y3",
+                        "stageId": "stage-33-engineering-build-41",
+                        "title": "The last successfully loaded thumbnail is cached locally for relaunch/offline; metadata/image/network failures keep Note create/edit non-blocking and preserve last-good values.",
+                        "closed": true,
+                        "groupCode": "Y",
+                        "groupLabel": "YouTube addition gates (written before product mutation)",
+                        "proves": null
+                      },
+                      {
+                        "id": "Y4",
+                        "stageId": "stage-33-engineering-build-41",
+                        "title": "Link cards render persisted Link title + thumbnail with a safe fallback in light/dark/Dynamic Type and remain clear of floating controls.",
+                        "closed": true,
+                        "groupCode": "Y",
+                        "groupLabel": "YouTube addition gates (written before product mutation)",
+                        "proves": null
+                      },
+                      {
+                        "id": "Y5",
+                        "stageId": "stage-33-engineering-build-41",
+                        "title": "A discoverable 링크 복사 action copies the exact original URL and exposes success feedback; duplicates remain distinct and enrichment drain remains idempotent.",
+                        "closed": true,
+                        "groupCode": "Y",
+                        "groupLabel": "YouTube addition gates (written before product mutation)",
+                        "proves": null
+                      },
+                      {
+                        "id": "L1",
+                        "stageId": "stage-33-engineering-build-41",
+                        "title": "Named light root/nested Folder, Inbox, card, header, loading, empty, and error surfaces resolve only through warm Ivory semantic roles; no pure-white/cool-gray branded surface remains.",
+                        "closed": true,
+                        "groupCode": "L",
+                        "groupLabel": "Light-surface/material addition gates (written before product mutation)",
+                        "proves": null
+                      },
+                      {
+                        "id": "L2",
+                        "stageId": "stage-33-engineering-build-41",
+                        "title": "Folder detail title/header is continuous with the surrounding Ivory family, using only separator or tonal elevation for hierarchy.",
+                        "closed": true,
+                        "groupCode": "L",
+                        "groupLabel": "Light-surface/material addition gates (written before product mutation)",
+                        "proves": null
+                      },
+                      {
+                        "id": "L3",
+                        "stageId": "stage-33-engineering-build-41",
+                        "title": "Note cards use the shared warm elevated Ivory token with readable text/image boundaries; Stage 33 black-cherry dark values remain unchanged.",
+                        "closed": true,
+                        "groupCode": "L",
+                        "groupLabel": "Light-surface/material addition gates (written before product mutation)",
+                        "proves": null
+                      },
+                      {
+                        "id": "L4",
+                        "stageId": "stage-33-engineering-build-41",
+                        "title": "The floating bottom tab uses native material with a warm-Ivory underlay and an opaque semantic fallback when Reduce Transparency is enabled.",
+                        "closed": true,
+                        "groupCode": "L",
+                        "groupLabel": "Light-surface/material addition gates (written before product mutation)",
+                        "proves": null
+                      },
+                      {
+                        "id": "L5",
+                        "stageId": "stage-33-engineering-build-41",
+                        "title": "Material translucency does not substitute for geometry: last-row clearance passes on small/current devices, normal/large Dynamic Type, content/image/loading/empty backgrounds, light/dark, and Reduce Transparency on/off.",
+                        "closed": true,
+                        "groupCode": "L",
+                        "groupLabel": "Light-surface/material addition gates (written before product mutation)",
+                        "proves": null
+                      },
+                      {
+                        "id": "B1",
+                        "stageId": "stage-33-engineering-build-41",
+                        "title": "The approved C geometry/proportions are byte-identical; only the primary shipping asset's color treatment changes to semantic Ivory + main Burgundy with a restrained warm tonal accent.",
+                        "closed": true,
+                        "groupCode": "B",
+                        "groupLabel": "Brand identity addition gates (written before shipping-asset mutation)",
+                        "proves": null
+                      },
+                      {
+                        "id": "B2",
+                        "stageId": "stage-33-engineering-build-41",
+                        "title": "AppIcon matrix, launch, sign-in, About, and every in-app brand-mark use are inventoried and resolve to the same primary light asset; small masked sizes remain legible.",
+                        "closed": true,
+                        "groupCode": "B",
+                        "groupLabel": "Brand identity addition gates (written before shipping-asset mutation)",
+                        "proves": null
+                      },
+                      {
+                        "id": "B3",
+                        "stageId": "stage-33-engineering-build-41",
+                        "title": "Dark UI presents the primary light logo in a contrast-safe container without inversion or a generated dark asset; dark-specific logo is recorded TBU for a later contract.",
+                        "closed": true,
+                        "groupCode": "B",
+                        "groupLabel": "Brand identity addition gates (written before shipping-asset mutation)",
+                        "proves": null
+                      },
+                      {
+                        "id": "M1",
+                        "stageId": "stage-33-engineering-build-41",
+                        "title": "More destination inventory is complete and every reachable destination is opened: Archive, Connections, Recently Deleted, and Settings (opened-count = total-count).",
+                        "closed": true,
+                        "groupCode": "M",
+                        "groupLabel": "More destination surface gates (written before product mutation)",
+                        "proves": null
+                      },
+                      {
+                        "id": "M2",
+                        "stageId": "stage-33-engineering-build-41",
+                        "title": "The shared branded List/Form/Scroll container owns navigation bar, safe areas, search backdrop, rows, footers, empty/loading/error states, and prevents system white/cool-gray reintroduction.",
+                        "closed": true,
+                        "groupCode": "M",
+                        "groupLabel": "More destination surface gates (written before product mutation)",
+                        "proves": null
+                      },
+                      {
+                        "id": "M3",
+                        "stageId": "stage-33-engineering-build-41",
+                        "title": "Connections populated, Recently Deleted long-list, Archive empty, and Archive populated/search rendered evidence has zero dominant pure-white region and matches semantic Ivory.",
+                        "closed": true,
+                        "groupCode": "M",
+                        "groupLabel": "More destination surface gates (written before product mutation)",
+                        "proves": null
+                      },
+                      {
+                        "id": "M4",
+                        "stageId": "stage-33-engineering-build-41",
+                        "title": "More destinations preserve black-cherry dark mode, small-device/Dynamic Type scrolling, bottom clearance, and material/Reduce Transparency continuity without a pink/white gradient band.",
+                        "closed": true,
+                        "groupCode": "M",
+                        "groupLabel": "More destination surface gates (written before product mutation)",
+                        "proves": null
+                      },
+                      {
+                        "id": "N1",
+                        "stageId": "stage-33-engineering-build-41",
+                        "title": "New Folder owns its full safe-area/Form canvas through the shared semantic Ivory destination and List modifiers; no system white/cool-gray surface leaks in light mode and dark remains black-cherry.",
+                        "closed": true,
+                        "groupCode": "N",
+                        "groupLabel": "New Folder correction gates (written before product mutation)",
+                        "proves": null
+                      },
+                      {
+                        "id": "N2",
+                        "stageId": "stage-33-engineering-build-41",
+                        "title": "Name is followed by one accessible 상위 폴더 row showing 최상위 or the selected breadcrumb; Create/Cancel stay reachable with keyboard, small viewport, and large Dynamic Type.",
+                        "closed": true,
+                        "groupCode": "N",
+                        "groupLabel": "New Folder correction gates (written before product mutation)",
+                        "proves": null
+                      },
+                      {
+                        "id": "N3",
+                        "stageId": "stage-33-engineering-build-41",
+                        "title": "The existing Folder destination hierarchy is reused with explicit root, path-disambiguated duplicate names, depth disclosure, and no second hierarchy source of truth.",
+                        "closed": true,
+                        "groupCode": "N",
+                        "groupLabel": "New Folder correction gates (written before product mutation)",
+                        "proves": null
+                      },
+                      {
+                        "id": "N4",
+                        "stageId": "stage-33-engineering-build-41",
+                        "title": "Root entry defaults to 최상위; Folder-detail entry defaults to that Folder; override/cancel preserve the form selection and exact selected parent ID reaches createFolder.",
+                        "closed": true,
+                        "groupCode": "N",
+                        "groupLabel": "New Folder correction gates (written before product mutation)",
+                        "proves": null
+                      },
+                      {
+                        "id": "N5",
+                        "stageId": "stage-33-engineering-build-41",
+                        "title": "Root/nested/override creation appears immediately under the exact parent and remains there after relaunch; empty/deep tree, VoiceOver, validation, light/dark and bottom/keyboard clearance pass without restoring icon-selection copy.",
+                        "closed": true,
+                        "groupCode": "N",
+                        "groupLabel": "New Folder correction gates (written before product mutation)",
+                        "proves": null
+                      },
+                      {
+                        "id": "E1",
+                        "stageId": "stage-33-engineering-build-41",
+                        "title": "Build-40's first-character focus loss is reproduced through the real FoundationEventComposerView → FoundationUnderlinedTitleField path, and the exact identity/responder root cause is recorded before correction.",
+                        "closed": true,
+                        "groupCode": "E",
+                        "groupLabel": "New Event input regression gates (written before product mutation)",
+                        "proves": null
+                      },
+                      {
+                        "id": "E2",
+                        "stageId": "stage-33-engineering-build-41",
+                        "title": "One stable title input identity remains first responder through Korean multi-syllable input, Latin/numeric/emoji, paste, delete/retype, marked-text composition, date/time/all-day state changes, and SwiftUI re-renders.",
+                        "closed": true,
+                        "groupCode": "E",
+                        "groupLabel": "New Event input regression gates (written before product mutation)",
+                        "proves": null
+                      },
+                      {
+                        "id": "E3",
+                        "stageId": "stage-33-engineering-build-41",
+                        "title": "Keyboard dismissal occurs only on explicit Cancel/Save/submit/background intent; validation and title/date suggestion side effects never dismiss or recreate the field.",
+                        "closed": true,
+                        "groupCode": "E",
+                        "groupLabel": "New Event input regression gates (written before product mutation)",
+                        "proves": null
+                      },
+                      {
+                        "id": "E4",
+                        "stageId": "stage-33-engineering-build-41",
+                        "title": "New Event owns the full safe-area/Form/date/toggle/calendar sheet surface through the shared semantic Ivory destination/List contracts, with no screen-local RGB or system white/cool-gray leakage and no black-cherry regression.",
+                        "closed": true,
+                        "groupCode": "E",
+                        "groupLabel": "New Event input regression gates (written before product mutation)",
+                        "proves": null
+                      },
+                      {
+                        "id": "E5",
+                        "stageId": "stage-33-engineering-build-41",
+                        "title": "Exact Event title saves once, reopens and survives relaunch; Cancel persists nothing; small-device keyboard, Dynamic Type, VoiceOver, New Note and New Folder input regressions pass with rendered/resolved-color evidence.",
+                        "closed": true,
+                        "groupCode": "E",
+                        "groupLabel": "New Event input regression gates (written before product mutation)",
+                        "proves": null
+                      },
+                      {
+                        "id": "A1",
+                        "stageId": "stage-33-engineering-build-41",
+                        "title": "The real root/child long-press 보관함 action preserves the exact Folder ID through preview/confirmation and calls the same archive command as every equivalent entry point.",
+                        "closed": true,
+                        "groupCode": "A",
+                        "groupLabel": "Folder archive regression gates (written before the Stage 33 archive repair)",
+                        "proves": null
+                      },
+                      {
+                        "id": "A2",
+                        "stageId": "stage-33-engineering-build-41",
+                        "title": "Successful archive removes the exact subtree from the active tree immediately, appears in Archive immediately, remains archived after relaunch, and restores with byte/count-preserved content and the documented parent fallback.",
+                        "closed": true,
+                        "groupCode": "A",
+                        "groupLabel": "Folder archive regression gates (written before the Stage 33 archive repair)",
+                        "proves": null
+                      },
+                      {
+                        "id": "A3",
+                        "stageId": "stage-33-engineering-build-41",
+                        "title": "Preview or archive failure is never swallowed: durable state remains unchanged and one actionable retry surface is visible; double invocation and already-archived calls are idempotent.",
+                        "closed": true,
+                        "groupCode": "A",
+                        "groupLabel": "Folder archive regression gates (written before the Stage 33 archive repair)",
+                        "proves": null
+                      },
+                      {
+                        "id": "A4",
+                        "stageId": "stage-33-engineering-build-41",
+                        "title": "Empty/non-empty, pinned, root/child Folder, VoiceOver labels, menu dismissal, and small-device context-menu paths pass without data loss.",
+                        "closed": true,
+                        "groupCode": "A",
+                        "groupLabel": "Folder archive regression gates (written before the Stage 33 archive repair)",
+                        "proves": null
+                      },
+                      {
+                        "id": "D1",
+                        "stageId": "stage-33-engineering-build-41",
+                        "title": "Delete confirmation clearly separates 폴더만 삭제 from 폴더와 콘텐츠 모두 삭제; Cancel/safe action is the default and the destructive path requires a second confirmation naming the Folder and full affected count.",
+                        "closed": true,
+                        "groupCode": "D",
+                        "groupLabel": "Recoverable Folder subtree delete gates (written before product mutation)",
+                        "proves": null
+                      },
+                      {
+                        "id": "D2",
+                        "stageId": "stage-33-engineering-build-41",
+                        "title": "The preview traverses the actual subtree and reports descendant Folder plus Note/Todo/Event and attached photo/link impact without double-counting shared source objects.",
+                        "closed": true,
+                        "groupCode": "D",
+                        "groupLabel": "Recoverable Folder subtree delete gates (written before product mutation)",
+                        "proves": null
+                      },
+                      {
+                        "id": "D3",
+                        "stageId": "stage-33-engineering-build-41",
+                        "title": "폴더만 삭제 preserves every child byte/count and rehomes direct children to the valid parent exactly as the existing contract requires.",
+                        "closed": true,
+                        "groupCode": "D",
+                        "groupLabel": "Recoverable Folder subtree delete gates (written before product mutation)",
+                        "proves": null
+                      },
+                      {
+                        "id": "D4",
+                        "stageId": "stage-33-engineering-build-41",
+                        "title": "폴더와 콘텐츠 모두 삭제 commits one local atomic tombstone batch for the subtree, immediately removes it from active projections, and exposes the recoverable hierarchy in Recently Deleted for 30 days; no permanent delete occurs.",
+                        "closed": true,
+                        "groupCode": "D",
+                        "groupLabel": "Recoverable Folder subtree delete gates (written before product mutation)",
+                        "proves": null
+                      },
+                      {
+                        "id": "D5",
+                        "stageId": "stage-33-engineering-build-41",
+                        "title": "Restore clears the same subtree tombstones atomically, preserves identity/fields/relationships, restores the original parent when valid, and uses the documented root fallback when it is not.",
+                        "closed": true,
+                        "groupCode": "D",
+                        "groupLabel": "Recoverable Folder subtree delete gates (written before product mutation)",
+                        "proves": null
+                      },
+                      {
+                        "id": "D6",
+                        "stageId": "stage-33-engineering-build-41",
+                        "title": "Injected batch failure, concurrent/double invocation, already trashed/archived/pinned, nested/duplicate-name/large subtree, relaunch, and recovery round-trip prove no partial state or silent success.",
+                        "closed": true,
+                        "groupCode": "D",
+                        "groupLabel": "Recoverable Folder subtree delete gates (written before product mutation)",
+                        "proves": null
+                      },
+                      {
+                        "id": "D7",
+                        "stageId": "stage-33-engineering-build-41",
+                        "title": "The semantic Ivory sheet, destructive hierarchy, full-count copy, 44pt actions, Dynamic Type, VoiceOver, and small-device rendering pass.",
+                        "closed": true,
+                        "groupCode": "D",
+                        "groupLabel": "Recoverable Folder subtree delete gates (written before product mutation)",
+                        "proves": null
+                      },
+                      {
+                        "id": "G1",
+                        "stageId": "stage-33-engineering-build-41",
+                        "title": "Exact build-40 baseline and tracked-clean state are verified before product edits.",
+                        "closed": true,
+                        "groupCode": "G",
+                        "groupLabel": null,
+                        "proves": null
+                      },
+                      {
+                        "id": "G2",
+                        "stageId": "stage-33-engineering-build-41",
+                        "title": "All production title surfaces in the audited core UI use semantic foreground roles and focused source contracts reject theme-breaking title literals.",
+                        "closed": true,
+                        "groupCode": "G",
+                        "groupLabel": null,
+                        "proves": null
+                      },
+                      {
+                        "id": "G3",
+                        "stageId": "stage-33-engineering-build-41",
+                        "title": "New Note presents canonical title then body then location/attachments, with an explicit body affordance and deterministic keyboard focus progression.",
+                        "closed": true,
+                        "groupCode": "G",
+                        "groupLabel": null,
+                        "proves": null
+                      },
+                      {
+                        "id": "G4",
+                        "stageId": "stage-33-engineering-build-41",
+                        "title": "The attachment area exposes equal compact Photo and Link actions with 44pt minimum targets, accessible labels, and unchanged handlers.",
+                        "closed": true,
+                        "groupCode": "G",
+                        "groupLabel": null,
+                        "proves": null
+                      },
+                      {
+                        "id": "G5",
+                        "stageId": "stage-33-engineering-build-41",
+                        "title": "A Folder row opens the Folder while exactly one separate trailing disclosure control expands/collapses children only when children exist.",
+                        "closed": true,
+                        "groupCode": "G",
+                        "groupLabel": null,
+                        "proves": null
+                      },
+                      {
+                        "id": "G6",
+                        "stageId": "stage-33-engineering-build-41",
+                        "title": "Folder disclosure state persists locally across navigation/relaunch, supports deep hierarchy, and does not mutate the folder domain/schema.",
+                        "closed": true,
+                        "groupCode": "G",
+                        "groupLabel": null,
+                        "proves": null
+                      },
+                      {
+                        "id": "G7",
+                        "stageId": "stage-33-engineering-build-41",
+                        "title": "Focused UI tests prove Note composer order/actions and Folder navigation/disclosure separation at rendered accessibility seams.",
+                        "closed": true,
+                        "groupCode": "G",
+                        "groupLabel": null,
+                        "proves": null
+                      },
+                      {
+                        "id": "G8",
+                        "stageId": "stage-33-engineering-build-41",
+                        "title": "Light/dark and smallest-device rendered evidence is captured for New Note and Folder hierarchy with no observed title-color/focus/clipping regression.",
+                        "closed": true,
+                        "groupCode": "G",
+                        "groupLabel": null,
+                        "proves": null
+                      },
+                      {
+                        "id": "G9",
+                        "stageId": "stage-33-engineering-build-41",
+                        "title": "DockFoundation and DockStorage complete suites pass.",
+                        "closed": true,
+                        "groupCode": "G",
+                        "groupLabel": null,
+                        "proves": null
+                      },
+                      {
+                        "id": "G10",
+                        "stageId": "stage-33-engineering-build-41",
+                        "title": "DockTests and DockUITests complete suites plus the existing core-loop regression pass.",
+                        "closed": true,
+                        "groupCode": "G",
+                        "groupLabel": null,
+                        "proves": null
+                      },
+                      {
+                        "id": "G11",
+                        "stageId": "stage-33-engineering-build-41",
+                        "title": "Exactly one non-amending product commit contains only Stage 33 tracked changes; frozen product/data/auth contracts remain unchanged.",
+                        "closed": true,
+                        "groupCode": "G",
+                        "groupLabel": null,
+                        "proves": null
+                      },
+                      {
+                        "id": "G12",
+                        "stageId": "stage-33-engineering-build-41",
+                        "title": "The next unused build is independently verified, then archive/export/deep-codesign/bundle consistency and IPA SHA checks pass without upload.",
+                        "closed": true,
+                        "groupCode": "G",
+                        "groupLabel": null,
+                        "proves": null
+                      },
+                      {
+                        "id": "G13",
+                        "stageId": "stage-33-engineering-build-41",
+                        "title": "Outcome Scorecard records build-40 affected UI/UX rows as NEEDS_REVISION and the Stage 33 measured delta without claiming Cherry acceptance.",
+                        "closed": true,
+                        "groupCode": "G",
+                        "groupLabel": null,
+                        "proves": null
+                      },
+                      {
+                        "id": "G14",
+                        "stageId": "stage-33-engineering-build-41",
+                        "title": "Terminal receipt and Release Scope identify exact commit/tree/build/IPA SHA, residuals, false completion count, and the next Cherry TestFlight touchpoint.",
+                        "closed": true,
+                        "groupCode": "G",
+                        "groupLabel": null,
+                        "proves": null
+                      },
+                      {
+                        "id": "G15",
+                        "stageId": "stage-33-engineering-build-41",
+                        "title": "Standard and high-contrast dark tokens form one near-black black-cherry hierarchy while every accepted light token resolves byte-identically to build 40.",
+                        "closed": true,
+                        "groupCode": "G",
+                        "groupLabel": null,
+                        "proves": null
+                      },
+                      {
+                        "id": "G16",
+                        "stageId": "stage-33-engineering-build-41",
+                        "title": "Folder, Feed, Alerts, More, Search, Auth, New Note, and nested Folder render named dark evidence without brown bands, black titles, or indiscriminate pink foregrounds.",
+                        "closed": true,
+                        "groupCode": "G",
+                        "groupLabel": null,
+                        "proves": null
+                      },
+                      {
+                        "id": "G17",
+                        "stageId": "stage-33-engineering-build-41",
+                        "title": "More's four unchanged navigation actions use the same reusable 44pt row, icon-column, gap, insets, and separator geometry as Folder root in light/dark and Dynamic Type.",
+                        "closed": true,
+                        "groupCode": "G",
+                        "groupLabel": null,
+                        "proves": null
+                      },
+                      {
+                        "id": "G18",
+                        "stageId": "stage-33-engineering-build-41",
+                        "title": "Cold and warm Folder first-open are measured on large and smallest iPhone simulators with realistic persisted data; first usable paint improves materially and warm open does not regress.",
+                        "closed": true,
+                        "groupCode": "G",
+                        "groupLabel": null,
+                        "proves": null
+                      },
+                      {
+                        "id": "G19",
+                        "stageId": "stage-33-engineering-build-41",
+                        "title": "Folder hydration immediately paints a branded title/list skeleton with progress copy, no spinner-only or pure-black blank frame, and gates unavailable capture actions.",
+                        "closed": true,
+                        "groupCode": "G",
+                        "groupLabel": null,
+                        "proves": null
+                      }
+                    ],
+                    "groups": [
+                      {
+                        "code": "Y",
+                        "name": "링크 미리보기",
+                        "sourceName": "YouTube addition gates (written before product mutation)",
+                        "total": 5,
+                        "closed": 5
+                      },
+                      {
+                        "code": "L",
+                        "name": "아이보리 표면·머티리얼",
+                        "sourceName": "Light-surface/material addition gates (written before product mutation)",
+                        "total": 5,
+                        "closed": 5
+                      },
+                      {
+                        "code": "B",
+                        "name": "브랜드 아이덴티티",
+                        "sourceName": "Brand identity addition gates (written before shipping-asset mutation)",
+                        "total": 3,
+                        "closed": 3
+                      },
+                      {
+                        "code": "M",
+                        "name": "더보기 화면",
+                        "sourceName": "More destination surface gates (written before product mutation)",
+                        "total": 4,
+                        "closed": 4
+                      },
+                      {
+                        "code": "N",
+                        "name": "새 폴더",
+                        "sourceName": "New Folder correction gates (written before product mutation)",
+                        "total": 5,
+                        "closed": 5
+                      },
+                      {
+                        "code": "E",
+                        "name": "새 일정 입력",
+                        "sourceName": "New Event input regression gates (written before product mutation)",
+                        "total": 5,
+                        "closed": 5
+                      },
+                      {
+                        "code": "A",
+                        "name": "폴더 보관",
+                        "sourceName": "Folder archive regression gates (written before the Stage 33 archive repair)",
+                        "total": 4,
+                        "closed": 4
+                      },
+                      {
+                        "code": "D",
+                        "name": "폴더 하위 트리 복구 삭제",
+                        "sourceName": "Recoverable Folder subtree delete gates (written before product mutation)",
+                        "total": 7,
+                        "closed": 7
+                      },
+                      {
+                        "code": "G",
+                        "name": "엔지니어링 완료 증거",
+                        "sourceName": "G",
+                        "total": 19,
+                        "closed": 19
+                      }
+                    ],
+                    "total": 57,
+                    "closed": 57,
+                    "available": true,
+                    "sourceRef": "GATES_STAGE33_PHYSICAL_UIUX.md",
+                    "observedAt": "2026-08-23T11:16:06.041Z"
+                  },
+                  "sourceState": "present_read_only",
+                  "state": "complete",
+                  "axes": {
+                    "implementation": "complete_on_pinned_candidate",
+                    "test": "complete_57_of_57_engineering_gates",
+                    "evidence": "complete_for_engineering_and_internal_distribution",
+                    "independentQa": "not_final_phase_qa",
+                    "cherryAcceptance": "pending",
+                    "release": "internal_testflight_available_not_release"
+                  }
+                },
+                {
+                  "id": "stage-33-bottom-shell-seam-correction",
+                  "title": "Bottom-shell Seam Correction",
+                  "purpose": "Remove the physical rectangular seam without changing Feed, data, navigation behavior or the proven clearance contract.",
+                  "dependsOn": [
+                    "stage-33-engineering-build-41"
+                  ],
+                  "expectedDurationMinutes": null,
+                  "gatePurpose": "Bottom-shell Seam Correction acceptance checklist",
+                  "gate": {
+                    "gates": [
+                      {
+                        "id": "S1",
+                        "stageId": "stage-33-bottom-shell-seam-correction",
+                        "title": "Build-41 commit/tree and tracked-clean state are verified; the physical screenshot is inspected before mutation.",
+                        "closed": true,
+                        "groupCode": "S",
+                        "groupLabel": null,
+                        "proves": null
+                      },
+                      {
+                        "id": "S2",
+                        "stageId": "stage-33-bottom-shell-seam-correction",
+                        "title": "Red-first source/pixel contracts reproduce the flat full-width 37% shell background and fail before the correction.",
+                        "closed": true,
+                        "groupCode": "S",
+                        "groupLabel": null,
+                        "proves": null
+                      },
+                      {
+                        "id": "S3",
+                        "stageId": "stage-33-bottom-shell-seam-correction",
+                        "title": "One shared alpha-falloff/mask removes the rectangular top boundary while keeping the floating capsule/search/FAB readable and hit-test behavior unchanged.",
+                        "closed": true,
+                        "groupCode": "S",
+                        "groupLabel": null,
+                        "proves": null
+                      },
+                      {
+                        "id": "S4",
+                        "stageId": "stage-33-bottom-shell-seam-correction",
+                        "title": "Rendered light-Ivory Folder evidence passes for short and long content on current and smallest iPhone viewports; the sampled shell transition has no abrupt horizontal color step.",
+                        "closed": true,
+                        "groupCode": "S",
+                        "groupLabel": null,
+                        "proves": null
+                      },
+                      {
+                        "id": "S5",
+                        "stageId": "stage-33-bottom-shell-seam-correction",
+                        "title": "Reduce Transparency uses an accessible semantic fallback with the same seamless top falloff; Dynamic Type and smallest-device controls remain readable and at least 44pt.",
+                        "closed": true,
+                        "groupCode": "S",
+                        "groupLabel": null,
+                        "proves": null
+                      },
+                      {
+                        "id": "S6",
+                        "stageId": "stage-33-bottom-shell-seam-correction",
+                        "title": "Bottom content clearance, final-row reachability, Search/FAB/tab hit areas, keyboard behavior, and scroll performance do not regress across all root tabs.",
+                        "closed": true,
+                        "groupCode": "S",
+                        "groupLabel": null,
+                        "proves": null
+                      },
+                      {
+                        "id": "S7",
+                        "stageId": "stage-33-bottom-shell-seam-correction",
+                        "title": "Focused source/unit/UI tests plus complete proportional DockFoundation, DockTests, and signed simulator build pass with zero new product failure/flake.",
+                        "closed": true,
+                        "groupCode": "S",
+                        "groupLabel": null,
+                        "proves": null
+                      },
+                      {
+                        "id": "S8",
+                        "stageId": "stage-33-bottom-shell-seam-correction",
+                        "title": "Exactly one non-amending product commit contains only the bounded shell/test correction; Feed/data/auth/backend remain unchanged.",
+                        "closed": true,
+                        "groupCode": "S",
+                        "groupLabel": null,
+                        "proves": null
+                      },
+                      {
+                        "id": "S9",
+                        "stageId": "stage-33-bottom-shell-seam-correction",
+                        "title": "Immutable candidate receipt records commit/tree/tests/rendered evidence, false_completion_count, and Cherry physical TestFlight acceptance as pending rather than self-passed.",
+                        "closed": true,
+                        "groupCode": "S",
+                        "groupLabel": null,
+                        "proves": null
+                      }
+                    ],
+                    "groups": [
+                      {
+                        "code": "S",
+                        "name": "S",
+                        "sourceName": "S",
+                        "total": 9,
+                        "closed": 9
+                      }
+                    ],
+                    "total": 9,
+                    "closed": 9,
+                    "available": true,
+                    "sourceRef": "GATES_STAGE33_BOTTOM_SHELL_SEAM.md",
+                    "observedAt": "2026-08-23T13:14:36.795Z"
+                  },
+                  "sourceState": "present_read_only_complete_9_of_9",
+                  "state": "complete",
+                  "axes": {
+                    "implementation": "complete_on_pinned_candidate",
+                    "test": "complete",
+                    "evidence": "complete_for_engineering_candidate",
+                    "independentQa": "not_started",
+                    "cherryAcceptance": "pending",
+                    "release": "not_started"
+                  }
+                },
+                {
+                  "id": "stage-33-physical-acceptance-boundary",
+                  "title": "Stage 33 Physical Acceptance Boundary",
+                  "purpose": "Bind the corrected exact TestFlight build to Cherry's named physical UI/UX verdict and close the dependency for Final Feed.",
+                  "dependsOn": [
+                    "stage-33-bottom-shell-seam-correction"
+                  ],
+                  "expectedDurationMinutes": null,
+                  "gatePurpose": "Stage 33 Physical Acceptance Boundary acceptance checklist",
+                  "gate": {
+                    "gates": [
+                      {
+                        "id": "P33A1",
+                        "stageId": "stage-33-physical-acceptance-boundary",
+                        "title": "Exact internal TestFlight candidate is available for Cherry installation.",
+                        "closed": true,
+                        "groupCode": "P",
+                        "groupLabel": null,
+                        "proves": null
+                      },
+                      {
+                        "id": "P33A2",
+                        "stageId": "stage-33-physical-acceptance-boundary",
+                        "title": "Cherry physical checks and explicit evidence requirements are prepared.",
+                        "closed": true,
+                        "groupCode": "P",
+                        "groupLabel": null,
+                        "proves": null
+                      },
+                      {
+                        "id": "P33A3",
+                        "stageId": "stage-33-physical-acceptance-boundary",
+                        "title": "Cherry installs build 43 and records exact device/build/timestamp evidence.",
+                        "closed": false,
+                        "groupCode": "P",
+                        "groupLabel": null,
+                        "proves": null
+                      },
+                      {
+                        "id": "P33A4",
+                        "stageId": "stage-33-physical-acceptance-boundary",
+                        "title": "Bottom-shell seam, readability and clearance receive an explicit physical verdict.",
+                        "closed": false,
+                        "groupCode": "P",
+                        "groupLabel": null,
+                        "proves": null
+                      },
+                      {
+                        "id": "P33A5",
+                        "stageId": "stage-33-physical-acceptance-boundary",
+                        "title": "Note-detail feedback and the overall Stage 35 lane are explicitly accepted by Cherry.",
+                        "closed": false,
+                        "groupCode": "P",
+                        "groupLabel": null,
+                        "proves": null
+                      }
+                    ],
+                    "groups": [
+                      {
+                        "code": "P",
+                        "name": "P",
+                        "sourceName": "P",
+                        "total": 5,
+                        "closed": 2
+                      }
+                    ],
+                    "total": 5,
+                    "closed": 2,
+                    "available": true,
+                    "sourceRef": "GATES_STAGE33_PHYSICAL_ACCEPTANCE.md",
+                    "observedAt": "2026-08-23T20:22:13.981Z"
+                  },
+                  "sourceState": "physical_verdict_pending",
+                  "state": "pending",
+                  "axes": {
+                    "implementation": "complete",
+                    "test": "internal_testflight_build_43_available",
+                    "evidence": "pending_cherry_physical_verdict",
+                    "independentQa": "not_applicable_at_this_boundary",
+                    "cherryAcceptance": "pending",
+                    "release": "internal_testflight_build_43_available_no_external_release"
+                  }
+                },
+                {
+                  "id": "stage-35-note-detail-engineering-candidate",
+                  "title": "Stage 35 Note-detail Engineering Candidate",
+                  "purpose": "Preserve the immutable Note-detail correction candidate that Cherry authorized as the engineering continuation boundary.",
+                  "dependsOn": [
+                    "stage-33-bottom-shell-seam-correction"
+                  ],
+                  "expectedDurationMinutes": null,
+                  "gatePurpose": "Stage 35 Note-detail Engineering Candidate acceptance checklist",
+                  "gate": {
+                    "gates": [
+                      {
+                        "id": "S35P1",
+                        "stageId": "stage-35-note-detail-engineering-candidate",
+                        "title": "Builder's immutable Note-detail candidate identity is exact.",
+                        "closed": true,
+                        "groupCode": "S",
+                        "groupLabel": null,
+                        "proves": null
+                      },
+                      {
+                        "id": "S35P2",
+                        "stageId": "stage-35-note-detail-engineering-candidate",
+                        "title": "All twelve Builder engineering Gates remain checked in the source ledger.",
+                        "closed": true,
+                        "groupCode": "S",
+                        "groupLabel": null,
+                        "proves": null
+                      },
+                      {
+                        "id": "S35P3",
+                        "stageId": "stage-35-note-detail-engineering-candidate",
+                        "title": "Exact internal build 43 carries the Stage 35 product candidate and preserves physical acceptance as pending.",
+                        "closed": true,
+                        "groupCode": "S",
+                        "groupLabel": null,
+                        "proves": null
+                      }
+                    ],
+                    "groups": [
+                      {
+                        "code": "S",
+                        "name": "S",
+                        "sourceName": "S",
+                        "total": 3,
+                        "closed": 3
+                      }
+                    ],
+                    "total": 3,
+                    "closed": 3,
+                    "available": true,
+                    "sourceRef": "GATES_STAGE35_OUTCOME_PACKAGE.md",
+                    "observedAt": "2026-08-23T20:22:13.982Z"
+                  },
+                  "sourceState": "present_package_projection_complete_3_of_3_source_12_of_12",
+                  "state": "complete",
+                  "axes": {
+                    "implementation": "complete_on_pinned_candidate",
+                    "test": "complete",
+                    "evidence": "complete_for_engineering_candidate",
+                    "independentQa": "not_started",
+                    "cherryAcceptance": "pending_parallel_lane",
+                    "release": "internal_testflight_build_43_available"
+                  }
+                }
+              ]
+            },
+            {
+              "id": "scope-final-feed",
+              "title": "Final Feed",
+              "purpose": "Deliver the sole remaining MVP product stage as a personal chronological view over existing local records and queries.",
+              "stages": [
+                {
+                  "id": "stage-final-feed",
+                  "title": "Final Feed Product Stage",
+                  "purpose": "Plan, implement, verify and physically accept exactly one bounded chronological Feed stage.",
+                  "dependsOn": [
+                    "stage-35-note-detail-engineering-candidate"
+                  ],
+                  "expectedDurationMinutes": null,
+                  "gatePurpose": "Final Feed Product Stage acceptance checklist",
+                  "gate": {
+                    "gates": [
+                      {
+                        "id": "C3-1",
+                        "stageId": "stage-final-feed",
+                        "title": "Exact bounded baseline",
+                        "closed": true,
+                        "groupCode": "C",
+                        "groupLabel": null,
+                        "proves": null
+                      },
+                      {
+                        "id": "C3-2",
+                        "stageId": "stage-final-feed",
+                        "title": "Initial oldest record is spatially off-screen",
+                        "closed": true,
+                        "groupCode": "C",
+                        "groupLabel": null,
+                        "proves": null
+                      },
+                      {
+                        "id": "C3-3",
+                        "stageId": "stage-final-feed",
+                        "title": "Minimum clearance contract is discriminating",
+                        "closed": true,
+                        "groupCode": "C",
+                        "groupLabel": null,
+                        "proves": null
+                      },
+                      {
+                        "id": "C3-4",
+                        "stageId": "stage-final-feed",
+                        "title": "Production inset removal mutation fails red-first",
+                        "closed": true,
+                        "groupCode": "C",
+                        "groupLabel": null,
+                        "proves": null
+                      },
+                      {
+                        "id": "C3-5",
+                        "stageId": "stage-final-feed",
+                        "title": "Clearance-specific source contract",
+                        "closed": true,
+                        "groupCode": "C",
+                        "groupLabel": null,
+                        "proves": null
+                      },
+                      {
+                        "id": "C3-6",
+                        "stageId": "stage-final-feed",
+                        "title": "Identity/order/reopen and prior state corrections preserved",
+                        "closed": true,
+                        "groupCode": "C",
+                        "groupLabel": null,
+                        "proves": null
+                      },
+                      {
+                        "id": "C3-7",
+                        "stageId": "stage-final-feed",
+                        "title": "Focused and full regressions pass",
+                        "closed": true,
+                        "groupCode": "C",
+                        "groupLabel": null,
+                        "proves": null
+                      },
+                      {
+                        "id": "C3-8",
+                        "stageId": "stage-final-feed",
+                        "title": "Rendered and signed evidence pass",
+                        "closed": true,
+                        "groupCode": "C",
+                        "groupLabel": null,
+                        "proves": null
+                      },
+                      {
+                        "id": "C3-9",
+                        "stageId": "stage-final-feed",
+                        "title": "Deferred and external boundaries remain explicit",
+                        "closed": true,
+                        "groupCode": "C",
+                        "groupLabel": null,
+                        "proves": null
+                      },
+                      {
+                        "id": "C3-10",
+                        "stageId": "stage-final-feed",
+                        "title": "One immutable commit and append-only receipt",
+                        "closed": true,
+                        "groupCode": "C",
+                        "groupLabel": null,
+                        "proves": null
+                      }
+                    ],
+                    "groups": [
+                      {
+                        "code": "C",
+                        "name": "C",
+                        "sourceName": "C",
+                        "total": 10,
+                        "closed": 10
+                      }
+                    ],
+                    "total": 10,
+                    "closed": 10,
+                    "available": true,
+                    "sourceRef": "GATES_FINAL_FEED_CLEARANCE_CORRECTION_3.md",
+                    "observedAt": "2026-08-23T19:12:21.032Z"
+                  },
+                  "sourceState": "present_read_only_complete_10_of_10",
+                  "state": "complete",
+                  "axes": {
+                    "implementation": "third_test_evidence_correction_complete_on_4a3ad80",
+                    "test": "complete_523_246_41_plus_small_clearance_and_no_inset_mutation_red",
+                    "evidence": "complete_4a3ad80_candidate_receipt_and_handoff_verified",
+                    "independentQa": "pass_ux_product_qa_only_cumulative_false_completion_6",
+                    "cherryAcceptance": "pending",
+                    "release": "no_build_bump_or_testflight_upload"
+                  }
+                },
+                {
+                  "id": "stage-user-visible-app-name-correction",
+                  "title": "User-visible App Name Correction",
+                  "purpose": "Restore the canonical 체리노트 name across app, share, widget and permission surfaces without changing internal identity or behavior.",
+                  "dependsOn": [
+                    "stage-final-feed"
+                  ],
+                  "expectedDurationMinutes": null,
+                  "gatePurpose": "User-visible App Name Correction acceptance checklist",
+                  "gate": {
+                    "gates": [
+                      {
+                        "id": "ANC1",
+                        "stageId": "stage-user-visible-app-name-correction",
+                        "title": "Cherry's canonical naming correction and exact source cause are recorded.",
+                        "closed": true,
+                        "groupCode": "ANC",
+                        "groupLabel": null,
+                        "proves": null
+                      },
+                      {
+                        "id": "ANC2",
+                        "stageId": "stage-user-visible-app-name-correction",
+                        "title": "Builder receives a bounded correction without distribution authority.",
+                        "closed": true,
+                        "groupCode": "ANC",
+                        "groupLabel": null,
+                        "proves": null
+                      },
+                      {
+                        "id": "ANC3",
+                        "stageId": "stage-user-visible-app-name-correction",
+                        "title": "Builder returns one exact tracked-clean engineering candidate.",
+                        "closed": true,
+                        "groupCode": "ANC",
+                        "groupLabel": null,
+                        "proves": null
+                      },
+                      {
+                        "id": "ANC4",
+                        "stageId": "stage-user-visible-app-name-correction",
+                        "title": "Built app/share/widget names and permission copy are independently evidenced.",
+                        "closed": true,
+                        "groupCode": "ANC",
+                        "groupLabel": null,
+                        "proves": null
+                      },
+                      {
+                        "id": "ANC5",
+                        "stageId": "stage-user-visible-app-name-correction",
+                        "title": "A refreshed immutable handoff covers the new user-visible bytes.",
+                        "closed": true,
+                        "groupCode": "ANC",
+                        "groupLabel": null,
+                        "proves": null
+                      },
+                      {
+                        "id": "ANC6",
+                        "stageId": "stage-user-visible-app-name-correction",
+                        "title": "Downstream QA, Release Audit, distribution and acceptance remain separate and held.",
+                        "closed": true,
+                        "groupCode": "ANC",
+                        "groupLabel": null,
+                        "proves": null
+                      }
+                    ],
+                    "groups": [
+                      {
+                        "code": "ANC",
+                        "name": "ANC",
+                        "sourceName": "ANC",
+                        "total": 6,
+                        "closed": 6
+                      }
+                    ],
+                    "total": 6,
+                    "closed": 6,
+                    "available": true,
+                    "sourceRef": "GATES_APP_NAME_CORRECTION_OUTCOME.md",
+                    "observedAt": "2026-08-23T23:13:20.236Z"
+                  },
+                  "sourceState": "present_complete_6_of_6",
+                  "state": "complete",
+                  "axes": {
+                    "implementation": "complete_on_exact_1cdec3f_candidate",
+                    "test": "complete_523_foundation_248_docktests_and_signed_build_matrix",
+                    "evidence": "complete_receipt_87b4523_and_handoff_verified",
+                    "independentQa": "pending_refresh_after_new_user_visible_bytes",
+                    "cherryAcceptance": "pending",
+                    "release": "no_build_bump_upload_or_release_authority"
+                  }
+                }
+              ]
+            },
+            {
+              "id": "scope-mvp-handoff-and-acceptance",
+              "title": "Immutable Handoff and MVP Acceptance",
+              "purpose": "Freeze one exact Phase 1 candidate, run two independent verification lanes, obtain Cherry physical acceptance and record MVP scope closure.",
+              "stages": [
+                {
+                  "id": "stage-immutable-handoff",
+                  "title": "Immutable Handoff",
+                  "purpose": "Freeze exact Git, artifact, Gate, test, scope and rollback evidence for independent consumers.",
+                  "dependsOn": [
+                    "stage-user-visible-app-name-correction"
+                  ],
+                  "expectedDurationMinutes": null,
+                  "gatePurpose": "Immutable Handoff acceptance checklist",
+                  "gate": {
+                    "gates": [
+                      {
+                        "id": "ANH1",
+                        "stageId": "stage-immutable-handoff",
+                        "title": "Exact commit, tree and parent are reachable.",
+                        "closed": true,
+                        "groupCode": "ANH",
+                        "groupLabel": null,
+                        "proves": null
+                      },
+                      {
+                        "id": "ANH2",
+                        "stageId": "stage-immutable-handoff",
+                        "title": "Candidate contains exactly the five bounded paths.",
+                        "closed": true,
+                        "groupCode": "ANH",
+                        "groupLabel": null,
+                        "proves": null
+                      },
+                      {
+                        "id": "ANH3",
+                        "stageId": "stage-immutable-handoff",
+                        "title": "Gate, receipt and candidate diff identities are exact.",
+                        "closed": true,
+                        "groupCode": "ANH",
+                        "groupLabel": null,
+                        "proves": null
+                      },
+                      {
+                        "id": "ANH4",
+                        "stageId": "stage-immutable-handoff",
+                        "title": "Source and generated plist display names are exact Unicode values.",
+                        "closed": true,
+                        "groupCode": "ANH",
+                        "groupLabel": null,
+                        "proves": null
+                      },
+                      {
+                        "id": "ANH5",
+                        "stageId": "stage-immutable-handoff",
+                        "title": "Test and build evidence is pinned without promotion.",
+                        "closed": true,
+                        "groupCode": "ANH",
+                        "groupLabel": null,
+                        "proves": null
+                      },
+                      {
+                        "id": "ANH6",
+                        "stageId": "stage-immutable-handoff",
+                        "title": "Fresh QA receives a runnable exact-candidate contract.",
+                        "closed": true,
+                        "groupCode": "ANH",
+                        "groupLabel": null,
+                        "proves": null
+                      },
+                      {
+                        "id": "ANH7",
+                        "stageId": "stage-immutable-handoff",
+                        "title": "Internal identity and distribution boundaries remain unchanged.",
+                        "closed": true,
+                        "groupCode": "ANH",
+                        "groupLabel": null,
+                        "proves": null
+                      },
+                      {
+                        "id": "ANH8",
+                        "stageId": "stage-immutable-handoff",
+                        "title": "Acceptance and closure remain pending and separate.",
+                        "closed": true,
+                        "groupCode": "ANH",
+                        "groupLabel": null,
+                        "proves": null
+                      }
+                    ],
+                    "groups": [
+                      {
+                        "code": "ANH",
+                        "name": "ANH",
+                        "sourceName": "ANH",
+                        "total": 8,
+                        "closed": 8
+                      }
+                    ],
+                    "total": 8,
+                    "closed": 8,
+                    "available": true,
+                    "sourceRef": "GATES_IMMUTABLE_HANDOFF_APP_NAME_CORRECTION.md",
+                    "observedAt": "2026-08-23T23:13:20.235Z"
+                  },
+                  "sourceState": "current_candidate_complete_8_of_8",
+                  "state": "complete",
+                  "axes": {
+                    "implementation": "exact_1cdec3f_frozen",
+                    "test": "evidence_manifest_validated",
+                    "evidence": "complete_for_fresh_independent_review",
+                    "independentQa": "prior_pass_not_current_candidate",
+                    "cherryAcceptance": "pending",
+                    "release": "not_started"
+                  }
+                },
+                {
+                  "id": "stage-ux-product-qa",
+                  "title": "Fresh UX and Product QA",
+                  "purpose": "Independently test actual use, comprehension, named patterns and counterexamples against the immutable handoff.",
+                  "dependsOn": [
+                    "stage-immutable-handoff"
+                  ],
+                  "expectedDurationMinutes": null,
+                  "gatePurpose": "Fresh UX and Product QA acceptance checklist",
+                  "gate": {
+                    "gates": [
+                      {
+                        "id": "ANQ1",
+                        "stageId": "stage-ux-product-qa",
+                        "title": "Fresh isolated reviewer pins the exact candidate identity and five-path scope.",
+                        "closed": true,
+                        "groupCode": "ANQ",
+                        "groupLabel": null,
+                        "proves": null
+                      },
+                      {
+                        "id": "ANQ2",
+                        "stageId": "stage-ux-product-qa",
+                        "title": "Source, generated plist and built bundle names independently match the canonical values.",
+                        "closed": true,
+                        "groupCode": "ANQ",
+                        "groupLabel": null,
+                        "proves": null
+                      },
+                      {
+                        "id": "ANQ3",
+                        "stageId": "stage-ux-product-qa",
+                        "title": "All three permission descriptions independently contain clear Korean 체리노트 copy.",
+                        "closed": true,
+                        "groupCode": "ANQ",
+                        "groupLabel": null,
+                        "proves": null
+                      },
+                      {
+                        "id": "ANQ4",
+                        "stageId": "stage-ux-product-qa",
+                        "title": "Internal identity and build/version invariants are independently preserved.",
+                        "closed": true,
+                        "groupCode": "ANQ",
+                        "groupLabel": null,
+                        "proves": null
+                      },
+                      {
+                        "id": "ANQ5",
+                        "stageId": "stage-ux-product-qa",
+                        "title": "Name contracts and proportional regressions pass in the fresh lane.",
+                        "closed": true,
+                        "groupCode": "ANQ",
+                        "groupLabel": null,
+                        "proves": null
+                      },
+                      {
+                        "id": "ANQ6",
+                        "stageId": "stage-ux-product-qa",
+                        "title": "Rendered or installed simulator evidence checks relevant user-visible naming surfaces.",
+                        "closed": true,
+                        "groupCode": "ANQ",
+                        "groupLabel": null,
+                        "proves": null
+                      },
+                      {
+                        "id": "ANQ7",
+                        "stageId": "stage-ux-product-qa",
+                        "title": "Reviewer records failures, flakes and false_completion_count without reusing prior verdicts.",
+                        "closed": true,
+                        "groupCode": "ANQ",
+                        "groupLabel": null,
+                        "proves": null
+                      },
+                      {
+                        "id": "ANQ8",
+                        "stageId": "stage-ux-product-qa",
+                        "title": "Fresh UX/Product verdict is explicit and grants no Release Audit, distribution or Cherry acceptance authority.",
+                        "closed": true,
+                        "groupCode": "ANQ",
+                        "groupLabel": null,
+                        "proves": null
+                      }
+                    ],
+                    "groups": [
+                      {
+                        "code": "ANQ",
+                        "name": "ANQ",
+                        "sourceName": "ANQ",
+                        "total": 8,
+                        "closed": 8
+                      }
+                    ],
+                    "total": 8,
+                    "closed": 8,
+                    "available": true,
+                    "sourceRef": "GATES_UX_PRODUCT_QA_APP_NAME_CORRECTION.md",
+                    "observedAt": "2026-08-24T15:35:24.793Z"
+                  },
+                  "sourceState": "current_candidate_open_0_of_8",
+                  "state": "gates_closed_evidence_pending",
+                  "axes": {
+                    "implementation": "exact_1cdec3f_frozen",
+                    "test": "not_started_preflight_hold",
+                    "evidence": "pending_fresh_review_of_name_corrected_candidate",
+                    "independentQa": "preflight_hold_missing_approved_profile_ticket_and_runtime_permission_binding",
+                    "cherryAcceptance": "pending",
+                    "release": "not_started"
+                  }
+                },
+                {
+                  "id": "stage-release-audit",
+                  "title": "Separate Fresh Release Audit",
+                  "purpose": "Independently audit exact Git and artifact identity, tests, signing, privacy, auth, data, crash, rollback and release boundaries.",
+                  "dependsOn": [
+                    "stage-immutable-handoff"
+                  ],
+                  "expectedDurationMinutes": null,
+                  "gatePurpose": "Separate Fresh Release Audit acceptance checklist",
+                  "gate": {
+                    "gates": [
+                      {
+                        "id": "RA1",
+                        "stageId": "stage-release-audit",
+                        "title": "Exact candidate and immutable handoff are pinned and mechanically valid.",
+                        "closed": true,
+                        "groupCode": "RA",
+                        "groupLabel": null,
+                        "proves": null
+                      },
+                      {
+                        "id": "RA2",
+                        "stageId": "stage-release-audit",
+                        "title": "Fresh UX & Product QA input is complete but grants no release authority.",
+                        "closed": true,
+                        "groupCode": "RA",
+                        "groupLabel": null,
+                        "proves": null
+                      },
+                      {
+                        "id": "RA3",
+                        "stageId": "stage-release-audit",
+                        "title": "Audit dimensions and terminal verdict vocabulary are explicit.",
+                        "closed": true,
+                        "groupCode": "RA",
+                        "groupLabel": null,
+                        "proves": null
+                      },
+                      {
+                        "id": "RA4",
+                        "stageId": "stage-release-audit",
+                        "title": "Distribution, physical acceptance, closure and external outcome stay separate.",
+                        "closed": true,
+                        "groupCode": "RA",
+                        "groupLabel": null,
+                        "proves": null
+                      },
+                      {
+                        "id": "RA5",
+                        "stageId": "stage-release-audit",
+                        "title": "Canonical runtime sources and exact blocker are recorded fail-closed.",
+                        "closed": true,
+                        "groupCode": "RA",
+                        "groupLabel": null,
+                        "proves": null
+                      },
+                      {
+                        "id": "RA6",
+                        "stageId": "stage-release-audit",
+                        "title": "Canonical lime-release-qa ticket and validated specialist profile are present.",
+                        "closed": false,
+                        "groupCode": "RA",
+                        "groupLabel": null,
+                        "proves": null
+                      },
+                      {
+                        "id": "RA7",
+                        "stageId": "stage-release-audit",
+                        "title": "Fresh independent release-auditor runtime is bound to this exact candidate.",
+                        "closed": false,
+                        "groupCode": "RA",
+                        "groupLabel": null,
+                        "proves": null
+                      },
+                      {
+                        "id": "RA8",
+                        "stageId": "stage-release-audit",
+                        "title": "Separate fresh Release Audit report reaches an allowed terminal verdict.",
+                        "closed": false,
+                        "groupCode": "RA",
+                        "groupLabel": null,
+                        "proves": null
+                      }
+                    ],
+                    "groups": [
+                      {
+                        "code": "RA",
+                        "name": "RA",
+                        "sourceName": "RA",
+                        "total": 8,
+                        "closed": 5
+                      }
+                    ],
+                    "total": 8,
+                    "closed": 5,
+                    "available": true,
+                    "sourceRef": "GATES_RELEASE_AUDIT.md",
+                    "observedAt": "2026-08-23T20:17:18.017Z"
+                  },
+                  "sourceState": "present_preflight_5_of_8_three_delivery_gates_open",
+                  "state": "queued",
+                  "axes": {
+                    "implementation": "frozen_candidate_only",
+                    "test": "independently_reproduced_not_started",
+                    "evidence": "not_started",
+                    "independentQa": "prior_profile_preactivation_pass_requires_candidate_repin",
+                    "cherryAcceptance": "pending",
+                    "release": "audit_not_release"
+                  }
+                },
+                {
+                  "id": "stage-mvp-scope-closure",
+                  "title": "Cherry Physical Acceptance and MVP Scope Closure",
+                  "purpose": "Combine no verdicts automatically; require both independent reports, exact physical evidence and Cherry's explicit decision before Parent records closure.",
+                  "dependsOn": [
+                    "stage-ux-product-qa",
+                    "stage-release-audit"
+                  ],
+                  "expectedDurationMinutes": null,
+                  "gatePurpose": "Cherry Physical Acceptance and MVP Scope Closure acceptance checklist",
+                  "gate": {
+                    "gates": [
+                      {
+                        "id": "MC1",
+                        "stageId": "stage-mvp-scope-closure",
+                        "title": "Final Feed engineering candidate is exact, clean and Gate-complete.",
+                        "closed": true,
+                        "groupCode": "MC",
+                        "groupLabel": null,
+                        "proves": null
+                      },
+                      {
+                        "id": "MC2",
+                        "stageId": "stage-mvp-scope-closure",
+                        "title": "Latest immutable handoff is exact and complete.",
+                        "closed": true,
+                        "groupCode": "MC",
+                        "groupLabel": null,
+                        "proves": null
+                      },
+                      {
+                        "id": "MC3",
+                        "stageId": "stage-mvp-scope-closure",
+                        "title": "Fresh UX & Product QA passed only its independent lane.",
+                        "closed": true,
+                        "groupCode": "MC",
+                        "groupLabel": null,
+                        "proves": null
+                      },
+                      {
+                        "id": "MC4",
+                        "stageId": "stage-mvp-scope-closure",
+                        "title": "Separate fresh Release Audit reaches PASS_RELEASE_AUDIT_ONLY for the exact candidate.",
+                        "closed": false,
+                        "groupCode": "MC",
+                        "groupLabel": null,
+                        "proves": null
+                      },
+                      {
+                        "id": "MC5",
+                        "stageId": "stage-mvp-scope-closure",
+                        "title": "Final Feed exact candidate has an approved internal TestFlight distribution artifact.",
+                        "closed": false,
+                        "groupCode": "MC",
+                        "groupLabel": null,
+                        "proves": null
+                      },
+                      {
+                        "id": "MC6",
+                        "stageId": "stage-mvp-scope-closure",
+                        "title": "Cherry physically accepts the Stage 35 Note-detail and bottom-shell experience.",
+                        "closed": false,
+                        "groupCode": "MC",
+                        "groupLabel": null,
+                        "proves": null
+                      },
+                      {
+                        "id": "MC7",
+                        "stageId": "stage-mvp-scope-closure",
+                        "title": "Cherry physically accepts Final Feed on its exact distributed build.",
+                        "closed": false,
+                        "groupCode": "MC",
+                        "groupLabel": null,
+                        "proves": null
+                      },
+                      {
+                        "id": "MC8",
+                        "stageId": "stage-mvp-scope-closure",
+                        "title": "Cherry explicitly approves Phase 1 MVP scope closure after reviewing both independent reports and both physical lanes.",
+                        "closed": false,
+                        "groupCode": "MC",
+                        "groupLabel": null,
+                        "proves": null
+                      },
+                      {
+                        "id": "MC9",
+                        "stageId": "stage-mvp-scope-closure",
+                        "title": "Parent records MVP_SCOPE_CLOSED only after MC1–MC8 are mechanically complete.",
+                        "closed": false,
+                        "groupCode": "MC",
+                        "groupLabel": null,
+                        "proves": null
+                      },
+                      {
+                        "id": "MC10",
+                        "stageId": "stage-mvp-scope-closure",
+                        "title": "External Outcome remains a separate, explicitly incomplete state.",
+                        "closed": true,
+                        "groupCode": "MC",
+                        "groupLabel": null,
+                        "proves": null
+                      }
+                    ],
+                    "groups": [
+                      {
+                        "code": "MC",
+                        "name": "MC",
+                        "sourceName": "MC",
+                        "total": 10,
+                        "closed": 4
+                      }
+                    ],
+                    "total": 10,
+                    "closed": 4,
+                    "available": true,
+                    "sourceRef": "GATES_MVP_SCOPE_CLOSURE.md",
+                    "observedAt": "2026-08-23T20:18:32.810Z"
+                  },
+                  "sourceState": "present_open_4_of_10",
+                  "state": "locked",
+                  "axes": {
+                    "implementation": "frozen_candidate_only",
+                    "test": "must_be_complete_but_not_sufficient",
+                    "evidence": "pending",
+                    "independentQa": "both_reports_required",
+                    "cherryAcceptance": "pending",
+                    "release": "separate_explicit_authority_required"
+                  }
+                }
+              ]
+            }
+          ]
+        }
+      ],
+      "connectors": {
+        "github": {
+          "adopted": true,
+          "required": false,
+          "state": "connected",
+          "repository": "dltmddnr3/dock",
+          "remoteName": "origin",
+          "defaultBranch": "main",
+          "completionAuthority": false,
+          "localCandidate": {
+            "state": "available",
+            "branch": "main",
+            "ahead": 15,
+            "behind": 0,
+            "sync": "ahead"
+          },
+          "published": {
+            "state": "connected",
+            "repository": "dltmddnr3/dock",
+            "ref": "origin/main",
+            "detail": "published"
+          },
+          "checks": {
+            "state": "unknown"
+          },
+          "release": {
+            "state": "unknown"
+          }
+        }
+      },
+      "current": {
+        "phaseId": "phase-1-mvp-closure",
+        "scopeId": "scope-mvp-handoff-and-acceptance",
+        "stageId": "stage-ux-product-qa"
+      },
+      "next": {
+        "phaseId": "phase-1-mvp-closure",
+        "scopeId": "scope-mvp-handoff-and-acceptance",
+        "stageId": "stage-release-audit"
+      },
       "bindings": [
         {
           "role": "planner",
@@ -63,10 +1684,13 @@
       ],
       "now": {
         "status": "unbound",
-        "activity": null
+        "activity": null,
+        "observedAt": null,
+        "source": "runtime_registry"
       },
       "progress": {
-        "available": false
+        "available": false,
+        "reason": "no_cross_stage_aggregate"
       }
     },
     {
