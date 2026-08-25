@@ -54,3 +54,13 @@
 - `EXTERNAL_OUTCOME_COMPLETE`: `false`
 
 이 영수증은 P2만 증명한다. Google 실제 로그인, email code 실제 로그인, 인증 후 Apple 연결, 다른 사용자 거부, Vercel Preview 환경, MacBook/mobile 검수, HP1 완료, Production release 또는 Phase 완료를 증명하지 않는다.
+
+## P3 직접 검증 대기
+
+- 실행 절차: `docs/PHASE2_HOSTED_IDENTITY_P3_DIRECT_PROBE.md`
+- Google 로그인: `사용자 계정 선택 대기`
+- email code 대체 로그인: `미실행`
+- Apple 연결 전용: `설정 활성 · 실제 연결 미실행`
+- Apple 직접 가입·로그인: `설정 비활성 · 로그아웃 상태 직접 확인 미실행`
+- 다른 사용자 거부: `미실행`
+- 로그아웃·세션 철회: `미실행`
