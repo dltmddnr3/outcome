@@ -1,6 +1,6 @@
 {
   "schemaVersion": 2,
-  "observedAt": "2026-08-25T06:32:20.910Z",
+  "observedAt": "2026-08-25T06:36:37.271Z",
   "projects": [
     {
       "status": "conflict",
@@ -1696,10 +1696,10 @@
     {
       "status": "valid",
       "errors": [],
-      "observedAt": "2026-08-25T06:32:10.673Z",
+      "observedAt": "2026-08-25T06:36:30.125Z",
       "sourceFreshness": {
         "state": "observed",
-        "observedAt": "2026-08-25T06:32:10.673Z"
+        "observedAt": "2026-08-25T06:36:30.125Z"
       },
       "project": {
         "id": "outcome",
@@ -3259,7 +3259,7 @@
                         "id": "B12",
                         "stageId": "outcome-stage-account-access-hosted-preview-code-readiness",
                         "title": "전체 회귀·브라우저·보안·변경 거부·정보 가림·빌드와 상위 재검증이 통과하고 결과가 인증 코드 준비만 완료로 끝난다.",
-                        "closed": false,
+                        "closed": true,
                         "groupCode": "B",
                         "groupLabel": null,
                         "proves": "evidence"
@@ -3271,21 +3271,21 @@
                         "name": "무자격증명 코드 준비",
                         "sourceName": "B",
                         "total": 12,
-                        "closed": 11
+                        "closed": 12
                       }
                     ],
                     "total": 12,
-                    "closed": 11,
+                    "closed": 12,
                     "available": true,
                     "sourceRef": "GATES_PHASE2_ACCOUNT_ACCESS_HOSTED_PREVIEW_CODE_READINESS.md",
-                    "observedAt": "2026-08-25T06:32:10.673Z"
+                    "observedAt": "2026-08-25T06:36:30.125Z"
                   },
                   "sourceState": "present",
-                  "state": "active",
+                  "state": "complete",
                   "axes": {
                     "implementation": "evidence_closed",
                     "test": "evidence_closed",
-                    "evidence": "partially_evidenced",
+                    "evidence": "evidence_closed",
                     "independentQa": "not_sourced",
                     "cherryAcceptance": "not_sourced",
                     "release": "not_sourced"
@@ -3373,7 +3373,7 @@
                     "observedAt": "2026-08-25T05:21:17.063Z"
                   },
                   "sourceState": "present",
-                  "state": "locked",
+                  "state": "active",
                   "axes": {
                     "implementation": "pending",
                     "test": "pending",
@@ -3816,12 +3816,12 @@
       "current": {
         "phaseId": "outcome-phase-2",
         "scopeId": "outcome-phase-2-account-service",
-        "stageId": "outcome-stage-account-access-hosted-preview-code-readiness"
+        "stageId": "outcome-stage-account-access-hosted-identity-preview"
       },
       "next": {
         "phaseId": "outcome-phase-2",
         "scopeId": "outcome-phase-2-account-service",
-        "stageId": "outcome-stage-account-access-hosted-identity-preview"
+        "stageId": "outcome-stage-account-access-hosted-data-preview"
       },
       "bindings": [
         {
@@ -3879,7 +3879,7 @@
   ],
   "snapshot": {
     "boundary": "deployment_snapshot",
-    "capturedAt": "2026-08-25T06:32:20.910Z",
+    "capturedAt": "2026-08-25T06:36:37.271Z",
     "source": "sanitized_public_projection",
     "liveSessionRelay": false,
     "refreshBehavior": "new_deployment_required"
