@@ -8,6 +8,9 @@ const builtBrowser = readdirSync('dist/assets').filter((name) => name.endsWith('
 for (const marker of ['oauth_google', 'oauth_apple', '/workspace/sso-callback']) {
   if (!builtBrowser.includes(marker)) throw new Error(`Clerk browser integration missing from production asset: ${marker}`)
 }
+for (const marker of ['sessionPresent', 'ownerVerified', 'data-private-logout', 'data-private-link-provider']) {
+  if (!builtBrowser.includes(marker)) throw new Error(`Clerk revoked-session recovery boundary missing from production asset: ${marker}`)
+}
 if (builtBrowser.includes('/api/private/auth/callback') || builtBrowser.includes('sessionToken')) throw new Error('production browser asset contains forbidden server callback/session token handoff')
 
 const now = () => Date.parse('2026-08-25T00:00:00.000Z')

@@ -35,7 +35,7 @@ function InjectedPrivateWorkspaceEntry() {
   useEffect(() => { void load().catch(() => undefined) }, [])
   const authenticate = async (provider: 'google' | 'email_code') => { setState('loading'); setTransitionError(null); try { await beginPrivateSession(provider); await load() } catch { setTransitionError('검증용 인증 전환을 완료하지 못했습니다.'); setState('login') } }
   const signOut = async () => { setState('loading'); setTransitionError(null); try { await endPrivateSession(); setWorkspace(undefined); setState('login') } catch { setTransitionError('로그아웃을 완료하지 못했습니다.'); setState('unavailable') } }
-  return <AccountWorkspace state={state} workspace={workspace} ownerVerified={state === 'ready'} onLogin={authenticate} onLogout={signOut} transitionError={transitionError} />
+  return <AccountWorkspace state={state} workspace={workspace} ownerVerified={state === 'ready'} sessionPresent={state === 'ready'} onLogin={authenticate} onLogout={signOut} transitionError={transitionError} />
 }
 
 function Login({ onAuthenticated }: { onAuthenticated: () => void }) {

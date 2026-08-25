@@ -70,7 +70,7 @@ function HostedWorkspaceBody() {
     <span>Apple은 소유자 로그인 확인 후 연결</span>
     <p className="account-workspace__adapter-note">Clerk 브라우저 세션 · 회원가입 전환 차단</p>
   </div>
-  return <AccountWorkspace state={state} workspace={workspace} ownerVerified={ownerVerified} loginContent={loginContent} onLogout={ownerVerified ? async () => { await signOut({ redirectUrl: '/workspace' }) } : undefined} onAppleLink={ownerVerified ? linkApple : undefined} transitionError={error} />
+  return <AccountWorkspace state={state} workspace={workspace} ownerVerified={ownerVerified} sessionPresent={Boolean(isSignedIn)} loginContent={loginContent} onLogout={isSignedIn ? async () => { await signOut({ redirectUrl: '/workspace' }) } : undefined} onAppleLink={ownerVerified ? linkApple : undefined} transitionError={error} />
 }
 
 export function HostedClerkWorkspace({ publishableKey, pathname = window.location.pathname }: { publishableKey: string; pathname?: string }) {

@@ -1,10 +1,11 @@
 import { renderToStaticMarkup } from 'react-dom/server'
 import { describe, expect, it, vi } from 'vitest'
 
+const clerkAuth = vi.hoisted(() => ({ isSignedIn: false }))
 vi.mock('@clerk/react', () => ({
   ClerkProvider: ({ children, publishableKey }: { children: React.ReactNode; publishableKey: string }) => <div data-clerk-provider={publishableKey}>{children}</div>,
   AuthenticateWithRedirectCallback: ({ transferable }: { transferable: boolean }) => <div data-clerk-redirect-callback="true" data-transferable={String(transferable)} />,
-  useAuth: () => ({ isLoaded: true, isSignedIn: false, signOut: vi.fn() }),
+  useAuth: () => ({ isLoaded: true, isSignedIn: clerkAuth.isSignedIn, getToken: vi.fn().mockResolvedValue(null), signOut: vi.fn() }),
   useSignIn: () => ({ signIn: {}, fetchStatus: 'idle' }),
   useUser: () => ({ user: null }),
 }))
@@ -41,5 +42,14 @@ describe('Clerk browser session boundary', () => {
     await expect(requireHostedSessionToken(getToken)).resolves.toBe('sdk-issued-session')
     expect(getToken).toHaveBeenCalledOnce()
     await expect(requireHostedSessionToken(async () => null)).rejects.toThrow('authentication_required')
+  })
+
+  it('keeps SDK logout recovery visible before server owner verification without exposing Apple', () => {
+    clerkAuth.isSignedIn = true
+    const html = renderToStaticMarkup(<HostedClerkWorkspace publishableKey="pk_test_browser" pathname="/workspace" />)
+    clerkAuth.isSignedIn = false
+    expect(html).toContain('data-private-logout="true"')
+    expect(html).not.toContain('data-private-link-provider="apple"')
+    expect(html).not.toContain('data-private-project=')
   })
 })
