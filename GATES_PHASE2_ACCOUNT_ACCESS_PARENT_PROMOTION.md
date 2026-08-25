@@ -12,7 +12,7 @@ Outcome: exact Builder candidate를 Parent가 독립 재현하고, disabled-by-d
   EVIDENCE: 첫 Parent `npm test`는 canonical dependency installation에 새 PGlite가 없어 1개 test import가 실패했다. Isolated exact-lock install로 재실행해 96/96 PASS. 이어 account browser는 merge 전 stale `dist`를 읽어 login state timeout이 발생했고, canonical build 후 동일 command가 PASS했다. 어느 실패도 PASS로 재표기하지 않았다.
 - [x] P5: Implementation I1-I8만 닫고 현재 Stage를 fresh UX & Product QA Q1-Q4 0/4로 이동한다.
   EVIDENCE: implementation Gate 8/8 ALL MET; Package parser status valid, current `outcome-stage-account-access-ux-product-qa`, next Release Audit, current Gate 0/4. QA/Audit/Cherry/release/external completion은 open이다.
-- [ ] P6: exact main public deployment, disabled private contract, public 405/redaction과 receipt parity를 검증한다.
-  EVIDENCE: pending
+- [x] P6: exact main public deployment, disabled private contract, public 405/redaction과 receipt parity를 검증한다.
+  EVIDENCE: production deployment `dpl_6ZMaaTDYBM4EX4zF8XEJnBqjCeqH` READY · stable page/API/health 200 · private config 200 with `enabled=false`/`completionAuthority=false` · private workspace 401 `authentication_required` · receipt commit `d52f2832662a`, tree `c22e317c3a90`, asset `index-Dks-j8-s.js` · HEAD=origin/main `d52f2832662a5805545805f99c5d3cf9cebd5ce7` · public mutation 32/32=405/API JSON 28/28 · prohibited identifiers=0 · current fresh UX/Product QA Q1-Q4 0/4.
 
 ABANDON: provider/resource/secret/database/domain creation, private surface enablement, QA self-pass, Release Audit, Cherry acceptance, release, Phase 2 completion과 `EXTERNAL_OUTCOME_COMPLETE`는 포함하지 않는다.
