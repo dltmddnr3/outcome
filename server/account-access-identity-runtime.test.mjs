@@ -67,6 +67,8 @@ test('sealed Package store accepts exactly the server-owned two-project snapshot
   assert.deepEqual(store.membershipsForSubject(owner), [{ workspaceId: 'account-only-preview', subject: owner, role: 'owner-viewer', state: 'active' }])
   assert.deepEqual(store.membershipsForSubject('other-owner'), [])
   assert.deepEqual(store.projectsForWorkspace('account-only-preview').map((project) => project.id), ['cherry-note', 'outcome'])
+  assert.deepEqual(store.workspaceProjection('account-only-preview').projects.map((project) => project.project.id), ['cherry-note', 'outcome'])
+  assert.equal(store.workspaceProjection('other-workspace'), null)
   for (const projects of [deploymentFixture.projects.slice(0, 1), [...deploymentFixture.projects, { project: { id: 'forged', name: 'Forged' } }], deploymentFixture.projects.map((project) => ({ ...project, project: { ...project.project, id: 'unknown' } }))]) {
     assert.throws(() => createSealedPackageStore({ sealedSnapshot: { projects }, ownerSubject: owner }), /sealed_package_snapshot_invalid/)
   }
@@ -122,6 +124,7 @@ test('identity-only account mode exposes publishable key, verifies owner, serves
     const workspace = await request({ method: 'GET', pathname: '/api/private/workspace', headers })
     assert.equal(workspace.status, 200)
     assert.deepEqual(workspace.body.workspace.projects.map((project) => project.project.id).sort(), ['cherry-note', 'outcome'])
+    assert.deepEqual(workspace.body.workspace.dashboard.projects.map((project) => project.project.id).sort(), ['cherry-note', 'outcome'])
     assert.equal(workspace.body.workspace.completionAuthority, false)
   }
   assert.deepEqual(await request({ method: 'GET', pathname: '/api/private/workspace?project=forged', headers: { authorization: 'Bearer sdk-valid' } }), { status: 404, body: { error: 'not_found' } })

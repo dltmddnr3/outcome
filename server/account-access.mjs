@@ -137,10 +137,14 @@ export function createAccountAccessService({ authProvider, store, ownerSubject, 
         .filter((project) => project.state === 'active' && PRIVATE_PROJECT_ALLOWLIST.includes(project.id))
       if (requestedProjectId && !projects.some((project) => project.id === requestedProjectId)) throw new AccountAccessError('project_access_denied', 403)
       const selected = requestedProjectId ? projects.filter((project) => project.id === requestedProjectId) : projects
+      const dashboard = typeof store.workspaceProjection === 'function'
+        ? await store.workspaceProjection(workspace.id, context)
+        : undefined
       return {
         access: 'private_read_only',
         workspace: { id: workspace.id, role: membership.role },
         projects: selected.map((project) => clone(project.projection)),
+        ...(dashboard ? { dashboard: clone(dashboard) } : {}),
         session: { expiresAt: new Date(Math.min(identity.expiresAt, now() + 7 * DAY_MS)).toISOString(), revocable: true },
         completionAuthority: false,
       }

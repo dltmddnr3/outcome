@@ -8,7 +8,7 @@ export type PrivateStage = { id: string; title: string; gate?: { gates?: Private
 export type PrivateScope = { id: string; title: string; stages: PrivateStage[] }
 export type PrivatePhase = { id: string; title: string; scopes: PrivateScope[] }
 export type PrivateProjectProjection = { project: { id: string; name: string }; phases: PrivatePhase[]; current: { phaseId: string; scopeId: string; stageId: string } }
-export type PrivateWorkspaceView = { viewState?: string; projects?: PrivateProjectProjection[] }
+export type PrivateWorkspaceView = { viewState?: string; projects?: PrivateProjectProjection[]; dashboard?: OutcomeDashboardData }
 
 async function readJson<T>(response: Response): Promise<T> {
   const body = await response.json() as T & { error?: string }

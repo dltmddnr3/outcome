@@ -200,6 +200,7 @@ export function createSealedPackageStore({ sealedSnapshot, ownerSubject } = {}) 
     membershipsForSubject(subject) { return subject === ownerSubject ? [{ workspaceId: PRIVATE_PREVIEW_WORKSPACE, subject, role: 'owner-viewer', state: 'active' }] : [] },
     workspace(id) { return id === PRIVATE_PREVIEW_WORKSPACE ? { id, state: 'active' } : null },
     projectsForWorkspace(id) { return id === PRIVATE_PREVIEW_WORKSPACE ? sealedProjects.map((project) => structuredClone(project)) : [] },
+    workspaceProjection(id) { return id === PRIVATE_PREVIEW_WORKSPACE ? structuredClone(sealedSnapshot) : null },
   })
 }
 

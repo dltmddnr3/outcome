@@ -14,11 +14,10 @@ for (const marker of ['sessionPresent', 'ownerVerified', 'data-private-logout', 
 if (builtBrowser.includes('/api/private/auth/callback') || builtBrowser.includes('sessionToken')) throw new Error('production browser asset contains forbidden server callback/session token handoff')
 
 const now = () => Date.parse('2026-08-25T00:00:00.000Z')
-const readyProjects = [
-  { project: { id: 'cherry-note', name: 'Cherry Note' }, phases: [{ id: 'cherry-phase', title: '체리 단계', scopes: [{ id: 'cherry-scope', title: '체리 범위', stages: [{ id: 'cherry-current', title: '체리 실제 현재', gate: { gates: [{ id: 'C1', title: '현재 완료 조건', closed: false }] } }, { id: 'cherry-next', title: '체리 탐색 대상', gate: { gates: [{ id: 'C2', title: '탐색 완료 조건', closed: true }] } }] }] }], current: { phaseId: 'cherry-phase', scopeId: 'cherry-scope', stageId: 'cherry-current' } },
-  { project: { id: 'outcome', name: 'OUTCOME' }, phases: [{ id: 'outcome-phase', title: '아웃컴 단계', scopes: [{ id: 'outcome-scope', title: '아웃컴 범위', stages: [{ id: 'outcome-current', title: '아웃컴 실제 현재', gate: { gates: [{ id: 'O1', title: '아웃컴 완료 조건', closed: false }] } }] }] }], current: { phaseId: 'outcome-phase', scopeId: 'outcome-scope', stageId: 'outcome-current' } },
-]
-const store = createInMemoryAccountStore({ workspaces: [{ id: 'workspace', state: 'active' }], memberships: [{ subject: 'owner', workspaceId: 'workspace', role: 'owner-viewer', state: 'active' }], projects: readyProjects.map((projection) => ({ id: projection.project.id, workspaceId: 'workspace', state: 'active', projection })) })
+const readyDashboard = { ...JSON.parse(readFileSync('snapshot/outcome-package-source.json', 'utf8')), build: { repository: 'test/repo', ref: 'test', commit: null, tree: null, asset: null, runtimeNowPinned: false } }
+const readyProjects = readyDashboard.projects
+const memoryStore = createInMemoryAccountStore({ workspaces: [{ id: 'workspace', state: 'active' }], memberships: [{ subject: 'owner', workspaceId: 'workspace', role: 'owner-viewer', state: 'active' }], projects: readyProjects.map((projection) => ({ id: projection.project.id, workspaceId: 'workspace', state: 'active', projection })) })
+const store = { ...memoryStore, workspaceProjection: (workspaceId) => workspaceId === 'workspace' ? structuredClone(readyDashboard) : null }
 const accountAccess = createAccountAccessService({ now, ownerSubject: 'owner', store, authProvider: { verify: async (token) => token === 'valid' ? { subject: 'owner', issuedAt: now(), expiresAt: now() + 60_000, linkedProviders: ['google', 'email_code'] } : null } })
 const transitions = []
 const loginMeasurements = []
@@ -40,7 +39,7 @@ const states = {
   session_expired: { status: 401, body: { error: 'session_expired' } },
   access_denied: { status: 403, body: { error: 'project_access_denied' } },
   safe_degraded: { status: 200, body: { workspace: { viewState: 'safe_degraded' } } },
-  ready: { status: 200, body: { workspace: { viewState: 'ready', projects: readyProjects } } },
+  ready: { status: 200, body: { workspace: { viewState: 'ready', projects: readyProjects, dashboard: readyDashboard } } },
 }
 
 try {
@@ -62,6 +61,7 @@ try {
 
   for (const viewport of [{ name: 'macbook', width: 1440, height: 900 }, { name: 'mobile', width: 390, height: 844 }, { name: 'phone', width: 375, height: 812 }]) {
     for (const [state, fixture] of Object.entries(states)) {
+      if (state === 'ready') continue
       const context = await browser.newContext({ viewport, reducedMotion: 'reduce' })
       const page = await context.newPage()
       await page.route('**/api/private/config', (route) => route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ enabled: true, access: 'private_read_only', providers: [{ id: 'google', mode: 'primary' }, { id: 'apple', mode: 'linked_only' }, { id: 'email_code', mode: 'fallback_recovery' }], sessionMaximumDays: 7, completionAuthority: false }) }))
@@ -121,23 +121,22 @@ try {
     await page.locator('[data-state-code="login"]').waitFor()
     await page.locator('[data-private-login-provider=google]').focus(); await page.keyboard.press('Enter')
     await page.locator('[data-state-code="loading"]').waitFor()
-    await page.locator('[data-state-code="ready"]').waitFor()
+    await page.locator('.oc-dashboard').waitFor()
     if (await page.locator('[data-private-project]').count() !== 2) throw new Error(`${viewport.name} project controls missing`)
-    await page.locator('[data-private-stage=cherry-next]').click()
-    const selection = await page.evaluate(() => ({ actualCurrent: document.querySelector('[data-private-stage=cherry-current]')?.getAttribute('aria-current'), actualSelected: document.querySelector('[data-private-stage=cherry-current]')?.getAttribute('aria-selected'), touchedCurrent: document.querySelector('[data-private-stage=cherry-next]')?.getAttribute('aria-current'), touchedSelected: document.querySelector('[data-private-stage=cherry-next]')?.getAttribute('aria-selected'), actualText: document.querySelector('[data-private-actual]')?.textContent, selectedText: document.querySelector('[data-private-selected]')?.textContent }))
-    if (selection.actualCurrent !== 'step' || selection.actualSelected !== 'false' || selection.touchedCurrent !== null || selection.touchedSelected !== 'true' || !selection.actualText?.includes('체리 실제 현재') || !selection.selectedText?.includes('체리 탐색 대상')) throw new Error(`${viewport.name} current-vs-selected failed ${JSON.stringify(selection)}`)
-    await page.locator('[data-private-project=outcome]').focus(); await page.keyboard.press('Enter')
-    const outcomePressed = await page.locator('[data-private-project=outcome]').getAttribute('aria-pressed'); const outcomeGate = await page.locator('.account-workspace__gates').textContent()
-    if (outcomePressed !== 'true' || !outcomeGate.includes('아웃컴 완료 조건')) throw new Error(`${viewport.name} project switch failed`)
-    const motion = await page.evaluate(() => [...document.querySelectorAll('.account-workspace *')].filter((element) => getComputedStyle(element).animationName !== 'none').length)
-    if (motion !== 0) throw new Error(`${viewport.name} reduced motion failed animations=${motion}`)
+    const shell = await page.evaluate(() => ({ sidebar: Boolean(document.querySelector('.oc-global-nav')), journey: Boolean(document.querySelector('.oc-outcome-map')), current: document.querySelectorAll('[aria-current=step]').length, overflow: document.documentElement.scrollWidth - document.documentElement.clientWidth }))
+    if (!shell.sidebar || !shell.journey || shell.current < 3 || shell.overflow !== 0) throw new Error(`${viewport.name} existing shell failed ${JSON.stringify(shell)}`)
+    if (process.env.OUTCOME_ACCOUNT_UX_SCREENSHOTS === '1' && ['macbook-ready', 'mobile-ready'].includes(viewport.name)) await page.screenshot({ path: `${screenshotDirectory}/${viewport.name}-${viewport.width}x${viewport.height}-shell.png`, fullPage: true })
     if (viewport.width <= 390) {
-      await page.evaluate(() => { document.documentElement.style.zoom = '2' })
-      const overflow = await page.evaluate(() => document.documentElement.scrollWidth - document.documentElement.clientWidth)
-      if (overflow !== 0) throw new Error(`${viewport.name} ready 200% zoom overflow=${overflow}`)
-      await page.evaluate(() => { document.documentElement.style.zoom = '1' })
+      await page.locator('.oc-nav-trigger').click()
+      if (process.env.OUTCOME_ACCOUNT_UX_SCREENSHOTS === '1' && viewport.name === 'mobile-ready') await page.screenshot({ path: `${screenshotDirectory}/${viewport.name}-${viewport.width}x${viewport.height}-sidebar.png`, fullPage: false })
     }
+    await page.locator('[data-private-project=cherry-note]').click()
+    await page.locator('#oc-project-title', { hasText: 'Cherry Note' }).waitFor()
+    if (await page.locator('[data-private-project=cherry-note]').getAttribute('aria-current') !== 'page') throw new Error(`${viewport.name} project switch failed`)
+    const motion = await page.evaluate(() => [...document.querySelectorAll('.oc-dashboard *')].filter((element) => getComputedStyle(element).animationName !== 'none').length)
+    if (motion !== 0) throw new Error(`${viewport.name} reduced motion failed animations=${motion}`)
     const logout = page.locator('[data-private-logout=true]'); if (await logout.evaluate((element) => element.getBoundingClientRect().height) < 44) throw new Error(`${viewport.name} logout touch target`)
+    if (viewport.width <= 390) await page.locator('.oc-nav-trigger').click()
     await logout.click(); await page.locator('[data-state-code="login"]').waitFor()
     await context.close()
   }
@@ -164,7 +163,7 @@ try {
     await context.close()
   }
   if (transitions.length !== 6 || transitions.filter(([action]) => action === 'login').length !== 3 || transitions.filter(([action]) => action === 'logout').length !== 3) throw new Error(`injected transition count failed ${JSON.stringify(transitions)}`)
-  console.log(`account access browser PASS: account-only legacy convergence=6/6 with anonymous project payload requests=0; Clerk SDK browser markers present with no server callback/session-token handoff; 3 viewports x ${Object.keys(states).length} settled states + loading + ready login/logout hierarchy; login=${JSON.stringify(loginMeasurements)}; mobile/phone 200% zoom overflow=0; touch>=44; current-vs-selected preserved`)
+  console.log(`account access browser PASS: account-only legacy convergence=6/6 with anonymous project payload requests=0; Clerk SDK browser markers present with no server callback/session-token handoff; 3 viewports x ${Object.keys(states).length - 1} non-ready states + loading + ready existing-shell login/logout hierarchy; login=${JSON.stringify(loginMeasurements)}; non-ready mobile/phone 200% zoom overflow=0; ready shell overflow=0; touch>=44; project switch preserved`)
 } finally {
   server.close(); await once(server, 'close'); await browser.close()
 }

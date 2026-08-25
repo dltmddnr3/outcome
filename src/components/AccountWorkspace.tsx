@@ -55,6 +55,7 @@ export function AccountWorkspace({ state = 'unavailable', workspace, ownerVerifi
   const choosePhase = (phaseId: string) => { if (!project) return; const nextPhase = project.phases.find((item) => item.id === phaseId); const nextScope = nextPhase?.scopes.find((item) => item.id === project.current.scopeId) ?? nextPhase?.scopes[0]; const nextStage = nextScope?.stages.find((item) => item.id === project.current.stageId) ?? nextScope?.stages[0]; setSelection({ projectId: project.project.id, phaseId, scopeId: nextScope?.id ?? '', stageId: nextStage?.id ?? '' }) }
   const chooseScope = (scopeId: string) => { if (!project || !phase) return; const nextScope = phase.scopes.find((item) => item.id === scopeId); const nextStage = nextScope?.stages.find((item) => item.id === project.current.stageId) ?? nextScope?.stages[0]; setSelection({ projectId: project.project.id, phaseId: phase.id, scopeId, stageId: nextStage?.id ?? '' }) }
   const chooseStage = (stageId: string) => { if (project && phase && scope) setSelection({ projectId: project.project.id, phaseId: phase.id, scopeId: scope.id, stageId }) }
+  if (state === 'ready' && workspace?.dashboard) return <OutcomeDashboard initialData={workspace.dashboard} onUnauthorized={() => undefined} onLogout={onLogout} />
   return <main className="account-workspace" data-account-state={state} data-completion-authority="false">
     <header className="account-workspace__header">
       <div><span className="account-workspace__eyebrow">OUTCOME · 비공개</span><h1>Cherry 전용 비공개 워크스페이스</h1></div>
@@ -94,3 +95,4 @@ export function AccountWorkspace({ state = 'unavailable', workspace, ownerVerifi
 }
 import { type ReactNode, useState } from 'react'
 import type { PrivateProjectProjection, PrivateWorkspaceView } from '../lib/api'
+import { OutcomeDashboard } from './OutcomeDashboard'

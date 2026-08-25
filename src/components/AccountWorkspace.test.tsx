@@ -1,6 +1,8 @@
 import { renderToStaticMarkup } from 'react-dom/server'
 import { describe, expect, it } from 'vitest'
 import { AccountWorkspace, accountWorkspaceStateCopy } from './AccountWorkspace'
+import deploymentFixture from '../../snapshot/outcome-package-source.json'
+import type { OutcomeDashboardData } from './OutcomeDashboard'
 
 const render = (state: keyof typeof accountWorkspaceStateCopy) => renderToStaticMarkup(<AccountWorkspace state={state} />)
 const readyWorkspace = { projects: [
@@ -43,6 +45,17 @@ describe('account workspace presentation contract', () => {
     for (const label of ['프로젝트', '페이즈', '범위', '스테이지', '완료 조건', '실제 현재']) expect(html).toContain(label)
     expect(html).toContain('aria-current="step"')
     expect(html).toContain('aria-selected="true"')
+  })
+
+  it('비공개 snapshot envelope가 있으면 기존 OUTCOME 사이드바와 프로젝트 여정을 그대로 사용한다', () => {
+    const dashboard = { ...deploymentFixture, build: { repository: 'test/repo', ref: 'test', commit: null, tree: null, asset: null, runtimeNowPinned: false } } as unknown as OutcomeDashboardData
+    const html = renderToStaticMarkup(<AccountWorkspace state="ready" workspace={{ ...readyWorkspace, dashboard }} onLogout={async () => {}} />)
+    expect(html).toContain('oc-global-nav')
+    expect(html).toContain('oc-project-switcher')
+    expect(html).toContain('프로젝트 여정')
+    expect(html.match(/data-private-project=/g)).toHaveLength(2)
+    expect(html).toContain('data-private-logout="true"')
+    expect(html).not.toContain('account-workspace__ready')
   })
 
   it('login은 실제 OAuth가 아닌 주입 어댑터 전환을 명시하고 ready에는 로그아웃이 있다', () => {
