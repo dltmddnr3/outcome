@@ -49,7 +49,7 @@ test('connected folder hierarchy fails closed when nested Scope or Stage rails d
 
 test('H12 geometry regressions fail closed for oversized Hero, hidden mobile Map, wrong DOM order, and clipped Phase labels', () => {
   for (const key of ['heroGeometry', 'mobileMapFirstFold', 'mobileDomOrder', 'phaseLabelsFull']) assert.throws(() => assertDashboardMeasurement('mobile-390x844/outcome', { ...passingMeasurement(), [key]: false }), new RegExp(`${key}=false`))
-  assert.throws(() => assertDashboardMeasurement('mobile-390x844/outcome', { ...passingMeasurement(), heroGeometry: false, heroHeight: 393.4375 }), /heroGeometry=false.*heroHeight=393\.4375/)
+  assert.throws(() => assertDashboardMeasurement('mobile-390x844/outcome', { ...passingMeasurement(), heroGeometry: false, heroHeight: 230.5 }), /heroGeometry=false.*heroHeight=230\.5/)
 })
 
 test('mobile sticky context requires exact scroll retention and ordered visible band plus actual-current header', () => {
@@ -82,8 +82,8 @@ test('interactive Phase options fail closed for vertical or horizontal title cli
   assert.throws(() => assertDashboardMeasurement('desktop-1440x900/outcome', { ...passingMeasurement(), desktopPhaseListFirstFold: false }), /desktopPhaseListFirstFold=false/)
 })
 
-test('deployment snapshot badge fails closed below the 11px text contract', () => {
-  assert.throws(() => assertDashboardMeasurement('mobile-390x844/outcome', { ...passingMeasurement(), snapshotBadgeTextTruth: false, snapshotBadgeTextSizes: [10, 8] }), /snapshotBadgeTextTruth=false/)
+test('deployment snapshot badge absence fails closed when the primary badge reappears', () => {
+  assert.throws(() => assertDashboardMeasurement('mobile-390x844/outcome', { ...passingMeasurement(), snapshotBadgeTextTruth: false }), /snapshotBadgeTextTruth=false/)
 })
 
 test('source-labeled Gate group expectations derive from the Package payload', () => {

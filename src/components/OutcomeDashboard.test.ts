@@ -122,6 +122,10 @@ describe('OUTCOME Package dashboard', () => {
   it('핵심 정보 영역을 시각 리뉴얼 뒤에도 보존한다', () => {
     const source = OutcomeDashboard.toString()
     for (const token of ['oc-hero', 'oc-now-summary', 'oc-bindings', 'oc-structure-band', 'oc-outcome-map', 'oc-gate-inspector', 'oc-technical']) expect(source).toContain(token)
+    expect(source).not.toContain('oc-snapshot-badge')
+    expect(source).not.toContain('now.metadata')
+    expect(source).toContain('data-snapshot-boundary')
+    expect(source).toContain('배포 스냅샷이며 실시간 세션은 별도 연결 예정')
   })
   it('탐색 selection은 actual current와 분리되고 zero-Stage branch를 보존한다', () => {
     const value = project('outcome', 'OUTCOME')

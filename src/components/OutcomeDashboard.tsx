@@ -116,11 +116,11 @@ export function OutcomeDashboard({ onUnauthorized }: { onUnauthorized: () => voi
       <a className="oc-nav-account" href="/workspace" onClick={() => closeNavigation()}><UserRound size={18} aria-hidden="true" /><span><strong>로그인 또는 계정 관리</strong><small>비공개 워크스페이스</small></span></a>
     </aside>
     <main ref={contentRef} id="oc-main-content" className="oc-dashboard-content" tabIndex={-1}>
-    <header className="oc-topbar"><button ref={menuButtonRef} className="oc-nav-trigger" aria-label="전역 탐색 열기" aria-expanded={navigationOpen} onClick={() => setNavigationOpen(true)}><Menu size={20} aria-hidden="true" /></button>{snapshot && <span className="oc-snapshot-badge"><strong>{snapshot.label}</strong><small>{snapshot.detail}</small></span>}</header>
+    <header className="oc-topbar"><button ref={menuButtonRef} className="oc-nav-trigger" aria-label="전역 탐색 열기" aria-expanded={navigationOpen} onClick={() => setNavigationOpen(true)}><Menu size={20} aria-hidden="true" /></button></header>
     <section id="oc-current-work" className={`oc-hero ${project.status}`} aria-labelledby="oc-project-title">
       <div className="oc-hero-title"><Layers3 size={22} aria-hidden="true" /><div><h1 id="oc-project-title">{hero.name}</h1><p>{hero.outcome}</p></div></div>
       <div className="oc-hero-meta"><span className={`oc-source ${project.status}`}><strong>{sourceLabel}</strong><small>{sourceTimePrefix} {sourceObservedAt}</small></span><button className="cn-refresh" onClick={() => void load()} aria-label={refreshLabel} title={refreshLabel}><RefreshCw size={16} /></button></div>
-      <div className="oc-now-summary" data-now-status={project.now.status}><strong>{now.headline}</strong><span>{now.metadata}</span></div>
+      <div className="oc-now-summary" data-now-status={project.now.status}><strong>{now.headline}</strong></div>
       <div className="oc-bindings" role="group" aria-label="역할별 세션 관측">{project.bindings.map((binding) => { const live = liveBinding === binding; return <div key={binding.role} className={`oc-role-row ${binding.status}`} data-live={live ? 'true' : 'false'}><strong>{roleLabel(binding.role)}</strong><span>{bindingHeroLabel(binding)}</span>{live && <span className="oc-live-signal" aria-label="실시간 활동"><i aria-hidden="true" /><b>실시간</b></span>}</div> })}</div>
       {project.status !== 'valid' && <div className={`oc-warning ${project.status}`} role="status"><strong>{sourceStateLabel(project.status)}</strong><span>원본 묶음의 참조와 식별자를 다시 확인하세요.</span></div>}
     </section>
