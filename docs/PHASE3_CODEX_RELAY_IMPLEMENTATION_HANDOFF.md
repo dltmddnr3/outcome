@@ -10,6 +10,12 @@ Decision set P3-IMPLEMENTATION-1: APPROVED
 - `Mac mini private control plane`: raw session locator, adapter credential, registry, routing decision과 dispatch는 Mac mini 안에서만 소유한다. Vercel/private workspace는 public-safe projection과 end-to-end encrypted command envelope만 중계한다.
 - `high-risk Cherry reconfirmation`: push, deploy, release, credential, billing, delete와 모든 외부 mutation은 exact target·intent digest·rollback을 보여준 Cherry의 만료형 single-use 재승인 없이는 전달하지 않는다.
 
+Decision set P3-PROOF-1: APPROVED
+
+- `read-only first task`: 최초 실제 routed task는 source analysis와 non-destructive test observation만 허용하며 repository file mutation은 0건이어야 한다.
+- `local picker explicit bind`: raw locator는 Mac mini local picker 안에서만 읽고 Cherry가 project+role을 확인한 뒤에만 binding한다.
+- `offline reject and draft-only`: Mac mini offline/stale 상태에서는 submit을 거부하고 browser-local draft만 보존하며 자동 replay하지 않는다.
+
 Cherry는 2026-08-25 KST 직전 세 추천안에 `추천안 적용`으로 답했다. 이 승인은 본 architecture와 initial Builder spike handoff 작성만 허용하며 실제 Codex 접근, binding, observation, message dispatch, hosted queue/resource/secret 생성, product implementation, push/deploy/release를 허용하지 않는다.
 
 ## Immutable input
@@ -221,6 +227,68 @@ supported observation과 exact-session instruction delivery가 모두 재현되�
 
 NO-GO는 실패가 아니라 source-grounded scope correction이며 hidden/private interface로 우회하지 않는다.
 
+## First proof behavior
+
+Technical Spike가 GO이고 Registry·Observation·Routing candidate가 각자의 Gate를 충족한 뒤에만 최초 실제 routed task를 연다.
+
+First task intent:
+
+`선택 프로젝트의 현재 Package 문서와 exact Git 상태를 읽고, 현재 Phase/Scope/Stage/Gate 및 다음 미충족 경계를 source reference와 함께 요약하라. 파일을 변경하지 말고 외부 mutation을 수행하지 말라.`
+
+Allowed:
+
+- Package 계약·지도·Gate와 allowlisted source의 read-only inspection
+- `git status`, `git show`, `git diff --check`, read-only search
+- 이미 승인된 non-destructive test command 실행과 출력 관찰
+- source pin, command, exit code, result pointer와 limitation 반환
+
+Forbidden:
+
+- tracked/untracked product 파일 생성·수정·삭제
+- formatter, build finalizer, migration, generated snapshot 등 workspace를 변경할 수 있는 command
+- Git index/commit/branch/remote mutation
+- provider/session 설정 변경, message fan-out, push/deploy/release 또는 외부 mutation
+- Gate checkbox/evidence 작성과 QA/Audit/Cherry acceptance 판정
+
+Proof 전후 `git status --porcelain=v1`의 task-owned delta는 파일 변경 0건이어야 한다. 기존 unrelated `docs/ROADMAP 2.md`는 열거나 변경하거나 task delta로 흡수하지 않는다.
+
+## Proof success receipt
+
+다음 항목이 모두 있어야 first routed task를 성공으로 기록한다.
+
+- immutable instruction ID와 idempotency key
+- exact project, Planner binding version, target role/binding version
+- requested/validated/dispatched/acknowledged/result timestamps
+- read-only intent digest와 risk=`low_read_only`
+- result pointer와 source references; evidence/Gate pointer는 별도이며 자동 closure 없음
+- before/after Git status와 file mutation count `0`
+- raw session/thread/task/turn ID, local path, credential public leak `0`
+- timeout/duplicate/offline negative probe receipt
+
+Receipt가 없어도 result text가 보이면 success로 승격하지 않는다.
+
+## Mac mini local picker contract
+
+- picker는 `127.0.0.1` 또는 Mac mini의 승인된 local-only UI에서만 동작한다.
+- Codex technical spike가 허용한 supported interface로만 existing session candidates를 읽는다.
+- raw locator와 full title/prompt는 Mac mini memory/Keychain boundary 밖으로 나가지 않는다.
+- 화면에는 provider=`Codex`, safe alias, last observed, availability와 existing binding conflict만 보여준다.
+- candidate 선택만으로 binding하지 않는다. Cherry가 project와 role을 선택하고 safe alias를 다시 확인한 explicit action 뒤 compare-and-swap binding을 만든다.
+- 이미 다른 project/role에 active binding된 candidate, ambiguous/stale candidate, unsupported source는 bind disabled다.
+- cancel은 state mutation 0건이다. rebind는 old binding revoke와 new version을 한 transaction으로 기록하며 자동 복제하지 않는다.
+- picker telemetry에는 candidate count와 error class만 허용하고 raw locator/session ID는 기록하지 않는다.
+
+Raw locator는 Mac mini 내부에만 존재하며 hosted workspace에는 opaque binding ID와 public-safe metadata만 전송한다.
+
+## Offline draft-only contract
+
+- Mac mini heartbeat가 30초 내 없거나 observation age가 90초를 넘으면 control plane을 offline/stale로 판정한다.
+- offline/stale이면 submit control을 disabled하고 provider queue write, hosted encrypted envelope 생성, instruction ID 발행을 모두 거부한다. provider queue write count는 `0`이다.
+- 사용자가 작성한 draft는 현재 authenticated browser의 session-scoped local storage에만 보존하고 서버·Mac mini·provider로 전송하지 않는다.
+- draft는 logout, tab/session 종료 또는 24시간 중 먼저 발생할 때 삭제한다. 다른 기기와 동기화하지 않는다.
+- Mac mini가 online으로 돌아와도 automatic replay는 금지한다. Cherry가 freshness와 exact target을 다시 보고 명시적으로 재제출해야 새 instruction을 만든다.
+- offline 전 이미 acknowledged된 instruction만 기존 ledger에서 관찰할 수 있으며 미확인 instruction을 success로 승격하지 않는다.
+
 ## High-risk Cherry reconfirmation
 
 High-risk operations:
@@ -266,6 +334,8 @@ Initial slice: `Codex adapter technical spike only`
 
 Handoff state: `PREPARED_NOT_DISPATCHED`
 
+First proof behavior state: `APPROVED_NOT_EXECUTED`
+
 ### Allowed
 
 - current repository의 새 spike harness와 tests, `GATES_PHASE3_CODEX_ADAPTER_TECHNICAL_SPIKE.md` evidence receipt
@@ -306,6 +376,8 @@ Builder must return exact commit/tree, changed files, test commands/counts, capa
 - scope beyond technical spike
 
 Stop means preserve evidence and return `SAFE_HOLD`; do not improvise around the boundary.
+
+Exact dispatch-ready task brief: `docs/PHASE3_CODEX_ADAPTER_TECHNICAL_SPIKE_BUILDER_BRIEF.md`.
 
 ## Skill and external-system boundary
 

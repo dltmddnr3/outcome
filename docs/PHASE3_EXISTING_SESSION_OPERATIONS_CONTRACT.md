@@ -210,5 +210,8 @@ QA PASS는 Audit이나 Cherry acceptance가 아니며, Audit PASS도 release 또
 - high-risk operation은 exact target·intent digest·rollback에 묶인 만료형 single-use Cherry 재확인을 요구한다.
 - exact implementation contract와 initial spike handoff는 `docs/PHASE3_CODEX_RELAY_IMPLEMENTATION_HANDOFF.md`를 따른다.
 - Codex supported interface가 아직 증명되지 않았으므로 S1-S6 전에 registry/router 구현을 시작하지 않는다.
+- first actual routed task는 read-only analysis·non-destructive test observation만 허용하고 repository file mutation은 0건이어야 한다.
+- raw session locator는 Mac mini local picker 안에서만 읽으며 Cherry의 explicit project+role 확인 전에는 binding하지 않는다.
+- Mac mini offline/stale이면 submit과 provider queue write를 거부하고 session-scoped browser draft만 보존하며 automatic replay하지 않는다.
 
 Notion과 Linear connector가 현재 환경에 연결되어 있지 않으므로 이 로컬 계약은 source-controlled canonical draft지만 외부 PRD/실행 티켓 완료를 주장하지 않는다.

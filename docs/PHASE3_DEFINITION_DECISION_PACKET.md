@@ -129,4 +129,14 @@ Cherry가 후속 세 추천안에도 `추천안 적용`으로 답했다.
 
 구현 인계 residual unknowns: Codex supported interface 실사 결과와 exact Builder private session binding. 둘은 제품 방향 질문이 아니라 technical spike evidence와 private runtime assignment로 해결한다.
 
+## 첫 Proof 행동 결정 · 2026-08-25 KST
+
+Cherry가 후속 세 추천안에 다시 `추천안 적용`으로 답했다.
+
+- first routed task: 읽기 전용 분석과 비파괴 테스트만 허용하고 tracked/untracked product file mutation은 0건
+- binding UX: Mac mini local picker에서 public-safe 세션 정보를 선택한 뒤 project+role을 명시적으로 확인해야 binding
+- offline behavior: Mac mini가 offline/stale이면 새 지시를 거부하고 browser-local draft만 보존하며 자동 replay 금지
+
+이 결정은 first proof 행동 계약과 Technical Spike Builder brief를 dispatch-ready로 작성할 권한만 연다. 실제 picker 실행, session enumeration/binding, Builder assignment, Codex observation/message dispatch와 파일·외부 mutation은 승인하지 않는다.
+
 Notion·Linear connector가 이 작업 환경에 연결되어 있지 않으므로 이 로컬 패킷은 decision-ready 초안일 뿐 외부 PRD·task completion을 주장하지 않는다.
