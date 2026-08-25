@@ -1,6 +1,6 @@
 {
   "schemaVersion": 2,
-  "observedAt": "2026-08-25T00:12:41.765Z",
+  "observedAt": "2026-08-25T00:22:56.528Z",
   "projects": [
     {
       "status": "conflict",
@@ -1696,10 +1696,10 @@
     {
       "status": "valid",
       "errors": [],
-      "observedAt": "2026-08-25T00:12:22.372Z",
+      "observedAt": "2026-08-25T00:22:42.477Z",
       "sourceFreshness": {
         "state": "observed",
-        "observedAt": "2026-08-25T00:12:22.372Z"
+        "observedAt": "2026-08-25T00:22:42.477Z"
       },
       "project": {
         "id": "outcome",
@@ -2727,7 +2727,7 @@
                         "id": "K2",
                         "stageId": "outcome-stage-account-access-definition",
                         "title": "인증 제공자, 소유자 식별, 접속 수명, 로그아웃·접속 철회, 요청 위조 방지와 계정 복구 계약이 승인된다.",
-                        "closed": false,
+                        "closed": true,
                         "groupCode": "K",
                         "groupLabel": null,
                         "proves": "security"
@@ -2775,14 +2775,14 @@
                         "name": "계정 접근 계약 결정",
                         "sourceName": "K",
                         "total": 6,
-                        "closed": 1
+                        "closed": 2
                       }
                     ],
                     "total": 6,
-                    "closed": 1,
+                    "closed": 2,
                     "available": true,
                     "sourceRef": "GATES_PHASE2_ACCOUNT_ACCESS_DEFINITION.md",
-                    "observedAt": "2026-08-25T00:12:22.372Z"
+                    "observedAt": "2026-08-25T00:22:42.477Z"
                   },
                   "sourceState": "present",
                   "state": "active",
@@ -2964,7 +2964,7 @@
   ],
   "snapshot": {
     "boundary": "deployment_snapshot",
-    "capturedAt": "2026-08-25T00:12:41.765Z",
+    "capturedAt": "2026-08-25T00:22:56.528Z",
     "source": "sanitized_public_projection",
     "liveSessionRelay": false,
     "refreshBehavior": "new_deployment_required"

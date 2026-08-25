@@ -1,9 +1,9 @@
 # Phase 2 · Account Access Outcome Contract
 
-Status: `K1 APPROVED · K2-K6 CHERRY DECISION REQUIRED`
+Status: `K1-K2 APPROVED · K3-K6 CHERRY DECISION REQUIRED`
 Updated: 2026-08-25 KST
 
-Decision boundary: `NO_ACCOUNT_IMPLEMENTATION_BEFORE_CHERRY_DECISION`
+Decision boundary: `NO_ACCOUNT_IMPLEMENTATION_BEFORE_K1_K6`
 
 ## Outcome
 
@@ -28,26 +28,28 @@ Why this is the smallest useful step:
 
 Deferred alternative: a general multi-tenant account service with invitations, member roles, shared projects, organization ownership, billing, and support operations. This requires a separate approved Stage after the owner-only workspace is proven.
 
-## K2 provider recommendation · not approved
+## Approved K2 authentication contract
 
-Recommendation: use **Clerk email verification code (passwordless OTP)** for the first Cherry-only private workspace. Keep password login, Google OAuth, social login, self-signup, invitations, organizations, multi-user membership, and provider installation deferred.
+Approved 2026-08-25 KST: use **Clerk** with **Google primary**, **Apple linked access**, and **email verification code fallback** for the first Cherry-only private workspace. Keep password login, public self-signup, invitations, organizations, multi-user membership, and provider installation deferred.
 
-Why this is the smallest fit:
+### Identity and access sequence
 
-1. Clerk supports email verification codes without storing an OUTCOME password. The code is valid for 10 minutes and the prebuilt flow applies a 30-second resend cooldown.
-2. Email code entry works without relying on Google OAuth inside the GPT/mobile in-app browser. Google sign-in is therefore deferred until its browser handoff can be proven in the actual feedback environments.
-3. Clerk provides a seven-day default maximum session lifetime and explicit per-session revocation. A custom inactivity timeout or custom lifetime is a later cost-and-policy decision, not implied here.
-4. Clerk uses `SameSite=Lax` session cookies and requires that navigation/GET never cause mutation. Its provider-domain client credential is `HttpOnly`; the app-domain session token is short-lived and is not `HttpOnly`, so OUTCOME must not claim that every provider cookie is `HttpOnly`.
+1. A private operator bootstrap creates exactly one Cherry owner from an approved verified email. No public sign-up route exists.
+2. The canonical account identity is the resulting Clerk user ID stored only in private runtime configuration. Email, Google subject, and Apple subject are credentials linked to that owner; none independently grants workspace ownership.
+3. Google is the primary sign-in action. If the current environment is an embedded user-agent that Google rejects, OUTCOME opens the system browser or offers email verification code fallback without weakening owner matching.
+4. Apple is linked from an already authenticated owner session before it becomes a sign-in action. This prevents Apple Private Relay email from silently creating a second owner account.
+5. Email verification code remains the passwordless fallback and recovery entry when Google or Apple is unavailable.
 
-K2 remains open until Cherry separately approves all of the following:
+### Approved session and security boundary
 
-- Provider: Clerk production instance with email verification code only.
-- Owner identity: one exact verified Cherry email, supplied later through private runtime configuration and never written to Git, Package documents, snapshots, logs, or the public dashboard.
-- Access creation: no public sign-up route; the sole owner is provisioned through an approved private operator step.
+- Provider: Clerk production instance with Google, Apple, and email verification code; no password.
+- Owner identity: one canonical Clerk user ID bootstrapped from one exact verified Cherry email. Exact identifiers are supplied later through private runtime configuration and never written to Git, Package documents, snapshots, logs, or the public dashboard.
+- Access creation: no public sign-up route; the sole owner is provisioned through an approved private operator step. Any unbound provider identity fails closed.
 - Session: seven-day maximum lifetime for v1; no custom inactivity timeout in the first implementation.
 - Logout and revocation: local sign-out plus operator-visible revocation of every active session for the owner.
 - Request protection: `SameSite=Lax`, no mutation on GET/navigation, server-side identity verification, and explicit Origin/CSRF/idempotency controls before any later state-changing route.
-- Recovery: regain access only through control of the same verified email; if email control is lost, access stays denied until Cherry approves an operator recovery procedure. No password reset exists in this passwordless v1.
+- Recovery: regain access through the linked email verification code, or an already linked Google/Apple credential. If all linked credentials are lost, access stays denied until Cherry approves a private operator recovery procedure. No password reset exists in this passwordless v1.
+- Account-link collision: an email or social identity that is not already bound to the canonical owner never creates or inherits a workspace.
 
 Official provider references reviewed on 2026-08-25 KST:
 
@@ -57,6 +59,10 @@ Official provider references reviewed on 2026-08-25 KST:
 - Clerk session revocation: https://clerk.com/docs/reference/backend/sessions/revoke-session
 - Clerk CSRF protection: https://clerk.com/docs/guides/secure/best-practices/csrf-protection
 - Clerk cookie and token model: https://clerk.com/docs/guides/how-clerk-works/overview
+- Clerk account linking: https://clerk.com/docs/guides/configure/auth-strategies/social-connections/account-linking
+- Clerk Apple connection: https://clerk.com/docs/guides/configure/auth-strategies/social-connections/apple
+- Google embedded user-agent policy: https://developers.google.com/identity/protocols/oauth2/native-app
+- Apple web configuration: https://developer.apple.com/documentation/signinwithapple/configuring-your-environment-for-sign-in-with-apple
 - Supabase SSR comparison: https://supabase.com/docs/guides/auth/server-side/advanced-guide
 
 Comparison boundary: Supabase remains a candidate for K4 durable data and tenant-row isolation. It is not selected for K2 because its browser session maintenance requires browser access to the refresh token, adding a larger auth/session integration surface than the owner-only v1 needs.
@@ -101,7 +107,7 @@ Comparison boundary: Supabase remains a candidate for K4 durable data and tenant
 ## Cherry decisions required
 
 1. **Approved 2026-08-25 KST:** Cherry-only owner workspace beside the public sanitized snapshot; self-signup and invitations disabled.
-2. Approve or revise the K2 recommendation: Clerk email verification code, exact private owner identity, seven-day maximum session, revocation, CSRF boundary, and recovery procedure.
+2. **Approved 2026-08-25 KST:** Clerk with Google primary, Apple linked access, email verification code fallback, canonical private owner identity, seven-day session, revocation, CSRF boundary, and recovery procedure.
 3. **Approved with K1:** keep the current public sanitized snapshot publicly reachable beside the private workspace.
 4. Approve collected account fields, retention window, deletion/export process, and audit retention.
 5. Approve storage/hosting region, operational owner, recovery objective, and monthly cost ceiling.
@@ -109,4 +115,4 @@ Comparison boundary: Supabase remains a candidate for K4 durable data and tenant
 
 ## Builder entry condition
 
-Builder work may start only after K1-K6 in `GATES_PHASE2_ACCOUNT_ACCESS_DEFINITION.md` are evidence-closed by Cherry decisions. K1 approval alone does not authorize provider installation or product code. The first implementation contract must then name provider, environment, exact allowed paths, red-first isolation tests, secret boundary, migration/rollback, preview verification, fresh UX & Product QA, and separate Release Audit. It must not add live collector relay, dispatch, project creation, billing, or release mutation by implication.
+Builder work may start only after K1-K6 in `GATES_PHASE2_ACCOUNT_ACCESS_DEFINITION.md` are evidence-closed by Cherry decisions. K1-K2 approval alone does not authorize provider installation or product code. The first implementation contract must then name provider, environment, exact allowed paths, red-first isolation tests, secret boundary, migration/rollback, preview verification, fresh UX & Product QA, and separate Release Audit. It must not add live collector relay, dispatch, project creation, billing, or release mutation by implication.

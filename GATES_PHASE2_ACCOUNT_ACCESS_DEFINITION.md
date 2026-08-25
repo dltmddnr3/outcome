@@ -7,9 +7,9 @@ Decision contract: `docs/PHASE2_ACCOUNT_ACCESS_CONTRACT.md` (추천 초안이며
 - [x] K1: Cherry가 1차 사용자 범위와 공개 화면·비공개 작업공간의 분리를 승인한다.
   PROVES: cherry_decision
   EVIDENCE: 2026-08-25 KST Cherry가 `네 의견대로 진행`으로 추천안인 `공개 정제 스냅샷 유지 + Cherry 단독 private workspace + self-signup/invitation 비활성`을 승인했다. 이 결정은 K1에만 적용되며 K2-K6, provider 설치, 계정 생성과 구현을 승인하지 않는다.
-- [ ] K2: 인증 제공자, 소유자 식별, 접속 수명, 로그아웃·접속 철회, 요청 위조 방지와 계정 복구 계약이 승인된다.
+- [x] K2: 인증 제공자, 소유자 식별, 접속 수명, 로그아웃·접속 철회, 요청 위조 방지와 계정 복구 계약이 승인된다.
   PROVES: security
-  EVIDENCE: pending
+  EVIDENCE: 2026-08-25 KST Cherry가 `승인 진행`으로 Clerk 기반 `Google primary + Apple linked access + email verification code fallback`, 단일 canonical owner, seven-day session, logout/revocation, CSRF와 recovery 계약을 승인했다. 실제 owner email/provider user ID는 private runtime/bootstrap 값이며 Git·Package·snapshot·log·public UI에 기록하지 않는다. 이 결정은 K2에만 적용되며 K3-K6와 provider/OAuth/secret 구현을 승인하지 않는다.
 - [ ] K3: 작업공간 간 격리, 프로젝트 가시성, 최소 권한, 비밀정보 소유권과 감사 경계가 승인된다.
   PROVES: security
   EVIDENCE: pending
