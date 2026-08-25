@@ -59,7 +59,7 @@ test('mobile sticky context requires exact scroll retention and ordered visible 
   assert.throws(() => assertMobileStickyMeasurement('mobile-390x844/outcome', { ...passing, scrollY: 958 }), /scrollY=958/)
 })
 
-test('mobile role geometry fails closed for collapsed names, row escape, descendant intersections, and status overflow', () => {
+test('role geometry fails closed unless every name and status stays on one line without intersections or overflow', () => {
   assert.throws(() => assertDashboardMeasurement('mobile-390x844/cherry-note', { ...passingMeasurement(), roleGeometry: false }), /roleGeometry=false/)
   assert.throws(() => assertDashboardMeasurement('mobile-390x844/cherry-note', { ...passingMeasurement(), roleDescendantIntersections: ['사용성·제품 검수/출시 감사'] }), /roleIntersections=/)
   assert.throws(() => assertDashboardMeasurement('mobile-390x844/cherry-note', { ...passingMeasurement(), roleStatusOverflow: ['사용성·제품 검수:114x44->114x111'] }), /roleStatusOverflow=/)
