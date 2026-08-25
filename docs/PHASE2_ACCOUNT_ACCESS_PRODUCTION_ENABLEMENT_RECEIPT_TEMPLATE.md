@@ -17,6 +17,7 @@
 | 결정 | exact 승인 참조 | 허용 | 금지 | 결과 |
 | --- | --- | --- | --- | --- |
 | HP3-A 자원 준비 | `[ ]` | provider/data/host staged preparation | activation·real data·release | `[ ]` |
+| HP3-B QA 검수 창 | `[ ]` | exact staged candidate의 제한 traffic | general traffic·real data·activation | `[ ]` |
 | affected QA | `[ ]` | exact candidate review | implementation·promotion | `[ ]` |
 | separate Audit | `[ ]` | exact candidate audit | Cherry acceptance·release | `[ ]` |
 | Cherry production candidate | `[ ]` | candidate product decision | activation·release | `[ ]` |
@@ -90,6 +91,8 @@ domain 값, account email, organization/project/team 식별자는 기록하지 �
 
 ## 8. 보안·제품 검증
 
+- QA window candidate/start/expiry/actor receipt: `[비민감 참조]`
+- QA window 만료 뒤 private deny 복귀: `[통과/실패/미실행]`
 - Google/email code/linked Apple owner journey: `[결과]`
 - other/unlinked owner deny: `[결과]`
 - anon/cross-workspace/forged/revoked/write deny matrix: `[결과]`
@@ -133,6 +136,7 @@ domain 값, account email, organization/project/team 식별자는 기록하지 �
 - Vercel staged Production topology and plan: `[pending/decided]`
 - isolated restore cost/target: `[pending/decided]`
 - HP3-A approval: `[pending/approved/rejected]`
+- HP3-B QA window approval: `[pending/approved/rejected]`
 - HP3-D activation approval: `[pending/approved/rejected]`
 - public-service release: `[pending/approved/rejected]`
 

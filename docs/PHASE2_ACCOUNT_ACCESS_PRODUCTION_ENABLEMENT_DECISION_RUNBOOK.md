@@ -37,9 +37,11 @@
 
 결과는 `PRODUCTION_RESOURCE_CANDIDATE_ONLY`다. 실제 사용자 데이터 반입, private traffic, domain cutover, activation, release는 포함하지 않는다.
 
-### HP3-B · 영향 후보 독립 검증
+### HP3-B · `QA_WINDOW_ONLY`와 영향 후보 독립 검증
 
 HP3-A가 만든 exact disabled/staged candidate에 대해 새 UX & Product QA와 별도 Release Audit을 다시 수행한다. hosted Preview의 이전 QA/Audit은 production provider·domain·data·deployment 후보에 재사용하지 않는다.
+
+실제 provider·domain 여정을 검수하려면 별도 exact QA-window 승인이 먼저 필요하다. Builder/operator만 승인된 staged URL/domain에서 private flag를 일시적으로 열고, reviewer는 mutation 권한 없이 검수한다. window는 actor·시작·만료·candidate·허용 계정·자동 재차단을 영수증에 고정하며 일반 production traffic, real Package data와 production domain cutover를 허용하지 않는다. 격리된 검수 topology가 없으면 QA를 시작하지 않는다.
 
 검증은 최소한 실제 Google·email code·linked Apple, owner-only deny, production RLS, managed backup과 isolated restore, `RPO ≤ 24h`, `RTO ≤ 8h`, 비용 stop, domain/cookie/redirect, public `405`·가림·receipt parity와 rollback을 포함한다.
 
@@ -183,6 +185,12 @@ Supabase secret/service-role/database password/connection string은 현재 read-
 
 > `HP3-A 운영 자원 준비 승인: exact receipt에 고정된 Clerk production, Google OAuth, Apple web credential, Supabase Pro Seoul, Vercel staged Production 환경과 owned domain/DNS 준비만 허용. private surface 활성화, 실제 데이터 반입, domain traffic cutover, 운영 출시와 외부 사용자 접근은 금지.`
 
+## QA 검수 창 승인 문구
+
+아래 문구는 HP3-A resource candidate와 즉시 재차단 절차가 고정된 뒤, fresh QA 시작 전에만 제시한다.
+
+> `HP3-B QA 검수 창 승인: exact staged production candidate에서 지정 reviewer와 canonical test owner의 제한된 검수 traffic만 허용하고 Builder/operator가 private flag를 일시적으로 연다. window 만료 즉시 재차단하며 일반 production traffic, real Package data, domain cutover, activation과 release는 금지.`
+
 ## 운영 활성화 승인 문구
 
 아래 문구는 HP3-A 후보의 fresh QA, separate Release Audit과 Cherry production candidate acceptance가 같은 pin에서 끝난 뒤에만 제시한다.
@@ -192,5 +200,5 @@ Supabase secret/service-role/database password/connection string은 현재 read-
 ## 결과 기록
 
 - 실제 판단과 실행 결과는 `docs/PHASE2_ACCOUNT_ACCESS_PRODUCTION_ENABLEMENT_RECEIPT_TEMPLATE.md`를 복제한 비민감 영수증에만 기록한다.
-- resource preparation, affected QA, Audit, Cherry candidate acceptance, activation, release를 각각 다른 시각·actor·pin으로 기록한다.
+- resource preparation, QA window, affected QA, Audit, Cherry candidate acceptance, activation, release를 각각 다른 시각·actor·pin으로 기록한다.
 - 현재 결과는 `HP3_DECISION_PREFLIGHT_ONLY`이며 HP3 승인이나 운영 준비 완료가 아니다.

@@ -239,13 +239,53 @@ phases:
               - code: A
                 primary_label: 호스팅 출시 감사
           - id: outcome-stage-account-access-cherry-acceptance
-            title: Cherry 최종 승인
-            purpose: 두 독립 검증을 통과해 정확히 고정된 후보를 Cherry가 맥북과 모바일에서 직접 판정한다.
+            title: 호스팅 후보 Cherry 승인
+            purpose: HP1+HP2 호스팅 후보의 두 독립 검증을 통과한 exact pin을 Cherry가 맥북과 모바일에서 직접 판정한다.
             depends_on: [outcome-stage-account-access-hosted-preview-release-audit]
             gates_file: GATES_PHASE2_ACCOUNT_ACCESS_CHERRY_ACCEPTANCE.md#C1-C4
             gate_groups:
               - code: C
-                primary_label: Cherry 실제 사용 승인
+                primary_label: 호스팅 후보 실제 사용 승인
+          - id: outcome-stage-account-access-production-resource-preparation
+            title: 운영 자원 준비
+            purpose: 별도 HP3-A 승인 아래 운영 provider·data·host 자원을 private-disabled staged candidate와 비민감 영수증으로 준비한다.
+            depends_on: [outcome-stage-account-access-cherry-acceptance]
+            gates_file: GATES_PHASE2_ACCOUNT_ACCESS_PRODUCTION_RESOURCE_PREPARATION.md#H1-H6
+            gate_groups:
+              - code: H
+                primary_label: 운영 자원 준비
+          - id: outcome-stage-account-access-production-ux-product-qa
+            title: 운영 후보 독립 검수
+            purpose: 새 검수자가 exact production candidate의 실제 provider·domain·MacBook/mobile 제품 여정을 독립 반증한다.
+            depends_on: [outcome-stage-account-access-production-resource-preparation]
+            gates_file: GATES_PHASE2_ACCOUNT_ACCESS_PRODUCTION_UX_PRODUCT_QA.md#Q1-Q4
+            gate_groups:
+              - code: Q
+                primary_label: 운영 후보 사용성·제품 검수
+          - id: outcome-stage-account-access-production-release-audit
+            title: 운영 후보 출시 감사
+            purpose: 별도의 새 감사자가 같은 production candidate의 auth·RLS·data lifecycle·operations·cost·rollback을 독립 판정한다.
+            depends_on: [outcome-stage-account-access-production-ux-product-qa]
+            gates_file: GATES_PHASE2_ACCOUNT_ACCESS_PRODUCTION_RELEASE_AUDIT.md#A1-A4
+            gate_groups:
+              - code: A
+                primary_label: 운영 후보 출시 감사
+          - id: outcome-stage-account-access-production-cherry-acceptance
+            title: Cherry 운영 후보 승인
+            purpose: 두 독립 검증을 통과한 exact production candidate를 Cherry가 직접 판정하되 activation 권한과 분리한다.
+            depends_on: [outcome-stage-account-access-production-release-audit]
+            gates_file: GATES_PHASE2_ACCOUNT_ACCESS_PRODUCTION_CHERRY_ACCEPTANCE.md#C1-C4
+            gate_groups:
+              - code: C
+                primary_label: Cherry 운영 후보 승인
+          - id: outcome-stage-account-access-production-activation
+            title: 운영 활성화
+            purpose: 별도 HP3-D 승인 아래 canonical Cherry owner의 private read-only 접근만 열고 15분·24시간 관측과 rollback 영수증을 고정한다.
+            depends_on: [outcome-stage-account-access-production-cherry-acceptance]
+            gates_file: GATES_PHASE2_ACCOUNT_ACCESS_PRODUCTION_ACTIVATION.md#L1-L6
+            gate_groups:
+              - code: L
+                primary_label: 운영 접근 활성화
 
   - id: outcome-phase-3
     title: Phase 3 · Definition Pending
@@ -304,6 +344,6 @@ phases:
 - Next: `P2 · Clerk Development 구성`; Cherry가 HP1을 Clerk Development + Vercel Preview로 정확히 승인해 P1은 닫혔다. Production·Supabase·DNS·도메인·출시는 계속 미승인이며, P2는 개발 환경·수동 단일 소유자·임의 가입 차단·조직 미사용을 직접 확인해야 닫힌다.
 - Dashboard registration: Package-driven Cherry Note/OUTCOME UI, GitHub connector Gate M15, fresh UX & Product QA Q1–Q4, separate fresh Release Audit A1–A4, Cherry acceptance C1–C2, stable snapshot host S1–S6, and registered Package portfolio foundation P1–P6 are evidence-closed.
 - Phase 1 closure boundary: 2026-08-25 KST Cherry가 내부사용 Local MVP 종료를 승인했다. 외부 공개 수준 MVP와 release approval은 이 결정에 포함되지 않는다.
-- Future roadmap visibility: Phase 2의 account access definition `K6 6/6`, provider-neutral disabled implementation `I1-I8 8/8`, prior fresh UX/Product re-QA `Q1-Q4 4/4`, prior Release re-Audit `A1-A4 4/4`, hosted-preview execution contract `H1-H6 6/6`, browser-viable public-redacted code readiness `B1-B12 12/12`, hosted-data 실행 사전준비 `E1-E8 8/8`, HP3 운영 활성화 결정 사전준비 `R1-R8 8/8`은 각각의 exact candidate 또는 문서 증거로 닫혔다. HP1 hosted identity는 승인만 확보된 `P1-P6 1/6`, HP2 hosted data `D1-D7 0/7`, hosted fresh QA `Q1-Q4 0/4`, hosted fresh Audit `A1-A4 0/4`, Cherry acceptance `C1-C4 0/4`로 실제 실행·판정은 locked/open이다. 두 사전준비 완료는 HP1 완료, HP2·HP3 승인, 운영 활성화나 출시를 대신하지 않는다. 이전 disabled candidate의 QA/Audit은 이후 후보 C1에 재사용하지 않는다. HP3 resource preparation·affected fresh QA/Audit·Cherry production candidate acceptance·production activation·public-service release는 아직 실행 Stage로 등록하거나 완료하지 않았다. Phase 2 전체, Phase 4와 5는 완료가 아니며 Phase 3은 `Definition Pending`이다.
+- Future roadmap visibility: Phase 2의 account access definition `K6 6/6`, provider-neutral disabled implementation `I1-I8 8/8`, prior fresh UX/Product re-QA `Q1-Q4 4/4`, prior Release re-Audit `A1-A4 4/4`, hosted-preview execution contract `H1-H6 6/6`, browser-viable public-redacted code readiness `B1-B12 12/12`, hosted-data 실행 사전준비 `E1-E8 8/8`, HP3 운영 활성화 결정 사전준비 `R1-R8 8/8`은 각각의 exact candidate 또는 문서 증거로 닫혔다. HP1 hosted identity는 승인만 확보된 `P1-P6 1/6`, HP2 hosted data `D1-D7 0/7`, hosted fresh QA `Q1-Q4 0/4`, hosted fresh Audit `A1-A4 0/4`, hosted Cherry acceptance `C1-C4 0/4`, HP3 운영 자원 준비·새 QA·새 Audit·Cherry 운영 후보 승인·운영 활성화는 합계 `0/24`로 locked/open이다. 두 사전준비 완료는 HP1 완료, HP2·HP3 승인, 운영 활성화나 출시를 대신하지 않는다. 이전 candidate의 QA/Audit은 다음 provider/data/domain candidate에 재사용하지 않는다. production hierarchy 등록은 추적 가시성만 제공하며 실행 권한이 아니다. public-service release와 Phase 2 전체, Phase 4와 5는 완료가 아니며 Phase 3은 `Definition Pending`이다.
 - `MVP_SCOPE_CLOSED`: true
 - `EXTERNAL_OUTCOME_COMPLETE`: false
