@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState, type CSSProperties } from 'react'
+import { useEffect, useLayoutEffect, useMemo, useState, type CSSProperties } from 'react'
 import { Check, ChevronLeft, ChevronRight, Circle, Layers3, Radio, RefreshCw } from 'lucide-react'
 import { fetchOutcomeDashboard } from '../lib/api'
 import { activityLabelKo, axisLabelKo, freshnessLabelKo, gatePresentation, groupPresentation, phasePresentation, projectOutcomePresentation, roleLabel, scopePresentation, sourceLabelKo, sourceStateLabelKo, stagePresentation, stateLabelKo } from './outcomeKorean'
@@ -67,6 +67,11 @@ export function OutcomeDashboard({ onUnauthorized }: { onUnauthorized: () => voi
   const load = async () => { try { setData(await fetchOutcomeDashboard()); setError(null) } catch (reason) { const message = reason instanceof Error ? reason.message : ''; if (message === 'authentication_required') onUnauthorized(); else setError('대시보드를 읽지 못했습니다.') } }
   useEffect(() => { void load(); const timer = window.setInterval(() => void load(), 10_000); return () => window.clearInterval(timer) }, [])
   const project = useMemo(() => data ? selectProject(data.projects, selectedProjectId) : null, [data, selectedProjectId]); const resolved = project ? resolveHierarchySelection(project, selection) : null
+  useLayoutEffect(() => {
+    if (mobileLevel !== 3 || window.innerWidth >= 760) return
+    const sticky = document.querySelector<HTMLElement>('.oc-hierarchy-sticky')?.getBoundingClientRect(); const map = document.querySelector<HTMLElement>('.oc-outcome-map')?.getBoundingClientRect()
+    if (sticky && map && sticky.bottom > map.top) window.scrollBy(0, -Math.ceil(sticky.bottom - map.top) - 2)
+  }, [mobileLevel, resolved?.selection.stageId])
   if (!data || !project || !resolved) return <section className="cn-dashboard cn-loading"><h2>{error ?? 'OUTCOME 원본 묶음을 검증하고 있습니다'}</h2>{error && <button onClick={() => void load()}>다시 확인</button>}</section>
   const current = currentHierarchy(project); if (!current.phase || !current.scope || !current.stage) return <section className="cn-dashboard cn-loading"><h2>현재 위치 원본 근거가 없습니다</h2></section>
   const { phase: selectedPhase, scope: selectedScope, stage: selectedStage } = resolved; const exploring = hierarchyIsExploring(project, resolved.selection); const hero = projectHeroModel(project); const now = nowPresentation(project.now); const snapshot = snapshotPresentation(data.snapshot); const sourceLabel = snapshot?.sourceLabel ?? sourceStateLabel(project.status); const sourceTimePrefix = snapshot?.timePrefix ?? '원본 관측'; const sourceObservedAt = snapshot ? compactTime(data.snapshot!.capturedAt) : hero.freshness; const refreshLabel = snapshot?.refreshLabel ?? '원본 묶음 새로고침'; const liveBinding = data.snapshot?.liveSessionRelay === false ? null : selectLiveBinding(project.bindings); const phases = structuralPhaseModel(project)
