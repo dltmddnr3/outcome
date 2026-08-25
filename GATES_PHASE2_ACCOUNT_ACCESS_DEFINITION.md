@@ -16,9 +16,9 @@ Decision contract: `docs/PHASE2_ACCOUNT_ACCESS_CONTRACT.md` (추천 초안이며
 - [x] K4: 영속 저장소, 배포본 최신성, 삭제·내보내기, 보존 기간, 이전과 백업·복구 계약이 승인된다.
   PROVES: architecture
   EVIDENCE: 2026-08-25 KST Cherry가 직전 K4 approval 요청에 `중단 지시 이전까지 연속 계속 진행`으로 답해 Supabase Pro Seoul, append-only snapshot/current pointer, immutable deployment receipt, 90/365-day retention, 30-day deletion, JSON export, daily 7-day backup, migration/restore, RPO 24h/RTO 8h 계약을 승인했다. 실제 paid resource/database/secret 생성은 별도 외부 mutation 경계로 남는다.
-- [ ] K5: 오남용 방지, 관측, 사고 대응, 비용 상한, 단계적 적용과 되돌리기 수용 조건이 승인된다.
+- [x] K5: 오남용 방지, 관측, 사고 대응, 비용 상한, 단계적 적용과 되돌리기 수용 조건이 승인된다.
   PROVES: operations
-  EVIDENCE: pending
+  EVIDENCE: 2026-08-25 KST Cherry의 `중단 지시 이전까지 연속 계속 진행` standing directive에 따라, 별도 recommendation slice에서 공개 GET-only/405, private API rate limit, exact metric·severity·incident ownership, 월 USD 75 상한, 7단계 rollout과 fail-closed rollback 계약을 승인했다. 이 결정은 K5에만 적용되며 K6, provider/resource/secret/database/product mutation을 승인하지 않는다.
 - [ ] K6: Cherry가 정확한 계정 접근 결과 계약을 승인하고 첫 구현 작업의 허용 범위를 연다.
   PROVES: cherry_acceptance
   EVIDENCE: pending

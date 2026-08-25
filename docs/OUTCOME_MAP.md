@@ -221,9 +221,9 @@ phases:
 ## 현재 위치
 
 - Current: `outcome-phase-2 / outcome-phase-2-account-service / outcome-stage-account-access-definition · Phase 2 account access contract definition`
-- Next: `K5 · abuse prevention, observability, incident response, cost ceiling, staged rollout and rollback decision`; K1-K4는 2026-08-25 KST Cherry 승인으로 닫혔고 K5–K6 승인 전 인증·DB·secret·domain 제품 변경은 시작하지 않는다.
+- Next: `K6 · exact account-access result contract and first bounded Builder authorization`; K1-K5는 2026-08-25 KST Cherry 승인으로 닫혔고 K6 승인 전 인증·DB·secret·domain 제품 변경은 시작하지 않는다.
 - Dashboard registration: Package-driven Cherry Note/OUTCOME UI, GitHub connector Gate M15, fresh UX & Product QA Q1–Q4, separate fresh Release Audit A1–A4, Cherry acceptance C1–C2, stable snapshot host S1–S6, and registered Package portfolio foundation P1–P6 are evidence-closed.
 - Phase 1 closure boundary: 2026-08-25 KST Cherry가 내부사용 Local MVP 종료를 승인했다. 외부 공개 수준 MVP와 release approval은 이 결정에 포함되지 않는다.
-- Future roadmap visibility: Phase 2의 account access definition은 `K4 4/6 승인 · K5–K6 Cherry 결정 대기` 상태로 source-visible하다. Phase 4와 5는 roadmap container이며 Phase 3은 `Definition Pending`으로 어떤 진행도 추론하지 않는다.
+- Future roadmap visibility: Phase 2의 account access definition은 `K5 5/6 승인 · K6 Cherry 결정 대기` 상태로 source-visible하다. Phase 4와 5는 roadmap container이며 Phase 3은 `Definition Pending`으로 어떤 진행도 추론하지 않는다.
 - `MVP_SCOPE_CLOSED`: true
 - `EXTERNAL_OUTCOME_COMPLETE`: false

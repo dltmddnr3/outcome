@@ -1,6 +1,6 @@
 # Phase 2 · Account Access Outcome Contract
 
-Status: `K1-K4 APPROVED · K5-K6 CHERRY DECISION REQUIRED`
+Status: `K1-K5 APPROVED · K6 CHERRY DECISION REQUIRED`
 Updated: 2026-08-25 KST
 
 Decision boundary: `NO_ACCOUNT_IMPLEMENTATION_BEFORE_K1_K6`
@@ -192,7 +192,7 @@ Official references reviewed on 2026-08-25 KST:
 
 Changelog boundary: the 2026 Data API change means new tables are not assumed to be exposed automatically; grants/exposure and RLS are both explicit. Current management-log, extension pinning and self-hosted gateway breaking changes do not alter this managed-Postgres recommendation.
 
-## K5 operations recommendation · not approved
+## K5 operations contract · approved 2026-08-25 KST
 
 Recommendation: operate the first account service as a Cherry-only read-only private surface with explicit abuse caps, minimal security telemetry, a monthly infrastructure ceiling, staged promotion and one-command-equivalent private-surface rollback. Provider defaults are not completion evidence.
 
@@ -260,6 +260,50 @@ Official references reviewed on 2026-08-25 KST:
 - Supabase pricing: https://supabase.com/pricing
 - Supabase backups: https://supabase.com/docs/guides/platform/backups
 
+## K6 result acceptance recommendation · not approved
+
+Recommendation: K6 approval opens one bounded Builder implementation Stage for a Cherry-only, authenticated, read-only workspace. It approves the result contract and implementation scope below; it does not itself create provider tenants, OAuth credentials, Apple keys, paid resources, production databases, custom domains, accounts or a release.
+
+### Allowed first implementation scope
+
+- Preserve the existing public sanitized dashboard and canonical mutation `405` behavior without login.
+- Add one private entry and authenticated workspace shell for the canonical Cherry owner, with Google primary, Apple linked access and email verification-code fallback behind the approved Clerk contract.
+- Resolve workspace membership on the server and expose only the explicitly registered Cherry Note and OUTCOME Package projections.
+- Read the approved Supabase schema through server-owned access with RLS and deny-by-default authorization; no client-provided workspace/project identifier grants visibility.
+- Provide login, loading, empty, stale, conflict, unavailable, session-expired, access-denied and safe degraded read-only states on MacBook and mobile.
+- Add the K4 lifecycle and K5 operational contracts: append-only snapshots/current pointer, deletion/export workflow hooks, redacted telemetry, alert/receipt fields and rollback binding.
+- Add red-first automated tests, migrations, synthetic fixtures, preview configuration contracts, operator runbook and rollback procedure. Use placeholders or named environment contracts only; never commit secret values.
+
+### Explicitly outside this implementation authorization
+
+- Self-signup, invitations, organizations, multiple users/workspaces, admin or billing UI.
+- Project creation, Package authoring, session relay/chat, role dispatch, live multi-PC collector or autonomous sync.
+- Gate, approval, release, Git, database-content or project-state mutation from the dashboard.
+- NOL AX, Cherry Picker or any project beyond the two-project allowlist.
+- Public-service release, external public MVP, paid-plan purchase, provider tenant/account creation, OAuth consent publication, Apple key issuance, production secret entry, domain mutation or production database creation without a separate exact mutation approval.
+
+### K6 acceptance evidence
+
+K6 may close only when Cherry explicitly approves this exact result contract. That approval opens Builder work; it is not implementation PASS. The later implementation Stage must prove all of the following independently:
+
+1. Public regression: page/API/health remain available, public payload stays sanitized, every mutation remains `405`, and receipt commit/tree/asset/snapshot parity is exact.
+2. Authentication: approved Google, Apple and email-code paths plus logout, seven-day expiry, revocation, recovery and provider-failure states pass without leaking credentials or account identifiers.
+3. Authorization: unauthenticated, wrong-owner, forged workspace/project, unregistered project and stale-membership probes all deny; only the two-project allowlist is visible.
+4. Data: migrations and RLS are pinned; append-only snapshot/current-pointer behavior, retention, export, deletion and tested restore meet K4 without inferring freshness.
+5. Operations: K5 rate limits, metrics, alerts, incident receipts, cost thresholds, staged rollout and rollback are reproducible with exact evidence.
+6. UX: MacBook and mobile clearly distinguish public/private, current/touched hierarchy, loading/empty/error/stale/conflict/access-denied/session-expired states, and preserve 200% zoom/keyboard/touch accessibility.
+7. Boundaries: account/session activity never closes a Gate; provider defaults, tests, deployment and operator statements never substitute for independent QA, Release Audit or Cherry acceptance.
+
+### Role and promotion sequence
+
+1. Planner pins the immutable K1-K6 contract and issues one exact Builder ticket.
+2. Builder implements only the allowed scope in an isolated candidate and supplies tests, migrations, receipts, rollout and rollback evidence.
+3. Fresh UX & Product QA independently verifies the affected public/private journeys on the exact candidate.
+4. A separate fresh Release Audit verifies auth, RLS, privacy/data lifecycle, operations, costs, runtime identity and rollback on the same pins.
+5. Cherry physically accepts MacBook and mobile behavior and separately decides any production resource mutation and release.
+
+No role may self-promote its own result. A QA PASS grants only its named downstream review; a Release Audit PASS is not Cherry acceptance or release approval.
+
 ## Surface contract
 
 ### Public snapshot
@@ -302,12 +346,13 @@ Official references reviewed on 2026-08-25 KST:
 1. **Approved 2026-08-25 KST:** Cherry-only owner workspace beside the public sanitized snapshot; self-signup and invitations disabled.
 2. **Approved 2026-08-25 KST:** Clerk with Google primary, Apple linked access, email verification code fallback, canonical private owner identity, seven-day session, revocation, CSRF boundary, and recovery procedure.
 3. **Approved with K1:** keep the current public sanitized snapshot publicly reachable beside the private workspace.
-4. Approve collected account fields, retention window, deletion/export process, and audit retention.
-5. Approve storage/hosting region, operational owner, recovery objective, and monthly cost ceiling.
+4. **Approved 2026-08-25 KST:** minimal account fields, 90/365-day retention, 30-day deletion, JSON export and redacted security-audit retention boundary.
+5. **Approved 2026-08-25 KST:** Supabase Pro Seoul, Cherry decision ownership, Builder/operator containment, RPO 24h/RTO 8h and USD 75 monthly ceiling.
 6. **Approved 2026-08-25 KST:** one owner-viewer workspace, server-derived membership, Cherry Note/OUTCOME-only private allowlist, capability matrix, negative authorization tests, secret ownership and audit boundary.
 7. **Approved 2026-08-25 KST:** Supabase Pro Seoul, durable schema ownership, append-only snapshots, 90/365-day retention, 30-day deletion window, JSON export, managed backups, migration/restore procedure and RPO/RTO targets.
-8. Approve or revise the K5 recommendation: abuse caps, operational metrics/alerts, incident ownership, USD 75 monthly ceiling, staged rollout and rollback acceptance.
+8. **Approved 2026-08-25 KST:** K5 public/private abuse caps, exact operational metrics/alerts, incident ownership, USD 75 monthly ceiling, seven-step rollout and fail-closed rollback acceptance.
+9. Approve or revise the K6 result contract: one bounded Builder Stage, explicit non-scope, seven evidence dimensions, independent UX/Product QA, separate Release Audit and Cherry physical acceptance.
 
 ## Builder entry condition
 
-Builder work may start only after K1-K6 in `GATES_PHASE2_ACCOUNT_ACCESS_DEFINITION.md` are evidence-closed by Cherry decisions. K1-K4 approval alone does not authorize provider installation or product code. The first implementation contract must then name provider, environment, exact allowed paths, red-first isolation tests, secret boundary, migration/rollback, preview verification, fresh UX & Product QA, and separate Release Audit. It must not add live collector relay, dispatch, project creation, billing, or release mutation by implication.
+Builder work may start only after K1-K6 in `GATES_PHASE2_ACCOUNT_ACCESS_DEFINITION.md` are evidence-closed by Cherry decisions. K1-K5 approval alone does not authorize provider installation or product code. The first implementation contract must then name provider, environment, exact allowed paths, red-first isolation tests, secret boundary, migration/rollback, preview verification, fresh UX & Product QA, and separate Release Audit. It must not add live collector relay, dispatch, project creation, billing, or release mutation by implication.
