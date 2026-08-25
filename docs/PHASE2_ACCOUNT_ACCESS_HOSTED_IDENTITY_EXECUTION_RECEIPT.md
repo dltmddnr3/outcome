@@ -84,3 +84,15 @@ P3 판정: `G/E/A/D/R 5/5 PASS`. 이 판정은 P4 Vercel Preview 환경, P5 MacB
 - 공개 검증: 화면/API `200/200`; mutation `32/32=405`; API read-only JSON `28/28`; 공개 경계 금지 식별자 `0`
 
 P4 판정: `PASS`. Preview는 Vercel 인증 보호 아래 있으며 실제 MacBook/mobile 로그인·불러오는 중·준비·로그아웃·만료·철회·제공자 장애 흐름은 P5에서 별도로 실측한다. P4는 P5/P6, HP1 완료, HP2, Production release 또는 Phase 완료를 증명하지 않는다.
+
+## P5 맥북 현재 후보 재검증
+
+- 관측 시각: `2026-08-26T08:19:27+09:00`
+- 현재 후보: commit `64d58ef643acec74c65a89e293f0bfe9e1d67cda` · deployment `dpl_2VoNJzCykyky3vsKARXkAWprmZts` · Preview `READY`
+- 현재 허용 주소: `https://outcome-git-codex-hp1-session-bearer-white-castle.vercel.app/workspace`
+- 실패 재현: 이전 고정 배포 주소에서 Google 로그인 후 `/api/private/session`이 `401`을 반환했다. 비민감 런타임 진단은 `azpMatchesConfiguredOrigin=false`, `sdkReason=token-invalid-authorized-parties`였으며 계정·토큰·쿠키·식별자는 기록하지 않았다.
+- 복구: 같은 Chrome 세션을 현재 허용 주소로 전환했다. 권한 확인 중 상태를 거쳐 전역 사이드바 `1`, 허용된 비공개 프로젝트 `2`, 결과 지도 `1`, 가로 넘침 `0`으로 준비 상태가 확인됐다.
+- 판정: 맥북 Google 로그인·불러오는 중·준비 흐름은 현재 후보에서 `PASS`. 이전 고정 배포 주소는 허용 주소가 아니므로 P5 검수 링크로 재사용하지 않는다.
+- 잔여: 맥북 email code·로그아웃·만료·철회·인증 제공자 장애, 모바일 시스템 브라우저 전체 행렬은 미실행이다.
+
+P5는 잔여 행렬이 남아 있어 `OPEN`이다. 이 재검증은 P6, HP1 완료, HP2, 독립 검수, 출시 감사, Cherry 승인, 출시 또는 `EXTERNAL_OUTCOME_COMPLETE`를 닫지 않는다.
