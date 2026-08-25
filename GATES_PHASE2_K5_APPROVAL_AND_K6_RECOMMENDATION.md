@@ -16,8 +16,8 @@ Outcome: Cherry의 standing continuous directive를 직전 K5 operations recomme
   CHECK: rg -q 'Next: `K6' docs/OUTCOME_MAP.md && rg -q 'K5 5/6 승인' docs/OUTCOME_MAP.md && rg -q '`EXTERNAL_OUTCOME_COMPLETE`: false' docs/OUTCOME_MAP.md && echo E5_MAP_PASS
   EXPECT: E5_MAP_PASS
   EVIDENCE: `docs/OUTCOME_MAP.md` Current Stage 유지, Next K6, K5 5/6, external false. Stable snapshot은 OUTCOME 5/6이며 Cherry Note source 부재 시 마지막 실제 관측 `conflict` 상태를 그대로 보존했다.
-- [ ] E6: snapshot parser, tests, build, exact public receipt, mutation 405와 prohibited hit 0을 검증한다.
-  EVIDENCE: local candidate PASS · snapshot projects=2/prohibited=0/Gate evidence fields=0/OUTCOME K5 5/6; Cherry Note last observed conflict snapshot preserved; frontend 57/57; Node 78/78; Vercel build + stable-host 7/7; scope PASS. Exact public receipt와 remote mutation/redaction은 배포 후 pending.
+- [x] E6: snapshot parser, tests, build, exact public receipt, mutation 405와 prohibited hit 0을 검증한다.
+  EVIDENCE: local candidate PASS · snapshot projects=2/prohibited=0/Gate evidence fields=0/OUTCOME K5 5/6; Cherry Note last observed conflict snapshot preserved; frontend 57/57; Node 78/78; Vercel build + stable-host 7/7; scope PASS. Public deployment `dpl_Ggiz8SiCbxStBPs9jmeT3UPPyC64` READY · stable page/API/health 200 · receipt commit `b513cb2b768b`, tree `d21f317493d6`, asset `index-ClJ2FGRo.js` · HEAD=origin/main `b513cb2b768ba051e7f33e42ffc66ee5d49d0d56` · remote mutation 24/24=405 · public prohibited identifiers=0.
 
 ABANDON: K6를 이 recommendation 작업만으로 닫지 않는다. Supabase/Clerk/OAuth/Apple/Vercel paid resource·secret·database/domain/product code mutation은 수행하지 않는다.
 ABANDON: 외부 공개 수준 MVP, release approval, `EXTERNAL_OUTCOME_COMPLETE`는 open이다.
