@@ -22,9 +22,9 @@ Outcome: 승인된 K1-K6 계약을 벗어나지 않는 Cherry-only authenticated
   EVIDENCE: private-path 120/10m rate, 6/project/hour sync cap, idempotency/concurrency, 512 KiB measured-fixture payload cap, $40/$60/$75 states, redacted incident and rollback binding pass synthetic tests.
 - [ ] I7: MacBook/mobile의 login/loading/empty/stale/conflict/unavailable/session-expired/access-denied/safe-degraded states와 accessibility가 검증된다.
   PROVES: test
-  EVIDENCE: account browser passed MacBook/mobile for nine settled states plus loading, 200% zoom, keyboard focus, reduced motion, touch >=44 px and zero overflow/intersection; Korean-first static state tests 3 passed.
+  EVIDENCE: account browser passed MacBook/mobile for nine settled states plus loading and 200% zoom; canonical stable browser passed 1440x900, 390x844, 375x812 and 844x390 across both projects and every hierarchy state. Cherry conflict Hero is 351.98 px under the 360 px mobile contract; text >=11 px, touch >=44 px, contrast >=4.5, reduced motion static, and overflow/intersection/clipping/ellipsis/English fallback all zero.
 - [ ] I8: exact candidate commit/tree/asset, tests, migrations, synthetic fixtures, rollout/rollback과 changed-files receipt가 immutable handoff로 전달된다.
   PROVES: evidence
-  EVIDENCE: immutable candidate commit/tree/asset is issued in the post-commit Builder handoff; changed files, commands, migrations, rollout, rollback and limitations are recorded in docs/PHASE2_ACCOUNT_ACCESS_IMPLEMENTATION_EVIDENCE.md. Canonical mobile stable-browser Hero geometry remains blocked; result is not QA or release authority.
+  EVIDENCE: immutable candidate commit/tree/asset is issued in the post-commit Builder handoff; changed files, commands, migrations, rollout, rollback and limitations are recorded in docs/PHASE2_ACCOUNT_ACCESS_IMPLEMENTATION_EVIDENCE.md. Result is CANDIDATE_READY_ONLY and is not QA, release or Cherry authority.
 
 ABANDON: production provider/resource/secret/database/domain mutation, additional projects/users, write features, session relay/dispatch와 release는 포함하지 않는다.

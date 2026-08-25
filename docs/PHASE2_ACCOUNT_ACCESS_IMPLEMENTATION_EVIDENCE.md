@@ -1,6 +1,6 @@
 # Phase 2 · Account Access Implementation Evidence
 
-Status: `BLOCKED · LOCAL RLS PROOF COMPLETE · CANONICAL MOBILE STABLE-BROWSER OPEN`
+Status: `CANDIDATE_READY_ONLY · I1-I8 BUILDER EVIDENCE COMPLETE`
 
 Base: `0f88e71d2c8c` / tree `65c419a440b4`
 
@@ -31,7 +31,7 @@ Base: `0f88e71d2c8c` / tree `65c419a440b4`
 - `npm run build` and `npm run build:isolated`: TypeScript and Vite production builds passed.
 - `npm run check:scope` and `npm run check:runbook`: passed.
 - The tracked three-project portfolio fixture passed desktop/mobile navigation. The default detached-worktree generic browser command could not resolve the external Cherry Note Package from its relative registry; a worktree-contained synthetic registry run passed four viewports. This is not relabeled as canonical Package browser PASS.
-- `npm run test:stable-browser`: desktop 1440×900 passed all 48 hierarchy selections and 25 Stage selections after the Phase truth, Korean presentation and 11 px warning corrections. The canonical Cherry Note conflict state remains over the mobile Hero geometry ceiling (393.4375 px observed versus 360 px contract) at 390×844, so the full stable-browser command remains failed rather than being relabeled.
+- `npm run test:stable-browser`: all four viewports passed every Cherry Note and OUTCOME hierarchy state. Desktop 1440×900 and landscape 844×390 remain 164 px; mobile 390×844 and phone 375×812 measure 351.98 px for the Cherry Note conflict Hero and 313.05 px for OUTCOME. Across the four runs, text is at least 11 px, controls at least 44 px, contrast at least 4.5, and English fallback, clipping, ellipsis, intersections, viewport escape and document overflow are zero. Reduced motion is static and keyboard/mobile hierarchy assertions pass.
 
 ## Migration and fixture receipts
 
@@ -46,6 +46,8 @@ Base: `0f88e71d2c8c` / tree `65c419a440b4`
 - `package.json`
 - `package-lock.json`
 - `scripts/account-access-browser-check.mjs`
+- `scripts/browser-assertions.mjs`
+- `scripts/browser-assertions.test.mjs`
 - `scripts/check-mutation-matrix.mjs`
 - `server/account-access-api.mjs`
 - `server/account-access-api.test.mjs`
@@ -67,13 +69,15 @@ Base: `0f88e71d2c8c` / tree `65c419a440b4`
 - `test/fixtures/account-access.json`
 - `vercel.json`
 
-## Local RLS proof and remaining blocker
+## Local RLS proof and candidate boundary
 
 The exact pinned migration now executes in-process on official `@electric-sql/pglite` 0.5.7 (PostgreSQL 18.3). The committed test provisions only the Supabase platform prerequisites (`anon`, `authenticated`, and an `auth.jwt()` compatibility function), then applies the unchanged migration and exercises actual PostgreSQL roles and policies. It proves forced RLS on all eight tables, one canonical owner in exactly one workspace through the v1 `identity_subject` uniqueness constraint, owner-only reads, and denial for duplicate membership, anonymous, unknown, revoked and authenticated-write cases.
 
 This closes the local implementation proof for I4 only. It is not Supabase preview, Clerk integration, hosted backup/restore, or provider proof. The Builder did not start Docker or create a Supabase/Clerk/Google/Apple/Vercel resource.
 
-The remaining blocker is the canonical stable-browser mobile Hero geometry failure for the pre-existing Cherry Note `conflict` source state: 393.4375 px was directly measured at 390×844 against the 360 px contract. The account correction's desktop traversal, Korean surface, Phase truth and minimum text size pass. Reducing the mobile Hero by more than 33 px requires a separately bounded layout decision; this correction does not weaken the assertion or hide/truncate source truth. The result therefore remains `BLOCKED`, not `CANDIDATE_READY_ONLY`.
+The I7 correction first reproduced the canonical Cherry Note `conflict` Hero above the 360 px contract; the exact clean e61b5fc reproduction measured 399.4375 px in this run (the prior handoff recorded 393.4375 px under the earlier diagnostic layout). The corrected mobile layout places source status, NOW and the existing 44 px refresh control in one responsive row while keeping project identity, all source text, all four role rows and the full warning visible. Final 390×844 and 375×812 measurements are 351.98 px with no clipping, ellipsis, intersection, overflow, undersized text or undersized controls. The assertion remains unchanged and now includes the measured Hero height in future failure output.
+
+All I1-I8 Builder evidence is now reproducible locally, so the result is `CANDIDATE_READY_ONLY`. This is not independent QA, Release Audit, Cherry acceptance, hosted provider proof, deployment authority or Phase completion.
 
 ## Rollout
 
