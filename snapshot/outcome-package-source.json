@@ -1,6 +1,6 @@
 {
   "schemaVersion": 2,
-  "observedAt": "2026-08-25T04:31:04.126Z",
+  "observedAt": "2026-08-25T05:22:07.881Z",
   "projects": [
     {
       "status": "conflict",
@@ -1696,10 +1696,10 @@
     {
       "status": "valid",
       "errors": [],
-      "observedAt": "2026-08-25T04:30:53.212Z",
+      "observedAt": "2026-08-25T05:21:17.064Z",
       "sourceFreshness": {
         "state": "observed",
-        "observedAt": "2026-08-25T04:30:53.212Z"
+        "observedAt": "2026-08-25T05:21:17.064Z"
       },
       "project": {
         "id": "outcome",
@@ -2700,7 +2700,7 @@
             },
             {
               "id": "outcome-phase-2-account-service",
-              "title": "Account-based access",
+              "title": "계정 기반 접근",
               "purpose": "프로젝트별 가시성과 접근 권한을 계정 기반으로 관리한다.",
               "stages": [
                 {
@@ -2798,7 +2798,7 @@
                 {
                   "id": "outcome-stage-account-access-implementation",
                   "title": "계정 접근 구현 후보",
-                  "purpose": "승인된 K1-K6 계약을 provider-neutral local/preview candidate와 재현 가능한 구현 증거로 만든다.",
+                  "purpose": "승인된 K1-K6 계약을 특정 인증 제공자에 종속되지 않는 로컬·미리보기 구현 후보와 재현 가능한 증거로 만든다.",
                   "dependsOn": [
                     "outcome-stage-account-access-definition"
                   ],
@@ -2908,7 +2908,7 @@
                 {
                   "id": "outcome-stage-account-access-ux-product-qa",
                   "title": "계정 접근 사용성·제품 검수",
-                  "purpose": "Builder와 분리된 fresh reviewer가 exact candidate의 public/private 사용자 여정과 source truth를 반증한다.",
+                  "purpose": "구현 담당자와 분리된 새 검수자가 정확히 고정된 후보의 공개·비공개 사용자 여정과 원본 일치 여부를 반증한다.",
                   "dependsOn": [
                     "outcome-stage-account-access-implementation"
                   ],
@@ -2982,7 +2982,7 @@
                 {
                   "id": "outcome-stage-account-access-release-audit",
                   "title": "계정 접근 출시 감사",
-                  "purpose": "별도 fresh auditor가 동일 candidate의 auth, RLS, privacy/data, operations, cost, runtime, rollback을 검증한다.",
+                  "purpose": "별도의 새 감사자가 같은 후보의 인증, 행 단위 접근 제어, 개인정보·데이터, 운영, 비용, 실행 환경과 되돌리기를 검증한다.",
                   "dependsOn": [
                     "outcome-stage-account-access-ux-product-qa"
                   ],
@@ -3054,21 +3054,564 @@
                   }
                 },
                 {
-                  "id": "outcome-stage-account-access-cherry-acceptance",
-                  "title": "계정 접근 Cherry 승인",
-                  "purpose": "두 독립 검증을 통과한 exact candidate를 Cherry가 MacBook과 mobile에서 직접 판정한다.",
+                  "id": "outcome-stage-account-access-hosted-preview-preparation",
+                  "title": "호스팅 미리보기 실행 계약",
+                  "purpose": "실제 인증·데이터 변경을 코드 준비, 개발 인증, 호스팅 데이터, 운영 환경 활성화로 분리하고 증빙·되돌리기 경계를 고정한다.",
                   "dependsOn": [
                     "outcome-stage-account-access-release-audit"
                   ],
                   "expectedDurationMinutes": null,
-                  "gatePurpose": "계정 접근 Cherry 승인 acceptance checklist",
+                  "gatePurpose": "호스팅 미리보기 실행 계약 acceptance checklist",
+                  "gate": {
+                    "gates": [
+                      {
+                        "id": "H1",
+                        "stageId": "outcome-stage-account-access-hosted-preview-preparation",
+                        "title": "현재 배포가 실제 외부 로그인과 호스팅 데이터베이스를 제공하지 못하는 이유를 코드 근거로 명시한다.",
+                        "closed": true,
+                        "groupCode": "H",
+                        "groupLabel": null,
+                        "proves": null
+                      },
+                      {
+                        "id": "H2",
+                        "stageId": "outcome-stage-account-access-hosted-preview-preparation",
+                        "title": "자격증명 없는 구현 준비와 외부 자원 변경을 별도 승인 단위로 나눈다.",
+                        "closed": true,
+                        "groupCode": "H",
+                        "groupLabel": null,
+                        "proves": null
+                      },
+                      {
+                        "id": "H3",
+                        "stageId": "outcome-stage-account-access-hosted-preview-preparation",
+                        "title": "각 외부 변경 단위가 정확한 생성 대상, 비밀정보, 검증 영수증, 비용·도메인·소유자 경계와 되돌리기 절차를 가진다.",
+                        "closed": true,
+                        "groupCode": "H",
+                        "groupLabel": null,
+                        "proves": null
+                      },
+                      {
+                        "id": "H4",
+                        "stageId": "outcome-stage-account-access-hosted-preview-preparation",
+                        "title": "직접 검수와 독립 검증 순서가 기존 Cherry 승인, 출시, 페이즈 완료를 우회하지 않는다.",
+                        "closed": true,
+                        "groupCode": "H",
+                        "groupLabel": null,
+                        "proves": null
+                      },
+                      {
+                        "id": "H5",
+                        "stageId": "outcome-stage-account-access-hosted-preview-preparation",
+                        "title": "현재 결과 지도는 Cherry 승인을 유지하고 다음 경계를 호스팅 미리보기 외부 변경 승인 결정으로 명시한다.",
+                        "closed": true,
+                        "groupCode": "H",
+                        "groupLabel": null,
+                        "proves": null
+                      },
+                      {
+                        "id": "H6",
+                        "stageId": "outcome-stage-account-access-hosted-preview-preparation",
+                        "title": "준비 문서와 구현 인계는 비밀값·개인 식별자·외부 자원 생성·인증 제공자 활성화·배포·출시를 수행하지 않는다.",
+                        "closed": true,
+                        "groupCode": "H",
+                        "groupLabel": null,
+                        "proves": null
+                      }
+                    ],
+                    "groups": [
+                      {
+                        "code": "H",
+                        "name": "호스팅 미리보기 실행 계약",
+                        "sourceName": "H",
+                        "total": 6,
+                        "closed": 6
+                      }
+                    ],
+                    "total": 6,
+                    "closed": 6,
+                    "available": true,
+                    "sourceRef": "GATES_PHASE2_ACCOUNT_ACCESS_HOSTED_PREVIEW_PREPARATION.md",
+                    "observedAt": "2026-08-25T05:21:17.062Z"
+                  },
+                  "sourceState": "present",
+                  "state": "complete",
+                  "axes": {
+                    "implementation": "not_sourced",
+                    "test": "not_sourced",
+                    "evidence": "evidence_closed",
+                    "independentQa": "not_sourced",
+                    "cherryAcceptance": "not_sourced",
+                    "release": "not_sourced"
+                  }
+                },
+                {
+                  "id": "outcome-stage-account-access-hosted-preview-code-readiness",
+                  "title": "호스팅 미리보기 코드 준비",
+                  "purpose": "외부 자원이나 비밀값 없이 실제 인증·저장소 연결을 위한 무자격증명·실패 시 차단 제품 후보를 만든다.",
+                  "dependsOn": [
+                    "outcome-stage-account-access-hosted-preview-preparation"
+                  ],
+                  "expectedDurationMinutes": null,
+                  "gatePurpose": "호스팅 미리보기 코드 준비 acceptance checklist",
+                  "gate": {
+                    "gates": [
+                      {
+                        "id": "B1",
+                        "stageId": "outcome-stage-account-access-hosted-preview-code-readiness",
+                        "title": "완전한 환경 계약에서만 비공개 연결기를 선택하고 누락되거나 불완전한 설정은 동일한 비활성·401 상태로 차단한다.",
+                        "closed": true,
+                        "groupCode": "B",
+                        "groupLabel": null,
+                        "proves": "implementation"
+                      },
+                      {
+                        "id": "B2",
+                        "stageId": "outcome-stage-account-access-hosted-preview-code-readiness",
+                        "title": "클러크 연결기가 기준 소유자 확인, 구글·이메일 코드 시작, 인증 후 애플 연결만 허용, 로그아웃, 만료, 철회와 인증 제공자 장애를 구현한다.",
+                        "closed": true,
+                        "groupCode": "B",
+                        "groupLabel": null,
+                        "proves": "implementation"
+                      },
+                      {
+                        "id": "B3",
+                        "stageId": "outcome-stage-account-access-hosted-preview-code-readiness",
+                        "title": "호스팅 저장소 연결기가 서버에서 정한 작업공간·프로젝트 범위, 두 프로젝트 허용 목록과 기본 거부 오류 처리를 보존한다.",
+                        "closed": true,
+                        "groupCode": "B",
+                        "groupLabel": null,
+                        "proves": "security"
+                      },
+                      {
+                        "id": "B4",
+                        "stageId": "outcome-stage-account-access-hosted-preview-code-readiness",
+                        "title": "버셀 비공개 통신 연결이 명시적 활성화 표식과 완전한 연결값 뒤에서만 동작하고 공개 조회·405·가림·영수증 계약을 바꾸지 않는다.",
+                        "closed": true,
+                        "groupCode": "B",
+                        "groupLabel": null,
+                        "proves": "security"
+                      },
+                      {
+                        "id": "B5",
+                        "stageId": "outcome-stage-account-access-hosted-preview-code-readiness",
+                        "title": "맥북·모바일 로그인, 불러오는 중, 준비, 로그아웃, 거부, 만료, 철회, 이용 불가 상태가 자격증명 없는 시험 연결기로 검증되며 실제 외부 로그인으로 표시되지 않는다.",
+                        "closed": true,
+                        "groupCode": "B",
+                        "groupLabel": null,
+                        "proves": "test"
+                      },
+                      {
+                        "id": "B6",
+                        "stageId": "outcome-stage-account-access-hosted-preview-code-readiness",
+                        "title": "집중 실패 우선, 계정, 전체 화면·서버, 브라우저, 안정 호스트, 보안, 변경 거부, 정보 가림, 범위, 운영 절차와 빌드 검사가 모두 통과한다.",
+                        "closed": true,
+                        "groupCode": "B",
+                        "groupLabel": null,
+                        "proves": "test"
+                      },
+                      {
+                        "id": "B7",
+                        "stageId": "outcome-stage-account-access-hosted-preview-code-readiness",
+                        "title": "정확한 기준·후보 커밋과 트리, 의존성 근거, 환경 이름 목록, 적용·되돌리기, 결과 건수와 한계가 변경 불가 증거에 기록된다.",
+                        "closed": true,
+                        "groupCode": "B",
+                        "groupLabel": null,
+                        "proves": "evidence"
+                      },
+                      {
+                        "id": "B8",
+                        "stageId": "outcome-stage-account-access-hosted-preview-code-readiness",
+                        "title": "상위 검증자의 재검증 후 결과가 코드 준비만 완료로 끝나며 HP1 외부 변경, 독립 검수, 출시 감사, Cherry 승인, 출시와 페이즈 완료를 주장하지 않는다.",
+                        "closed": true,
+                        "groupCode": "B",
+                        "groupLabel": null,
+                        "proves": "evidence"
+                      }
+                    ],
+                    "groups": [
+                      {
+                        "code": "B",
+                        "name": "무자격증명 코드 준비",
+                        "sourceName": "B",
+                        "total": 8,
+                        "closed": 8
+                      }
+                    ],
+                    "total": 8,
+                    "closed": 8,
+                    "available": true,
+                    "sourceRef": "GATES_PHASE2_ACCOUNT_ACCESS_HOSTED_PREVIEW_CODE_READINESS.md",
+                    "observedAt": "2026-08-25T05:21:17.063Z"
+                  },
+                  "sourceState": "present",
+                  "state": "complete",
+                  "axes": {
+                    "implementation": "evidence_closed",
+                    "test": "evidence_closed",
+                    "evidence": "evidence_closed",
+                    "independentQa": "not_sourced",
+                    "cherryAcceptance": "not_sourced",
+                    "release": "not_sourced"
+                  }
+                },
+                {
+                  "id": "outcome-stage-account-access-hosted-identity-preview",
+                  "title": "개발 인증 직접 검수",
+                  "purpose": "Cherry 승인 아래 클러크 개발 인증과 버셀 미리보기에서 구글·이메일·연결된 애플 로그인과 로그아웃을 직접 검증한다.",
+                  "dependsOn": [
+                    "outcome-stage-account-access-hosted-preview-code-readiness"
+                  ],
+                  "expectedDurationMinutes": null,
+                  "gatePurpose": "개발 인증 직접 검수 acceptance checklist",
+                  "gate": {
+                    "gates": [
+                      {
+                        "id": "P1",
+                        "stageId": "outcome-stage-account-access-hosted-identity-preview",
+                        "title": "Cherry가 HP1의 정확한 외부 변경 범위를 명시적으로 승인한다.",
+                        "closed": false,
+                        "groupCode": "P",
+                        "groupLabel": null,
+                        "proves": "cherry_decision"
+                      },
+                      {
+                        "id": "P2",
+                        "stageId": "outcome-stage-account-access-hosted-identity-preview",
+                        "title": "클러크 개발 환경이 초대 전용·단일 소유자·조직 및 임의 가입 없음으로 생성되고 민감정보를 가린 영수증이 고정된다.",
+                        "closed": false,
+                        "groupCode": "P",
+                        "groupLabel": null,
+                        "proves": "security"
+                      },
+                      {
+                        "id": "P3",
+                        "stageId": "outcome-stage-account-access-hosted-identity-preview",
+                        "title": "구글 공용 개발 로그인, 이메일 코드 대체 경로, 인증 후 애플 연결만 허용, 다른 사용자 거부와 권한 철회가 직접 검증된다.",
+                        "closed": false,
+                        "groupCode": "P",
+                        "groupLabel": null,
+                        "proves": "implementation"
+                      },
+                      {
+                        "id": "P4",
+                        "stageId": "outcome-stage-account-access-hosted-identity-preview",
+                        "title": "버셀 미리보기 전용 연결값과 변경 불가 미리보기 배포가 생성되고 운영 주소와 설정은 비활성 상태를 유지한다.",
+                        "closed": false,
+                        "groupCode": "P",
+                        "groupLabel": null,
+                        "proves": "evidence"
+                      },
+                      {
+                        "id": "P5",
+                        "stageId": "outcome-stage-account-access-hosted-identity-preview",
+                        "title": "맥북과 모바일 시스템 브라우저에서 로그인·불러오는 중·준비·로그아웃·만료·철회·인증 제공자 장애 흐름이 실측된다.",
+                        "closed": false,
+                        "groupCode": "P",
+                        "groupLabel": null,
+                        "proves": "test"
+                      },
+                      {
+                        "id": "P6",
+                        "stageId": "outcome-stage-account-access-hosted-identity-preview",
+                        "title": "정확한 미리보기 후보, 인증 제공자·설정 이름, 민감정보를 가린 영수증, 비용, 되돌리기와 한계가 기록되고 HP2 외부 변경은 별도로 열려 있다.",
+                        "closed": false,
+                        "groupCode": "P",
+                        "groupLabel": null,
+                        "proves": "evidence"
+                      }
+                    ],
+                    "groups": [
+                      {
+                        "code": "P",
+                        "name": "개발 인증 직접 검수",
+                        "sourceName": "P",
+                        "total": 6,
+                        "closed": 0
+                      }
+                    ],
+                    "total": 6,
+                    "closed": 0,
+                    "available": true,
+                    "sourceRef": "GATES_PHASE2_ACCOUNT_ACCESS_HOSTED_IDENTITY_PREVIEW.md",
+                    "observedAt": "2026-08-25T05:21:17.063Z"
+                  },
+                  "sourceState": "present",
+                  "state": "active",
+                  "axes": {
+                    "implementation": "pending",
+                    "test": "pending",
+                    "evidence": "pending",
+                    "independentQa": "not_sourced",
+                    "cherryAcceptance": "not_sourced",
+                    "release": "not_sourced"
+                  }
+                },
+                {
+                  "id": "outcome-stage-account-access-hosted-data-preview",
+                  "title": "호스팅 데이터 격리 검증",
+                  "purpose": "별도 승인된 격리 수파베이스 미리보기에서 합성 패키지 데이터, 실제 행 단위 접근 제어, 생명주기와 복원을 검증한다.",
+                  "dependsOn": [
+                    "outcome-stage-account-access-hosted-identity-preview"
+                  ],
+                  "expectedDurationMinutes": null,
+                  "gatePurpose": "호스팅 데이터 격리 검증 acceptance checklist",
+                  "gate": {
+                    "gates": [
+                      {
+                        "id": "D1",
+                        "stageId": "outcome-stage-account-access-hosted-data-preview",
+                        "title": "Cherry가 HP2의 정확한 수파베이스 외부 변경 범위를 명시적으로 승인한다.",
+                        "closed": false,
+                        "groupCode": "D",
+                        "groupLabel": null,
+                        "proves": "cherry_decision"
+                      },
+                      {
+                        "id": "D2",
+                        "stageId": "outcome-stage-account-access-hosted-data-preview",
+                        "title": "격리된 비운영 수파베이스 프로젝트의 요금제·서울 지역·소유자·비용 영수증이 고정된다.",
+                        "closed": false,
+                        "groupCode": "D",
+                        "groupLabel": null,
+                        "proves": "evidence"
+                      },
+                      {
+                        "id": "D3",
+                        "stageId": "outcome-stage-account-access-hosted-data-preview",
+                        "title": "현재 클러크 외부 인증 연동과 정확히 고정된 이관·권한·행 단위 접근 제어가 적용된다.",
+                        "closed": false,
+                        "groupCode": "D",
+                        "groupLabel": null,
+                        "proves": "implementation"
+                      },
+                      {
+                        "id": "D4",
+                        "stageId": "outcome-stage-account-access-hosted-data-preview",
+                        "title": "익명, 다른 소유자, 위조 작업공간·프로젝트, 미등록 프로젝트, 철회·만료된 멤버십과 인증된 쓰기가 실제 호스팅 데이터베이스의 행 단위 접근 제어에서 거부된다.",
+                        "closed": false,
+                        "groupCode": "D",
+                        "groupLabel": null,
+                        "proves": "security"
+                      },
+                      {
+                        "id": "D5",
+                        "stageId": "outcome-stage-account-access-hosted-data-preview",
+                        "title": "추가 전용 스냅샷·현재 위치 표시, 내보내기, 삭제 기록과 격리 복원 예행연습이 합성 데이터로 검증된다.",
+                        "closed": false,
+                        "groupCode": "D",
+                        "groupLabel": null,
+                        "proves": "test"
+                      },
+                      {
+                        "id": "D6",
+                        "stageId": "outcome-stage-account-access-hosted-data-preview",
+                        "title": "맥북·모바일 비공개 작업공간에서 Cherry Note와 OUTCOME만 조회되고 공개 화면은 405·정보 가림·영수증 경계를 유지한다.",
+                        "closed": false,
+                        "groupCode": "D",
+                        "groupLabel": null,
+                        "proves": "test"
+                      },
+                      {
+                        "id": "D7",
+                        "stageId": "outcome-stage-account-access-hosted-data-preview",
+                        "title": "정확한 호스팅 후보, 이관·데이터 영수증, 측정 비용, 되돌리기와 한계가 새 사용성·제품 검수 인계로 고정된다.",
+                        "closed": false,
+                        "groupCode": "D",
+                        "groupLabel": null,
+                        "proves": "evidence"
+                      }
+                    ],
+                    "groups": [
+                      {
+                        "code": "D",
+                        "name": "호스팅 데이터 격리 검증",
+                        "sourceName": "D",
+                        "total": 7,
+                        "closed": 0
+                      }
+                    ],
+                    "total": 7,
+                    "closed": 0,
+                    "available": true,
+                    "sourceRef": "GATES_PHASE2_ACCOUNT_ACCESS_HOSTED_DATA_PREVIEW.md",
+                    "observedAt": "2026-08-25T05:21:17.063Z"
+                  },
+                  "sourceState": "present",
+                  "state": "locked",
+                  "axes": {
+                    "implementation": "pending",
+                    "test": "pending",
+                    "evidence": "pending",
+                    "independentQa": "not_sourced",
+                    "cherryAcceptance": "not_sourced",
+                    "release": "not_sourced"
+                  }
+                },
+                {
+                  "id": "outcome-stage-account-access-hosted-preview-ux-product-qa",
+                  "title": "호스팅 독립 검수",
+                  "purpose": "새 검수자가 실제 인증과 호스팅 데이터 후보의 맥북·모바일 공개·비공개 여정을 독립 반증한다.",
+                  "dependsOn": [
+                    "outcome-stage-account-access-hosted-data-preview"
+                  ],
+                  "expectedDurationMinutes": null,
+                  "gatePurpose": "호스팅 독립 검수 acceptance checklist",
+                  "gate": {
+                    "gates": [
+                      {
+                        "id": "Q1",
+                        "stageId": "outcome-stage-account-access-hosted-preview-ux-product-qa",
+                        "title": "새 격리 검수자가 정확한 후보 커밋·트리, 미리보기 배포, 클러크·수파베이스 영수증과 이전 세션 재사용 0건을 확인한다.",
+                        "closed": false,
+                        "groupCode": "Q",
+                        "groupLabel": null,
+                        "proves": "evidence"
+                      },
+                      {
+                        "id": "Q2",
+                        "stageId": "outcome-stage-account-access-hosted-preview-ux-product-qa",
+                        "title": "구글·이메일·연결된 애플 로그인, 로그아웃, 만료·철회, 접근 거부, 두 프로젝트 위계와 오류·복구가 맥북·모바일에서 직접 통과한다.",
+                        "closed": false,
+                        "groupCode": "Q",
+                        "groupLabel": null,
+                        "proves": "test"
+                      },
+                      {
+                        "id": "Q3",
+                        "stageId": "outcome-stage-account-access-hosted-preview-ux-product-qa",
+                        "title": "공개·비공개 구분, 200% 확대, 키보드·터치, 불러오는 중·비어 있음·오래됨·충돌·이용 불가 상태와 거짓 완료 0건이 통과한다.",
+                        "closed": false,
+                        "groupCode": "Q",
+                        "groupLabel": null,
+                        "proves": "test"
+                      },
+                      {
+                        "id": "Q4",
+                        "stageId": "outcome-stage-account-access-hosted-preview-ux-product-qa",
+                        "title": "보고서가 사용성·제품 검수만 통과 또는 실패로 끝나며 출시 감사, Cherry 승인, 자원 승격, 출시와 완료 권한을 주장하지 않는다.",
+                        "closed": false,
+                        "groupCode": "Q",
+                        "groupLabel": null,
+                        "proves": "evidence"
+                      }
+                    ],
+                    "groups": [
+                      {
+                        "code": "Q",
+                        "name": "호스팅 독립 검수",
+                        "sourceName": "Q",
+                        "total": 4,
+                        "closed": 0
+                      }
+                    ],
+                    "total": 4,
+                    "closed": 0,
+                    "available": true,
+                    "sourceRef": "GATES_PHASE2_ACCOUNT_ACCESS_HOSTED_PREVIEW_UX_PRODUCT_QA.md",
+                    "observedAt": "2026-08-25T05:21:17.063Z"
+                  },
+                  "sourceState": "present",
+                  "state": "locked",
+                  "axes": {
+                    "implementation": "not_sourced",
+                    "test": "pending",
+                    "evidence": "pending",
+                    "independentQa": "not_sourced",
+                    "cherryAcceptance": "not_sourced",
+                    "release": "not_sourced"
+                  }
+                },
+                {
+                  "id": "outcome-stage-account-access-hosted-preview-release-audit",
+                  "title": "호스팅 출시 감사",
+                  "purpose": "별도의 새 감사자가 같은 호스팅 후보의 인증, 행 단위 접근 제어·데이터, 개인정보, 비용, 실행 환경과 되돌리기를 검증한다.",
+                  "dependsOn": [
+                    "outcome-stage-account-access-hosted-preview-ux-product-qa"
+                  ],
+                  "expectedDurationMinutes": null,
+                  "gatePurpose": "호스팅 출시 감사 acceptance checklist",
+                  "gate": {
+                    "gates": [
+                      {
+                        "id": "A1",
+                        "stageId": "outcome-stage-account-access-hosted-preview-release-audit",
+                        "title": "새 격리 감사자가 독립 검수를 통과한 정확한 커밋·트리·배포·인증·데이터 영수증과 독립성을 확인한다.",
+                        "closed": false,
+                        "groupCode": "A",
+                        "groupLabel": null,
+                        "proves": "evidence"
+                      },
+                      {
+                        "id": "A2",
+                        "stageId": "outcome-stage-account-access-hosted-preview-release-audit",
+                        "title": "전체 회귀, 실제 인증·세션, 행 단위 접근 제어 거부, 정보 가림, 요청 위조·출처, 변경 거부, 접근성과 영수증 일치가 통과한다.",
+                        "closed": false,
+                        "groupCode": "A",
+                        "groupLabel": null,
+                        "proves": "test"
+                      },
+                      {
+                        "id": "A3",
+                        "stageId": "outcome-stage-account-access-hosted-preview-release-audit",
+                        "title": "복원, 우선 비활성화 되돌리기, 세션 철회, 인증 제공자 장애, 방화벽·경보·비용 상한과 운영 환경 비활성 경계가 재현된다.",
+                        "closed": false,
+                        "groupCode": "A",
+                        "groupLabel": null,
+                        "proves": "evidence"
+                      },
+                      {
+                        "id": "A4",
+                        "stageId": "outcome-stage-account-access-hosted-preview-release-audit",
+                        "title": "보고서가 출시 감사만 통과 또는 실패로 끝나며 Cherry 승인, 운영 환경 변경, 출시와 완료 권한을 주장하지 않는다.",
+                        "closed": false,
+                        "groupCode": "A",
+                        "groupLabel": null,
+                        "proves": "evidence"
+                      }
+                    ],
+                    "groups": [
+                      {
+                        "code": "A",
+                        "name": "호스팅 출시 감사",
+                        "sourceName": "A",
+                        "total": 4,
+                        "closed": 0
+                      }
+                    ],
+                    "total": 4,
+                    "closed": 0,
+                    "available": true,
+                    "sourceRef": "GATES_PHASE2_ACCOUNT_ACCESS_HOSTED_PREVIEW_RELEASE_AUDIT.md",
+                    "observedAt": "2026-08-25T05:21:17.064Z"
+                  },
+                  "sourceState": "present",
+                  "state": "locked",
+                  "axes": {
+                    "implementation": "not_sourced",
+                    "test": "pending",
+                    "evidence": "pending",
+                    "independentQa": "not_sourced",
+                    "cherryAcceptance": "not_sourced",
+                    "release": "not_sourced"
+                  }
+                },
+                {
+                  "id": "outcome-stage-account-access-cherry-acceptance",
+                  "title": "Cherry 최종 승인",
+                  "purpose": "두 독립 검증을 통과해 정확히 고정된 후보를 Cherry가 맥북과 모바일에서 직접 판정한다.",
+                  "dependsOn": [
+                    "outcome-stage-account-access-hosted-preview-release-audit"
+                  ],
+                  "expectedDurationMinutes": null,
+                  "gatePurpose": "Cherry 최종 승인 acceptance checklist",
                   "gate": {
                     "gates": [
                       {
                         "id": "C1",
                         "stageId": "outcome-stage-account-access-cherry-acceptance",
-                        "title": "exact candidate가 fresh UX & Product QA PASS와 separate Release Audit PASS를 모두 가진다.",
-                        "closed": true,
+                        "title": "정확히 고정된 후보가 새 독립 사용성·제품 검수 통과와 별도 출시 감사 통과를 모두 가진다.",
+                        "closed": false,
                         "groupCode": "C",
                         "groupLabel": null,
                         "proves": "cherry_acceptance"
@@ -3076,7 +3619,7 @@
                       {
                         "id": "C2",
                         "stageId": "outcome-stage-account-access-cherry-acceptance",
-                        "title": "Cherry가 MacBook과 mobile에서 public/private 전환, 로그인·로그아웃·접속 거부, 두 프로젝트 탐색과 오류/복구 상태를 직접 수용한다.",
+                        "title": "Cherry가 맥북과 모바일에서 공개·비공개 전환, 로그인·로그아웃·접속 거부, 두 프로젝트 탐색과 오류·복구 상태를 직접 수용한다.",
                         "closed": false,
                         "groupCode": "C",
                         "groupLabel": null,
@@ -3085,7 +3628,7 @@
                       {
                         "id": "C3",
                         "stageId": "outcome-stage-account-access-cherry-acceptance",
-                        "title": "Cherry가 account-access 결과 Stage의 closure를 명시적으로 승인한다.",
+                        "title": "Cherry가 계정 접근 결과 스테이지의 종료를 명시적으로 승인한다.",
                         "closed": false,
                         "groupCode": "C",
                         "groupLabel": null,
@@ -3094,7 +3637,7 @@
                       {
                         "id": "C4",
                         "stageId": "outcome-stage-account-access-cherry-acceptance",
-                        "title": "public-service release와 EXTERNAL_OUTCOME_COMPLETE는 별도 결정으로 open임을 확인한다.",
+                        "title": "공개 서비스 출시와 외부 결과 완료는 별도 결정으로 열려 있음을 확인한다.",
                         "closed": false,
                         "groupCode": "C",
                         "groupLabel": null,
@@ -3107,23 +3650,23 @@
                         "name": "Cherry 실제 사용 승인",
                         "sourceName": "C",
                         "total": 4,
-                        "closed": 1
+                        "closed": 0
                       }
                     ],
                     "total": 4,
-                    "closed": 1,
+                    "closed": 0,
                     "available": true,
                     "sourceRef": "GATES_PHASE2_ACCOUNT_ACCESS_CHERRY_ACCEPTANCE.md",
-                    "observedAt": "2026-08-25T04:30:53.212Z"
+                    "observedAt": "2026-08-25T05:21:17.064Z"
                   },
                   "sourceState": "present",
-                  "state": "active",
+                  "state": "locked",
                   "axes": {
                     "implementation": "not_sourced",
                     "test": "not_sourced",
-                    "evidence": "partially_evidenced",
+                    "evidence": "pending",
                     "independentQa": "not_sourced",
-                    "cherryAcceptance": "partially_evidenced",
+                    "cherryAcceptance": "pending",
                     "release": "not_sourced"
                   }
                 }
@@ -3216,7 +3759,7 @@
           "localCandidate": {
             "state": "available",
             "branch": "main",
-            "ahead": 1,
+            "ahead": 4,
             "behind": 0,
             "sync": "ahead"
           },
@@ -3237,9 +3780,13 @@
       "current": {
         "phaseId": "outcome-phase-2",
         "scopeId": "outcome-phase-2-account-service",
-        "stageId": "outcome-stage-account-access-cherry-acceptance"
+        "stageId": "outcome-stage-account-access-hosted-identity-preview"
       },
-      "next": null,
+      "next": {
+        "phaseId": "outcome-phase-2",
+        "scopeId": "outcome-phase-2-account-service",
+        "stageId": "outcome-stage-account-access-hosted-data-preview"
+      },
       "bindings": [
         {
           "role": "planner",
@@ -3296,7 +3843,7 @@
   ],
   "snapshot": {
     "boundary": "deployment_snapshot",
-    "capturedAt": "2026-08-25T04:31:04.126Z",
+    "capturedAt": "2026-08-25T05:22:07.881Z",
     "source": "sanitized_public_projection",
     "liveSessionRelay": false,
     "refreshBehavior": "new_deployment_required"

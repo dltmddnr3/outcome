@@ -155,7 +155,7 @@ phases:
               - code: P
                 primary_label: 등록 프로젝트 포트폴리오 기반
       - id: outcome-phase-2-account-service
-        title: Account-based access
+        title: 계정 기반 접근
         purpose: 프로젝트별 가시성과 접근 권한을 계정 기반으로 관리한다.
         stages:
           - id: outcome-stage-account-access-definition
@@ -168,7 +168,7 @@ phases:
                 primary_label: 계정 접근 계약 결정
           - id: outcome-stage-account-access-implementation
             title: 계정 접근 구현 후보
-            purpose: 승인된 K1-K6 계약을 provider-neutral local/preview candidate와 재현 가능한 구현 증거로 만든다.
+            purpose: 승인된 K1-K6 계약을 특정 인증 제공자에 종속되지 않는 로컬·미리보기 구현 후보와 재현 가능한 증거로 만든다.
             depends_on: [outcome-stage-account-access-definition]
             gates_file: GATES_PHASE2_ACCOUNT_ACCESS_IMPLEMENTATION.md#I1-I8
             gate_groups:
@@ -176,7 +176,7 @@ phases:
                 primary_label: 계정 접근 구현 후보
           - id: outcome-stage-account-access-ux-product-qa
             title: 계정 접근 사용성·제품 검수
-            purpose: Builder와 분리된 fresh reviewer가 exact candidate의 public/private 사용자 여정과 source truth를 반증한다.
+            purpose: 구현 담당자와 분리된 새 검수자가 정확히 고정된 후보의 공개·비공개 사용자 여정과 원본 일치 여부를 반증한다.
             depends_on: [outcome-stage-account-access-implementation]
             gates_file: GATES_PHASE2_ACCOUNT_ACCESS_UX_PRODUCT_QA.md#Q1-Q4
             gate_groups:
@@ -184,63 +184,63 @@ phases:
                 primary_label: 독립 사용성·제품 검수
           - id: outcome-stage-account-access-release-audit
             title: 계정 접근 출시 감사
-            purpose: 별도 fresh auditor가 동일 candidate의 auth, RLS, privacy/data, operations, cost, runtime, rollback을 검증한다.
+            purpose: 별도의 새 감사자가 같은 후보의 인증, 행 단위 접근 제어, 개인정보·데이터, 운영, 비용, 실행 환경과 되돌리기를 검증한다.
             depends_on: [outcome-stage-account-access-ux-product-qa]
             gates_file: GATES_PHASE2_ACCOUNT_ACCESS_RELEASE_AUDIT.md#A1-A4
             gate_groups:
               - code: A
                 primary_label: 독립 출시 감사
           - id: outcome-stage-account-access-hosted-preview-preparation
-            title: Hosted preview 실행 계약
-            purpose: 실제 provider/data mutation을 code readiness, development identity, hosted data, production enablement로 분리하고 receipt·rollback 경계를 고정한다.
+            title: 호스팅 미리보기 실행 계약
+            purpose: 실제 인증·데이터 변경을 코드 준비, 개발 인증, 호스팅 데이터, 운영 환경 활성화로 분리하고 증빙·되돌리기 경계를 고정한다.
             depends_on: [outcome-stage-account-access-release-audit]
             gates_file: GATES_PHASE2_ACCOUNT_ACCESS_HOSTED_PREVIEW_PREPARATION.md#H1-H6
             gate_groups:
               - code: H
-                primary_label: Hosted preview 실행 계약
+                primary_label: 호스팅 미리보기 실행 계약
           - id: outcome-stage-account-access-hosted-preview-code-readiness
-            title: Hosted preview 코드 준비
-            purpose: 외부 resource나 secret 없이 real provider/store binding을 위한 credential-free fail-closed product candidate를 만든다.
+            title: 호스팅 미리보기 코드 준비
+            purpose: 외부 자원이나 비밀값 없이 실제 인증·저장소 연결을 위한 무자격증명·실패 시 차단 제품 후보를 만든다.
             depends_on: [outcome-stage-account-access-hosted-preview-preparation]
             gates_file: GATES_PHASE2_ACCOUNT_ACCESS_HOSTED_PREVIEW_CODE_READINESS.md#B1-B8
             gate_groups:
               - code: B
-                primary_label: Credential-free 코드 준비
+                primary_label: 무자격증명 코드 준비
           - id: outcome-stage-account-access-hosted-identity-preview
             title: 개발 인증 직접 검수
-            purpose: Cherry 승인 아래 Clerk development identity와 Vercel Preview에서 Google·email·linked Apple 로그인·로그아웃을 직접 검증한다.
+            purpose: Cherry 승인 아래 클러크 개발 인증과 버셀 미리보기에서 구글·이메일·연결된 애플 로그인과 로그아웃을 직접 검증한다.
             depends_on: [outcome-stage-account-access-hosted-preview-code-readiness]
             gates_file: GATES_PHASE2_ACCOUNT_ACCESS_HOSTED_IDENTITY_PREVIEW.md#P1-P6
             gate_groups:
               - code: P
-                primary_label: Hosted identity preview
+                primary_label: 개발 인증 직접 검수
           - id: outcome-stage-account-access-hosted-data-preview
-            title: Hosted data 격리 검증
-            purpose: 별도 승인된 isolated Supabase preview에서 synthetic Package data, real RLS, lifecycle과 restore를 검증한다.
+            title: 호스팅 데이터 격리 검증
+            purpose: 별도 승인된 격리 수파베이스 미리보기에서 합성 패키지 데이터, 실제 행 단위 접근 제어, 생명주기와 복원을 검증한다.
             depends_on: [outcome-stage-account-access-hosted-identity-preview]
             gates_file: GATES_PHASE2_ACCOUNT_ACCESS_HOSTED_DATA_PREVIEW.md#D1-D7
             gate_groups:
               - code: D
-                primary_label: Hosted data preview
+                primary_label: 호스팅 데이터 격리 검증
           - id: outcome-stage-account-access-hosted-preview-ux-product-qa
-            title: Hosted preview 사용성·제품 검수
-            purpose: fresh reviewer가 real identity와 hosted data candidate의 MacBook/mobile public-private journey를 독립 반증한다.
+            title: 호스팅 독립 검수
+            purpose: 새 검수자가 실제 인증과 호스팅 데이터 후보의 맥북·모바일 공개·비공개 여정을 독립 반증한다.
             depends_on: [outcome-stage-account-access-hosted-data-preview]
             gates_file: GATES_PHASE2_ACCOUNT_ACCESS_HOSTED_PREVIEW_UX_PRODUCT_QA.md#Q1-Q4
             gate_groups:
               - code: Q
-                primary_label: Hosted preview 독립 검수
+                primary_label: 호스팅 독립 검수
           - id: outcome-stage-account-access-hosted-preview-release-audit
-            title: Hosted preview 출시 감사
-            purpose: 별도 fresh auditor가 동일 hosted candidate의 auth, RLS/data, privacy, cost, runtime과 rollback을 검증한다.
+            title: 호스팅 출시 감사
+            purpose: 별도의 새 감사자가 같은 호스팅 후보의 인증, 행 단위 접근 제어·데이터, 개인정보, 비용, 실행 환경과 되돌리기를 검증한다.
             depends_on: [outcome-stage-account-access-hosted-preview-ux-product-qa]
             gates_file: GATES_PHASE2_ACCOUNT_ACCESS_HOSTED_PREVIEW_RELEASE_AUDIT.md#A1-A4
             gate_groups:
               - code: A
-                primary_label: Hosted preview 독립 감사
+                primary_label: 호스팅 출시 감사
           - id: outcome-stage-account-access-cherry-acceptance
-            title: 계정 접근 Cherry 승인
-            purpose: 두 독립 검증을 통과한 exact candidate를 Cherry가 MacBook과 mobile에서 직접 판정한다.
+            title: Cherry 최종 승인
+            purpose: 두 독립 검증을 통과해 정확히 고정된 후보를 Cherry가 맥북과 모바일에서 직접 판정한다.
             depends_on: [outcome-stage-account-access-hosted-preview-release-audit]
             gates_file: GATES_PHASE2_ACCOUNT_ACCESS_CHERRY_ACCEPTANCE.md#C1-C4
             gate_groups:
