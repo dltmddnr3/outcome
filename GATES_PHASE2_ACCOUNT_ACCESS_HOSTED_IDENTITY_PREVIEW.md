@@ -2,9 +2,9 @@
 
 Outcome: Cherry가 승인한 개발 환경에서 정확히 한 명의 canonical owner가 Google·email code로 로그인하고 Apple을 연결한 뒤 MacBook/mobile에서 로그인·로그아웃·거부·복구를 직접 검수한다.
 
-- [ ] P1: Cherry가 HP1의 정확한 외부 변경 범위를 명시적으로 승인한다.
+- [x] P1: Cherry가 HP1의 정확한 외부 변경 범위를 명시적으로 승인한다.
   PROVES: cherry_decision
-  EVIDENCE: pending
+  EVIDENCE: `2026-08-25 KST` Cherry가 직전 제시된 정확한 문구—`HP1 개발 인증 외부 변경 승인: Clerk Development + Vercel Preview만 허용. Production, Supabase, DNS·도메인, 출시 변경은 금지.`—에 직접 `승인`으로 응답했다. 허용 범위는 Clerk Development와 Vercel Preview뿐이며 Production·Supabase·DNS·도메인·출시는 미승인이다.
 - [ ] P2: 클러크 개발 환경이 초대 전용·단일 소유자·조직 및 임의 가입 없음으로 생성되고 민감정보를 가린 영수증이 고정된다.
   PROVES: security
   EVIDENCE: pending

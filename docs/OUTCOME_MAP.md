@@ -300,10 +300,10 @@ phases:
 
 ## 현재 위치
 
-- Current: `outcome-phase-2 / outcome-phase-2-account-service / outcome-stage-account-access-hosted-identity-preview · P1 exact HP1 external-mutation approval`
-- Next: `P1 · Cherry exact approval`; 코드 준비 B1-B12는 인증 브라우저·서버 경계와 Vite 공개 환경 가림 보정 뒤 exact public candidate `6c69980e51cc76c0af9ca0137ccce9b480f246b3`에서 실제 공개 경계 0까지 닫혔다. 클러크 Development·버셀 Preview 외부 변경은 Cherry가 HP1의 정확한 허용 범위를 새로 승인하기 전에는 실행하지 않는다.
+- Current: `outcome-phase-2 / outcome-phase-2-account-service / outcome-stage-account-access-hosted-identity-preview · P2 Clerk Development and single-owner boundary`
+- Next: `P2 · Clerk Development 구성`; Cherry가 HP1을 Clerk Development + Vercel Preview로 정확히 승인해 P1은 닫혔다. Production·Supabase·DNS·도메인·출시는 계속 미승인이며, P2는 개발 환경·수동 단일 소유자·임의 가입 차단·조직 미사용을 직접 확인해야 닫힌다.
 - Dashboard registration: Package-driven Cherry Note/OUTCOME UI, GitHub connector Gate M15, fresh UX & Product QA Q1–Q4, separate fresh Release Audit A1–A4, Cherry acceptance C1–C2, stable snapshot host S1–S6, and registered Package portfolio foundation P1–P6 are evidence-closed.
 - Phase 1 closure boundary: 2026-08-25 KST Cherry가 내부사용 Local MVP 종료를 승인했다. 외부 공개 수준 MVP와 release approval은 이 결정에 포함되지 않는다.
-- Future roadmap visibility: Phase 2의 account access definition `K6 6/6`, provider-neutral disabled implementation `I1-I8 8/8`, prior fresh UX/Product re-QA `Q1-Q4 4/4`, prior Release re-Audit `A1-A4 4/4`, hosted-preview execution contract `H1-H6 6/6`과 browser-viable public-redacted code readiness `B1-B12 12/12`는 각각의 exact candidate 증거로 닫혔다. HP1 hosted identity `P1-P6 0/6`, HP2 hosted data `D1-D7 0/7`, hosted fresh QA `Q1-Q4 0/4`, hosted fresh Audit `A1-A4 0/4`, Cherry acceptance `C1-C4 0/4`는 locked/open이다. 이전 disabled candidate의 QA/Audit은 이후 후보 C1에 재사용하지 않는다. HP3 production enablement, Phase 2 전체, Phase 4와 5는 완료가 아니며 Phase 3은 `Definition Pending`이다.
+- Future roadmap visibility: Phase 2의 account access definition `K6 6/6`, provider-neutral disabled implementation `I1-I8 8/8`, prior fresh UX/Product re-QA `Q1-Q4 4/4`, prior Release re-Audit `A1-A4 4/4`, hosted-preview execution contract `H1-H6 6/6`, browser-viable public-redacted code readiness `B1-B12 12/12`, hosted-data 실행 사전준비 `E1-E8 8/8`은 각각의 exact candidate 또는 문서 증거로 닫혔다. HP1 hosted identity는 승인만 확보된 `P1-P6 1/6`, HP2 hosted data `D1-D7 0/7`, hosted fresh QA `Q1-Q4 0/4`, hosted fresh Audit `A1-A4 0/4`, Cherry acceptance `C1-C4 0/4`로 실제 실행·판정은 locked/open이다. hosted-data 사전준비 완료는 HP1 완료나 HP2 승인을 대신하지 않는다. 이전 disabled candidate의 QA/Audit은 이후 후보 C1에 재사용하지 않는다. HP3 production enablement, Phase 2 전체, Phase 4와 5는 완료가 아니며 Phase 3은 `Definition Pending`이다.
 - `MVP_SCOPE_CLOSED`: true
 - `EXTERNAL_OUTCOME_COMPLETE`: false
