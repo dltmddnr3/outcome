@@ -3,7 +3,7 @@ import test from 'node:test'
 import { assertDashboardMeasurement, assertMobileStickyMeasurement, assertSourceGroupOccurrences, sourceLabeledGroupStageKeys } from './browser-assertions.mjs'
 
 const passingMeasurement = () => ({
-  documentOverflow: 0, clippedDescendants: [], ellipsisTruncation: [], viewportEscape: [], siblingIntersections: [], roleDescendantIntersections: [], roleStatusOverflow: [], undersizedText: [], lowContrastText: [], undersizedControls: [], unexpectedEnglish: [], translationFallback: [], activeAnimationCount: 0,
+  documentOverflow: 0, clippedDescendants: [], ellipsisTruncation: [], viewportEscape: [], siblingIntersections: [], roleDescendantIntersections: [], roleStatusOverflow: [], undersizedText: [], lowContrastText: [], undersizedControls: [], unexpectedEnglish: [], translationFallback: [], activeAnimationCount: 0, heroHeight: 352,
   pageHeading: true, sequentialHeadings: true, compactHero: true, roleGeometry: true, heroGeometry: true, mobileMapFirstFold: true, mobileDomOrder: true, mobileHierarchyTruth: true, currentStageActionTruth: true, singleProgressRailTruth: true, phaseNavigationUniqueTruth: true, currentSelectionDistinctionTruth: true, folderHierarchyTruth: true, phaseCurrentMarkerTruth: true, phaseLabelsFull: true, phaseBandTruth: true, phaseOptionTitlesFull: true, desktopPhaseListFirstFold: true, liveSemantics: true, structureTruth: true, phaseCompletionTruth: true, stagePositionTruth: true, snapshotHeroTruth: true, oneMapSurface: true, roving: true, desktopColumns: true, mobileDrill: true, gateCountTruth: true, gaugeTruth: true, explorationTruth: true, groupTruth: true, singleStaleNowSignal: true, snapshotBadgeTextTruth: true, technicalCollapsed: true, technicalEvidence: true, noFabricatedProgress: true, firstFold: true,
 })
 
@@ -44,6 +44,7 @@ test('connected folder hierarchy fails closed when nested Scope or Stage rails d
 
 test('H12 geometry regressions fail closed for oversized Hero, hidden mobile Map, wrong DOM order, and clipped Phase labels', () => {
   for (const key of ['heroGeometry', 'mobileMapFirstFold', 'mobileDomOrder', 'phaseLabelsFull']) assert.throws(() => assertDashboardMeasurement('mobile-390x844/outcome', { ...passingMeasurement(), [key]: false }), new RegExp(`${key}=false`))
+  assert.throws(() => assertDashboardMeasurement('mobile-390x844/outcome', { ...passingMeasurement(), heroGeometry: false, heroHeight: 393.4375 }), /heroGeometry=false.*heroHeight=393\.4375/)
 })
 
 test('mobile sticky context requires exact scroll retention and ordered visible band plus actual-current header', () => {

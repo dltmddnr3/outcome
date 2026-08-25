@@ -151,6 +151,16 @@ describe('OUTCOME Package dashboard', () => {
     ] }]
     expect(structuralPhaseModel(value)[0]).toMatchObject({ status: 'partial', stages: 3, complete: 2 })
   })
+  it('현재 Phase도 완료 Stage와 열린 Stage가 섞이면 위치 표식과 별개로 일부 완료다', () => {
+    const value = project('outcome', 'OUTCOME')
+    value.phases = [{ id: 'outcome-phase-2', title: '', purpose: '', completion: null, scopes: [{ id: 'accounts', title: '', purpose: '', stages: [stage({ id: 'done', state: 'complete' }), stage({ id: 'current', state: 'active' })] }] }]
+    value.current = { phaseId: 'outcome-phase-2', scopeId: 'accounts', stageId: 'current' }
+    expect(structuralPhaseModel(value)[0]).toMatchObject({ status: 'partial', current: true, stages: 2, complete: 1 })
+  })
+  it('계정 접근 Stage와 완료 조건은 원본 ID를 보존하며 한글 표시를 제공한다', () => {
+    expect(stagePresentation('outcome-stage-account-access-implementation', 'English title', 'English purpose')).toEqual(['계정 접근 구현 후보', '승인된 계정 접근 계약을 로컬·미리보기에서 검증 가능한 읽기 전용 후보와 재현 가능한 근거로 구현합니다.'])
+    expect(gatePresentation('outcome-stage-account-access-implementation', 'I4', 'English fallback')).toBe('서버가 소유자와 작업공간 소속을 판정하고, 두 프로젝트 허용 목록과 작업공간 간 접근 차단을 실제 행 수준 보안으로 검증합니다.')
+  })
   it('Stage 행의 분수는 Gate 진행이 아니라 스테이지 위치로 명시한다', () => {
     const source = OutcomeDashboard.toString()
     expect(source).toContain('스테이지 위치')

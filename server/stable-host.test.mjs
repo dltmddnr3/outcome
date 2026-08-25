@@ -42,13 +42,23 @@ test('stable host exposes public read-only session and health GETs', () => {
   assert.deepEqual(request('GET', '/api/health'), { status: 200, body: { status: 'available', access: 'public_read_only', source: 'deployment_snapshot' } })
 })
 
+test('stable host exposes a disabled provider-neutral private contract and fails workspace access closed', () => {
+  const config = request('GET', '/api/private/config')
+  assert.equal(config.status, 200)
+  assert.equal(config.body.enabled, false)
+  assert.equal(config.body.completionAuthority, false)
+  assert.deepEqual(config.body.providers.map((provider) => provider.id), ['google', 'apple', 'email_code'])
+  assert.deepEqual(request('GET', '/api/private/workspace'), { status: 401, body: { error: 'authentication_required' } })
+  assert.doesNotMatch(JSON.stringify(config.body), /secret|subject|token|VITE_/i)
+})
+
 test('stable host rejects every mutation and unknown GET fails closed', () => {
   let checked = 0
-  for (const path of ['/api/dashboard', '/api/auth/session', '/api/health', '/api/unknown']) for (const method of ['POST', 'PUT', 'PATCH', 'DELETE']) {
+  for (const path of ['/api/dashboard', '/api/auth/session', '/api/health', '/api/private/config', '/api/private/workspace', '/api/unknown']) for (const method of ['POST', 'PUT', 'PATCH', 'DELETE']) {
     assert.deepEqual(request(method, path), { status: 405, body: { error: 'read_only' } })
     checked += 1
   }
-  assert.equal(checked, 16)
+  assert.equal(checked, 24)
   assert.deepEqual(request('GET', '/api/unknown'), { status: 404, body: { error: 'not_found' } })
 })
 
@@ -68,6 +78,7 @@ test('Vercel config preserves dashboard route fallback and built output contract
   assert.equal(config.outputDirectory, 'dist')
   assert.equal(config.rewrites.some((item) => item.source === '/api/:path*' && item.destination.includes('/api')), true)
   assert.equal(config.rewrites.some((item) => item.source === '/cherry-note-dashboard' && item.destination === '/index.html'), true)
+  assert.equal(config.rewrites.some((item) => item.source === '/workspace' && item.destination === '/index.html'), true)
   if (process.env.OUTCOME_ASSERT_BUILT === '1') {
     assert.equal(existsSync(new URL('../dist/index.html', import.meta.url)), true)
     const html = readFileSync(new URL('../dist/index.html', import.meta.url), 'utf8')

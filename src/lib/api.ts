@@ -2,6 +2,7 @@ import type { CherryNoteDashboardData } from '../components/CherryNoteDashboard'
 import type { OutcomeDashboardData } from '../components/OutcomeDashboard'
 
 type Session = { authenticated: boolean; publicReadOnly?: boolean }
+export type PrivateAccessConfig = { enabled: boolean; access: 'private_read_only'; providers: Array<{ id: string; mode: string }>; sessionMaximumDays: number; completionAuthority: false }
 
 async function readJson<T>(response: Response): Promise<T> {
   const body = await response.json() as T & { error?: string }
@@ -33,4 +34,12 @@ export async function fetchCherryNoteDashboard(): Promise<CherryNoteDashboardDat
 export async function fetchOutcomeDashboard(): Promise<OutcomeDashboardData> {
   const body = await readJson<{ dashboard: OutcomeDashboardData }>(await fetch('/api/dashboard', { credentials: 'same-origin', headers: { accept: 'application/json' } }))
   return body.dashboard
+}
+
+export async function fetchPrivateAccessConfig(): Promise<PrivateAccessConfig> {
+  return readJson<PrivateAccessConfig>(await fetch('/api/private/config', { credentials: 'same-origin', headers: { accept: 'application/json' } }))
+}
+
+export async function fetchPrivateWorkspace(): Promise<{ workspace: { viewState?: string } }> {
+  return readJson<{ workspace: { viewState?: string } }>(await fetch('/api/private/workspace', { credentials: 'same-origin', headers: { accept: 'application/json' } }))
 }
