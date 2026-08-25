@@ -1,6 +1,6 @@
 # OUTCOME Phase 3 · Codex Adapter Technical Spike Builder Brief
 
-State: `DISPATCHED · SPIKE_IN_PROGRESS · MANUAL_BOOTSTRAP_NOT_RELAY_PROOF`
+State: `REBOUND · RETRY_READY · MANUAL_BOOTSTRAP_NOT_RELAY_PROOF`
 
 This brief was manually delivered once to the verified OUTCOME Builder as an approved bootstrap. That delivery is not automated relay proof. The actual Builder session ID belongs only in the private runtime registry and must not be added to Package documents, Git, logs, screenshots or public payloads.
 
@@ -10,8 +10,10 @@ Determine whether a supported Codex interface can safely observe an existing ses
 
 ## Immutable input
 
-- repository source pin: commit `7f8f1f08f5f552b919cf8b5f7486b5fbf286ba9e`
-- tree: `a7422da7dffe9b06543a47eebd4e1c9de29e07b4`
+- immutable product baseline commit: `7f8f1f08f5f552b919cf8b5f7486b5fbf286ba9e`
+- immutable product baseline tree: `a7422da7dffe9b06543a47eebd4e1c9de29e07b4`
+- execution authorization commit/tree: supplied separately in the private dispatch and required to contain this exact brief SHA-256
+- authorization invariant: the execution authorization commit must be a descendant of the product baseline; it is not expected to equal the baseline because Planner-only dispatch and binding contracts are added after it
 - handoff: `docs/PHASE3_CODEX_RELAY_IMPLEMENTATION_HANDOFF.md`
 - product contract: `docs/PHASE3_EXISTING_SESSION_OPERATIONS_CONTRACT.md`
 - Gate: `GATES_PHASE3_CODEX_ADAPTER_TECHNICAL_SPIKE.md#S1-S6`
