@@ -2,7 +2,7 @@ import snapshot from './deployment-snapshot.mjs'
 import { privateAccessPublicConfig } from '../server/account-access-api.mjs'
 import { handlePrivateAccessRequest } from '../server/account-access-api.mjs'
 import { AccountAccessError } from '../server/account-access.mjs'
-import { HOSTED_IDENTITY_ENV, createHostedIdentityRuntime, readHostedIdentityConfiguration } from '../server/account-access-hosted.mjs'
+import { HOSTED_IDENTITY_ENV, createHostedIdentityRuntime, readHostedIdentityConfiguration, safeClerkAuthReason } from '../server/account-access-hosted.mjs'
 
 const result = (status, body) => ({ status, body })
 
@@ -55,7 +55,8 @@ const privateSessionDiagnostic = (logger, input, error, configuredOrigin) => {
     ? { errorCode: error.code, status: knownStatus }
     : { errorCode: 'private_workspace_unavailable', status: 503 }
   const tokenState = privateTokenDiagnostic(input.token, configuredOrigin)
-  try { logger?.info?.('outcome_private_session', { authSource: input.authSource, ...tokenState, ...safeError }) } catch {}
+  const sdkReason = safeClerkAuthReason(error?.sdkReason)
+  try { logger?.info?.('outcome_private_session', { authSource: input.authSource, ...tokenState, ...(sdkReason ? { sdkReason } : {}), ...safeError }) } catch {}
 }
 
 export function createStableHostRequestHandler({ environment = process.env, runtimeFactory = createHostedIdentityRuntime, clerkClientFactory, logger } = {}) {

@@ -1,8 +1,29 @@
 import { AccountAccessError, createAccountAccessService } from './account-access.mjs'
 import { createClerkClient } from '@clerk/backend'
+import { TokenVerificationErrorReason } from '@clerk/backend/errors'
 
 const DAY_MS = 86_400_000
 const ALLOWED_PROJECTS = Object.freeze(['cherry-note', 'outcome'])
+const CLERK_AUTH_REASONS = new Set([
+  ...Object.values(TokenVerificationErrorReason),
+  'client-uat-but-no-session-token',
+  'dev-browser-missing',
+  'dev-browser-sync',
+  'primary-responds-to-syncing',
+  'primary-domain-cross-origin-sync',
+  'satellite-needs-syncing',
+  'session-token-and-uat-missing',
+  'session-token-missing',
+  'session-token-expired',
+  'session-token-iat-before-client-uat',
+  'session-token-nbf',
+  'session-token-iat-in-the-future',
+  'session-token-but-no-client-uat',
+  'active-organization-mismatch',
+  'token-type-mismatch',
+  'unexpected-error',
+])
+export const safeClerkAuthReason = (value) => typeof value === 'string' && CLERK_AUTH_REASONS.has(value) ? value : undefined
 
 export const HOSTED_IDENTITY_ENV = Object.freeze({
   privateSurfaceEnabled: 'OUTCOME_PRIVATE_SURFACE_ENABLED',
@@ -90,7 +111,14 @@ export function createClerkBackendGateway({ environment = {}, clerkClientFactory
     const token = sessionTokenFromRequest(request)
     if (!token) return null
     const state = await client.authenticateRequest(request, { authorizedParties: [bindings.privateAllowedOrigin], acceptsToken: 'session_token' })
-    return clerkIdentity({ client, auth: state.toAuth() })
+    const identity = await clerkIdentity({ client, auth: state.toAuth() })
+    const sdkReason = safeClerkAuthReason(state.reason)
+    if (!identity && sdkReason) {
+      const error = accountError('authentication_required', 401)
+      error.sdkReason = sdkReason
+      throw error
+    }
+    return identity
   }
   return {
     authenticationOptions: { acceptsToken: 'session_token', authorizedParties: [bindings.privateAllowedOrigin] },

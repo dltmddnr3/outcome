@@ -1,6 +1,7 @@
 import assert from 'node:assert/strict'
 import { writeFileSync } from 'node:fs'
 import test from 'node:test'
+import { TokenVerificationErrorReason } from '@clerk/backend/errors'
 import source from '../snapshot/outcome-package-source.json' with { type: 'json' }
 import { finalizeDeploymentSnapshot } from '../scripts/finalize-stable-snapshot.mjs'
 import {
@@ -10,6 +11,7 @@ import {
   createHostedIdentityRuntime,
   readHostedDataConfiguration,
   readHostedIdentityConfiguration,
+  safeClerkAuthReason,
 } from './account-access-hosted.mjs'
 
 const deploymentFixture = finalizeDeploymentSnapshot({ source, commit: '1'.repeat(40), tree: '2'.repeat(40), asset: 'index-test.js' })
@@ -33,12 +35,12 @@ const claims = ({ subject = owner, expired = false, sessionId = subject === owne
   exp: Math.floor((expired ? now() - 1 : now() + 60_000) / 1_000),
 })
 
-const clerkClientFactory = ({ unavailable = false, revoked = false } = {}) => () => ({
+const clerkClientFactory = ({ unavailable = false, revoked = false, reason } = {}) => () => ({
   async authenticateRequest(request) {
     if (unavailable) throw new Error('provider unavailable')
     const token = request.headers.get('cookie')?.match(/(?:^|;\s*)__session=([^;]+)/)?.[1]
     const value = token === 'sdk-valid' ? claims() : token === 'wrong-owner' ? claims({ subject: 'other-owner' }) : token === 'expired' ? claims({ expired: true }) : null
-    return { toAuth: () => value ? { isAuthenticated: true, userId: value.sub, sessionId: value.sid, sessionClaims: value } : { isAuthenticated: false } }
+    return { reason, toAuth: () => value ? { isAuthenticated: true, userId: value.sub, sessionId: value.sid, sessionClaims: value } : { isAuthenticated: false } }
   },
   sessions: {
     async getSession(sessionId) { return { id: sessionId, status: revoked ? 'revoked' : 'active', userId: sessionId === 'other-session' ? 'other-owner' : owner } },
@@ -136,4 +138,18 @@ test('private session diagnostics expose only auth-source and safe error enums',
   ])
   const serialized = JSON.stringify(diagnostics)
   assert.doesNotMatch(serialized, /sensitive|secret|signature|preview\.invalid|wrong-origin|4102444800|authorization|subject|session[_-]?id|kid|\bsub\b|\bsid\b|\bazp\b|\bexp\b|\biat\b/i)
+
+  for (const reason of Object.values(TokenVerificationErrorReason)) assert.equal(safeClerkAuthReason(reason), reason)
+
+  const clerkDiagnostics = []
+  const withReason = (reason) => createStableHostRequestHandler({
+    environment: identityEnvironment,
+    runtimeFactory: ({ environment }) => createHostedIdentityRuntime({ environment, clerkClientFactory: clerkClientFactory({ reason }), now }),
+    logger: { info: (...items) => clerkDiagnostics.push(items) },
+  })
+  assert.equal((await withReason('token-invalid-authorized-parties')({ method: 'GET', pathname: '/api/private/session', headers: { authorization: `Bearer ${jwt}` } })).status, 401)
+  assert.equal((await withReason('sensitive-unlisted-reason')({ method: 'GET', pathname: '/api/private/session', headers: { authorization: `Bearer ${jwt}` } })).status, 401)
+  assert.equal(clerkDiagnostics[0][1].sdkReason, 'token-invalid-authorized-parties')
+  assert.equal(Object.hasOwn(clerkDiagnostics[1][1], 'sdkReason'), false)
+  assert.doesNotMatch(JSON.stringify(clerkDiagnostics), /sensitive|secret|signature|preview\.invalid|wrong-origin|4102444800|authorization|subject|session[_-]?id|kid|\bsub\b|\bsid\b|\bazp\b|\bexp\b|\biat\b/i)
 })
