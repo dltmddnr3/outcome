@@ -1,27 +1,29 @@
 # Phase 2 · Account Access Hosted Preview Authorization
 
-Status: `DECISION READY · NO EXTERNAL MUTATION AUTHORIZED`
+Status: `HP0 PUBLIC BASELINE VERIFIED · HP1 DECISION READY · NO EXTERNAL MUTATION AUTHORIZED`
 
 Prepared: 2026-08-25 KST
 
-Purpose: 현재 disabled-public candidate의 독립 검증 결과를 과장하지 않고, Cherry가 실제 Google·Apple 로그인과 hosted workspace를 직접 검수하려 할 때 필요한 product-code 준비, provider/resource 생성, secret binding, preview 검증과 production enablement를 각각 독립된 승인 단위로 만든다.
+Purpose: 현재 비공개 기능이 비활성인 공개 기준선의 검증 결과를 과장하지 않고, Cherry가 실제 구글·애플 로그인과 호스팅 작업공간을 직접 검수하려 할 때 필요한 코드 준비, 외부 자원 생성, 비밀값 연결, 미리보기 검증과 운영 환경 활성화를 각각 독립된 승인 단위로 만든다.
 
 ## Source-grounded current gap
 
-현재 공개 배포에 environment value만 넣어도 로그인이 생기는 상태가 아니다.
+현재 공개 배포는 HP0 코드 준비를 포함하지만 환경값만 넣어 로그인이 활성화되는 상태가 아니다.
 
-- `api/index.mjs` private config is hard-coded disabled and `/api/private/workspace` is hard-coded `401`; the Vercel deployment path does not instantiate the account service.
-- `package.json` has no Clerk or Supabase runtime SDK. The current implementation has no Clerk or Supabase runtime SDK binding.
-- `server/account-access.mjs` declares five named environment contracts, but the deployed serverless path does not load them or connect them to a real provider.
-- `server/index.mjs` can exercise login/logout only when a caller explicitly injects `privateTransitionAdapter`; production supplies no such adapter.
+- `api/index.mjs`는 완전한 환경 계약과 별도로 주입된 `runtimeFactory`가 함께 있을 때만 비공개 실행 경계를 선택한다. 현재 Vercel 기본 내보내기는 실제 실행 연결기를 주입하지 않으므로 비공개 설정은 비활성이고 작업공간은 `401`로 차단된다.
+- `package.json`에는 Clerk나 Supabase 실행 SDK가 없다. HP0는 자격증명 없는 제공자·저장소 경계와 수파베이스 REST 게이트웨이만 준비했으며 실제 외부 제공자 연결은 없다.
+- `server/account-access-hosted.mjs`는 활성화 표식과 완전한 명명 환경 계약을 검증하지만, 누락·부분 설정·실행 연결기 오류는 모두 동일한 비활성 경계로 닫힌다.
+- 현재 공개 기준선 `d4d0438036a8`은 페이지/API 200, 비공개 설정 비활성, 비공개 작업공간 401, 변경 요청 405를 유지한다.
 - `supabase/migrations/202608250001_account_access_foundation.sql` is verified locally through PGlite/PostgreSQL roles. It has never been applied to a hosted Supabase project.
-- Current UX/Product re-QA and Release re-Audit prove the disabled public deployment and an isolated synthetic transition. They do not prove OAuth callbacks, real provider cookies, hosted RLS, restore, WAF, alerts or cost controls.
+- 이전 사용성·제품 재검수와 출시 재감사는 비활성 선행 후보와 격리된 합성 전환만 증명한다. HP0 이후 현재 후보의 실제 외부 로그인, 제공자 쿠키, 호스팅 행 단위 접근 제어, 복원, 방화벽, 경보 또는 비용 통제를 증명하지 않는다.
 
-Consequence: the current C1 evidence remains valid only for the disabled candidate. Any hosted-preview code or configuration change creates a new candidate and requires fresh UX & Product QA, a separate fresh Release Audit and a new Cherry acceptance receipt before C2-C4 can close.
+Consequence: 선행 후보의 C1 증거는 현재 HP0 이후 후보에 재사용되지 않으며 C1-C4는 0/4로 열려 있다. HP1 또는 HP2 외부 변경은 다시 새 후보를 만들고, 새 사용성·제품 검수와 별도 출시 감사 및 새 Cherry 승인 영수증을 요구한다.
 
 ## Recommended progression
 
 ### HP0 · credential-free code readiness
+
+Status: `CODE_READY_ONLY · PUBLIC DEFAULT-DISABLED BASELINE VERIFIED` at `d4d0438036a8`; [public baseline receipt](./PHASE2_ACCOUNT_ACCESS_HOSTED_PREVIEW_PUBLIC_BASELINE.md).
 
 Authority: covered only as repository-local Builder work under the approved K6 implementation boundary. It creates no external account, resource, secret, domain, deployment or release.
 
