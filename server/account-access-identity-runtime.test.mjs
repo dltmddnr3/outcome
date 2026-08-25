@@ -110,3 +110,23 @@ test('default production creation point selects complete HP1 and fails partial o
     assert.deepEqual(await request({ method: 'POST', pathname: '/api/private/auth/login' }), { status: 405, body: { error: 'read_only' } })
   }
 })
+
+test('private session diagnostics expose only auth-source and safe error enums', async () => {
+  const { createStableHostRequestHandler } = await import('../api/index.mjs')
+  const diagnostics = []
+  const logger = { info: (...items) => diagnostics.push(items) }
+  const runtimeFactory = ({ environment }) => createHostedIdentityRuntime({ environment, clerkClientFactory: clerkClientFactory(), now })
+  const request = createStableHostRequestHandler({ environment: identityEnvironment, runtimeFactory, logger })
+
+  assert.equal((await request({ method: 'GET', pathname: '/api/private/session', headers: { authorization: 'Bearer secret-diagnostic-token' } })).status, 401)
+  assert.equal((await request({ method: 'GET', pathname: '/api/private/session', headers: { cookie: '__session=secret-cookie-token' } })).status, 401)
+  assert.equal((await request({ method: 'GET', pathname: '/api/private/session' })).status, 401)
+
+  assert.deepEqual(diagnostics, [
+    ['outcome_private_session', { authSource: 'bearer', errorCode: 'authentication_required', status: 401 }],
+    ['outcome_private_session', { authSource: 'cookie', errorCode: 'authentication_required', status: 401 }],
+    ['outcome_private_session', { authSource: 'none', errorCode: 'authentication_required', status: 401 }],
+  ])
+  const serialized = JSON.stringify(diagnostics)
+  assert.doesNotMatch(serialized, /secret|token|cookie=|authorization|subject|session[_-]?id/i)
+})

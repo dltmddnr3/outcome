@@ -1,6 +1,7 @@
 import snapshot from './deployment-snapshot.mjs'
 import { privateAccessPublicConfig } from '../server/account-access-api.mjs'
 import { handlePrivateAccessRequest } from '../server/account-access-api.mjs'
+import { AccountAccessError } from '../server/account-access.mjs'
 import { HOSTED_IDENTITY_ENV, createHostedIdentityRuntime, readHostedIdentityConfiguration } from '../server/account-access-hosted.mjs'
 
 const result = (status, body) => ({ status, body })
@@ -17,13 +18,29 @@ export function handleStableHostRequest({ method = 'GET', pathname = '/' } = {})
 }
 const header = (headers, name) => typeof headers?.get === 'function' ? headers.get(name) : headers?.[name] ?? headers?.[name.toLowerCase()] ?? ''
 const cookieValue = (headers, name) => String(header(headers, 'cookie')).split(';').map((item) => item.trim().split('=')).find(([key]) => key === name)?.[1] ?? ''
-const privateSessionToken = (headers) => {
+const privateSessionInput = (headers) => {
   const authorization = String(header(headers, 'authorization'))
-  if (authorization) return authorization.match(/^Bearer ([A-Za-z0-9._~-]+)$/)?.[1] ?? ''
-  return cookieValue(headers, '__session')
+  if (authorization) return { authSource: 'bearer', token: authorization.match(/^Bearer ([A-Za-z0-9._~-]+)$/)?.[1] ?? '' }
+  const token = cookieValue(headers, '__session')
+  return { authSource: token ? 'cookie' : 'none', token }
+}
+const privateSessionToken = (headers) => privateSessionInput(headers).token
+const PRIVATE_SESSION_ERROR_STATUS = Object.freeze({
+  authentication_required: 401,
+  session_revoked: 401,
+  session_expired: 401,
+  owner_mismatch: 403,
+  authentication_unavailable: 503,
+})
+const privateSessionDiagnostic = (logger, input, error) => {
+  const knownStatus = error instanceof AccountAccessError ? PRIVATE_SESSION_ERROR_STATUS[error.code] : undefined
+  const safeError = knownStatus === error?.status
+    ? { errorCode: error.code, status: knownStatus }
+    : { errorCode: 'private_workspace_unavailable', status: 503 }
+  try { logger?.info?.('outcome_private_session', { authSource: input.authSource, ...safeError }) } catch {}
 }
 
-export function createStableHostRequestHandler({ environment = process.env, runtimeFactory = createHostedIdentityRuntime, clerkClientFactory } = {}) {
+export function createStableHostRequestHandler({ environment = process.env, runtimeFactory = createHostedIdentityRuntime, clerkClientFactory, logger } = {}) {
   const configured = readHostedIdentityConfiguration(environment).enabled
   const configuredOrigin = typeof environment?.[HOSTED_IDENTITY_ENV.privateAllowedOrigin] === 'string' ? environment[HOSTED_IDENTITY_ENV.privateAllowedOrigin].trim() : ''
   const validRuntime = (value) => value?.allowedOrigin === configuredOrigin
@@ -43,10 +60,12 @@ export function createStableHostRequestHandler({ environment = process.env, runt
     if (!hosted) return handleStableHostRequest({ method, pathname })
     if (method === 'GET' && pathname === '/api/private/config') return result(200, { ...privateAccessPublicConfig(true), publishableKey: hosted.publishableKey })
     if (method === 'GET' && pathname === '/api/private/session') {
+      const sessionInput = privateSessionInput(headers)
       try {
-        await hosted.service.authenticate(privateSessionToken(headers))
+        await hosted.service.authenticate(sessionInput.token)
         return result(200, { authenticated: true, owner: true })
       } catch (error) {
+        privateSessionDiagnostic(logger, sessionInput, error)
         return error?.status ? result(error.status, { error: error.code }) : result(503, { error: 'private_workspace_unavailable' })
       }
     }
@@ -60,7 +79,7 @@ const requestPath = (request) => {
   return new URL(request.url ?? '/', 'https://outcome.invalid').pathname
 }
 
-const hostedRequest = createStableHostRequestHandler()
+const hostedRequest = createStableHostRequestHandler({ logger: console })
 
 export default async function handler(request, response) {
   const pathname = requestPath(request)
