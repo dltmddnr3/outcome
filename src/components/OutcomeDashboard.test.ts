@@ -39,9 +39,9 @@ describe('OUTCOME Package dashboard', () => {
     expect(tokens.map((token) => source.indexOf(token))).toEqual([...tokens].map((_, index, values) => source.indexOf(values[index])).sort((left, right) => left - right))
     expect(source).toContain('oc-hierarchy-sticky')
   })
-  it('모바일 위계 탐색은 네 층위를 항상 표시하고 현재 층위를 문구와 접근성 상태로 명시한다', () => {
+  it('모바일 위계 탐색은 세 층위를 항상 표시하고 현재 층위를 문구와 접근성 상태로 명시한다', () => {
     const source = OutcomeDashboard.toString()
-    expect(mobileHierarchyLevels).toEqual(['페이즈', '범위', '스테이지', '완료 조건'])
+    expect(mobileHierarchyLevels).toEqual(['페이즈', '범위', '스테이지'])
     expect(source).toContain('mobileHierarchyLevels.map')
     expect(source).toContain('"aria-current": active ? "step"')
     expect(source).toContain('선택 중')
@@ -49,9 +49,15 @@ describe('OUTCOME Package dashboard', () => {
   })
   it('기존 세 current surface를 하나의 Outcome Map으로 통합한다', () => {
     const source = OutcomeDashboard.toString()
+    expect(source).toContain('oc-workbench')
+    expect(source).toContain('oc-chat-placeholder')
+    expect(source).toContain('세션 채팅')
+    expect(source).toContain('연결 준비 중')
+    expect(source).toContain('data-default-open')
     expect(source).toContain('oc-outcome-map')
     expect(source).toContain('oc-map-columns')
     for (const removed of ['oc-current-flow', 'oc-current-stage', 'oc-stage-explorer', 'oc-selected-detail']) expect(source).not.toContain(removed)
+    expect(source).not.toContain('data-column="4"')
   })
   it('작업 단계 목록 선택은 우측 상세만 바꾸고 실제 현재 위치를 유지한다', () => {
     expect(nextStageOptionIndex('ArrowDown', 1, 4)).toBe(2)

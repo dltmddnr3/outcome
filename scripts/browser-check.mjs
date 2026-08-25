@@ -1,5 +1,5 @@
 import { once } from 'node:events'
-import { existsSync, mkdtempSync, readFileSync, rmSync, symlinkSync } from 'node:fs'
+import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, symlinkSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { isAbsolute, join, relative, resolve } from 'node:path'
 import { chromium } from '@playwright/test'
@@ -29,14 +29,18 @@ try {
   const base = `http://127.0.0.1:${server.address().port}`
   const browser = await chromium.launch({ headless: true, executablePath: '/Applications/Google Chrome.app/Contents/MacOS/Google Chrome' })
   try {
+    const screenshotDirectory = process.env.OUTCOME_BROWSER_SCREENSHOTS === '1' ? resolve('.outcome-runtime/split-workbench-screenshots') : null
+    if (screenshotDirectory) mkdirSync(screenshotDirectory, { recursive: true })
     for (const viewport of [
       { name: 'desktop-1440x900', width: 1440, height: 900 },
+      { name: 'tablet-1024x768', width: 1024, height: 768 },
       { name: 'mobile-390x844', width: 390, height: 844 },
+      { name: 'mobile-360x800', width: 360, height: 800 },
       { name: 'phone-375x812', width: 375, height: 812 },
       { name: 'landscape-844x390', width: 844, height: 390 },
     ]) {
       const context = await browser.newContext({ viewport })
-      const page = await context.newPage(); await page.goto(`${base}/cherry-note-dashboard`); await verifyAllDashboardStates(page, viewport.name); await context.close()
+      const page = await context.newPage(); await page.goto(`${base}/cherry-note-dashboard`); await verifyAllDashboardStates(page, viewport.name); if (screenshotDirectory && ['desktop-1440x900', 'mobile-390x844'].includes(viewport.name)) await page.screenshot({ path: join(screenshotDirectory, `${viewport.name}.png`), fullPage: true }); await context.close()
     }
     console.log(`browser fixture boundary PASS: registry=test/fixtures/portfolio-registry.json projects=${fixtureIds.join(',')} source=repository-contained deterministic fixture; live external source not exercised`)
   } finally { await browser.close() }
