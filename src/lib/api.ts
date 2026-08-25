@@ -50,8 +50,10 @@ export async function fetchPrivateWorkspace(): Promise<{ workspace: PrivateWorks
   return readJson<{ workspace: PrivateWorkspaceView }>(await fetch('/api/private/workspace', { credentials: 'same-origin', headers: { accept: 'application/json' } }))
 }
 
-export async function beginPrivateSession(provider: 'google' | 'email_code'): Promise<void> {
-  await readJson(await fetch('/api/private/auth/login', { method: 'POST', credentials: 'same-origin', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ provider }) }))
+export async function beginPrivateSession(provider: 'google' | 'email_code', navigate: (url: string) => void = (url) => window.location.assign(url)): Promise<{ state: string; mode: string; redirectUrl?: string }> {
+  const transition = await readJson<{ state: string; mode: string; redirectUrl?: string }>(await fetch('/api/private/auth/login', { method: 'POST', credentials: 'same-origin', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ provider }) }))
+  if (transition.redirectUrl) navigate(transition.redirectUrl)
+  return transition
 }
 
 export async function endPrivateSession(): Promise<void> {

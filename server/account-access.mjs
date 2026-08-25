@@ -82,7 +82,7 @@ export function createInMemoryAccountStore(seed = {}) {
 const verifyIdentity = async ({ authProvider, token, ownerSubject, now }) => {
   if (!token) throw new AccountAccessError('authentication_required', 401)
   let identity
-  try { identity = await authProvider.verify(token) } catch { throw new AccountAccessError('authentication_unavailable', 503) }
+  try { identity = await authProvider.verify(token) } catch (error) { if (error instanceof AccountAccessError) throw error; throw new AccountAccessError('authentication_unavailable', 503) }
   if (!identity) throw new AccountAccessError('authentication_required', 401)
   if (identity.revoked) throw new AccountAccessError('session_revoked', 401)
   if (!Number.isFinite(identity.expiresAt) || identity.expiresAt <= now()) throw new AccountAccessError('session_expired', 401)
@@ -126,13 +126,14 @@ export function createAccountAccessService({ authProvider, store, ownerSubject, 
     },
     async readWorkspace({ token, requestedProjectId } = {}) {
       const identity = await authenticate(token)
-      const memberships = store.membershipsForSubject(identity.subject)
+      const context = { token, subject: identity.subject }
+      const memberships = await store.membershipsForSubject(identity.subject, context)
       if (memberships.length > 1) throw new AccountAccessError('membership_conflict', 403)
       const membership = memberships[0]
       if (!membership || membership.state !== 'active' || membership.role !== 'owner-viewer') throw new AccountAccessError('membership_inactive', 403)
-      const workspace = store.workspace(membership.workspaceId)
+      const workspace = await store.workspace(membership.workspaceId, context)
       if (!workspace || workspace.state !== 'active') throw new AccountAccessError('workspace_inactive', 403)
-      const projects = store.projectsForWorkspace(workspace.id)
+      const projects = (await store.projectsForWorkspace(workspace.id, context))
         .filter((project) => project.state === 'active' && PRIVATE_PROJECT_ALLOWLIST.includes(project.id))
       if (requestedProjectId && !projects.some((project) => project.id === requestedProjectId)) throw new AccountAccessError('project_access_denied', 403)
       const selected = requestedProjectId ? projects.filter((project) => project.id === requestedProjectId) : projects
