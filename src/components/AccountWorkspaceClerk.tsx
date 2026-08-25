@@ -20,7 +20,7 @@ function HostedWorkspaceBody() {
   const { isLoaded, isSignedIn, getToken, signOut } = useAuth()
   const { signIn } = useSignIn()
   const { user } = useUser()
-  const [state, setState] = useState<AccountWorkspaceState>('loading')
+  const [state, setState] = useState<AccountWorkspaceState>(isLoaded && !isSignedIn ? 'login' : 'loading')
   const [ownerVerified, setOwnerVerified] = useState(false)
   const [workspace, setWorkspace] = useState<PrivateWorkspaceView>()
   const [email, setEmail] = useState('')
@@ -62,12 +62,14 @@ function HostedWorkspaceBody() {
     if (redirect) window.location.assign(redirect.href)
   }
   const loginContent = <div className="account-workspace__actions" data-clerk-browser-auth="true">
-    <button type="button" data-touch-target="44" data-private-login-provider="google" onClick={() => void google()}>Google로 계속</button>
-    <form onSubmit={codeSent ? verifyCode : sendCode}>
+    <button className="account-workspace__google" type="button" data-touch-target="44" data-private-login-provider="google" onClick={() => void google()}>Google로 계속</button>
+    <div className="account-workspace__separator" aria-hidden="true"><span>또는</span></div>
+    <form className="account-workspace__fallback" onSubmit={codeSent ? verifyCode : sendCode}>
+      <strong>이메일로 확인</strong>
       {!codeSent ? <><label htmlFor="private-email">이메일</label><input id="private-email" type="email" required value={email} onChange={(event) => setEmail(event.target.value)} /></> : <><label htmlFor="private-code">인증 코드</label><input id="private-code" inputMode="numeric" required value={code} onChange={(event) => setCode(event.target.value)} /></>}
       <button type="submit" data-touch-target="44">{codeSent ? '인증 코드 확인' : '이메일 인증 코드 받기'}</button>
     </form>
-    <span>Apple은 소유자 로그인 확인 후 연결</span>
+    <span className="account-workspace__apple-note">Apple은 소유자 로그인 확인 후 연결</span>
     <p className="account-workspace__adapter-note">Clerk 브라우저 세션 · 회원가입 전환 차단</p>
   </div>
   return <AccountWorkspace state={state} workspace={workspace} ownerVerified={ownerVerified} sessionPresent={Boolean(isSignedIn)} loginContent={loginContent} onLogout={isSignedIn ? async () => { await signOut({ redirectUrl: '/workspace' }) } : undefined} onAppleLink={ownerVerified ? linkApple : undefined} transitionError={error} />

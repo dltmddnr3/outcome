@@ -11,6 +11,24 @@ export const accountWorkspaceStateCopy = {
   ready: { title: '비공개 결과를 확인할 수 있습니다', detail: '허용된 프로젝트만 읽기 전용으로 표시합니다.' },
 } as const
 
+const accountWorkspaceStateLabel: Record<keyof typeof accountWorkspaceStateCopy, string> = {
+  login: '로그인 필요',
+  loading: '권한 확인 중',
+  empty: '연결된 프로젝트 없음',
+  stale: '마지막 확인 결과',
+  conflict: '계정 연결 충돌',
+  unavailable: '데이터 연결 준비 전',
+  session_expired: '로그인 만료',
+  access_denied: '접근 권한 없음',
+  safe_degraded: '안전한 읽기 전용',
+  ready: '비공개 결과 준비 완료',
+}
+
+const verifiedUnavailableCopy = {
+  title: '로그인 완료 · 데이터 연결 준비 중',
+  detail: 'Cherry 소유자 인증은 완료되었습니다. 비공개 프로젝트 저장소가 연결될 때까지 프로젝트 내용은 표시하지 않습니다.',
+} as const
+
 export type AccountWorkspaceState = keyof typeof accountWorkspaceStateCopy
 
 type PrivateSelection = { projectId: string; phaseId: string; scopeId: string; stageId: string }
@@ -19,8 +37,9 @@ type LoginProvider = 'google' | 'email_code'
 const initialSelection = (project: PrivateProjectProjection): PrivateSelection => ({ projectId: project.project.id, phaseId: project.current.phaseId, scopeId: project.current.scopeId, stageId: project.current.stageId })
 
 export function AccountWorkspace({ state = 'unavailable', workspace, ownerVerified = false, sessionPresent = false, onLogin, onLogout, onAppleLink, loginContent, transitionError = null }: { state?: AccountWorkspaceState; workspace?: PrivateWorkspaceView; ownerVerified?: boolean; sessionPresent?: boolean; onLogin?: (provider: LoginProvider) => Promise<void>; onLogout?: () => Promise<void>; onAppleLink?: () => Promise<void>; loginContent?: ReactNode; transitionError?: string | null }) {
-  const copy = accountWorkspaceStateCopy[state]
-  const alert = ['conflict', 'unavailable', 'session_expired', 'access_denied'].includes(state)
+  const verifiedUnavailable = state === 'unavailable' && ownerVerified
+  const copy = verifiedUnavailable ? verifiedUnavailableCopy : accountWorkspaceStateCopy[state]
+  const alert = ['conflict', 'unavailable', 'session_expired', 'access_denied'].includes(state) && !verifiedUnavailable
   const projects = workspace?.projects ?? []
   const [selection, setSelection] = useState<PrivateSelection | null>(null)
   const [busy, setBusy] = useState<LoginProvider | 'logout' | null>(null)
@@ -36,22 +55,23 @@ export function AccountWorkspace({ state = 'unavailable', workspace, ownerVerifi
   const choosePhase = (phaseId: string) => { if (!project) return; const nextPhase = project.phases.find((item) => item.id === phaseId); const nextScope = nextPhase?.scopes.find((item) => item.id === project.current.scopeId) ?? nextPhase?.scopes[0]; const nextStage = nextScope?.stages.find((item) => item.id === project.current.stageId) ?? nextScope?.stages[0]; setSelection({ projectId: project.project.id, phaseId, scopeId: nextScope?.id ?? '', stageId: nextStage?.id ?? '' }) }
   const chooseScope = (scopeId: string) => { if (!project || !phase) return; const nextScope = phase.scopes.find((item) => item.id === scopeId); const nextStage = nextScope?.stages.find((item) => item.id === project.current.stageId) ?? nextScope?.stages[0]; setSelection({ projectId: project.project.id, phaseId: phase.id, scopeId, stageId: nextStage?.id ?? '' }) }
   const chooseStage = (stageId: string) => { if (project && phase && scope) setSelection({ projectId: project.project.id, phaseId: phase.id, scopeId: scope.id, stageId }) }
-  return <main className="account-workspace" data-completion-authority="false">
+  return <main className="account-workspace" data-account-state={state} data-completion-authority="false">
     <header className="account-workspace__header">
-      <div><span className="account-workspace__eyebrow">OUTCOME PRIVATE</span><h1>Cherry 전용 비공개 워크스페이스</h1></div>
+      <div><span className="account-workspace__eyebrow">OUTCOME · 비공개</span><h1>Cherry 전용 비공개 워크스페이스</h1></div>
       <div className="account-workspace__header-actions"><span className="account-workspace__mode">읽기 전용</span>{sessionPresent && onLogout && <button type="button" data-private-logout="true" disabled={busy !== null} onClick={() => void transition('logout', onLogout)}>{busy === 'logout' ? '로그아웃 중…' : '로그아웃'}</button>}</div>
     </header>
     <section className="account-workspace__state" role={alert ? 'alert' : 'status'} aria-live={alert ? 'assertive' : 'polite'}>
-      <span className="account-workspace__state-code">{state}</span>
+      <span className="account-workspace__state-code" data-state-code={state}>{verifiedUnavailable ? '계정 확인 완료' : accountWorkspaceStateLabel[state]}</span>
       <h2>{copy.title}</h2>
       <p>{copy.detail}</p>
       {state === 'login' && (loginContent ?? <div className="account-workspace__actions">
-        <button type="button" data-touch-target="44" data-private-login-provider="google" disabled={busy !== null} onClick={() => void transition('google', onLogin ? () => onLogin('google') : undefined)}>{busy === 'google' ? '연결 확인 중…' : 'Google로 계속'}</button>
-        <button type="button" data-touch-target="44" data-private-login-provider="email_code" disabled={busy !== null} onClick={() => void transition('email_code', onLogin ? () => onLogin('email_code') : undefined)}>{busy === 'email_code' ? '코드 확인 중…' : '이메일 인증 코드'}</button>
-        <span>Apple은 로그인 후 연결</span>
+        <button className="account-workspace__google" type="button" data-touch-target="44" data-private-login-provider="google" disabled={busy !== null} onClick={() => void transition('google', onLogin ? () => onLogin('google') : undefined)}>{busy === 'google' ? '연결 확인 중…' : 'Google로 계속'}</button>
+        <div className="account-workspace__separator" aria-hidden="true"><span>또는</span></div>
+        <div className="account-workspace__fallback"><span>이메일로 확인</span><button type="button" data-touch-target="44" data-private-login-provider="email_code" disabled={busy !== null} onClick={() => void transition('email_code', onLogin ? () => onLogin('email_code') : undefined)}>{busy === 'email_code' ? '코드 확인 중…' : '이메일 인증 코드 받기'}</button></div>
+        <span className="account-workspace__apple-note">Apple은 로그인 후 연결</span>
         <p className="account-workspace__adapter-note">검증용 공급자 중립 전환 · 실제 OAuth 연결 아님</p>
       </div>)}
-      {ownerVerified && onAppleLink && <button type="button" data-touch-target="44" data-private-link-provider="apple" disabled={busy !== null} onClick={() => void transition('logout', onAppleLink)}>Apple 계정 연결</button>}
+      {ownerVerified && onAppleLink && <div className="account-workspace__verified-actions"><button type="button" data-touch-target="44" data-private-link-provider="apple" disabled={busy !== null} onClick={() => void transition('logout', onAppleLink)}>Apple 계정 연결</button><small>소유자 계정에 읽기 전용으로 연결합니다.</small></div>}
       {state === 'session_expired' && <button type="button" data-touch-target="44">다시 로그인</button>}
       {state === 'safe_degraded' && <p className="account-workspace__notice">변경 기능 없음 · 자동 동기화 없음 · 마지막 검증 시각 유지</p>}
       {transitionError && <p className="account-workspace__transition-error" role="alert">{transitionError}</p>}

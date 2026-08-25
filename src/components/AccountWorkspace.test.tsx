@@ -23,6 +23,8 @@ describe('account workspace presentation contract', () => {
     const html = render('login')
     expect(html).toContain('Google로 계속')
     expect(html).toContain('이메일 인증 코드')
+    expect(html).toContain('account-workspace__separator')
+    expect(html).toContain('account-workspace__fallback')
     expect(html).toContain('Apple은 로그인 후 연결')
     expect(html).not.toContain('회원가입')
     expect(html).not.toContain('초대')
@@ -54,11 +56,21 @@ describe('account workspace presentation contract', () => {
 
   it('HP1 소유자 확인은 워크스페이스 503과 별개로 Apple 연결을 허용하고 미확인 사용자는 숨긴다', () => {
     const verified = renderToStaticMarkup(<AccountWorkspace state="unavailable" ownerVerified sessionPresent onLogout={async () => {}} onAppleLink={async () => {}} />)
+    expect(verified).toContain('로그인 완료 · 데이터 연결 준비 중')
+    expect(verified).toContain('data-state-code="unavailable"')
+    expect(verified).not.toContain('>unavailable<')
+    expect(verified).toContain('role="status"')
     expect(verified).toContain('data-private-link-provider="apple"')
     expect(verified).toContain('data-private-logout="true"')
     const denied = renderToStaticMarkup(<AccountWorkspace state="access_denied" onLogout={async () => {}} onAppleLink={async () => {}} />)
     expect(denied).not.toContain('data-private-link-provider="apple"')
     expect(denied).not.toContain('data-private-logout="true"')
+  })
+
+  it('기계 상태 코드는 사용자에게 한국어 상태명으로 제시한다', () => {
+    expect(render('login')).toContain('>로그인 필요<')
+    expect(render('access_denied')).toContain('>접근 권한 없음<')
+    expect(render('unavailable')).toContain('>데이터 연결 준비 전<')
   })
 
   it('철회된 SDK 세션은 거부 화면에서 로그아웃만 복구 수단으로 제공한다', () => {

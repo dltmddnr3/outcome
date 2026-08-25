@@ -23,6 +23,10 @@ describe('Clerk browser session boundary', () => {
   it('normal workspace is SDK-owned and does not render a server callback form', () => {
     const html = renderToStaticMarkup(<HostedClerkWorkspace publishableKey="pk_test_browser" pathname="/workspace" />)
     expect(html).toContain('data-clerk-provider="pk_test_browser"')
+    expect(html).toContain('account-workspace__google')
+    expect(html).toContain('account-workspace__separator')
+    expect(html).toContain('account-workspace__fallback')
+    expect(html).toContain('for="private-email"')
     expect(html).not.toContain('/api/private/auth/callback')
     expect(html).not.toContain('sessionToken')
   })

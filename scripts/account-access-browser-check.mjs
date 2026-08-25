@@ -1,5 +1,5 @@
 import { once } from 'node:events'
-import { readFileSync, readdirSync } from 'node:fs'
+import { mkdirSync, readFileSync, readdirSync } from 'node:fs'
 import { chromium } from '@playwright/test'
 import { createAccountAccessService, createInMemoryAccountStore } from '../server/account-access.mjs'
 import { createOutcomeServer } from '../server/index.mjs'
@@ -21,6 +21,9 @@ const readyProjects = [
 const store = createInMemoryAccountStore({ workspaces: [{ id: 'workspace', state: 'active' }], memberships: [{ subject: 'owner', workspaceId: 'workspace', role: 'owner-viewer', state: 'active' }], projects: readyProjects.map((projection) => ({ id: projection.project.id, workspaceId: 'workspace', state: 'active', projection })) })
 const accountAccess = createAccountAccessService({ now, ownerSubject: 'owner', store, authProvider: { verify: async (token) => token === 'valid' ? { subject: 'owner', issuedAt: now(), expiresAt: now() + 60_000, linkedProviders: ['google', 'email_code'] } : null } })
 const transitions = []
+const loginMeasurements = []
+const screenshotDirectory = '.outcome-runtime/account-access-preview-ux'
+if (process.env.OUTCOME_ACCOUNT_UX_SCREENSHOTS === '1') mkdirSync(screenshotDirectory, { recursive: true })
 const browser = await chromium.launch({ headless: true, executablePath: '/Applications/Google Chrome.app/Contents/MacOS/Google Chrome' })
 const server = createOutcomeServer({ publicReadOnly: true, accountAccess, secureCookies: false, privateTransitionAdapter: {
   begin: async ({ provider }) => { transitions.push(['login', provider]); await new Promise((resolve) => setTimeout(resolve, 80)); return { token: 'valid' } },
@@ -48,7 +51,7 @@ try {
       await page.route('**/api/private/config', (route) => route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ enabled: true, access: 'private_read_only', providers: [{ id: 'google', mode: 'primary' }, { id: 'apple', mode: 'linked_only' }, { id: 'email_code', mode: 'fallback_recovery' }], sessionMaximumDays: 7, completionAuthority: false }) }))
       await page.route('**/api/private/workspace', (route) => route.fulfill({ status: fixture.status, contentType: 'application/json', body: JSON.stringify(fixture.body) }))
       await page.goto(`${base}/workspace`)
-      await page.locator('.account-workspace__state-code', { hasText: state }).waitFor()
+      await page.locator(`[data-state-code="${state}"]`).waitFor()
       const result = await page.evaluate(() => {
         const root = document.querySelector('.account-workspace')
         const header = document.querySelector('.account-workspace__header')?.getBoundingClientRect()
@@ -63,16 +66,28 @@ try {
           intersection: header && panel ? Math.max(0, Math.min(header.bottom, panel.bottom) - Math.max(header.top, panel.top)) : -1,
           buttons,
           contrast,
+          login: root?.getAttribute('data-account-state') === 'login' ? {
+            panelWidth: panel?.width ?? 0,
+            headerWidth: header?.width ?? 0,
+            googleHeight: document.querySelector('[data-private-login-provider=google]')?.getBoundingClientRect().height ?? 0,
+            googleBackground: getComputedStyle(document.querySelector('[data-private-login-provider=google]')).backgroundColor,
+            separator: Boolean(document.querySelector('.account-workspace__separator')),
+            fallback: Boolean(document.querySelector('.account-workspace__fallback')),
+          } : null,
         }
       })
       if (!result.Korean || !result.readOnly || !result.completionFalse || result.horizontalOverflow > 1 || result.intersection !== 0 || result.buttons.some((height) => height < 44) || result.contrast < 4.5) throw new Error(`${viewport.name}/${state} failed ${JSON.stringify(result)}`)
+      if (state === 'login' && (!result.login || result.login.panelWidth > Math.min(620, viewport.width - 32) + 1 || result.login.headerWidth > Math.min(620, viewport.width - 32) + 1 || result.login.googleHeight < 44 || result.login.googleBackground !== 'rgb(173, 255, 47)' || !result.login.separator || !result.login.fallback)) throw new Error(`${viewport.name}/login visual contract failed ${JSON.stringify(result.login)}`)
+      if (state === 'login') loginMeasurements.push({ viewport: `${viewport.width}x${viewport.height}`, panel: result.login.panelWidth, header: result.login.headerWidth, overflow: result.horizontalOverflow, google: result.login.googleHeight })
       if (state === 'ready') {
         const ready = await page.evaluate(() => ({ projects: document.querySelectorAll('[data-private-project]').length, columns: [...document.querySelectorAll('.account-workspace__hierarchy h3')].map((item) => item.textContent.trim()), current: document.querySelectorAll('[data-actual-current=true][aria-current=step]').length, gates: document.querySelectorAll('.account-workspace__gates li').length, logout: document.querySelector('[data-private-logout=true]')?.getBoundingClientRect().height ?? 0 }))
         if (ready.projects !== 2 || ready.columns.join('|') !== '페이즈|범위|스테이지|완료 조건' || ready.current !== 3 || ready.gates < 1 || ready.logout < 44) throw new Error(`${viewport.name}/ready hierarchy failed ${JSON.stringify(ready)}`)
       }
       if (state === 'login') {
         await page.keyboard.press('Tab')
-        if (await page.evaluate(() => document.activeElement?.tagName) !== 'BUTTON') throw new Error(`${viewport.name}/login keyboard focus failed`)
+        const focus = await page.evaluate(() => ({ provider: document.activeElement?.getAttribute('data-private-login-provider'), outlineWidth: Number.parseFloat(getComputedStyle(document.activeElement).outlineWidth), outlineColor: getComputedStyle(document.activeElement).outlineColor }))
+        if (focus.provider !== 'google' || focus.outlineWidth < 3 || focus.outlineColor !== 'rgb(173, 255, 47)') throw new Error(`${viewport.name}/login keyboard focus failed ${JSON.stringify(focus)}`)
+        if (process.env.OUTCOME_ACCOUNT_UX_SCREENSHOTS === '1' && ['macbook', 'mobile'].includes(viewport.name)) await page.screenshot({ path: `${screenshotDirectory}/${viewport.name}-${viewport.width}x${viewport.height}-login.png`, fullPage: true })
       }
       if (viewport.width <= 390) {
         await page.evaluate(() => { document.documentElement.style.zoom = '2' })
@@ -87,10 +102,10 @@ try {
     const context = await browser.newContext({ viewport, reducedMotion: 'reduce' })
     const page = await context.newPage()
     await page.goto(`${base}/workspace`)
-    await page.locator('.account-workspace__state-code', { hasText: 'login' }).waitFor()
+    await page.locator('[data-state-code="login"]').waitFor()
     await page.locator('[data-private-login-provider=google]').focus(); await page.keyboard.press('Enter')
-    await page.locator('.account-workspace__state-code', { hasText: 'loading' }).waitFor()
-    await page.locator('.account-workspace__state-code', { hasText: 'ready' }).waitFor()
+    await page.locator('[data-state-code="loading"]').waitFor()
+    await page.locator('[data-state-code="ready"]').waitFor()
     if (await page.locator('[data-private-project]').count() !== 2) throw new Error(`${viewport.name} project controls missing`)
     await page.locator('[data-private-stage=cherry-next]').click()
     const selection = await page.evaluate(() => ({ actualCurrent: document.querySelector('[data-private-stage=cherry-current]')?.getAttribute('aria-current'), actualSelected: document.querySelector('[data-private-stage=cherry-current]')?.getAttribute('aria-selected'), touchedCurrent: document.querySelector('[data-private-stage=cherry-next]')?.getAttribute('aria-current'), touchedSelected: document.querySelector('[data-private-stage=cherry-next]')?.getAttribute('aria-selected'), actualText: document.querySelector('[data-private-actual]')?.textContent, selectedText: document.querySelector('[data-private-selected]')?.textContent }))
@@ -107,7 +122,7 @@ try {
       await page.evaluate(() => { document.documentElement.style.zoom = '1' })
     }
     const logout = page.locator('[data-private-logout=true]'); if (await logout.evaluate((element) => element.getBoundingClientRect().height) < 44) throw new Error(`${viewport.name} logout touch target`)
-    await logout.click(); await page.locator('.account-workspace__state-code', { hasText: 'login' }).waitFor()
+    await logout.click(); await page.locator('[data-state-code="login"]').waitFor()
     await context.close()
   }
 
@@ -115,9 +130,9 @@ try {
     const context = await browser.newContext({ viewport: { width: 1440, height: 900 } })
     const page = await context.newPage()
     await page.route('**/api/private/auth/login', (route) => route.fulfill({ status: 503, contentType: 'application/json', body: JSON.stringify({ error: 'authentication_unavailable' }) }))
-    await page.goto(`${base}/workspace`); await page.locator('.account-workspace__state-code', { hasText: 'login' }).waitFor(); await page.locator('[data-private-login-provider=google]').click()
+    await page.goto(`${base}/workspace`); await page.locator('[data-state-code="login"]').waitFor(); await page.locator('[data-private-login-provider=google]').click()
     await page.locator('.account-workspace__transition-error', { hasText: '검증용 인증 전환을 완료하지 못했습니다.' }).waitFor()
-    if (await page.locator('.account-workspace__state-code').textContent() !== 'login') throw new Error('injected login failure did not fail closed to login')
+    if (await page.locator('.account-workspace__state-code').getAttribute('data-state-code') !== 'login') throw new Error('injected login failure did not fail closed to login')
     await context.close()
   }
 
@@ -127,13 +142,13 @@ try {
     await page.route('**/api/private/config', (route) => route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ enabled: true }) }))
     await page.route('**/api/private/workspace', async (route) => { await new Promise((resolve) => setTimeout(resolve, 1_000)); await route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ workspace: {} }) }) })
     await page.goto(`${base}/workspace`)
-    await page.locator('.account-workspace__state-code', { hasText: 'loading' }).waitFor()
+    await page.locator('[data-state-code="loading"]').waitFor()
     if (viewport.width <= 390) await page.evaluate(() => { document.documentElement.style.zoom = '2' })
     if (await page.evaluate(() => document.documentElement.scrollWidth - document.documentElement.clientWidth) !== 0) throw new Error(`${viewport.name} 200% zoom horizontal overflow`)
     await context.close()
   }
   if (transitions.length !== 6 || transitions.filter(([action]) => action === 'login').length !== 3 || transitions.filter(([action]) => action === 'logout').length !== 3) throw new Error(`injected transition count failed ${JSON.stringify(transitions)}`)
-  console.log(`account access browser PASS: Clerk SDK browser markers present with no server callback/session-token handoff; 3 viewports x ${Object.keys(states).length} settled states + loading + ready login/logout hierarchy; mobile/phone 200% zoom overflow=0; touch>=44; current-vs-selected preserved`)
+  console.log(`account access browser PASS: Clerk SDK browser markers present with no server callback/session-token handoff; 3 viewports x ${Object.keys(states).length} settled states + loading + ready login/logout hierarchy; login=${JSON.stringify(loginMeasurements)}; mobile/phone 200% zoom overflow=0; touch>=44; current-vs-selected preserved`)
 } finally {
   server.close(); await once(server, 'close'); await browser.close()
 }
