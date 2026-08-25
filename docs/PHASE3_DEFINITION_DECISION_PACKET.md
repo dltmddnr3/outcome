@@ -1,8 +1,8 @@
 # Phase 3 · 목적 정의 결정 패킷
 
-상태: `RECOMMENDATION ONLY · CHERRY DECISION REQUIRED · NO IMPLEMENTATION`
+상태: `Decision: APPROVED · 2026-08-25 KST · NO IMPLEMENTATION AUTHORITY`
 
-이 문서는 Phase 3을 완료하거나 시작하지 않는다. 이미 확정된 Phase 2·4·5 사이의 제품 구조 공백을 설명하고, Cherry가 결정할 질문을 세 개로 압축한다. 결정 전에는 `OUTCOME_MAP`의 `Phase 3 · Definition Pending`과 빈 Stage 배열을 유지한다.
+Cherry가 2026-08-25 KST `추천안 적용`으로 Q1 `A 추천안`, Q2 `A Planner-only`, Q3 `A 추천 proof`를 승인했다. 이 결정은 Phase 3 Outcome Contract와 실행 Stage/Gate 정의만 허용하며 Phase 3 진입·구현·세션 연결·외부 mutation·QA·Audit·release를 승인하지 않는다.
 
 ## 기존 Phase 경계
 
@@ -113,6 +113,8 @@ NOW는 “무엇을 하고 있는가”의 관찰값이다. 진행률은 오직 
 
 Cherry가 Q1–Q3을 결정하면 그 응답을 source로 Phase 3 Outcome Contract, Scope, Stage, Gate와 acceptance를 별도 변경으로 작성한다. 그때도 구현 handoff, QA, Audit, Cherry acceptance, release는 각각 분리한다.
 
-현재 residual unknowns: `[Q1, Q2, Q3]`
+확정 결정: `[Q1=A, Q2=A, Q3=A]`
+
+현재 residual unknowns: Phase 3 구현 인계 전에 별도 결정할 provider/session adapter 범위, private control-plane 실행 위치, 고위험 지시의 Cherry 재확인 정책.
 
 Notion·Linear connector가 이 작업 환경에 연결되어 있지 않으므로 이 로컬 패킷은 decision-ready 초안일 뿐 외부 PRD·task completion을 주장하지 않는다.

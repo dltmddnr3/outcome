@@ -288,14 +288,82 @@ phases:
                 primary_label: 운영 접근 활성화
 
   - id: outcome-phase-3
-    title: Phase 3 · Definition Pending
-    purpose: Cherry가 Phase 2와 Phase 4 사이의 제품 목적을 결정하기 전까지 기능과 진행을 추론하지 않는다.
-    completion: Cherry-approved Phase 3 Outcome Contract exists.
+    title: Phase 3 · Existing Session Operations
+    purpose: 여러 PC와 외부 Codex/Claude에 이미 존재하는 역할 세션을 프로젝트에 비공개로 연결·관찰하고 Planner-only 경로로 업무를 전달해 증거 영수증을 회수한다.
+    completion: private session registry, multi-PC observation, Planner-only routing, evidence continuity, fresh QA, separate fresh Audit, and Cherry physical acceptance are evidence-closed.
     scopes:
-      - id: outcome-phase-3-definition
-        title: Purpose definition pending
-        purpose: Phase 3 목적·범위·Stage·Gate를 Cherry와 정의한다.
-        stages: []
+      - id: outcome-phase-3-session-registry
+        title: Private session registry
+        purpose: 프로젝트와 Planner·Builder·UX & Product QA·Release Audit의 실제 기존 세션 binding을 비공개 단일 source로 관리한다.
+        stages:
+          - id: outcome-stage-phase3-private-session-registry
+            title: Private role-session registry candidate
+            purpose: binding schema, uniqueness, lifecycle, secret redaction, audit와 rollback을 immutable candidate로 증명한다.
+            depends_on: []
+            gates_file: GATES_PHASE3_PRIVATE_SESSION_REGISTRY.md#R1-R6
+            gate_groups:
+              - code: R
+                primary_label: 비공개 역할 세션 연결
+      - id: outcome-phase-3-observation-relay
+        title: Multi-PC observation relay
+        purpose: 관찰 위치가 달라도 availability·freshness·NOW 출처를 같은 의미로 제공한다.
+        stages:
+          - id: outcome-stage-phase3-multi-pc-observation
+            title: Cross-device observation continuity candidate
+            purpose: 두 관찰 위치와 stale·offline·conflict·redaction·recovery를 source-grounded candidate로 증명한다.
+            depends_on: [outcome-stage-phase3-private-session-registry]
+            gates_file: GATES_PHASE3_MULTI_PC_OBSERVATION_RELAY.md#O1-O6
+            gate_groups:
+              - code: O
+                primary_label: 다중 PC 관찰 연속성
+      - id: outcome-phase-3-planner-routing
+        title: Planner-only work routing
+        purpose: Cherry 요청을 project Planner가 유일한 routing authority로 검증해 exact target role에 전달한다.
+        stages:
+          - id: outcome-stage-phase3-planner-routing
+            title: Planner-routed instruction candidate
+            purpose: target validation, idempotency, receipt, timeout·cancel·wrong-binding denial과 dispatch 안전 경계를 증명한다.
+            depends_on: [outcome-stage-phase3-multi-pc-observation]
+            gates_file: GATES_PHASE3_PLANNER_WORK_ROUTING.md#T1-T7
+            gate_groups:
+              - code: T
+                primary_label: Planner 경유 업무 전달
+      - id: outcome-phase-3-evidence-continuity
+        title: Evidence return and continuity
+        purpose: instruction, role result, evidence pointer, Gate 판정과 session replacement history를 분리해 검증 가능한 연속성을 보존한다.
+        stages:
+          - id: outcome-stage-phase3-evidence-continuity
+            title: Evidence receipt and recovery candidate
+            purpose: immutable correlation, result/evidence 분리, rebind recovery, audit와 fail-closed integrity를 증명한다.
+            depends_on: [outcome-stage-phase3-planner-routing]
+            gates_file: GATES_PHASE3_EVIDENCE_CONTINUITY.md#E1-E6
+            gate_groups:
+              - code: E
+                primary_label: 증거 영수증과 복구
+          - id: outcome-stage-phase3-fresh-ux-product-qa
+            title: Fresh UX & Product QA
+            purpose: 분리된 fresh reviewer가 동일 immutable candidate의 이해 가능성, 실패 복구, multi-device real-use와 false completion을 반증한다.
+            depends_on: [outcome-stage-phase3-evidence-continuity]
+            gates_file: GATES_PHASE3_EXISTING_SESSION_OPERATIONS_QA.md#Q1-Q4
+            gate_groups:
+              - code: Q
+                primary_label: 사용성·제품 독립 검수
+          - id: outcome-stage-phase3-release-audit
+            title: Separate fresh Release Audit
+            purpose: QA 뒤 별도 fresh auditor가 동일 immutable candidate의 runtime·privacy·regression·rollback과 proof scope를 감사한다.
+            depends_on: [outcome-stage-phase3-fresh-ux-product-qa]
+            gates_file: GATES_PHASE3_EXISTING_SESSION_OPERATIONS_RELEASE_AUDIT.md#A1-A4
+            gate_groups:
+              - code: A
+                primary_label: 독립 출시 감사
+          - id: outcome-stage-phase3-cherry-acceptance
+            title: Cherry physical acceptance
+            purpose: Cherry가 두 프로젝트·두 관찰 위치·단일 routed task를 실제로 사용해 Phase 3 결과와 경계를 명시적으로 수용한다.
+            depends_on: [outcome-stage-phase3-release-audit]
+            gates_file: GATES_PHASE3_EXISTING_SESSION_OPERATIONS_CHERRY_ACCEPTANCE.md#C1-C4
+            gate_groups:
+              - code: C
+                primary_label: Cherry 실제 사용 승인
 
   - id: outcome-phase-4
     title: Phase 4 · In-OUTCOME Development
@@ -344,6 +412,6 @@ phases:
 - Next: `P2 · Clerk Development 구성`; Cherry가 HP1을 Clerk Development + Vercel Preview로 정확히 승인해 P1은 닫혔다. Production·Supabase·DNS·도메인·출시는 계속 미승인이며, P2는 개발 환경·수동 단일 소유자·임의 가입 차단·조직 미사용을 직접 확인해야 닫힌다.
 - Dashboard registration: Package-driven Cherry Note/OUTCOME UI, GitHub connector Gate M15, fresh UX & Product QA Q1–Q4, separate fresh Release Audit A1–A4, Cherry acceptance C1–C2, stable snapshot host S1–S6, and registered Package portfolio foundation P1–P6 are evidence-closed.
 - Phase 1 closure boundary: 2026-08-25 KST Cherry가 내부사용 Local MVP 종료를 승인했다. 외부 공개 수준 MVP와 release approval은 이 결정에 포함되지 않는다.
-- Future roadmap visibility: Phase 2의 account access definition `K6 6/6`, provider-neutral disabled implementation `I1-I8 8/8`, prior fresh UX/Product re-QA `Q1-Q4 4/4`, prior Release re-Audit `A1-A4 4/4`, hosted-preview execution contract `H1-H6 6/6`, browser-viable public-redacted code readiness `B1-B12 12/12`, hosted-data 실행 사전준비 `E1-E8 8/8`, HP3 운영 활성화 결정 사전준비 `R1-R8 8/8`은 각각의 exact candidate 또는 문서 증거로 닫혔다. HP1 hosted identity는 승인만 확보된 `P1-P6 1/6`, HP2 hosted data `D1-D7 0/7`, hosted fresh QA `Q1-Q4 0/4`, hosted fresh Audit `A1-A4 0/4`, hosted Cherry acceptance `C1-C4 0/4`, HP3 운영 자원 준비·새 QA·새 Audit·Cherry 운영 후보 승인·운영 활성화는 합계 `0/24`로 locked/open이다. 두 사전준비 완료는 HP1 완료, HP2·HP3 승인, 운영 활성화나 출시를 대신하지 않는다. 이전 candidate의 QA/Audit은 다음 provider/data/domain candidate에 재사용하지 않는다. production hierarchy 등록은 추적 가시성만 제공하며 실행 권한이 아니다. public-service release와 Phase 2 전체, Phase 4와 5는 완료가 아니며 Phase 3은 `Definition Pending`이다.
+- Future roadmap visibility: Phase 2의 account access definition `K6 6/6`, provider-neutral disabled implementation `I1-I8 8/8`, prior fresh UX/Product re-QA `Q1-Q4 4/4`, prior Release re-Audit `A1-A4 4/4`, hosted-preview execution contract `H1-H6 6/6`, browser-viable public-redacted code readiness `B1-B12 12/12`, hosted-data 실행 사전준비 `E1-E8 8/8`, HP3 운영 활성화 결정 사전준비 `R1-R8 8/8`은 각각의 exact candidate 또는 문서 증거로 닫혔다. HP1 hosted identity는 승인만 확보된 `P1-P6 1/6`, HP2 hosted data `D1-D7 0/7`, hosted fresh QA `Q1-Q4 0/4`, hosted fresh Audit `A1-A4 0/4`, hosted Cherry acceptance `C1-C4 0/4`, HP3 운영 자원 준비·새 QA·새 Audit·Cherry 운영 후보 승인·운영 활성화는 합계 `0/24`로 locked/open이다. 두 사전준비 완료는 HP1 완료, HP2·HP3 승인, 운영 활성화나 출시를 대신하지 않는다. 이전 candidate의 QA/Audit은 다음 provider/data/domain candidate에 재사용하지 않는다. production hierarchy 등록은 추적 가시성만 제공하며 실행 권한이 아니다. Phase 3 목적·Planner-only 경로·첫 proof는 Cherry 승인으로 계약화됐지만 current가 아니며 Phase 3 실행 Gate `0/37`은 모두 locked/open이다. public-service release와 Phase 2 전체, Phase 3 실행, Phase 4와 5는 완료가 아니다.
 - `MVP_SCOPE_CLOSED`: true
 - `EXTERNAL_OUTCOME_COMPLETE`: false

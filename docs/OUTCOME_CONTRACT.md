@@ -52,6 +52,15 @@ Status: **Phase 1 internal-use Local MVP accepted · external public MVP not acc
   - 원격 mutation·dispatch·release
   - Cherry Note iOS 제품 변경
 
+## Approved future Phase contract
+
+- Phase ID: `outcome-phase-3`
+- Phase name: `Phase 3 · Existing Session Operations`
+- Approval: 2026-08-25 KST Cherry `추천안 적용`
+- Purpose: 여러 PC와 외부 Codex/Claude에 이미 존재하는 역할 세션을 project-scoped private binding으로 연결·관찰하고 Planner-only 경로로 업무를 전달해 결과·증거 영수증을 회수한다.
+- Canonical detail: `docs/PHASE3_EXISTING_SESSION_OPERATIONS_CONTRACT.md`
+- Execution boundary: Phase 2가 current이고 Phase 3 실행 Gate는 `0/37`; 계약 승인은 Phase 3 entry, 구현, session binding/message dispatch, QA/Audit/Cherry acceptance, release 또는 external completion이 아니다.
+
 ## 1. 누구를 위한 제품인가
 
 여러 Codex·Claude 세션으로 제품을 만드는 Cherry가 사용합니다. Cherry는 로그나 JSON을 직접 해석하지 않고도 프로젝트가 어디까지 왔고 무엇이 막혔으며 다음에 무엇을 해야 하는지 알고 싶습니다.
