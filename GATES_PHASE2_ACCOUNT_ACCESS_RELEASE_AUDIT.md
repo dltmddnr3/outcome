@@ -2,17 +2,17 @@
 
 Outcome: fresh release auditor가 동일 exact candidate의 auth, authorization, privacy/data lifecycle, operations, cost, runtime and rollback boundary를 독립 검증한다.
 
-- [ ] A1: auditor identity, exact Git/build/migration/snapshot pins와 UX/Product QA input이 유효하다.
+- [x] A1: auditor identity, exact Git/build/migration/snapshot pins와 UX/Product QA input이 유효하다.
   PROVES: release_audit
-  EVIDENCE: prior fresh auditor pinned `70a86ea5f7bd`, tree `1d5649199bb0` and public asset `index-fGSYVODK.js`, but terminal report `docs/PHASE2_ACCOUNT_ACCESS_FRESH_RELEASE_AUDIT_70A86EA5.md` was `BLOCKED`. A new corrected candidate and auditor pin remain required.
-- [ ] A2: auth/session/CSRF, RLS/deny, secret/redaction, retention/export/deletion/restore와 provider outage가 fail-closed로 검증된다.
+  EVIDENCE: a new auditor, separate from Builder, Parent, UX reviewers and the prior blocked auditor, pinned candidate `64ea005a5421`, tree `6792e6cdbbec`, public asset `index-fGSYVODK.js`, migration and upstream QA inputs in `docs/PHASE2_ACCOUNT_ACCESS_FRESH_RELEASE_REAUDIT_64EA005.md`.
+- [x] A2: auth/session/CSRF, RLS/deny, secret/redaction, retention/export/deletion/restore와 provider outage가 fail-closed로 검증된다.
   PROVES: security
-  EVIDENCE: prior audit independently passed the disabled provider-neutral auth/RLS/redaction/local data-lifecycle matrix and disclosed hosted/provider residuals, but no partial result closes A2 while the same audit is terminally blocked. Fresh re-audit required.
-- [ ] A3: rate limits, telemetry/alerts, cost ceiling, incident response, staged rollout과 rollback receipts가 재현된다.
+  EVIDENCE: account Node 18/18 plus UI 5/5 and actual PGlite/PostgreSQL 18.3 migration prove the disabled provider-neutral auth/session/outage matrix, eight forced-RLS tables, owner/anonymous/forged/cross-workspace/revoked/write denials, redaction and local lifecycle contracts. Real provider CSRF/cookie compatibility, hosted purge/restore and Supabase remain explicitly blocking before private enablement, not promoted as PASS.
+- [x] A3: rate limits, telemetry/alerts, cost ceiling, incident response, staged rollout과 rollback receipts가 재현된다.
   PROVES: release_audit
-  EVIDENCE: prior audit reproduced local rate/cost/incident/rollback controls and classified hosted operations as deferred before private enablement, but no partial result closes A3 while the same audit is terminally blocked. Fresh re-audit required.
-- [ ] A4: audit report가 PASS_RELEASE_AUDIT_ONLY 또는 FAIL로 끝나며 Cherry acceptance, production mutation과 release approval을 주장하지 않는다.
+  EVIDENCE: fresh re-audit reproduced 120/10m and 6/project/hour limits, idempotency/concurrency/payload denial, USD 40/60/75 cost states, redacted incident/metric vocabularies and non-mutating rollback rebuild to `eb0ce106`; hosted WAF/alerts/spend actions/private-resource rollback remain deferred before enablement.
+- [x] A4: audit report가 PASS_RELEASE_AUDIT_ONLY 또는 FAIL로 끝나며 Cherry acceptance, production mutation과 release approval을 주장하지 않는다.
   PROVES: release_audit
-  EVIDENCE: report-only commit `bfd3068f2c36`, tree `ad522bb79eea`, report SHA-256 `67208f6ecd4b165e01ba7712fbca24cbd9e138a35ac3ea25295ad7280a64f685`, terminal `BLOCKED`; canonical `npm run test:browser` default runtime could not resolve its external Cherry Note Package source. Cherry acceptance remains locked.
+  EVIDENCE: report-only commit `067205796bdd`, tree `7f0a12506167`, report SHA-256 `49c2460ca61af975d5ae4e310f10cd9d5fe7bb0e4e923da49a77fb8a69d8706c`, terminal `PASS_RELEASE_AUDIT_ONLY`. It opens only Cherry acceptance for the exact candidate.
 
 ABANDON: Release Audit PASS는 production provider/resource creation, Cherry acceptance, release 또는 external outcome completion이 아니다.

@@ -1,6 +1,6 @@
 {
   "schemaVersion": 2,
-  "observedAt": "2026-08-25T04:21:58.299Z",
+  "observedAt": "2026-08-25T04:31:04.126Z",
   "projects": [
     {
       "status": "conflict",
@@ -1696,10 +1696,10 @@
     {
       "status": "valid",
       "errors": [],
-      "observedAt": "2026-08-25T04:13:16.591Z",
+      "observedAt": "2026-08-25T04:30:53.212Z",
       "sourceFreshness": {
         "state": "observed",
-        "observedAt": "2026-08-25T04:13:16.591Z"
+        "observedAt": "2026-08-25T04:30:53.212Z"
       },
       "project": {
         "id": "outcome",
@@ -2994,7 +2994,7 @@
                         "id": "A1",
                         "stageId": "outcome-stage-account-access-release-audit",
                         "title": "auditor identity, exact Git/build/migration/snapshot pins와 UX/Product QA input이 유효하다.",
-                        "closed": false,
+                        "closed": true,
                         "groupCode": "A",
                         "groupLabel": null,
                         "proves": "release_audit"
@@ -3003,7 +3003,7 @@
                         "id": "A2",
                         "stageId": "outcome-stage-account-access-release-audit",
                         "title": "auth/session/CSRF, RLS/deny, secret/redaction, retention/export/deletion/restore와 provider outage가 fail-closed로 검증된다.",
-                        "closed": false,
+                        "closed": true,
                         "groupCode": "A",
                         "groupLabel": null,
                         "proves": "security"
@@ -3012,7 +3012,7 @@
                         "id": "A3",
                         "stageId": "outcome-stage-account-access-release-audit",
                         "title": "rate limits, telemetry/alerts, cost ceiling, incident response, staged rollout과 rollback receipts가 재현된다.",
-                        "closed": false,
+                        "closed": true,
                         "groupCode": "A",
                         "groupLabel": null,
                         "proves": "release_audit"
@@ -3021,7 +3021,7 @@
                         "id": "A4",
                         "stageId": "outcome-stage-account-access-release-audit",
                         "title": "audit report가 PASS_RELEASE_AUDIT_ONLY 또는 FAIL로 끝나며 Cherry acceptance, production mutation과 release approval을 주장하지 않는다.",
-                        "closed": false,
+                        "closed": true,
                         "groupCode": "A",
                         "groupLabel": null,
                         "proves": "release_audit"
@@ -3033,24 +3033,24 @@
                         "name": "독립 출시 감사",
                         "sourceName": "A",
                         "total": 4,
-                        "closed": 0
+                        "closed": 4
                       }
                     ],
                     "total": 4,
-                    "closed": 0,
+                    "closed": 4,
                     "available": true,
                     "sourceRef": "GATES_PHASE2_ACCOUNT_ACCESS_RELEASE_AUDIT.md",
-                    "observedAt": "2026-08-25T04:13:16.591Z"
+                    "observedAt": "2026-08-25T04:30:53.212Z"
                   },
                   "sourceState": "present",
-                  "state": "active",
+                  "state": "complete",
                   "axes": {
                     "implementation": "not_sourced",
                     "test": "not_sourced",
-                    "evidence": "pending",
+                    "evidence": "evidence_closed",
                     "independentQa": "not_sourced",
                     "cherryAcceptance": "not_sourced",
-                    "release": "pending"
+                    "release": "evidence_closed"
                   }
                 },
                 {
@@ -3068,7 +3068,7 @@
                         "id": "C1",
                         "stageId": "outcome-stage-account-access-cherry-acceptance",
                         "title": "exact candidate가 fresh UX & Product QA PASS와 separate Release Audit PASS를 모두 가진다.",
-                        "closed": false,
+                        "closed": true,
                         "groupCode": "C",
                         "groupLabel": null,
                         "proves": "cherry_acceptance"
@@ -3107,23 +3107,23 @@
                         "name": "Cherry 실제 사용 승인",
                         "sourceName": "C",
                         "total": 4,
-                        "closed": 0
+                        "closed": 1
                       }
                     ],
                     "total": 4,
-                    "closed": 0,
+                    "closed": 1,
                     "available": true,
                     "sourceRef": "GATES_PHASE2_ACCOUNT_ACCESS_CHERRY_ACCEPTANCE.md",
-                    "observedAt": "2026-08-25T02:25:32.363Z"
+                    "observedAt": "2026-08-25T04:30:53.212Z"
                   },
                   "sourceState": "present",
-                  "state": "locked",
+                  "state": "active",
                   "axes": {
                     "implementation": "not_sourced",
                     "test": "not_sourced",
-                    "evidence": "pending",
+                    "evidence": "partially_evidenced",
                     "independentQa": "not_sourced",
-                    "cherryAcceptance": "pending",
+                    "cherryAcceptance": "partially_evidenced",
                     "release": "not_sourced"
                   }
                 }
@@ -3216,9 +3216,9 @@
           "localCandidate": {
             "state": "available",
             "branch": "main",
-            "ahead": 0,
+            "ahead": 1,
             "behind": 0,
-            "sync": "synced"
+            "sync": "ahead"
           },
           "published": {
             "state": "connected",
@@ -3237,13 +3237,9 @@
       "current": {
         "phaseId": "outcome-phase-2",
         "scopeId": "outcome-phase-2-account-service",
-        "stageId": "outcome-stage-account-access-release-audit"
-      },
-      "next": {
-        "phaseId": "outcome-phase-2",
-        "scopeId": "outcome-phase-2-account-service",
         "stageId": "outcome-stage-account-access-cherry-acceptance"
       },
+      "next": null,
       "bindings": [
         {
           "role": "planner",
@@ -3300,7 +3296,7 @@
   ],
   "snapshot": {
     "boundary": "deployment_snapshot",
-    "capturedAt": "2026-08-25T04:21:58.299Z",
+    "capturedAt": "2026-08-25T04:31:04.126Z",
     "source": "sanitized_public_projection",
     "liveSessionRelay": false,
     "refreshBehavior": "new_deployment_required"
