@@ -2,7 +2,7 @@ import type { CherryNoteDashboardData } from '../components/CherryNoteDashboard'
 import type { OutcomeDashboardData } from '../components/OutcomeDashboard'
 
 type Session = { authenticated: boolean; publicReadOnly?: boolean }
-export type PrivateAccessConfig = { enabled: boolean; access: 'private_read_only'; providers: Array<{ id: string; mode: string }>; sessionMaximumDays: number; completionAuthority: false }
+export type PrivateAccessConfig = { enabled: boolean; access: 'private_read_only'; providers: Array<{ id: string; mode: string }>; sessionMaximumDays: number; completionAuthority: false; publishableKey?: string }
 export type PrivateGate = { id: string; title: string; closed: boolean }
 export type PrivateStage = { id: string; title: string; gate?: { gates?: PrivateGate[] } }
 export type PrivateScope = { id: string; title: string; stages: PrivateStage[] }
@@ -48,6 +48,10 @@ export async function fetchPrivateAccessConfig(): Promise<PrivateAccessConfig> {
 
 export async function fetchPrivateWorkspace(): Promise<{ workspace: PrivateWorkspaceView }> {
   return readJson<{ workspace: PrivateWorkspaceView }>(await fetch('/api/private/workspace', { credentials: 'same-origin', headers: { accept: 'application/json' } }))
+}
+
+export async function fetchPrivateOwnerSession(): Promise<{ authenticated: true; owner: true }> {
+  return readJson<{ authenticated: true; owner: true }>(await fetch('/api/private/session', { credentials: 'same-origin', headers: { accept: 'application/json' } }))
 }
 
 export async function beginPrivateSession(provider: 'google' | 'email_code', navigate: (url: string) => void = (url) => window.location.assign(url)): Promise<{ state: string; mode: string; redirectUrl?: string }> {

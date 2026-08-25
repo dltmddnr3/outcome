@@ -1,6 +1,7 @@
 import { FormEvent, useEffect, useState } from 'react'
 import { OutcomeDashboard } from './components/OutcomeDashboard'
 import { AccountWorkspace, accountWorkspaceStateCopy, type AccountWorkspaceState } from './components/AccountWorkspace'
+import { HostedClerkWorkspace } from './components/AccountWorkspaceClerk'
 import { loginErrorPresentation } from './components/outcomeKorean'
 import { beginPrivateSession, endPrivateSession, fetchPrivateAccessConfig, fetchPrivateWorkspace, fetchSession, login, logout, type PrivateWorkspaceView } from './lib/api'
 
@@ -18,7 +19,12 @@ const privateResultState = (value: { workspace: { viewState?: string } }): Accou
   return state && state in accountWorkspaceStateCopy ? state as AccountWorkspaceState : 'ready'
 }
 
-function PrivateWorkspaceEntry() {
+function PrivateWorkspaceEntry({ config }: { config?: Awaited<ReturnType<typeof fetchPrivateAccessConfig>> }) {
+  if (config?.enabled && config.publishableKey) return <HostedClerkWorkspace publishableKey={config.publishableKey} />
+  return <InjectedPrivateWorkspaceEntry />
+}
+
+function InjectedPrivateWorkspaceEntry() {
   const [state, setState] = useState<AccountWorkspaceState>('loading')
   const [workspace, setWorkspace] = useState<PrivateWorkspaceView | undefined>()
   const [transitionError, setTransitionError] = useState<string | null>(null)
@@ -29,7 +35,7 @@ function PrivateWorkspaceEntry() {
   useEffect(() => { void load().catch(() => undefined) }, [])
   const authenticate = async (provider: 'google' | 'email_code') => { setState('loading'); setTransitionError(null); try { await beginPrivateSession(provider); await load() } catch { setTransitionError('검증용 인증 전환을 완료하지 못했습니다.'); setState('login') } }
   const signOut = async () => { setState('loading'); setTransitionError(null); try { await endPrivateSession(); setWorkspace(undefined); setState('login') } catch { setTransitionError('로그아웃을 완료하지 못했습니다.'); setState('unavailable') } }
-  return <AccountWorkspace state={state} workspace={workspace} onLogin={authenticate} onLogout={signOut} transitionError={transitionError} />
+  return <AccountWorkspace state={state} workspace={workspace} ownerVerified={state === 'ready'} onLogin={authenticate} onLogout={signOut} transitionError={transitionError} />
 }
 
 function Login({ onAuthenticated }: { onAuthenticated: () => void }) {
@@ -63,5 +69,10 @@ function DashboardEntry() {
 }
 
 export function OutcomeApp() {
-  return window.location.pathname === '/workspace' ? <PrivateWorkspaceEntry /> : <DashboardEntry />
+  const privatePath = window.location.pathname.startsWith('/workspace')
+  const [config, setConfig] = useState<Awaited<ReturnType<typeof fetchPrivateAccessConfig>> | null>(null)
+  useEffect(() => { if (privatePath) void fetchPrivateAccessConfig().then(setConfig).catch(() => setConfig({ enabled: false, access: 'private_read_only', providers: [], sessionMaximumDays: 7, completionAuthority: false })) }, [privatePath])
+  if (!privatePath) return <DashboardEntry />
+  if (config === null) return <AccountWorkspace state="loading" />
+  return <PrivateWorkspaceEntry config={config} />
 }

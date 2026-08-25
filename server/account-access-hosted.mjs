@@ -1,66 +1,59 @@
 import { AccountAccessError, createAccountAccessService } from './account-access.mjs'
+import { createClerkClient } from '@clerk/backend'
 
 const DAY_MS = 86_400_000
 const ALLOWED_PROJECTS = Object.freeze(['cherry-note', 'outcome'])
 
-export const HOSTED_PREVIEW_ENV = Object.freeze({
+export const HOSTED_IDENTITY_ENV = Object.freeze({
   privateSurfaceEnabled: 'OUTCOME_PRIVATE_SURFACE_ENABLED',
   clerkPublishableKey: 'OUTCOME_CLERK_PUBLISHABLE_KEY',
   clerkSecretKey: 'OUTCOME_CLERK_SECRET_KEY',
   ownerSubject: 'OUTCOME_OWNER_SUBJECT',
-  clerkSignInUrl: 'OUTCOME_CLERK_SIGN_IN_URL',
-  clerkAccountUrl: 'OUTCOME_CLERK_ACCOUNT_URL',
   privateAllowedOrigin: 'OUTCOME_PRIVATE_ALLOWED_ORIGIN',
-  supabaseUrl: 'OUTCOME_SUPABASE_URL',
-  supabasePublishableKey: 'OUTCOME_SUPABASE_PUBLISHABLE_KEY',
   rollbackDeployment: 'OUTCOME_PRIVATE_ROLLBACK_DEPLOYMENT',
 })
 
-const readBindings = (environment) => Object.fromEntries(Object.entries(HOSTED_PREVIEW_ENV).map(([key, name]) => [key, typeof environment?.[name] === 'string' ? environment[name].trim() : '']))
+export const HOSTED_DATA_ENV = Object.freeze({
+  supabaseUrl: 'OUTCOME_SUPABASE_URL',
+  supabasePublishableKey: 'OUTCOME_SUPABASE_PUBLISHABLE_KEY',
+})
+
+export const HOSTED_PREVIEW_ENV = Object.freeze({ ...HOSTED_IDENTITY_ENV, ...HOSTED_DATA_ENV })
+
+const readBindings = (environment, inventory = HOSTED_PREVIEW_ENV) => Object.fromEntries(Object.entries(inventory).map(([key, name]) => [key, typeof environment?.[name] === 'string' ? environment[name].trim() : '']))
 const validHttps = (value) => { try { return new URL(value).protocol === 'https:' } catch { return false } }
 
-export function readHostedPreviewConfiguration(environment = {}) {
-  const value = readBindings(environment)
+export function readHostedIdentityConfiguration(environment = {}) {
+  const value = readBindings(environment, HOSTED_IDENTITY_ENV)
   const complete = value.privateSurfaceEnabled === '1'
     && Object.entries(value).every(([key, item]) => key === 'privateSurfaceEnabled' || Boolean(item))
-    && [value.clerkSignInUrl, value.clerkAccountUrl, value.privateAllowedOrigin, value.supabaseUrl].every(validHttps)
+    && validHttps(value.privateAllowedOrigin)
   return { enabled: complete }
 }
 
-const accountError = (code, status) => new AccountAccessError(code, status)
-const providerRedirect = (value, allowedOrigins) => {
-  try {
-    const redirect = new URL(value?.redirectUrl)
-    if (!allowedOrigins.includes(redirect.origin)) throw new Error('provider_redirect_denied')
-    return value
-  } catch {
-    throw accountError('authentication_unavailable', 503)
-  }
+export function readHostedDataConfiguration(environment = {}) {
+  const value = readBindings(environment, HOSTED_DATA_ENV)
+  return { enabled: Object.values(value).every(Boolean) && validHttps(value.supabaseUrl) }
 }
 
-export function createClerkHostedAuthProvider({ gateway, ownerSubject, allowedRedirectOrigins = [], now = Date.now } = {}) {
-  if (!gateway?.verifySession || !gateway?.startSignIn || !gateway?.startAppleLink || !gateway?.revokeSession || !gateway?.revokeAllSessions || !ownerSubject || !allowedRedirectOrigins.length) throw new Error('hosted_provider_configuration_missing')
-  const verify = async (token) => {
-    if (!token) throw accountError('authentication_required', 401)
-    let value
-    try { value = await gateway.verifySession(token) } catch { throw accountError('authentication_unavailable', 503) }
+export const readHostedPreviewConfiguration = readHostedIdentityConfiguration
+
+const accountError = (code, status) => new AccountAccessError(code, status)
+export function createClerkHostedAuthProvider({ gateway, ownerSubject, now = Date.now } = {}) {
+  if (!gateway?.verifySession || !gateway?.revokeSession || !gateway?.revokeAllSessions || !ownerSubject) throw new Error('hosted_provider_configuration_missing')
+  const verifiedIdentity = (value) => {
     if (!value) throw accountError('authentication_required', 401)
     if (value.revoked) throw accountError('session_revoked', 401)
     if (!Number.isFinite(value.expiresAt) || value.expiresAt <= now() || !Number.isFinite(value.issuedAt) || value.issuedAt > now() || now() - value.issuedAt > 7 * DAY_MS) throw accountError('session_expired', 401)
     if (value.subject !== ownerSubject) throw accountError('owner_mismatch', 403)
     return value
   }
+  const verify = async (token) => {
+    if (!token) throw accountError('authentication_required', 401)
+    try { return verifiedIdentity(await gateway.verifySession(token)) } catch (error) { if (error instanceof AccountAccessError) throw error; throw accountError('authentication_unavailable', 503) }
+  }
   return {
     verify,
-    async begin({ provider } = {}) {
-      if (!['google', 'email_code'].includes(provider)) throw accountError('provider_not_allowed', 400)
-      try { return providerRedirect(await gateway.startSignIn({ provider }), allowedRedirectOrigins) } catch { throw accountError('authentication_unavailable', 503) }
-    },
-    async beginAppleLink({ token } = {}) {
-      if (!token) throw accountError('apple_link_required', 403)
-      const identity = await verify(token)
-      try { return providerRedirect(await gateway.startAppleLink({ subject: identity.subject, sessionId: identity.sessionId }), allowedRedirectOrigins) } catch { throw accountError('authentication_unavailable', 503) }
-    },
     async signOut({ token } = {}) {
       const identity = await verify(token)
       try { await gateway.revokeSession({ subject: identity.subject, sessionId: identity.sessionId }) } catch { throw accountError('authentication_unavailable', 503) }
@@ -70,6 +63,42 @@ export function createClerkHostedAuthProvider({ gateway, ownerSubject, allowedRe
       if (!operatorAuthorized) throw accountError('operator_authorization_required', 403)
       try { await gateway.revokeAllSessions({ subject: ownerSubject }) } catch { throw accountError('authentication_unavailable', 503) }
       return { state: 'revoked' }
+    },
+  }
+}
+
+const sessionTokenFromRequest = (request) => request.headers.get('cookie')?.split(';').map((item) => item.trim().split('=')).find(([key]) => key === '__session')?.[1] ?? ''
+const clerkIdentity = async ({ client, auth }) => {
+  if (!auth?.isAuthenticated || !auth.userId || !auth.sessionId || !auth.sessionClaims) return null
+  const session = await client.sessions.getSession(auth.sessionId)
+  return {
+    subject: auth.userId,
+    sessionId: auth.sessionId,
+    issuedAt: Number(auth.sessionClaims.iat) * 1_000,
+    expiresAt: Number(auth.sessionClaims.exp) * 1_000,
+    revoked: session?.status !== 'active' || session?.userId !== auth.userId,
+    linkedProviders: [],
+  }
+}
+
+export function createClerkBackendGateway({ environment = {}, clerkClientFactory = createClerkClient } = {}) {
+  if (!readHostedIdentityConfiguration(environment).enabled || typeof clerkClientFactory !== 'function') throw new Error('hosted_identity_configuration_missing')
+  const bindings = readBindings(environment, HOSTED_IDENTITY_ENV)
+  const client = clerkClientFactory({ secretKey: bindings.clerkSecretKey, publishableKey: bindings.clerkPublishableKey })
+  if (!client?.authenticateRequest || !client?.sessions?.getSession || !client?.sessions?.revokeSession || !client?.sessions?.getSessionList) throw new Error('clerk_runtime_invalid')
+  const authenticate = async (request) => {
+    const token = sessionTokenFromRequest(request)
+    if (!token) return null
+    const state = await client.authenticateRequest(request, { authorizedParties: [bindings.privateAllowedOrigin], acceptsToken: 'session_token' })
+    return clerkIdentity({ client, auth: state.toAuth() })
+  }
+  return {
+    authenticationOptions: { acceptsToken: 'session_token', authorizedParties: [bindings.privateAllowedOrigin] },
+    verifySession: (token) => authenticate(new Request(`${bindings.privateAllowedOrigin}/api/private/session`, { headers: { cookie: `__session=${token}` } })),
+    revokeSession: ({ sessionId }) => client.sessions.revokeSession(sessionId),
+    async revokeAllSessions({ subject }) {
+      const sessions = await client.sessions.getSessionList({ userId: subject })
+      await Promise.all((sessions?.data ?? []).map((session) => client.sessions.revokeSession(session.id)))
     },
   }
 }
@@ -119,17 +148,37 @@ export function createSupabaseRestGateway({ url, publishableKey, fetchImpl = fet
 }
 
 export function createHostedPreviewRuntime({ environment = {}, providerGateway, storeGateway, now = Date.now } = {}) {
-  if (!readHostedPreviewConfiguration(environment).enabled || !providerGateway || !storeGateway) return null
+  if (!readHostedIdentityConfiguration(environment).enabled || !readHostedDataConfiguration(environment).enabled || !providerGateway || !storeGateway) return null
   const bindings = readBindings(environment)
-  const allowedRedirectOrigins = [...new Set([new URL(bindings.clerkSignInUrl).origin, new URL(bindings.clerkAccountUrl).origin])]
-  const provider = createClerkHostedAuthProvider({ gateway: providerGateway, ownerSubject: bindings.ownerSubject, allowedRedirectOrigins, now })
+  const provider = createClerkHostedAuthProvider({ gateway: providerGateway, ownerSubject: bindings.ownerSubject, now })
   const store = createSupabaseHostedStore({ gateway: storeGateway, allowedProjects: ALLOWED_PROJECTS })
   const service = createAccountAccessService({ authProvider: { verify: provider.verify, signOut: provider.signOut, revokeAll: ({ subject: _subject }) => provider.revokeAll({ operatorAuthorized: true }) }, store, ownerSubject: bindings.ownerSubject, now })
   return {
     service,
-    transition: { begin: (input) => provider.begin(input), appleLink: (input) => provider.beginAppleLink(input), end: (input) => provider.signOut(input) },
     allowedOrigin: bindings.privateAllowedOrigin,
+    publishableKey: bindings.clerkPublishableKey,
     rollbackDeployment: bindings.rollbackDeployment,
     mode: 'hosted_preview_adapter',
+  }
+}
+
+export function createHostedIdentityRuntime({ environment = {}, clerkClientFactory = createClerkClient, now = Date.now } = {}) {
+  if (!readHostedIdentityConfiguration(environment).enabled) return null
+  const bindings = readBindings(environment, HOSTED_IDENTITY_ENV)
+  const gateway = createClerkBackendGateway({ environment, clerkClientFactory })
+  const provider = createClerkHostedAuthProvider({ gateway, ownerSubject: bindings.ownerSubject, now })
+  const store = {
+    async membershipsForSubject() { throw accountError('private_workspace_unavailable', 503) },
+    async workspace() { throw accountError('private_workspace_unavailable', 503) },
+    async projectsForWorkspace() { throw accountError('private_workspace_unavailable', 503) },
+  }
+  const service = createAccountAccessService({ authProvider: { verify: provider.verify, signOut: provider.signOut, revokeAll: ({ subject: _subject }) => provider.revokeAll({ operatorAuthorized: true }) }, store, ownerSubject: bindings.ownerSubject, now })
+  return {
+    service,
+    allowedOrigin: bindings.privateAllowedOrigin,
+    publishableKey: bindings.clerkPublishableKey,
+    rollbackDeployment: bindings.rollbackDeployment,
+    dataReady: false,
+    mode: 'hosted_identity_adapter',
   }
 }

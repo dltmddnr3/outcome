@@ -1,7 +1,14 @@
 import { once } from 'node:events'
+import { readFileSync, readdirSync } from 'node:fs'
 import { chromium } from '@playwright/test'
 import { createAccountAccessService, createInMemoryAccountStore } from '../server/account-access.mjs'
 import { createOutcomeServer } from '../server/index.mjs'
+
+const builtBrowser = readdirSync('dist/assets').filter((name) => name.endsWith('.js')).map((name) => readFileSync(`dist/assets/${name}`, 'utf8')).join('\n')
+for (const marker of ['oauth_google', 'oauth_apple', '/workspace/sso-callback']) {
+  if (!builtBrowser.includes(marker)) throw new Error(`Clerk browser integration missing from production asset: ${marker}`)
+}
+if (builtBrowser.includes('/api/private/auth/callback') || builtBrowser.includes('sessionToken')) throw new Error('production browser asset contains forbidden server callback/session token handoff')
 
 const now = () => Date.parse('2026-08-25T00:00:00.000Z')
 const readyProjects = [
@@ -123,7 +130,7 @@ try {
     await context.close()
   }
   if (transitions.length !== 6 || transitions.filter(([action]) => action === 'login').length !== 3 || transitions.filter(([action]) => action === 'logout').length !== 3) throw new Error(`injected transition count failed ${JSON.stringify(transitions)}`)
-  console.log(`account access browser PASS: 3 viewports x ${Object.keys(states).length} settled states + loading + ready login/logout hierarchy; mobile/phone 200% zoom overflow=0; touch>=44; current-vs-selected preserved`)
+  console.log(`account access browser PASS: Clerk SDK browser markers present with no server callback/session-token handoff; 3 viewports x ${Object.keys(states).length} settled states + loading + ready login/logout hierarchy; mobile/phone 200% zoom overflow=0; touch>=44; current-vs-selected preserved`)
 } finally {
   server.close(); await once(server, 'close'); await browser.close()
 }

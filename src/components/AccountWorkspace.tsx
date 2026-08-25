@@ -18,7 +18,7 @@ type LoginProvider = 'google' | 'email_code'
 
 const initialSelection = (project: PrivateProjectProjection): PrivateSelection => ({ projectId: project.project.id, phaseId: project.current.phaseId, scopeId: project.current.scopeId, stageId: project.current.stageId })
 
-export function AccountWorkspace({ state = 'unavailable', workspace, onLogin, onLogout, transitionError = null }: { state?: AccountWorkspaceState; workspace?: PrivateWorkspaceView; onLogin?: (provider: LoginProvider) => Promise<void>; onLogout?: () => Promise<void>; transitionError?: string | null }) {
+export function AccountWorkspace({ state = 'unavailable', workspace, ownerVerified = false, onLogin, onLogout, onAppleLink, loginContent, transitionError = null }: { state?: AccountWorkspaceState; workspace?: PrivateWorkspaceView; ownerVerified?: boolean; onLogin?: (provider: LoginProvider) => Promise<void>; onLogout?: () => Promise<void>; onAppleLink?: () => Promise<void>; loginContent?: ReactNode; transitionError?: string | null }) {
   const copy = accountWorkspaceStateCopy[state]
   const alert = ['conflict', 'unavailable', 'session_expired', 'access_denied'].includes(state)
   const projects = workspace?.projects ?? []
@@ -39,18 +39,19 @@ export function AccountWorkspace({ state = 'unavailable', workspace, onLogin, on
   return <main className="account-workspace" data-completion-authority="false">
     <header className="account-workspace__header">
       <div><span className="account-workspace__eyebrow">OUTCOME PRIVATE</span><h1>Cherry 전용 비공개 워크스페이스</h1></div>
-      <div className="account-workspace__header-actions"><span className="account-workspace__mode">읽기 전용</span>{state === 'ready' && onLogout && <button type="button" data-private-logout="true" disabled={busy !== null} onClick={() => void transition('logout', onLogout)}>{busy === 'logout' ? '로그아웃 중…' : '로그아웃'}</button>}</div>
+      <div className="account-workspace__header-actions"><span className="account-workspace__mode">읽기 전용</span>{ownerVerified && onLogout && <button type="button" data-private-logout="true" disabled={busy !== null} onClick={() => void transition('logout', onLogout)}>{busy === 'logout' ? '로그아웃 중…' : '로그아웃'}</button>}</div>
     </header>
     <section className="account-workspace__state" role={alert ? 'alert' : 'status'} aria-live={alert ? 'assertive' : 'polite'}>
       <span className="account-workspace__state-code">{state}</span>
       <h2>{copy.title}</h2>
       <p>{copy.detail}</p>
-      {state === 'login' && <div className="account-workspace__actions">
+      {state === 'login' && (loginContent ?? <div className="account-workspace__actions">
         <button type="button" data-touch-target="44" data-private-login-provider="google" disabled={busy !== null} onClick={() => void transition('google', onLogin ? () => onLogin('google') : undefined)}>{busy === 'google' ? '연결 확인 중…' : 'Google로 계속'}</button>
         <button type="button" data-touch-target="44" data-private-login-provider="email_code" disabled={busy !== null} onClick={() => void transition('email_code', onLogin ? () => onLogin('email_code') : undefined)}>{busy === 'email_code' ? '코드 확인 중…' : '이메일 인증 코드'}</button>
         <span>Apple은 로그인 후 연결</span>
         <p className="account-workspace__adapter-note">검증용 공급자 중립 전환 · 실제 OAuth 연결 아님</p>
-      </div>}
+      </div>)}
+      {ownerVerified && onAppleLink && <button type="button" data-touch-target="44" data-private-link-provider="apple" disabled={busy !== null} onClick={() => void transition('logout', onAppleLink)}>Apple 계정 연결</button>}
       {state === 'session_expired' && <button type="button" data-touch-target="44">다시 로그인</button>}
       {state === 'safe_degraded' && <p className="account-workspace__notice">변경 기능 없음 · 자동 동기화 없음 · 마지막 검증 시각 유지</p>}
       {transitionError && <p className="account-workspace__transition-error" role="alert">{transitionError}</p>}
@@ -71,5 +72,5 @@ export function AccountWorkspace({ state = 'unavailable', workspace, onLogin, on
     </footer>
   </main>
 }
-import { useState } from 'react'
+import { type ReactNode, useState } from 'react'
 import type { PrivateProjectProjection, PrivateWorkspaceView } from '../lib/api'

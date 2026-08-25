@@ -47,8 +47,17 @@ describe('account workspace presentation contract', () => {
     const login = renderToStaticMarkup(<AccountWorkspace state="login" onLogin={async () => {}} />)
     expect(login).toContain('실제 OAuth 연결 아님')
     expect(login).toContain('data-private-login-provider="google"')
-    const ready = renderToStaticMarkup(<AccountWorkspace state="ready" workspace={readyWorkspace} onLogout={async () => {}} />)
+    const ready = renderToStaticMarkup(<AccountWorkspace state="ready" workspace={readyWorkspace} ownerVerified onLogout={async () => {}} />)
     expect(ready).toContain('data-private-logout="true"')
     expect(ready).toContain('로그아웃')
+  })
+
+  it('HP1 소유자 확인은 워크스페이스 503과 별개로 Apple 연결을 허용하고 미확인 사용자는 숨긴다', () => {
+    const verified = renderToStaticMarkup(<AccountWorkspace state="unavailable" ownerVerified onLogout={async () => {}} onAppleLink={async () => {}} />)
+    expect(verified).toContain('data-private-link-provider="apple"')
+    expect(verified).toContain('data-private-logout="true"')
+    const denied = renderToStaticMarkup(<AccountWorkspace state="access_denied" onLogout={async () => {}} onAppleLink={async () => {}} />)
+    expect(denied).not.toContain('data-private-link-provider="apple"')
+    expect(denied).not.toContain('data-private-logout="true"')
   })
 })
