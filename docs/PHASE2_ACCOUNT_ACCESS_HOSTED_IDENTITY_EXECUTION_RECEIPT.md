@@ -1,6 +1,6 @@
 # Phase 2 · 개발 인증 미리보기 실행 영수증
 
-상태: `P3 EVIDENCE CLOSED · P4-P6 OPEN`
+상태: `P4 EVIDENCE CLOSED · P5-P6 OPEN`
 
 ## 승인과 기준선
 
@@ -43,7 +43,8 @@
 - P1: 승인 증거 유지
 - P2: `CLOSED · DEVELOPMENT SINGLE-OWNER BOUNDARY ONLY`
 - P3: `CLOSED · G/E/A/D/R 5/5 PASS`
-- P4-P6: `OPEN · NOT PROVEN`
+- P4: `CLOSED · PREVIEW-ONLY IMMUTABLE DEPLOYMENT`
+- P5-P6: `OPEN · NOT PROVEN`
 - rollback 승인: `2026-08-25 KST Cherry 승인`
 - rollback 결과: 이전 exact Production deployment로 rebuild 없이 공개 별칭 복구
 - 복구 영수증: `9cbf834196e3982a7822c422a9a9b18a74d66692` / `d33a2cf61157c369e4121f4e38fd3ada97a24038` / `index-B_ICbkfO.js`
@@ -54,7 +55,7 @@
 - `HOSTED_IDENTITY_PREVIEW_ONLY`: `false`
 - `EXTERNAL_OUTCOME_COMPLETE`: `false`
 
-이 영수증은 P2와 P3만 증명한다. Vercel Preview 환경, MacBook/mobile 전체 흐름 검수, HP1 완료, Production release 또는 Phase 완료를 증명하지 않는다.
+이 영수증은 P2·P3·P4만 증명한다. MacBook/mobile 전체 흐름 검수, P6 최종 영수증, HP1 완료, Production release 또는 Phase 완료를 증명하지 않는다.
 
 ## P3 직접 검증 결과
 
@@ -67,3 +68,19 @@
 - 로그아웃·세션 철회: `PASS · 사용자 로그아웃 뒤 sign-in 복귀 · Clerk 모든 기기 세션 철회 뒤 기존 Account Portal 새로고침에서 sign-in 강제`
 
 P3 판정: `G/E/A/D/R 5/5 PASS`. 이 판정은 P4 Vercel Preview 환경, P5 MacBook/mobile 전체 흐름, P6 최종 영수증, HP1 완료, HP2 또는 Production release를 증명하지 않는다.
+
+## P4 Preview 전용 환경과 배포
+
+- 변경 전 Vercel 환경값: `0`
+- 변경 후 허용 이름: `6/6`
+- 대상: `Preview 6/6`
+- Production 연결: `0`
+- Development 연결: `0`
+- 예상 밖 환경 이름: `0`
+- 값 기록: `0`
+- 되돌리기 Preview: `dpl_BcXw6i4GWipQpszQaozZy93UbCXo` · exact commit `270ff7be8420765f9324dccfcd754af37c794c2f` · `READY`
+- 환경 변경 후 후보 Preview: `dpl_8LjkbN8B4YKf2u1Ezq9uPkyE55QE` · exact commit `270ff7be8420765f9324dccfcd754af37c794c2f` · `READY`
+- 공개 Production 불변: `9cbf834196e3` / `d33a2cf61157` / `index-B_ICbkfO.js`
+- 공개 검증: 화면/API `200/200`; mutation `32/32=405`; API read-only JSON `28/28`; 공개 경계 금지 식별자 `0`
+
+P4 판정: `PASS`. Preview는 Vercel 인증 보호 아래 있으며 실제 MacBook/mobile 로그인·불러오는 중·준비·로그아웃·만료·철회·제공자 장애 흐름은 P5에서 별도로 실측한다. P4는 P5/P6, HP1 완료, HP2, Production release 또는 Phase 완료를 증명하지 않는다.

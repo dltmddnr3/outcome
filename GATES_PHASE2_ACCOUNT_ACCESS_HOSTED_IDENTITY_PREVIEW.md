@@ -11,9 +11,9 @@ Outcome: Cherry가 승인한 개발 환경에서 정확히 한 명의 canonical 
 - [x] P3: 구글 공용 개발 로그인, 이메일 코드 대체 경로, 인증 후 애플 연결만 허용, 다른 사용자 거부와 권한 철회가 직접 검증된다.
   PROVES: implementation
   EVIDENCE: `2026-08-25 KST` Account Portal에서 Google 로그인과 새로고침 유지, 로그아웃 뒤 동일 소유자의 email code 로그인과 세션 유지, 인증된 Account 화면에서만 Apple 연결 후 사용자 `1`·social account `2` 유지, 로그아웃 sign-in 화면의 Apple 직접 로그인 비노출, 초대받지 않은 다른 Google 계정 시도의 일반 sign-in 복귀와 사용자 `1`·대기 초대 `0` 유지, Clerk 모든 기기 세션 철회 뒤 기존 Account Portal의 sign-in 강제를 직접 검증했다. 이메일·계정명·사진·사용자/세션/애플리케이션/인스턴스 식별자·OAuth/email code·토큰·쿠키는 영수증에 기록하지 않았다. 상세: `docs/PHASE2_ACCOUNT_ACCESS_HOSTED_IDENTITY_EXECUTION_RECEIPT.md`와 `docs/PHASE2_HOSTED_IDENTITY_P3_DIRECT_PROBE.md`.
-- [ ] P4: 버셀 미리보기 전용 연결값과 변경 불가 미리보기 배포가 생성되고 운영 주소와 설정은 비활성 상태를 유지한다.
+- [x] P4: 버셀 미리보기 전용 연결값과 변경 불가 미리보기 배포가 생성되고 운영 주소와 설정은 비활성 상태를 유지한다.
   PROVES: evidence
-  EVIDENCE: pending
+  EVIDENCE: `2026-08-25 KST` Vercel 프로젝트의 기존 환경값 `0`건을 확인한 뒤 허용된 여섯 이름만 `Preview`에 추가하고 Production·Development 연결 `0`건을 재관측했다. 환경값 없는 되돌리기 Preview `dpl_BcXw6i4GWipQpszQaozZy93UbCXo`와 환경 변경 이후 후보 Preview `dpl_8LjkbN8B4YKf2u1Ezq9uPkyE55QE`는 모두 exact commit `270ff7be8420765f9324dccfcd754af37c794c2f`, target `Preview`, state `READY`로 고정됐다. 공개 Production은 `9cbf834196e3` / `d33a2cf61157` / `index-B_ICbkfO.js`, 화면/API `200/200`, mutation `32/32=405`, 공개 경계 금지 식별자 `0`으로 불변이었다. 여섯 값·이메일·사용자/세션/애플리케이션/인스턴스 식별자·키·토큰·쿠키는 문서나 Git에 기록하지 않았다.
 - [ ] P5: 맥북과 모바일 시스템 브라우저에서 로그인·불러오는 중·준비·로그아웃·만료·철회·인증 제공자 장애 흐름이 실측된다.
   PROVES: test
   EVIDENCE: pending
