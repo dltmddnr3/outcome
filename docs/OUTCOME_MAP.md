@@ -375,8 +375,8 @@ phases:
 
   - id: outcome-phase-4
     title: Phase 4 · In-OUTCOME Development
-    purpose: Codex/Claude 화면 없이 OUTCOME 안에서 프로젝트 생성, 역할 세션 구성, 작업 대화를 수행한다.
-    completion: project creation, four-role session creation, linked chat, and end-to-end development are evidence-closed.
+    purpose: Codex/Claude 화면 없이 OUTCOME 안에서 프로젝트 생성, 역할 세션 구성, Codex 수준의 실시간 작업 타임라인과 제어를 수행한다.
+    completion: project creation, four-role session creation, session workspace, and end-to-end development are evidence-closed.
     scopes:
       - id: outcome-phase-4-project-creation
         title: Project and Package creation
@@ -387,8 +387,8 @@ phases:
         purpose: Planner, Builder, UX & Product QA, Release Audit 세션을 프로젝트에 생성·연결한다.
         stages: []
       - id: outcome-phase-4-linked-chat
-        title: Session-linked chat and control
-        purpose: OUTCOME 안에서 역할별 작업 지시와 결과 대화를 수행한다.
+        title: Codex-level session workspace
+        purpose: OUTCOME 안에서 역할별 메시지 streaming, 계획, 도구 실행, 파일 변경·diff, 테스트, 승인 요청, 중단·재시도와 재연결을 하나의 source-grounded 작업 타임라인으로 제공한다.
         stages: []
       - id: outcome-phase-4-full-development
         title: Full development workspace

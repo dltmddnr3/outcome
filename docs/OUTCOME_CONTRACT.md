@@ -61,6 +61,15 @@ Status: **Phase 1 internal-use Local MVP accepted · external public MVP not acc
 - Canonical detail: `docs/PHASE3_EXISTING_SESSION_OPERATIONS_CONTRACT.md`
 - Execution boundary: Phase 2가 current이고 Phase 3 실행 Gate는 `0/43`; 계약·구현 인계 승인은 Phase 3 entry, 구현, session binding/message dispatch, QA/Audit/Cherry acceptance, release 또는 external completion이 아니다.
 
+### Phase 4 session workspace decision
+
+- Phase ID: `outcome-phase-4`
+- Phase name: `Phase 4 · In-OUTCOME Development`
+- Approval: 2026-08-26 KST Cherry product direction
+- Purpose: OUTCOME 안에서 프로젝트와 역할 세션을 만들고, Codex 수준의 실시간 작업 타임라인·도구 실행·파일 변경·테스트·승인·복구를 포함한 세션 워크스페이스로 개발 흐름을 완결한다.
+- Canonical detail: `docs/PHASE4_SESSION_WORKSPACE_CONTRACT.md`
+- Execution boundary: Phase 3 adapter가 공식 interface와 event/dispatch/receipt를 증명하기 전에는 현재 UI를 `연결 준비 중`으로 유지하며 가짜 채팅·streaming·작업 activity를 만들지 않는다.
+
 ## 1. 누구를 위한 제품인가
 
 여러 Codex·Claude 세션으로 제품을 만드는 Cherry가 사용합니다. Cherry는 로그나 JSON을 직접 해석하지 않고도 프로젝트가 어디까지 왔고 무엇이 막혔으며 다음에 무엇을 해야 하는지 알고 싶습니다.
