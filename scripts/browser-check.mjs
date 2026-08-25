@@ -40,7 +40,12 @@ try {
       { name: 'landscape-844x390', width: 844, height: 390 },
     ]) {
       const context = await browser.newContext({ viewport })
-      const page = await context.newPage(); await page.goto(`${base}/cherry-note-dashboard`); await verifyAllDashboardStates(page, viewport.name); if (screenshotDirectory && ['desktop-1440x900', 'mobile-390x844'].includes(viewport.name)) await page.screenshot({ path: join(screenshotDirectory, `${viewport.name}.png`), fullPage: true }); await context.close()
+      const page = await context.newPage(); await page.goto(`${base}/cherry-note-dashboard`); await verifyAllDashboardStates(page, viewport.name)
+      if (screenshotDirectory && ['desktop-1440x900', 'mobile-390x844'].includes(viewport.name)) {
+        if (viewport.name === 'mobile-390x844') { await page.locator('.oc-nav-trigger').click(); await page.locator('.oc-global-nav').waitFor({ state: 'visible' }) }
+        await page.screenshot({ path: join(screenshotDirectory, `${viewport.name}.png`), fullPage: true })
+      }
+      await context.close()
     }
     console.log(`browser fixture boundary PASS: registry=test/fixtures/portfolio-registry.json projects=${fixtureIds.join(',')} source=repository-contained deterministic fixture; live external source not exercised`)
   } finally { await browser.close() }
