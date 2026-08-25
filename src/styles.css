@@ -223,6 +223,7 @@
 .oc-inspector-gates ol{display:grid;gap:0;margin:0;padding:0;list-style:none}
 .oc-inspector-gates li{display:grid;grid-template-columns:auto minmax(0,1fr);gap:9px;padding:8px 0;border-top:1px solid #293229;color:#d2d9d0}
 .oc-inspector-gates li b{color:#adff2f;font:700 11px ui-monospace,monospace}
+.oc-inspector-gates li span{font-size:12px;line-height:1.5;word-break:keep-all;overflow-wrap:break-word}
 .oc-inspector-gates p{margin:0;color:#b9c2b7}
 .oc-gate-inspector .oc-groups{grid-template-columns:repeat(auto-fit,minmax(min(180px,100%),1fr))}
 .oc-gate-inspector .oc-groups article{padding:7px 0;border-bottom:1px solid #293229}
