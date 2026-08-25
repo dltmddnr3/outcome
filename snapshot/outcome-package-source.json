@@ -1,6 +1,6 @@
 {
   "schemaVersion": 2,
-  "observedAt": "2026-08-25T02:27:16.030Z",
+  "observedAt": "2026-08-25T03:15:36.606Z",
   "projects": [
     {
       "status": "conflict",
@@ -1696,10 +1696,10 @@
     {
       "status": "valid",
       "errors": [],
-      "observedAt": "2026-08-25T02:26:52.949Z",
+      "observedAt": "2026-08-25T03:15:13.585Z",
       "sourceFreshness": {
         "state": "observed",
-        "observedAt": "2026-08-25T02:26:52.949Z"
+        "observedAt": "2026-08-25T03:15:13.585Z"
       },
       "project": {
         "id": "outcome",
@@ -2810,7 +2810,7 @@
                         "id": "I1",
                         "stageId": "outcome-stage-account-access-implementation",
                         "title": "exact Builder ticket, base commit, allowed paths와 non-scope가 고정된다.",
-                        "closed": false,
+                        "closed": true,
                         "groupCode": "I",
                         "groupLabel": null,
                         "proves": "architecture"
@@ -2819,7 +2819,7 @@
                         "id": "I2",
                         "stageId": "outcome-stage-account-access-implementation",
                         "title": "public page/API/health와 mutation 405/redaction/receipt 동작이 회귀 없이 보존된다.",
-                        "closed": false,
+                        "closed": true,
                         "groupCode": "I",
                         "groupLabel": null,
                         "proves": "evidence"
@@ -2828,7 +2828,7 @@
                         "id": "I3",
                         "stageId": "outcome-stage-account-access-implementation",
                         "title": "Google primary, Apple linked access, email-code fallback의 provider-neutral auth boundary와 session/logout/revoke/recovery failure states가 red-first tests로 구현된다.",
-                        "closed": false,
+                        "closed": true,
                         "groupCode": "I",
                         "groupLabel": null,
                         "proves": "implementation"
@@ -2837,7 +2837,7 @@
                         "id": "I4",
                         "stageId": "outcome-stage-account-access-implementation",
                         "title": "server-derived owner/workspace membership, two-project allowlist, RLS contract와 forged/cross-workspace deny tests가 구현된다.",
-                        "closed": false,
+                        "closed": true,
                         "groupCode": "I",
                         "groupLabel": null,
                         "proves": "security"
@@ -2846,7 +2846,7 @@
                         "id": "I5",
                         "stageId": "outcome-stage-account-access-implementation",
                         "title": "append-only snapshot/current pointer, migration, retention/export/deletion/restore contract가 synthetic fixtures로 검증된다.",
-                        "closed": false,
+                        "closed": true,
                         "groupCode": "I",
                         "groupLabel": null,
                         "proves": "implementation"
@@ -2855,7 +2855,7 @@
                         "id": "I6",
                         "stageId": "outcome-stage-account-access-implementation",
                         "title": "rate limit, redacted metrics/alerts, cost thresholds, incident receipt와 fail-closed rollback binding이 검증된다.",
-                        "closed": false,
+                        "closed": true,
                         "groupCode": "I",
                         "groupLabel": null,
                         "proves": "evidence"
@@ -2864,7 +2864,7 @@
                         "id": "I7",
                         "stageId": "outcome-stage-account-access-implementation",
                         "title": "MacBook/mobile의 login/loading/empty/stale/conflict/unavailable/session-expired/access-denied/safe-degraded states와 accessibility가 검증된다.",
-                        "closed": false,
+                        "closed": true,
                         "groupCode": "I",
                         "groupLabel": null,
                         "proves": "test"
@@ -2873,7 +2873,7 @@
                         "id": "I8",
                         "stageId": "outcome-stage-account-access-implementation",
                         "title": "exact candidate commit/tree/asset, tests, migrations, synthetic fixtures, rollout/rollback과 changed-files receipt가 immutable handoff로 전달된다.",
-                        "closed": false,
+                        "closed": true,
                         "groupCode": "I",
                         "groupLabel": null,
                         "proves": "evidence"
@@ -2885,21 +2885,21 @@
                         "name": "계정 접근 구현 후보",
                         "sourceName": "I",
                         "total": 8,
-                        "closed": 0
+                        "closed": 8
                       }
                     ],
                     "total": 8,
-                    "closed": 0,
+                    "closed": 8,
                     "available": true,
                     "sourceRef": "GATES_PHASE2_ACCOUNT_ACCESS_IMPLEMENTATION.md",
-                    "observedAt": "2026-08-25T02:25:32.361Z"
+                    "observedAt": "2026-08-25T03:15:13.585Z"
                   },
                   "sourceState": "present",
-                  "state": "active",
+                  "state": "complete",
                   "axes": {
-                    "implementation": "pending",
-                    "test": "pending",
-                    "evidence": "pending",
+                    "implementation": "evidence_closed",
+                    "test": "evidence_closed",
+                    "evidence": "evidence_closed",
                     "independentQa": "not_sourced",
                     "cherryAcceptance": "not_sourced",
                     "release": "not_sourced"
@@ -2969,7 +2969,7 @@
                     "observedAt": "2026-08-25T02:25:32.362Z"
                   },
                   "sourceState": "present",
-                  "state": "locked",
+                  "state": "active",
                   "axes": {
                     "implementation": "not_sourced",
                     "test": "pending",
@@ -3216,9 +3216,9 @@
           "localCandidate": {
             "state": "available",
             "branch": "main",
-            "ahead": 0,
+            "ahead": 5,
             "behind": 0,
-            "sync": "synced"
+            "sync": "ahead"
           },
           "published": {
             "state": "connected",
@@ -3237,12 +3237,12 @@
       "current": {
         "phaseId": "outcome-phase-2",
         "scopeId": "outcome-phase-2-account-service",
-        "stageId": "outcome-stage-account-access-implementation"
+        "stageId": "outcome-stage-account-access-ux-product-qa"
       },
       "next": {
         "phaseId": "outcome-phase-2",
         "scopeId": "outcome-phase-2-account-service",
-        "stageId": "outcome-stage-account-access-ux-product-qa"
+        "stageId": "outcome-stage-account-access-release-audit"
       },
       "bindings": [
         {
@@ -3300,7 +3300,7 @@
   ],
   "snapshot": {
     "boundary": "deployment_snapshot",
-    "capturedAt": "2026-08-25T02:27:16.030Z",
+    "capturedAt": "2026-08-25T03:15:36.606Z",
     "source": "sanitized_public_projection",
     "liveSessionRelay": false,
     "refreshBehavior": "new_deployment_required"

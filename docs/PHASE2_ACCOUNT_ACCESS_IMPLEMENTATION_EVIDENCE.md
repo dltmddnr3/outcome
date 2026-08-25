@@ -96,3 +96,9 @@ Set the private-surface binding off, return `/api/private/workspace` to fail-clo
 - No hosted Supabase migration/RLS, backup, restore, export purge, retention job, WAF rule, alert, cost integration or incident notification was executed. Local PostgreSQL role/RLS execution is limited to the committed PGlite test.
 - Provider buttons are state-contract controls only; they intentionally do not begin OAuth without an approved adapter and runtime configuration.
 - No deploy, push, release, external project registration, project/session mutation, QA, Release Audit or Cherry acceptance is claimed.
+
+## Parent promotion verification
+
+Parent preserved exact Builder candidate `f7d3467ecf9f` and merged it as `f8bae555970c` without squashing its immutable history. The first Parent run intentionally exposed two environment-order failures: the canonical dependency installation did not yet contain the new PGlite package, and the standalone account browser read a pre-merge `dist`. Parent used an isolated exact-lock npm cache/install, reproduced PostgreSQL/RLS PASS, built the canonical asset, then reran the affected browser command and all remaining suites.
+
+Final Parent evidence: frontend 62/62, Node 96/96, account Node 17/17 plus UI 3/3, account browser MacBook/mobile × nine states plus loading/200%, stable browser four viewports across both projects and every hierarchy selection, security 28/28, mutation 32/32=405 and API 28/28 canonical read-only JSON, prohibited disclosure 0, scope/runbook PASS, and Vercel build/stable-host 8/8. These results close only the local disabled-by-default Implementation candidate. Fresh UX & Product QA, separate Release Audit, real Supabase/Clerk preview, Cherry acceptance and release remain open.

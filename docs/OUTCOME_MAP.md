@@ -252,10 +252,10 @@ phases:
 
 ## 현재 위치
 
-- Current: `outcome-phase-2 / outcome-phase-2-account-service / outcome-stage-account-access-implementation · Phase 2 account access Builder candidate`
-- Next: `I1 · exact Builder ticket, base commit, allowed paths and non-scope`; K1-K6 definition은 2026-08-25 KST Cherry 승인으로 닫혔고 구현·독립 검수·출시 감사·Cherry 실제 승인·외부 mutation은 각각 open이다.
+- Current: `outcome-phase-2 / outcome-phase-2-account-service / outcome-stage-account-access-ux-product-qa · fresh account access UX & Product QA`
+- Next: `Q1 · fresh reviewer identity and exact candidate/handoff pins`; Implementation I1-I8은 Parent 재검증으로 닫혔고 독립 검수·출시 감사·Cherry 실제 승인·외부 mutation은 각각 open이다.
 - Dashboard registration: Package-driven Cherry Note/OUTCOME UI, GitHub connector Gate M15, fresh UX & Product QA Q1–Q4, separate fresh Release Audit A1–A4, Cherry acceptance C1–C2, stable snapshot host S1–S6, and registered Package portfolio foundation P1–P6 are evidence-closed.
 - Phase 1 closure boundary: 2026-08-25 KST Cherry가 내부사용 Local MVP 종료를 승인했다. 외부 공개 수준 MVP와 release approval은 이 결정에 포함되지 않는다.
-- Future roadmap visibility: Phase 2의 account access definition은 `K6 6/6 승인`으로 닫혔고 account access implementation `I1-I8 0/8`이 현재 Stage다. Phase 2 전체, Phase 4와 5는 완료가 아니며 Phase 3은 `Definition Pending`으로 어떤 진행도 추론하지 않는다.
+- Future roadmap visibility: Phase 2의 account access definition `K6 6/6`과 provider-neutral implementation `I1-I8 8/8`만 닫혔고 fresh UX/Product QA `Q1-Q4 0/4`가 현재 Stage다. Supabase/Clerk preview, Release Audit, Cherry acceptance, Phase 2 전체, Phase 4와 5는 완료가 아니며 Phase 3은 `Definition Pending`이다.
 - `MVP_SCOPE_CLOSED`: true
 - `EXTERNAL_OUTCOME_COMPLETE`: false
