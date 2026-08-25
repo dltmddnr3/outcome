@@ -300,10 +300,10 @@ phases:
 
 ## 현재 위치
 
-- Current: `outcome-phase-2 / outcome-phase-2-account-service / outcome-stage-account-access-hosted-identity-preview · P1 exact HP1 external-mutation approval`
-- Next: `P1 · Cherry exact approval`; 코드 준비 B1-B12는 exact candidate `ddc6d48183b90a510016c4cf6089a26b1b99544d`에서 Parent 재검증까지 닫혔다. 클러크 Development·버셀 Preview 외부 변경은 Cherry가 HP1의 정확한 허용 범위를 새로 승인하기 전에는 실행하지 않는다.
+- Current: `outcome-phase-2 / outcome-phase-2-account-service / outcome-stage-account-access-hosted-preview-code-readiness · B12 public Vite env redaction correction`
+- Next: `B12 · deployed public boundary 0`; 인증 코드는 준비됐지만 공개 Vercel 빌드에서 자동 Git 환경 메타데이터 전체 해시가 탐지됐다. 명시적 클라이언트 환경 접두사 보정과 실제 공개 API/HTML/bundle/rendered 금지 식별자 0 재검증 전에는 P1로 이동하지 않는다.
 - Dashboard registration: Package-driven Cherry Note/OUTCOME UI, GitHub connector Gate M15, fresh UX & Product QA Q1–Q4, separate fresh Release Audit A1–A4, Cherry acceptance C1–C2, stable snapshot host S1–S6, and registered Package portfolio foundation P1–P6 are evidence-closed.
 - Phase 1 closure boundary: 2026-08-25 KST Cherry가 내부사용 Local MVP 종료를 승인했다. 외부 공개 수준 MVP와 release approval은 이 결정에 포함되지 않는다.
-- Future roadmap visibility: Phase 2의 account access definition `K6 6/6`, provider-neutral disabled implementation `I1-I8 8/8`, prior fresh UX/Product re-QA `Q1-Q4 4/4`, prior Release re-Audit `A1-A4 4/4`, hosted-preview execution contract `H1-H6 6/6`과 browser-viable code readiness `B1-B12 12/12`는 각각의 exact candidate 증거로 닫혔다. HP1 hosted identity `P1-P6 0/6`, HP2 hosted data `D1-D7 0/7`, hosted fresh QA `Q1-Q4 0/4`, hosted fresh Audit `A1-A4 0/4`, Cherry acceptance `C1-C4 0/4`는 locked/open이다. 이전 disabled candidate의 QA/Audit은 이후 후보 C1에 재사용하지 않는다. HP3 production enablement, Phase 2 전체, Phase 4와 5는 완료가 아니며 Phase 3은 `Definition Pending`이다.
+- Future roadmap visibility: Phase 2의 account access definition `K6 6/6`, provider-neutral disabled implementation `I1-I8 8/8`, prior fresh UX/Product re-QA `Q1-Q4 4/4`, prior Release re-Audit `A1-A4 4/4`, hosted-preview execution contract `H1-H6 6/6`과 browser-viable code readiness `B1-B11 11/12`는 각각의 exact candidate 증거로 닫혔다. B12는 배포 전 로컬 검증 뒤 실제 Vercel 자동 Git 메타데이터가 클라이언트 번들에 직렬화되어 재개방됐다. HP1 hosted identity `P1-P6 0/6`, HP2 hosted data `D1-D7 0/7`, hosted fresh QA `Q1-Q4 0/4`, hosted fresh Audit `A1-A4 0/4`, Cherry acceptance `C1-C4 0/4`는 locked/open이다. 이전 disabled candidate의 QA/Audit은 이후 후보 C1에 재사용하지 않는다. HP3 production enablement, Phase 2 전체, Phase 4와 5는 완료가 아니며 Phase 3은 `Definition Pending`이다.
 - `MVP_SCOPE_CLOSED`: true
 - `EXTERNAL_OUTCOME_COMPLETE`: false
