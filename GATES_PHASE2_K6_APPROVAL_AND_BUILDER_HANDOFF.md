@@ -12,8 +12,8 @@ Outcome: Cherry의 standing continuous directive를 K6 result contract 승인으
   EVIDENCE: `docs/PHASE2_ACCOUNT_ACCESS_BUILDER_HANDOFF.md`가 dispatch pin, allowed/read-only paths, 7 implementation slices, required tests, external mutation boundary와 `CANDIDATE_READY_ONLY` handoff를 고정한다.
 - [x] E5: 실제 provider/resource/secret/database/domain/release mutation은 별도 승인 경계로 남는다.
   EVIDENCE: K6 Gate, contract, Builder handoff와 four downstream Gates 모두 production provider/resource/secret/database/domain/release를 open으로 보존한다. 수행된 외부 mutation은 docs Git/Vercel snapshot publish뿐이다.
-- [ ] E6: snapshot parser, tests, build, exact public receipt, mutation 405와 prohibited hit 0을 검증한다.
-  EVIDENCE: local candidate PASS · snapshot projects=2/prohibited=0/Gate evidence fields=0 · OUTCOME current Implementation I1-I8 0/8, next fresh UX/Product QA · Cherry Note last observed conflict preserved · frontend 57/57 · Node 78/78 · Vercel build + stable-host 7/7 · scope PASS. Exact public receipt와 remote mutation/redaction은 배포 후 pending.
+- [x] E6: snapshot parser, tests, build, exact public receipt, mutation 405와 prohibited hit 0을 검증한다.
+  EVIDENCE: local candidate PASS · snapshot projects=2/prohibited=0/Gate evidence fields=0 · OUTCOME current Implementation I1-I8 0/8, next fresh UX/Product QA · Cherry Note last observed conflict preserved · frontend 57/57 · Node 78/78 · Vercel build + stable-host 7/7 · scope PASS. Public deployment `dpl_9TEdFxN9ksHqLzaeLRd7hKh6Bd4Y` READY · stable page/API/health 200 · receipt commit `0f88e71d2c8c`, tree `65c419a440b4`, asset `index-ClJ2FGRo.js` · HEAD=origin/main `0f88e71d2c8c3a7ac69c98b42ba71b1714fca679` · remote mutation 24/24=405 · public prohibited identifiers=0.
 
 ABANDON: K6는 definition 계약만 닫는다. Implementation, QA, Audit, Cherry Acceptance, Phase 2 completion과 `EXTERNAL_OUTCOME_COMPLETE`를 닫지 않는다.
 ABANDON: Planner는 product code를 구현하지 않고 exact Builder handoff까지만 소유한다.
