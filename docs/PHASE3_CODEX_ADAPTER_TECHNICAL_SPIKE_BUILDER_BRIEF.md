@@ -1,8 +1,8 @@
 # OUTCOME Phase 3 · Codex Adapter Technical Spike Builder Brief
 
-State: `DISPATCH_READY · PRIVATE_TARGET_CHERRY_CONFIRMED · SEND_RECEIPT_PENDING`
+State: `DISPATCHED · SPIKE_IN_PROGRESS · MANUAL_BOOTSTRAP_NOT_RELAY_PROOF`
 
-This brief is prepared but not sent. The actual Builder session ID belongs only in the private runtime registry and must not be added to Package documents, Git, logs, screenshots or public payloads.
+This brief was manually delivered once to the verified OUTCOME Builder as an approved bootstrap. That delivery is not automated relay proof. The actual Builder session ID belongs only in the private runtime registry and must not be added to Package documents, Git, logs, screenshots or public payloads.
 
 ## Objective
 

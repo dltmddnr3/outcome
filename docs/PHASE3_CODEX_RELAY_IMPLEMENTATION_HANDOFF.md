@@ -338,7 +338,7 @@ Initial recipient role: `Builder`
 
 Initial slice: `Codex adapter technical spike only`
 
-Handoff state: `PREPARED_NOT_DISPATCHED`
+Handoff state: `TECHNICAL_SPIKE_MANUALLY_DISPATCHED · BUILDER_IN_PROGRESS · NOT_RELAY_PROOF`
 
 First proof behavior state: `APPROVED_NOT_EXECUTED`
 
