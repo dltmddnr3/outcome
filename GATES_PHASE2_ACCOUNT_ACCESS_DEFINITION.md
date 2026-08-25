@@ -19,9 +19,9 @@ Decision contract: `docs/PHASE2_ACCOUNT_ACCESS_CONTRACT.md` (추천 초안이며
 - [x] K5: 오남용 방지, 관측, 사고 대응, 비용 상한, 단계적 적용과 되돌리기 수용 조건이 승인된다.
   PROVES: operations
   EVIDENCE: 2026-08-25 KST Cherry의 `중단 지시 이전까지 연속 계속 진행` standing directive에 따라, 별도 recommendation slice에서 공개 GET-only/405, private API rate limit, exact metric·severity·incident ownership, 월 USD 75 상한, 7단계 rollout과 fail-closed rollback 계약을 승인했다. 이 결정은 K5에만 적용되며 K6, provider/resource/secret/database/product mutation을 승인하지 않는다.
-- [ ] K6: Cherry가 정확한 계정 접근 결과 계약을 승인하고 첫 구현 작업의 허용 범위를 연다.
+- [x] K6: Cherry가 정확한 계정 접근 결과 계약을 승인하고 첫 구현 작업의 허용 범위를 연다.
   PROVES: cherry_acceptance
-  EVIDENCE: pending
+  EVIDENCE: 2026-08-25 KST Cherry의 `중단 지시 이전까지 연속 계속 진행` standing directive에 따라 별도 K6 slice에서 Cherry-only authenticated read-only workspace의 allowed/non-scope, 7개 acceptance 차원, Planner→Builder→fresh UX/Product QA→separate Release Audit→Cherry physical acceptance 순서를 승인했다. 이는 definition 6/6과 exact Builder handoff 작성만 허용하며, 구현 PASS·provider/resource/secret/database/domain mutation·release를 승인하지 않는다.
 
 ABANDON: 인증 provider 설치, 계정 생성, secret·database·domain 변경, product code mutation은 K1-K6 결정 전 수행하지 않는다.
 ABANDON: live multi-PC collector, role session relay, 작업 dispatch, approval mutation과 account billing은 이 definition Stage 범위가 아니다.

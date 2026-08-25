@@ -1,6 +1,6 @@
 {
   "schemaVersion": 2,
-  "observedAt": "2026-08-25T02:21:25.041Z",
+  "observedAt": "2026-08-25T02:27:16.030Z",
   "projects": [
     {
       "status": "conflict",
@@ -1696,10 +1696,10 @@
     {
       "status": "valid",
       "errors": [],
-      "observedAt": "2026-08-25T02:20:22.526Z",
+      "observedAt": "2026-08-25T02:26:52.949Z",
       "sourceFreshness": {
         "state": "observed",
-        "observedAt": "2026-08-25T02:20:22.526Z"
+        "observedAt": "2026-08-25T02:26:52.949Z"
       },
       "project": {
         "id": "outcome",
@@ -2763,7 +2763,7 @@
                         "id": "K6",
                         "stageId": "outcome-stage-account-access-definition",
                         "title": "Cherry가 정확한 계정 접근 결과 계약을 승인하고 첫 구현 작업의 허용 범위를 연다.",
-                        "closed": false,
+                        "closed": true,
                         "groupCode": "K",
                         "groupLabel": null,
                         "proves": "cherry_acceptance"
@@ -2775,21 +2775,353 @@
                         "name": "계정 접근 계약 결정",
                         "sourceName": "K",
                         "total": 6,
-                        "closed": 5
+                        "closed": 6
                       }
                     ],
                     "total": 6,
-                    "closed": 5,
+                    "closed": 6,
                     "available": true,
                     "sourceRef": "GATES_PHASE2_ACCOUNT_ACCESS_DEFINITION.md",
-                    "observedAt": "2026-08-25T02:20:22.526Z"
+                    "observedAt": "2026-08-25T02:26:52.949Z"
+                  },
+                  "sourceState": "present",
+                  "state": "complete",
+                  "axes": {
+                    "implementation": "not_sourced",
+                    "test": "not_sourced",
+                    "evidence": "evidence_closed",
+                    "independentQa": "not_sourced",
+                    "cherryAcceptance": "evidence_closed",
+                    "release": "not_sourced"
+                  }
+                },
+                {
+                  "id": "outcome-stage-account-access-implementation",
+                  "title": "계정 접근 구현 후보",
+                  "purpose": "승인된 K1-K6 계약을 provider-neutral local/preview candidate와 재현 가능한 구현 증거로 만든다.",
+                  "dependsOn": [
+                    "outcome-stage-account-access-definition"
+                  ],
+                  "expectedDurationMinutes": null,
+                  "gatePurpose": "계정 접근 구현 후보 acceptance checklist",
+                  "gate": {
+                    "gates": [
+                      {
+                        "id": "I1",
+                        "stageId": "outcome-stage-account-access-implementation",
+                        "title": "exact Builder ticket, base commit, allowed paths와 non-scope가 고정된다.",
+                        "closed": false,
+                        "groupCode": "I",
+                        "groupLabel": null,
+                        "proves": "architecture"
+                      },
+                      {
+                        "id": "I2",
+                        "stageId": "outcome-stage-account-access-implementation",
+                        "title": "public page/API/health와 mutation 405/redaction/receipt 동작이 회귀 없이 보존된다.",
+                        "closed": false,
+                        "groupCode": "I",
+                        "groupLabel": null,
+                        "proves": "evidence"
+                      },
+                      {
+                        "id": "I3",
+                        "stageId": "outcome-stage-account-access-implementation",
+                        "title": "Google primary, Apple linked access, email-code fallback의 provider-neutral auth boundary와 session/logout/revoke/recovery failure states가 red-first tests로 구현된다.",
+                        "closed": false,
+                        "groupCode": "I",
+                        "groupLabel": null,
+                        "proves": "implementation"
+                      },
+                      {
+                        "id": "I4",
+                        "stageId": "outcome-stage-account-access-implementation",
+                        "title": "server-derived owner/workspace membership, two-project allowlist, RLS contract와 forged/cross-workspace deny tests가 구현된다.",
+                        "closed": false,
+                        "groupCode": "I",
+                        "groupLabel": null,
+                        "proves": "security"
+                      },
+                      {
+                        "id": "I5",
+                        "stageId": "outcome-stage-account-access-implementation",
+                        "title": "append-only snapshot/current pointer, migration, retention/export/deletion/restore contract가 synthetic fixtures로 검증된다.",
+                        "closed": false,
+                        "groupCode": "I",
+                        "groupLabel": null,
+                        "proves": "implementation"
+                      },
+                      {
+                        "id": "I6",
+                        "stageId": "outcome-stage-account-access-implementation",
+                        "title": "rate limit, redacted metrics/alerts, cost thresholds, incident receipt와 fail-closed rollback binding이 검증된다.",
+                        "closed": false,
+                        "groupCode": "I",
+                        "groupLabel": null,
+                        "proves": "evidence"
+                      },
+                      {
+                        "id": "I7",
+                        "stageId": "outcome-stage-account-access-implementation",
+                        "title": "MacBook/mobile의 login/loading/empty/stale/conflict/unavailable/session-expired/access-denied/safe-degraded states와 accessibility가 검증된다.",
+                        "closed": false,
+                        "groupCode": "I",
+                        "groupLabel": null,
+                        "proves": "test"
+                      },
+                      {
+                        "id": "I8",
+                        "stageId": "outcome-stage-account-access-implementation",
+                        "title": "exact candidate commit/tree/asset, tests, migrations, synthetic fixtures, rollout/rollback과 changed-files receipt가 immutable handoff로 전달된다.",
+                        "closed": false,
+                        "groupCode": "I",
+                        "groupLabel": null,
+                        "proves": "evidence"
+                      }
+                    ],
+                    "groups": [
+                      {
+                        "code": "I",
+                        "name": "계정 접근 구현 후보",
+                        "sourceName": "I",
+                        "total": 8,
+                        "closed": 0
+                      }
+                    ],
+                    "total": 8,
+                    "closed": 0,
+                    "available": true,
+                    "sourceRef": "GATES_PHASE2_ACCOUNT_ACCESS_IMPLEMENTATION.md",
+                    "observedAt": "2026-08-25T02:25:32.361Z"
                   },
                   "sourceState": "present",
                   "state": "active",
                   "axes": {
+                    "implementation": "pending",
+                    "test": "pending",
+                    "evidence": "pending",
+                    "independentQa": "not_sourced",
+                    "cherryAcceptance": "not_sourced",
+                    "release": "not_sourced"
+                  }
+                },
+                {
+                  "id": "outcome-stage-account-access-ux-product-qa",
+                  "title": "계정 접근 사용성·제품 검수",
+                  "purpose": "Builder와 분리된 fresh reviewer가 exact candidate의 public/private 사용자 여정과 source truth를 반증한다.",
+                  "dependsOn": [
+                    "outcome-stage-account-access-implementation"
+                  ],
+                  "expectedDurationMinutes": null,
+                  "gatePurpose": "계정 접근 사용성·제품 검수 acceptance checklist",
+                  "gate": {
+                    "gates": [
+                      {
+                        "id": "Q1",
+                        "stageId": "outcome-stage-account-access-ux-product-qa",
+                        "title": "reviewer identity와 exact candidate/handoff pins가 Builder와 분리되어 있다.",
+                        "closed": false,
+                        "groupCode": "Q",
+                        "groupLabel": null,
+                        "proves": "independent_qa"
+                      },
+                      {
+                        "id": "Q2",
+                        "stageId": "outcome-stage-account-access-ux-product-qa",
+                        "title": "public no-login journey와 Cherry-only private login/logout/expiry/deny/error journeys가 MacBook과 mobile에서 검증된다.",
+                        "closed": false,
+                        "groupCode": "Q",
+                        "groupLabel": null,
+                        "proves": "test"
+                      },
+                      {
+                        "id": "Q3",
+                        "stageId": "outcome-stage-account-access-ux-product-qa",
+                        "title": "project visibility, hierarchy/current-vs-selected truth, stale/conflict/empty/degraded states와 accessibility가 검증된다.",
+                        "closed": false,
+                        "groupCode": "Q",
+                        "groupLabel": null,
+                        "proves": "test"
+                      },
+                      {
+                        "id": "Q4",
+                        "stageId": "outcome-stage-account-access-ux-product-qa",
+                        "title": "QA report가 PASS_UX_PRODUCT_QA_ONLY 또는 FAIL로 끝나며 Release Audit·Cherry acceptance·release authority를 주장하지 않는다.",
+                        "closed": false,
+                        "groupCode": "Q",
+                        "groupLabel": null,
+                        "proves": "independent_qa"
+                      }
+                    ],
+                    "groups": [
+                      {
+                        "code": "Q",
+                        "name": "독립 사용성·제품 검수",
+                        "sourceName": "Q",
+                        "total": 4,
+                        "closed": 0
+                      }
+                    ],
+                    "total": 4,
+                    "closed": 0,
+                    "available": true,
+                    "sourceRef": "GATES_PHASE2_ACCOUNT_ACCESS_UX_PRODUCT_QA.md",
+                    "observedAt": "2026-08-25T02:25:32.362Z"
+                  },
+                  "sourceState": "present",
+                  "state": "locked",
+                  "axes": {
+                    "implementation": "not_sourced",
+                    "test": "pending",
+                    "evidence": "pending",
+                    "independentQa": "not_sourced",
+                    "cherryAcceptance": "not_sourced",
+                    "release": "not_sourced"
+                  }
+                },
+                {
+                  "id": "outcome-stage-account-access-release-audit",
+                  "title": "계정 접근 출시 감사",
+                  "purpose": "별도 fresh auditor가 동일 candidate의 auth, RLS, privacy/data, operations, cost, runtime, rollback을 검증한다.",
+                  "dependsOn": [
+                    "outcome-stage-account-access-ux-product-qa"
+                  ],
+                  "expectedDurationMinutes": null,
+                  "gatePurpose": "계정 접근 출시 감사 acceptance checklist",
+                  "gate": {
+                    "gates": [
+                      {
+                        "id": "A1",
+                        "stageId": "outcome-stage-account-access-release-audit",
+                        "title": "auditor identity, exact Git/build/migration/snapshot pins와 UX/Product QA input이 유효하다.",
+                        "closed": false,
+                        "groupCode": "A",
+                        "groupLabel": null,
+                        "proves": "release_audit"
+                      },
+                      {
+                        "id": "A2",
+                        "stageId": "outcome-stage-account-access-release-audit",
+                        "title": "auth/session/CSRF, RLS/deny, secret/redaction, retention/export/deletion/restore와 provider outage가 fail-closed로 검증된다.",
+                        "closed": false,
+                        "groupCode": "A",
+                        "groupLabel": null,
+                        "proves": "security"
+                      },
+                      {
+                        "id": "A3",
+                        "stageId": "outcome-stage-account-access-release-audit",
+                        "title": "rate limits, telemetry/alerts, cost ceiling, incident response, staged rollout과 rollback receipts가 재현된다.",
+                        "closed": false,
+                        "groupCode": "A",
+                        "groupLabel": null,
+                        "proves": "release_audit"
+                      },
+                      {
+                        "id": "A4",
+                        "stageId": "outcome-stage-account-access-release-audit",
+                        "title": "audit report가 PASS_RELEASE_AUDIT_ONLY 또는 FAIL로 끝나며 Cherry acceptance, production mutation과 release approval을 주장하지 않는다.",
+                        "closed": false,
+                        "groupCode": "A",
+                        "groupLabel": null,
+                        "proves": "release_audit"
+                      }
+                    ],
+                    "groups": [
+                      {
+                        "code": "A",
+                        "name": "독립 출시 감사",
+                        "sourceName": "A",
+                        "total": 4,
+                        "closed": 0
+                      }
+                    ],
+                    "total": 4,
+                    "closed": 0,
+                    "available": true,
+                    "sourceRef": "GATES_PHASE2_ACCOUNT_ACCESS_RELEASE_AUDIT.md",
+                    "observedAt": "2026-08-25T02:25:32.362Z"
+                  },
+                  "sourceState": "present",
+                  "state": "locked",
+                  "axes": {
                     "implementation": "not_sourced",
                     "test": "not_sourced",
-                    "evidence": "partially_evidenced",
+                    "evidence": "pending",
+                    "independentQa": "not_sourced",
+                    "cherryAcceptance": "not_sourced",
+                    "release": "pending"
+                  }
+                },
+                {
+                  "id": "outcome-stage-account-access-cherry-acceptance",
+                  "title": "계정 접근 Cherry 승인",
+                  "purpose": "두 독립 검증을 통과한 exact candidate를 Cherry가 MacBook과 mobile에서 직접 판정한다.",
+                  "dependsOn": [
+                    "outcome-stage-account-access-release-audit"
+                  ],
+                  "expectedDurationMinutes": null,
+                  "gatePurpose": "계정 접근 Cherry 승인 acceptance checklist",
+                  "gate": {
+                    "gates": [
+                      {
+                        "id": "C1",
+                        "stageId": "outcome-stage-account-access-cherry-acceptance",
+                        "title": "exact candidate가 fresh UX & Product QA PASS와 separate Release Audit PASS를 모두 가진다.",
+                        "closed": false,
+                        "groupCode": "C",
+                        "groupLabel": null,
+                        "proves": "cherry_acceptance"
+                      },
+                      {
+                        "id": "C2",
+                        "stageId": "outcome-stage-account-access-cherry-acceptance",
+                        "title": "Cherry가 MacBook과 mobile에서 public/private 전환, 로그인·로그아웃·접속 거부, 두 프로젝트 탐색과 오류/복구 상태를 직접 수용한다.",
+                        "closed": false,
+                        "groupCode": "C",
+                        "groupLabel": null,
+                        "proves": "cherry_acceptance"
+                      },
+                      {
+                        "id": "C3",
+                        "stageId": "outcome-stage-account-access-cherry-acceptance",
+                        "title": "Cherry가 account-access 결과 Stage의 closure를 명시적으로 승인한다.",
+                        "closed": false,
+                        "groupCode": "C",
+                        "groupLabel": null,
+                        "proves": "cherry_acceptance"
+                      },
+                      {
+                        "id": "C4",
+                        "stageId": "outcome-stage-account-access-cherry-acceptance",
+                        "title": "public-service release와 EXTERNAL_OUTCOME_COMPLETE는 별도 결정으로 open임을 확인한다.",
+                        "closed": false,
+                        "groupCode": "C",
+                        "groupLabel": null,
+                        "proves": "cherry_acceptance"
+                      }
+                    ],
+                    "groups": [
+                      {
+                        "code": "C",
+                        "name": "Cherry 실제 사용 승인",
+                        "sourceName": "C",
+                        "total": 4,
+                        "closed": 0
+                      }
+                    ],
+                    "total": 4,
+                    "closed": 0,
+                    "available": true,
+                    "sourceRef": "GATES_PHASE2_ACCOUNT_ACCESS_CHERRY_ACCEPTANCE.md",
+                    "observedAt": "2026-08-25T02:25:32.363Z"
+                  },
+                  "sourceState": "present",
+                  "state": "locked",
+                  "axes": {
+                    "implementation": "not_sourced",
+                    "test": "not_sourced",
+                    "evidence": "pending",
                     "independentQa": "not_sourced",
                     "cherryAcceptance": "pending",
                     "release": "not_sourced"
@@ -2905,9 +3237,13 @@
       "current": {
         "phaseId": "outcome-phase-2",
         "scopeId": "outcome-phase-2-account-service",
-        "stageId": "outcome-stage-account-access-definition"
+        "stageId": "outcome-stage-account-access-implementation"
       },
-      "next": null,
+      "next": {
+        "phaseId": "outcome-phase-2",
+        "scopeId": "outcome-phase-2-account-service",
+        "stageId": "outcome-stage-account-access-ux-product-qa"
+      },
       "bindings": [
         {
           "role": "planner",
@@ -2964,7 +3300,7 @@
   ],
   "snapshot": {
     "boundary": "deployment_snapshot",
-    "capturedAt": "2026-08-25T02:21:25.041Z",
+    "capturedAt": "2026-08-25T02:27:16.030Z",
     "source": "sanitized_public_projection",
     "liveSessionRelay": false,
     "refreshBehavior": "new_deployment_required"

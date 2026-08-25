@@ -1,6 +1,6 @@
 # Phase 2 · Account Access Outcome Contract
 
-Status: `K1-K5 APPROVED · K6 CHERRY DECISION REQUIRED`
+Status: `K1-K6 APPROVED · BUILDER HANDOFF OPEN`
 Updated: 2026-08-25 KST
 
 Decision boundary: `NO_ACCOUNT_IMPLEMENTATION_BEFORE_K1_K6`
@@ -260,7 +260,7 @@ Official references reviewed on 2026-08-25 KST:
 - Supabase pricing: https://supabase.com/pricing
 - Supabase backups: https://supabase.com/docs/guides/platform/backups
 
-## K6 result acceptance recommendation · not approved
+## K6 result acceptance contract · approved 2026-08-25 KST
 
 Recommendation: K6 approval opens one bounded Builder implementation Stage for a Cherry-only, authenticated, read-only workspace. It approves the result contract and implementation scope below; it does not itself create provider tenants, OAuth credentials, Apple keys, paid resources, production databases, custom domains, accounts or a release.
 
@@ -351,8 +351,8 @@ No role may self-promote its own result. A QA PASS grants only its named downstr
 6. **Approved 2026-08-25 KST:** one owner-viewer workspace, server-derived membership, Cherry Note/OUTCOME-only private allowlist, capability matrix, negative authorization tests, secret ownership and audit boundary.
 7. **Approved 2026-08-25 KST:** Supabase Pro Seoul, durable schema ownership, append-only snapshots, 90/365-day retention, 30-day deletion window, JSON export, managed backups, migration/restore procedure and RPO/RTO targets.
 8. **Approved 2026-08-25 KST:** K5 public/private abuse caps, exact operational metrics/alerts, incident ownership, USD 75 monthly ceiling, seven-step rollout and fail-closed rollback acceptance.
-9. Approve or revise the K6 result contract: one bounded Builder Stage, explicit non-scope, seven evidence dimensions, independent UX/Product QA, separate Release Audit and Cherry physical acceptance.
+9. **Approved 2026-08-25 KST:** K6 one bounded Builder Stage, explicit non-scope, seven evidence dimensions, independent UX/Product QA, separate Release Audit and Cherry physical acceptance.
 
 ## Builder entry condition
 
-Builder work may start only after K1-K6 in `GATES_PHASE2_ACCOUNT_ACCESS_DEFINITION.md` are evidence-closed by Cherry decisions. K1-K5 approval alone does not authorize provider installation or product code. The first implementation contract must then name provider, environment, exact allowed paths, red-first isolation tests, secret boundary, migration/rollback, preview verification, fresh UX & Product QA, and separate Release Audit. It must not add live collector relay, dispatch, project creation, billing, or release mutation by implication.
+K1-K6 definition decisions are now evidence-closed. Builder work may start only from the exact pushed Planner handoff in `docs/PHASE2_ACCOUNT_ACCESS_BUILDER_HANDOFF.md`; it must use the named allowed paths, red-first isolation tests, secret boundary, migration/rollback, preview verification, fresh UX & Product QA, and separate Release Audit. This authorization does not create provider installation, production resource/secret/database/domain mutation, deployment, release, live collector relay, dispatch, project creation or billing authority by implication.

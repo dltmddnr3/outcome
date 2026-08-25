@@ -166,6 +166,38 @@ phases:
             gate_groups:
               - code: K
                 primary_label: 계정 접근 계약 결정
+          - id: outcome-stage-account-access-implementation
+            title: 계정 접근 구현 후보
+            purpose: 승인된 K1-K6 계약을 provider-neutral local/preview candidate와 재현 가능한 구현 증거로 만든다.
+            depends_on: [outcome-stage-account-access-definition]
+            gates_file: GATES_PHASE2_ACCOUNT_ACCESS_IMPLEMENTATION.md#I1-I8
+            gate_groups:
+              - code: I
+                primary_label: 계정 접근 구현 후보
+          - id: outcome-stage-account-access-ux-product-qa
+            title: 계정 접근 사용성·제품 검수
+            purpose: Builder와 분리된 fresh reviewer가 exact candidate의 public/private 사용자 여정과 source truth를 반증한다.
+            depends_on: [outcome-stage-account-access-implementation]
+            gates_file: GATES_PHASE2_ACCOUNT_ACCESS_UX_PRODUCT_QA.md#Q1-Q4
+            gate_groups:
+              - code: Q
+                primary_label: 독립 사용성·제품 검수
+          - id: outcome-stage-account-access-release-audit
+            title: 계정 접근 출시 감사
+            purpose: 별도 fresh auditor가 동일 candidate의 auth, RLS, privacy/data, operations, cost, runtime, rollback을 검증한다.
+            depends_on: [outcome-stage-account-access-ux-product-qa]
+            gates_file: GATES_PHASE2_ACCOUNT_ACCESS_RELEASE_AUDIT.md#A1-A4
+            gate_groups:
+              - code: A
+                primary_label: 독립 출시 감사
+          - id: outcome-stage-account-access-cherry-acceptance
+            title: 계정 접근 Cherry 승인
+            purpose: 두 독립 검증을 통과한 exact candidate를 Cherry가 MacBook과 mobile에서 직접 판정한다.
+            depends_on: [outcome-stage-account-access-release-audit]
+            gates_file: GATES_PHASE2_ACCOUNT_ACCESS_CHERRY_ACCEPTANCE.md#C1-C4
+            gate_groups:
+              - code: C
+                primary_label: Cherry 실제 사용 승인
 
   - id: outcome-phase-3
     title: Phase 3 · Definition Pending
@@ -220,10 +252,10 @@ phases:
 
 ## 현재 위치
 
-- Current: `outcome-phase-2 / outcome-phase-2-account-service / outcome-stage-account-access-definition · Phase 2 account access contract definition`
-- Next: `K6 · exact account-access result contract and first bounded Builder authorization`; K1-K5는 2026-08-25 KST Cherry 승인으로 닫혔고 K6 승인 전 인증·DB·secret·domain 제품 변경은 시작하지 않는다.
+- Current: `outcome-phase-2 / outcome-phase-2-account-service / outcome-stage-account-access-implementation · Phase 2 account access Builder candidate`
+- Next: `I1 · exact Builder ticket, base commit, allowed paths and non-scope`; K1-K6 definition은 2026-08-25 KST Cherry 승인으로 닫혔고 구현·독립 검수·출시 감사·Cherry 실제 승인·외부 mutation은 각각 open이다.
 - Dashboard registration: Package-driven Cherry Note/OUTCOME UI, GitHub connector Gate M15, fresh UX & Product QA Q1–Q4, separate fresh Release Audit A1–A4, Cherry acceptance C1–C2, stable snapshot host S1–S6, and registered Package portfolio foundation P1–P6 are evidence-closed.
 - Phase 1 closure boundary: 2026-08-25 KST Cherry가 내부사용 Local MVP 종료를 승인했다. 외부 공개 수준 MVP와 release approval은 이 결정에 포함되지 않는다.
-- Future roadmap visibility: Phase 2의 account access definition은 `K5 5/6 승인 · K6 Cherry 결정 대기` 상태로 source-visible하다. Phase 4와 5는 roadmap container이며 Phase 3은 `Definition Pending`으로 어떤 진행도 추론하지 않는다.
+- Future roadmap visibility: Phase 2의 account access definition은 `K6 6/6 승인`으로 닫혔고 account access implementation `I1-I8 0/8`이 현재 Stage다. Phase 2 전체, Phase 4와 5는 완료가 아니며 Phase 3은 `Definition Pending`으로 어떤 진행도 추론하지 않는다.
 - `MVP_SCOPE_CLOSED`: true
 - `EXTERNAL_OUTCOME_COMPLETE`: false
