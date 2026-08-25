@@ -16,8 +16,8 @@ Outcome: Cherry의 `연속진행`을 직전 K3 recommendation 승인으로 기�
   CHECK: rg -q 'Next: `K4' docs/OUTCOME_MAP.md && rg -q 'K3 3/6 승인' docs/OUTCOME_MAP.md && rg -q '`EXTERNAL_OUTCOME_COMPLETE`: false' docs/OUTCOME_MAP.md && echo D5_MAP_PASS
   EXPECT: D5_MAP_PASS
   EVIDENCE: `docs/OUTCOME_MAP.md` Current 유지, Next K4, K3 3/6, external false.
-- [ ] D6: snapshot parser, tests, build, exact public receipt, mutation 405와 prohibited hit 0을 검증한다.
-  EVIDENCE: local candidate PASS · snapshot projects=2/prohibited=0/Gate evidence fields=0/K3 3/6; frontend 57/57; Node 78/78; Vercel build + stable-host 7/7; scope PASS. Exact public receipt와 remote mutation/redaction은 배포 후 pending.
+- [x] D6: snapshot parser, tests, build, exact public receipt, mutation 405와 prohibited hit 0을 검증한다.
+  EVIDENCE: local snapshot projects=2/prohibited=0/Gate evidence fields=0/K3 3/6; frontend 57/57; Node 78/78; Vercel build + stable-host 7/7; scope PASS. Production `dpl_ComzTwhcjAXeW9GPaTvZD8xXAX2N` READY; fixed URL page/API/health 200; receipt commit `9c35b864dd64`, tree `a3e7b63ba84c`, asset `index-ClJ2FGRo.js`; public mutation 24/24=405; prohibited identifiers=0; K4-K6 open.
 
 ABANDON: K4 승인, Supabase project/schema/table/region 생성, Clerk integration, secret·migration 실행, database/domain/product code mutation은 이 작업에서 수행하지 않는다.
 ABANDON: K5-K6, 외부 공개 수준 MVP, release approval, `EXTERNAL_OUTCOME_COMPLETE`는 open이다.
