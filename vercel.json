@@ -5,6 +5,8 @@
   "rewrites": [
     { "source": "/api/:path*", "destination": "/api?path=:path*" },
     { "source": "/workspace", "destination": "/index.html" },
+    { "source": "/workspace/sso-callback", "destination": "/index.html" },
+    { "source": "/workspace/apple-callback", "destination": "/index.html" },
     { "source": "/cherry-note-dashboard", "destination": "/index.html" }
   ],
   "headers": [

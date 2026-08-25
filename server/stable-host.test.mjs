@@ -96,6 +96,8 @@ test('Vercel config preserves dashboard route fallback and built output contract
   assert.equal(config.rewrites.some((item) => item.source === '/api/:path*' && item.destination.includes('/api')), true)
   assert.equal(config.rewrites.some((item) => item.source === '/cherry-note-dashboard' && item.destination === '/index.html'), true)
   assert.equal(config.rewrites.some((item) => item.source === '/workspace' && item.destination === '/index.html'), true)
+  assert.equal(config.rewrites.some((item) => item.source === '/workspace/sso-callback' && item.destination === '/index.html'), true)
+  assert.equal(config.rewrites.some((item) => item.source === '/workspace/apple-callback' && item.destination === '/index.html'), true)
   if (process.env.OUTCOME_ASSERT_BUILT === '1') {
     assert.equal(existsSync(new URL('../dist/index.html', import.meta.url)), true)
     const html = readFileSync(new URL('../dist/index.html', import.meta.url), 'utf8')
