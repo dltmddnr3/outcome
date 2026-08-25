@@ -26,17 +26,17 @@ Outcome: 별도 external mutation 없이 Clerk/Supabase hosted preview를 안전
 - [x] B8: 상위 검증자의 재검증 후 결과가 코드 준비만 완료로 끝나며 HP1 외부 변경, 독립 검수, 출시 감사, Cherry 승인, 출시와 페이즈 완료를 주장하지 않는다.
   PROVES: evidence
   EVIDENCE: Parent independently verified exact candidate `da490c27486859b0ea72da085d0295ca2629962a`, tree `74aa4dd89a01bd0bff47ffb2b8bd1918df046a9e`: hosted boundary 7/7; account Node 25/25 + UI/API 7/7; frontend 66/66 + Node 104/104; security 28/28; account browser 3 viewports × 9 states; generic/stable browser 4 viewports; mutations 32/32=405; prohibited identifiers 0; scope/runbook and isolated/Vercel builds PASS. Result is `CODE_READY_ONLY`; no HP1 external mutation, QA/Audit verdict, Cherry acceptance, release or completion was claimed.
-- [ ] B9: HP1 개발 인증 실행 경계는 수파베이스 환경값이나 저장소 없이 선택 가능하고, HP2 전까지 비공개 작업공간 데이터 조회는 계속 차단된다.
+- [x] B9: HP1 개발 인증 실행 경계는 수파베이스 환경값이나 저장소 없이 선택 가능하고, HP2 전까지 비공개 작업공간 데이터 조회는 계속 차단된다.
   PROVES: implementation
-  EVIDENCE: pending
-- [ ] B10: 실제 버셀 진입점은 완전한 HP1 환경 계약에서만 구체 인증 실행기를 선택하며 기본·부분 설정·실행기 오류는 비활성·401로 동일하게 닫힌다.
+  EVIDENCE: candidate `ddc6d48183b90a510016c4cf6089a26b1b99544d`, tree `c6402ede402fa5da9a24f2763eba6c45d9e7fc9a`; identity focused 4/4 proves the six-name HP1 inventory enables without Supabase while verified-owner workspace remains generic `503 private_workspace_unavailable` until HP2.
+- [x] B10: 실제 버셀 진입점은 완전한 HP1 환경 계약에서만 구체 인증 실행기를 선택하며 기본·부분 설정·실행기 오류는 비활성·401로 동일하게 닫힌다.
   PROVES: security
-  EVIDENCE: pending
-- [ ] B11: 구글·이메일 코드 시작, 인증 후 애플 연결만 허용, 콜백, 로그아웃, 만료·철회, 다른 소유자 거부, 출처 제한과 제공자 장애가 자격증명 없는 계약 시험으로 검증된다.
+  EVIDENCE: default `api/index.mjs` selects `createHostedIdentityRuntime` only for complete HP1; absent/partial/factory-error matrices return disabled config, private session/workspace `401`, private POST `405`; Parent focused recheck 4/4 PASS.
+- [x] B11: 공식 클라이언트 SDK의 구글·이메일 코드 시작, 불투명 가입 차단, 인증 후 애플 연결만 허용, 콜백·단기 토큰 갱신·로그아웃과 서버의 만료·철회·다른 소유자·출처·제공자 장애 거부가 자격증명 없는 계약 시험으로 검증된다.
   PROVES: test
-  EVIDENCE: pending
-- [ ] B12: 전체 회귀·브라우저·보안·변경 거부·정보 가림·빌드와 상위 재검증이 통과하고 결과가 인증 코드 준비만 완료로 끝난다.
+  EVIDENCE: exact pinned `@clerk/react@6.14.7` + `@clerk/backend@3.16.12`; OAuth callback uses `transferable=false`, exact Core 3 redirect mapping is regression-tested, owner verification is separated from HP2 503, Apple link is owner-only, server cookie minting is absent, wrong-owner/revoked/expired/provider-failure cases deny. Parent account Node 29/29 + UI/API 12/12 PASS.
+- [x] B12: 전체 회귀·브라우저·보안·변경 거부·정보 가림·빌드와 상위 재검증이 통과하고 결과가 인증 코드 준비만 완료로 끝난다.
   PROVES: evidence
-  EVIDENCE: pending
+  EVIDENCE: Parent exact-candidate recheck: focused identity 4/4; focused UI 10/10; account Node 29/29 + UI/API 12/12; frontend 71/71 + Node 108/108; security 28/28; account browser 3 viewports; stable browser 4 viewports × 54 selections with overflow/intersection/unexpected English 0; prohibited identifiers 0; mutations 32/32=405; scope/runbook PASS; Vercel build + stable-host 8/8 PASS; asset `index-B_ICbkfO.js`, SHA-256 `54d268338617ff60bf341ec9663905985420a851a3c0ab4c3643991a51b7f7b0`. Result: `IDENTITY_CODE_READY_ONLY`; no external mutation, QA/Audit, Cherry acceptance, release or completion.
 
 ABANDON: Clerk/Google/Apple/Supabase/Vercel account, resource, secret, environment, provider, domain, DNS, paid plan, deployment, release 또는 production data mutation은 이 Gate 범위가 아니다.
