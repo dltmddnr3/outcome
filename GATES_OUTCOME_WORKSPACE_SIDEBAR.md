@@ -11,7 +11,7 @@ Scope: Replace page-section navigation with a GPT-desktop-inspired workspace sid
   EVIDENCE: `npm run test:dashboard -- --run` PASS — 4 files, 73/73 tests. Browser fixture matches 3 project select controls and 3 sibling project-menu controls to the 3 payload projects; selected project retains `aria-current=page`, `선택됨`, and an inset marker.
 
 - [x] S3: The single bottom account/login area routes to the existing `/workspace` boundary; unavailable create, project context/archive, archive, and integrated connection-management writes are visibly marked `준비 중` and cannot imply successful mutation.
-  EVIDENCE: Exactly one sidebar `/workspace` link is present at the bottom. `새 프로젝트`, every project menu, `보관함`, and `연결 관리` are native disabled buttons with visible `준비 중`; no mutation handler or success state was added. Search is the sole new interaction and filters only the loaded client payload with a truthful no-results state.
+  EVIDENCE: Exactly one sidebar `/workspace` link is present at the bottom. `새 프로젝트`, `보관함`, and `연결 관리` are native disabled buttons with visible `준비 중`. Every project has a separate compact ellipsis button that is disabled and exposes `<project> 프로젝트 메뉴 · 준비 중` through its accessible label/title without repeating visible status text. No mutation handler or success state was added. Search is the sole new interaction and filters only the loaded client payload with a truthful no-results state.
 
 - [x] S4: Desktop keeps the management rail persistent; tablet/mobile use the existing modal drawer with Escape, backdrop close, focus trap/restore, body scroll lock, 44px targets, and no overflow.
   CHECK: npm run build:isolated && npm run test:browser

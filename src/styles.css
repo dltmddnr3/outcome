@@ -289,7 +289,7 @@ body:has(.account-workspace){min-width:0}
 .oc-new-project,.oc-management button,.oc-management a,.oc-nav-account{display:flex;width:100%;min-width:0;min-height:44px;align-items:center;gap:9px;padding:8px 10px;border:1px solid transparent;border-radius:7px;background:transparent;color:#c8d1c6;text-align:left;text-decoration:none}
 .oc-new-project{border-color:#394239;background:#111611;font-size:13px;font-weight:500}
 .oc-new-project>span,.oc-management :is(button,a)>span{min-width:0;flex:1}
-.oc-new-project small,.oc-management small,.oc-project-menu span{color:#929b90;font-size:11px;font-weight:500;white-space:nowrap}
+.oc-new-project small,.oc-management small{color:#929b90;font-size:11px;font-weight:500;white-space:nowrap}
 .oc-new-project:disabled,.oc-management button:disabled,.oc-project-menu:disabled{cursor:not-allowed;opacity:1}
 .oc-project-search{display:grid;grid-template-columns:18px minmax(0,1fr);align-items:center;gap:8px;min-height:44px;padding:0 10px;border:1px solid #303a30;border-radius:7px;background:#0b0f0b;color:#929b90}
 .oc-project-search input{width:100%;min-width:0;border:0;outline:0;background:transparent;color:#e5e9e2;font-size:13px}
@@ -299,15 +299,14 @@ body:has(.account-workspace){min-width:0}
 .oc-projects>header{display:flex;align-items:center;justify-content:space-between;padding:0 10px 7px;color:#919a90}
 .oc-projects>header strong,.oc-projects>header small{font-size:11px;font-weight:600}
 .oc-project-switcher,.oc-management{display:grid;gap:3px}
-.oc-project-row{display:grid;grid-template-columns:minmax(0,1fr) 62px;gap:2px;min-width:0}
+.oc-project-row{display:grid;grid-template-columns:minmax(0,1fr) 44px;gap:2px;min-width:0}
 .oc-project-select,.oc-project-menu{display:flex;min-width:0;min-height:44px;align-items:center;gap:8px;padding:7px 9px;border:1px solid transparent;border-radius:7px;background:transparent;color:#c8d1c6;text-align:left}
 .oc-project-select{font-size:13px;font-weight:500}
 .oc-project-select>i{width:7px;height:7px;flex:none;border:1px solid #697569;border-radius:50%;background:#697569}
 .oc-project-select>i.valid{border-color:#8fcb3e;background:#adff2f}
 .oc-project-select>span:not(.oc-visually-hidden){min-width:0;flex:1;overflow:visible;text-overflow:clip;white-space:normal}
 .oc-project-select small{flex:none;color:#dfffb2;font-size:11px;font-weight:700}
-.oc-project-menu{display:grid;grid-template-columns:18px 1fr;gap:3px;padding:5px;color:#929b90}
-.oc-project-menu span{white-space:normal}
+.oc-project-menu{display:grid;place-items:center;padding:5px;color:#929b90}
 .oc-project-empty{margin:0;padding:12px 10px;color:#929b90;font-size:11px;line-height:1.45}
 .oc-project-select[aria-current=page]{border-color:#526148;background:#172016;color:#f2f6ef;font-weight:700;box-shadow:inset 2px 0 #adff2f}
 .oc-project-select:hover,.oc-management a:hover,.oc-nav-account:hover{background:#141b14;color:#f2f6ef}
