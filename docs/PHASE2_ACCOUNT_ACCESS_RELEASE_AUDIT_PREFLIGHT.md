@@ -1,8 +1,8 @@
 # Phase 2 · Account Access Release Audit Preflight
 
-Status: `PREFLIGHT_HOLD · INPUT AUTHORITY REQUIRED`
+Status: `RESOLVED · OUTCOME-NATIVE ROUTE`
 
-This is a source-grounded hold, not a Release Audit verdict. `lime-release-auditor` requires the `whitecastle-execution-core` start Gate and a schema-valid `lime-release-qa` ticket before a fresh auditor may start.
+This records a source-grounded routing correction, not a Release Audit verdict. The first preflight attempted to apply the WhiteCastle-only `lime-release-auditor` profile. OUTCOME's approved standalone operating contract and prior independent Release Audit precedent explicitly do not require absent WhiteCastle/Linear envelopes, so the project uses its own Package Gate and a fresh `lime-independent-qa` reviewer instead.
 
 ## Exact candidate inputs already available
 
@@ -25,19 +25,18 @@ This is a source-grounded hold, not a Release Audit verdict. `lime-release-audit
 - Output base schema SHA-256: `f0130acbd149ab77802f3c15b61cabd75372afd6c74ac3fdc7f8ae1b18d2ecf2`
 - Release output schema SHA-256: `dc99dd794f6a881bf6e7d3cf7e21bfd672d9f25c587825e4f1bcc6ef406a5519`
 
-## Missing required inputs
+## WhiteCastle-only inputs not applicable to OUTCOME
 
-1. Real canonical Linear issue ID/URL/team/project receipt. OUTCOME contains no source for these fields.
-2. Control `upstream_start` acknowledgement and its authorizer receipt.
-3. Canonical Lime role-core registry path/SHA and exact executor binding.
+1. Linear issue ID/URL/team/project receipt.
+2. WhiteCastle control `upstream_start` acknowledgement.
+3. WhiteCastle Lime role-core registry and execution envelope.
 
-The input schema makes these fields mandatory. Placeholder IDs, invented URLs or self-acknowledgement would violate the execution contract, so no audit session was spawned.
+Those fields remain mandatory only when using the WhiteCastle profile. Placeholder IDs, invented URLs and self-acknowledgement remain forbidden. The OUTCOME-native handoff uses no such values and grants no WhiteCastle authority.
 
-## Minimal Cherry decision
+## Resolution source
 
-Choose one authority path:
+- `docs/OUTCOME_CONTRACT.md`, `docs/OUTCOME_MAP.md` and the project `GATES*.md` files define OUTCOME as a standalone Package-driven product and keep role verification within its own Gate chain.
+- The established OUTCOME Stage 7 audit contract used a separate fresh read-only session, exact Git/tree/build pins, regression/security/runtime/scope/rollback evidence and a single report file without requiring a WhiteCastle/Linear envelope.
+- The active user directive requires continuous OUTCOME Phase 2 progression while preserving separate external mutation, release and completion boundaries.
 
-- provide/authorize creation of the canonical Linear/control/role binding required by `lime-release-auditor`; or
-- explicitly approve an OUTCOME-native Release Audit contract that uses the existing `GATES_PHASE2_ACCOUNT_ACCESS_RELEASE_AUDIT.md` without WhiteCastle/Linear coupling.
-
-Until then A1-A4 remain 0/4. Cherry acceptance, provider/resource mutation, release, Phase 2 completion and `EXTERNAL_OUTCOME_COMPLETE` remain open/false.
+The executable contract is now `docs/PHASE2_ACCOUNT_ACCESS_RELEASE_AUDIT_HANDOFF.md`. A1-A4 remain 0/4 until a new auditor reports. Cherry acceptance, provider/resource mutation, release, Phase 2 completion and `EXTERNAL_OUTCOME_COMPLETE` remain open/false.
