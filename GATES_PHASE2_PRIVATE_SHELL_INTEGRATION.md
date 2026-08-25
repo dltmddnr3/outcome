@@ -22,8 +22,8 @@ Outcome: 계정 전용 접근 경계를 유지하면서 인증 후 화면은 기
   CHECK: `npm run test:account-access-browser`
   EXPECT: exit 0
   EVIDENCE: `npm run test:account-access-browser`가 1440×900, 390×844, 375×812에서 기존 shell sidebar, project journey, current hierarchy, project switch, logout, touch `>=44`, ready horizontal overflow `0`으로 통과했다. desktop 고정 sidebar와 mobile drawer screenshot을 직접 확인했다.
-- [ ] S5: exact Preview 배포에서 로그인 owner의 기존 셸·프로젝트 2개·모바일 overflow 0을 확인하고 Production은 변경하지 않는다.
+- [x] S5: exact Preview 배포에서 로그인 owner의 기존 셸·프로젝트 2개·모바일 overflow 0을 확인하고 Production은 변경하지 않는다.
   PROVES: hosted_preview
-  EVIDENCE: pending
+  EVIDENCE: Preview `dpl_GR4dsqRxy6ghSp71sXiQnX1gqvKP`가 commit `f13b651d942e1e9a2bd1930a4848361d7b22ab56`, tree `30ab42a4f16b52db81c0c8ede5a87ab0156b9b3d`, assets `index-BQhQu5vc.js`와 `index-BO9aiaa4.css`로 `READY`다. 안정 별칭의 실제 Chrome owner session에서 `.oc-dashboard=1`, `.oc-global-nav=1`, `.oc-outcome-map=1`, project controls `2`, overflow `0`을 확인했다. Production은 private config `enabled=false`, 기존 assets `index-B_ICbkfO.js`, `index-t6iIeZVW.css`로 불변이다.
 
 ABANDON: Production 전환, Supabase, Clerk 설정 변경, DNS/domain, release는 이 수정 범위가 아니다.
