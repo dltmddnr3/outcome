@@ -9,7 +9,7 @@ vi.mock('@clerk/react', () => ({
   useUser: () => ({ user: null }),
 }))
 
-import { HostedClerkWorkspace, hostedGoogleSsoParameters, requestHostedEmailCode } from './AccountWorkspaceClerk'
+import { HostedClerkWorkspace, hostedGoogleSsoParameters, requestHostedEmailCode, requireHostedSessionToken } from './AccountWorkspaceClerk'
 
 describe('Clerk browser session boundary', () => {
   it('mounts ClerkProvider with the runtime publishable key and real SDK callback component', () => {
@@ -34,5 +34,12 @@ describe('Clerk browser session boundary', () => {
     expect(await requestHostedEmailCode(undefined, 'owner@example.invalid')).toBe(false)
     expect(await requestHostedEmailCode({ emailCode: { sendCode: async () => ({ error: new Error('unready') }) } }, 'owner@example.invalid')).toBe(false)
     expect(await requestHostedEmailCode({ emailCode: { sendCode: async () => ({ error: null }) } }, 'owner@example.invalid')).toBe(true)
+  })
+
+  it('requires the Clerk SDK session token before calling the private owner boundary', async () => {
+    const getToken = vi.fn().mockResolvedValue('sdk-issued-session')
+    await expect(requireHostedSessionToken(getToken)).resolves.toBe('sdk-issued-session')
+    expect(getToken).toHaveBeenCalledOnce()
+    await expect(requireHostedSessionToken(async () => null)).rejects.toThrow('authentication_required')
   })
 })

@@ -10,9 +10,14 @@ export async function requestHostedEmailCode(signIn: EmailCodeSignIn | undefined
   if (!signIn) return false
   return !(await signIn.emailCode.sendCode({ emailAddress })).error
 }
+export async function requireHostedSessionToken(getToken: () => Promise<string | null>) {
+  const sessionToken = await getToken()
+  if (!sessionToken) throw new Error('authentication_required')
+  return sessionToken
+}
 
 function HostedWorkspaceBody() {
-  const { isLoaded, isSignedIn, signOut } = useAuth()
+  const { isLoaded, isSignedIn, getToken, signOut } = useAuth()
   const { signIn } = useSignIn()
   const { user } = useUser()
   const [state, setState] = useState<AccountWorkspaceState>('loading')
@@ -26,11 +31,12 @@ function HostedWorkspaceBody() {
   useEffect(() => {
     if (!isLoaded) return
     if (!isSignedIn) { setOwnerVerified(false); setState('login'); setWorkspace(undefined); return }
-    void fetchPrivateOwnerSession()
-      .then(() => { setOwnerVerified(true); return fetchPrivateWorkspace() })
+    void requireHostedSessionToken(getToken)
+      .then((sessionToken) => fetchPrivateOwnerSession(sessionToken).then(() => sessionToken))
+      .then((sessionToken) => { setOwnerVerified(true); return fetchPrivateWorkspace(sessionToken) })
       .then((value) => { setWorkspace(value.workspace); setState('ready') })
       .catch((reason) => { setWorkspace(undefined); if (!(reason instanceof Error && reason.message === 'private_workspace_unavailable')) setOwnerVerified(false); setState(reason instanceof Error && reason.message === 'private_workspace_unavailable' ? 'unavailable' : 'access_denied') })
-  }, [isLoaded, isSignedIn])
+  }, [getToken, isLoaded, isSignedIn])
 
   const google = async () => {
     setError(null)

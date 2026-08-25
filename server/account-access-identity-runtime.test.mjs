@@ -74,8 +74,11 @@ test('identity-only handler exposes publishable key, verifies owner, denies HP2 
   assert.deepEqual(await request({ method: 'GET', pathname: '/api/private/config' }), { status: 200, body: { enabled: true, access: 'private_read_only', providers: [{ id: 'google', mode: 'primary' }, { id: 'apple', mode: 'linked_only' }, { id: 'email_code', mode: 'fallback_recovery' }], sessionMaximumDays: 7, completionAuthority: false, publishableKey: 'pk_test_synthetic' } })
   assert.deepEqual(await request({ method: 'GET', pathname: '/api/private/session' }), { status: 401, body: { error: 'authentication_required' } })
   assert.deepEqual(await request({ method: 'GET', pathname: '/api/private/session', headers: { cookie: '__session=sdk-valid' } }), { status: 200, body: { authenticated: true, owner: true } })
+  assert.deepEqual(await request({ method: 'GET', pathname: '/api/private/session', headers: { authorization: 'Bearer sdk-valid' } }), { status: 200, body: { authenticated: true, owner: true } })
+  assert.deepEqual(await request({ method: 'GET', pathname: '/api/private/session', headers: { authorization: 'Bearer invalid token', cookie: '__session=sdk-valid' } }), { status: 401, body: { error: 'authentication_required' } })
   assert.deepEqual(await request({ method: 'GET', pathname: '/api/private/session', headers: { cookie: '__session=wrong-owner' } }), { status: 403, body: { error: 'owner_mismatch' } })
   assert.deepEqual(await request({ method: 'GET', pathname: '/api/private/workspace', headers: { cookie: '__session=sdk-valid' } }), { status: 503, body: { error: 'private_workspace_unavailable' } })
+  assert.deepEqual(await request({ method: 'GET', pathname: '/api/private/workspace', headers: { authorization: 'Bearer sdk-valid' } }), { status: 503, body: { error: 'private_workspace_unavailable' } })
 
   for (const body of [{ sessionToken: 'sdk-valid' }, { sessionToken: 'client-json-token' }]) {
     const callback = await request({ method: 'POST', pathname: '/api/private/auth/callback', origin: 'https://preview.invalid', body })

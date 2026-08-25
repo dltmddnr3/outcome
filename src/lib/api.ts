@@ -46,12 +46,14 @@ export async function fetchPrivateAccessConfig(): Promise<PrivateAccessConfig> {
   return readJson<PrivateAccessConfig>(await fetch('/api/private/config', { credentials: 'same-origin', headers: { accept: 'application/json' } }))
 }
 
-export async function fetchPrivateWorkspace(): Promise<{ workspace: PrivateWorkspaceView }> {
-  return readJson<{ workspace: PrivateWorkspaceView }>(await fetch('/api/private/workspace', { credentials: 'same-origin', headers: { accept: 'application/json' } }))
+export async function fetchPrivateWorkspace(sessionToken?: string): Promise<{ workspace: PrivateWorkspaceView }> {
+  return readJson<{ workspace: PrivateWorkspaceView }>(await fetch('/api/private/workspace', { credentials: 'same-origin', headers: privateSessionHeaders(sessionToken) }))
 }
 
-export async function fetchPrivateOwnerSession(): Promise<{ authenticated: true; owner: true }> {
-  return readJson<{ authenticated: true; owner: true }>(await fetch('/api/private/session', { credentials: 'same-origin', headers: { accept: 'application/json' } }))
+const privateSessionHeaders = (sessionToken?: string) => ({ accept: 'application/json', ...(sessionToken && /^[A-Za-z0-9._~-]+$/.test(sessionToken) ? { authorization: `Bearer ${sessionToken}` } : {}) })
+
+export async function fetchPrivateOwnerSession(sessionToken?: string): Promise<{ authenticated: true; owner: true }> {
+  return readJson<{ authenticated: true; owner: true }>(await fetch('/api/private/session', { credentials: 'same-origin', headers: privateSessionHeaders(sessionToken) }))
 }
 
 export async function beginPrivateSession(provider: 'google' | 'email_code', navigate: (url: string) => void = (url) => window.location.assign(url)): Promise<{ state: string; mode: string; redirectUrl?: string }> {

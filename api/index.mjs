@@ -17,6 +17,11 @@ export function handleStableHostRequest({ method = 'GET', pathname = '/' } = {})
 }
 const header = (headers, name) => typeof headers?.get === 'function' ? headers.get(name) : headers?.[name] ?? headers?.[name.toLowerCase()] ?? ''
 const cookieValue = (headers, name) => String(header(headers, 'cookie')).split(';').map((item) => item.trim().split('=')).find(([key]) => key === name)?.[1] ?? ''
+const privateSessionToken = (headers) => {
+  const authorization = String(header(headers, 'authorization'))
+  if (authorization) return authorization.match(/^Bearer ([A-Za-z0-9._~-]+)$/)?.[1] ?? ''
+  return cookieValue(headers, '__session')
+}
 
 export function createStableHostRequestHandler({ environment = process.env, runtimeFactory = createHostedIdentityRuntime, clerkClientFactory } = {}) {
   const configured = readHostedIdentityConfiguration(environment).enabled
@@ -39,13 +44,13 @@ export function createStableHostRequestHandler({ environment = process.env, runt
     if (method === 'GET' && pathname === '/api/private/config') return result(200, { ...privateAccessPublicConfig(true), publishableKey: hosted.publishableKey })
     if (method === 'GET' && pathname === '/api/private/session') {
       try {
-        await hosted.service.authenticate(cookieValue(headers, '__session'))
+        await hosted.service.authenticate(privateSessionToken(headers))
         return result(200, { authenticated: true, owner: true })
       } catch (error) {
         return error?.status ? result(error.status, { error: error.code }) : result(503, { error: 'private_workspace_unavailable' })
       }
     }
-    if (method === 'GET' && pathname === '/api/private/workspace') return handlePrivateAccessRequest({ method, pathname, token: cookieValue(headers, '__session'), service: hosted.service })
+    if (method === 'GET' && pathname === '/api/private/workspace') return handlePrivateAccessRequest({ method, pathname, token: privateSessionToken(headers), service: hosted.service })
     return result(405, { error: 'read_only' })
   }
 }
