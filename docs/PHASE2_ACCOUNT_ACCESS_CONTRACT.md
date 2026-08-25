@@ -1,6 +1,6 @@
 # Phase 2 · Account Access Outcome Contract
 
-Status: `K1-K3 APPROVED · K4-K6 CHERRY DECISION REQUIRED`
+Status: `K1-K4 APPROVED · K5-K6 CHERRY DECISION REQUIRED`
 Updated: 2026-08-25 KST
 
 Decision boundary: `NO_ACCOUNT_IMPLEMENTATION_BEFORE_K1_K6`
@@ -124,9 +124,9 @@ Official references reviewed on 2026-08-25 KST:
 - Clerk session tokens: https://clerk.com/docs/guides/sessions/session-tokens
 - Clerk environment variables: https://clerk.com/docs/guides/development/clerk-environment-variables
 
-## K4 durable data recommendation · not approved
+## Approved K4 durable data contract
 
-Recommendation: use **Supabase managed Postgres Pro in Northeast Asia (Seoul, `ap-northeast-2`)** as the durable account/workspace/project/snapshot source. Keep the fixed Vercel public dashboard as a deployment-pinned sanitized projection, not as the database authority.
+Approved 2026-08-25 KST: use **Supabase managed Postgres Pro in Northeast Asia (Seoul, `ap-northeast-2`)** as the durable account/workspace/project/snapshot source. Keep the fixed Vercel public dashboard as a deployment-pinned sanitized projection, not as the database authority.
 
 Why Pro is the minimum operational recommendation: managed Pro projects receive daily backups with the latest seven days available. Free projects require operator-maintained exports and do not provide the same managed restore evidence. PITR is deferred until the write rate or public multi-user risk justifies its compute/add-on cost.
 
@@ -192,6 +192,74 @@ Official references reviewed on 2026-08-25 KST:
 
 Changelog boundary: the 2026 Data API change means new tables are not assumed to be exposed automatically; grants/exposure and RLS are both explicit. Current management-log, extension pinning and self-hosted gateway breaking changes do not alter this managed-Postgres recommendation.
 
+## K5 operations recommendation · not approved
+
+Recommendation: operate the first account service as a Cherry-only read-only private surface with explicit abuse caps, minimal security telemetry, a monthly infrastructure ceiling, staged promotion and one-command-equivalent private-surface rollback. Provider defaults are not completion evidence.
+
+### Abuse and request controls
+
+- Keep public snapshot routes GET-only and preserve the existing canonical 405 response for all mutations.
+- Keep public self-signup and invitation routes absent. Clerk's provider rate limits protect its authentication endpoints; OUTCOME honors `429` and `Retry-After` without retry storms.
+- Apply one Vercel WAF rate-limit rule to OUTCOME private/API paths for the initial Hobby/preview surface: 120 requests per 10 minutes per source IP. Provider callbacks and static assets are excluded by exact path matching.
+- Limit manual/scheduled Package ingestion to 6 attempts per project per hour, require an idempotency key and reject concurrent sync for the same project.
+- Reject unknown content types, oversized payloads and unregistered project IDs before database work. The implementation contract must set the payload cap from measured Package fixtures rather than inventing it here.
+- Supabase Pro Spend Cap stays enabled. No PITR, custom domain, read replica, branch compute, additional disk/IOPS or paid Clerk add-on is activated by implication.
+
+### Operational metrics and alert contract
+
+Track exact counts/ages, never an invented progress percentage:
+
+- page/API/health availability and 5xx count;
+- authentication success/failure/429 counts by provider category without user identifiers;
+- authorization-denial count by reason code and cross-workspace negative-test result;
+- current snapshot age, consecutive sync failures and validation conflict count;
+- deployment commit/tree/asset/snapshot receipt parity;
+- database connection/query failures, migration version and latest verified backup/restore receipt age;
+- public mutation status and prohibited-disclosure scan result;
+- daily provider usage and projected monthly OUTCOME infrastructure cost.
+
+Alert thresholds for v1:
+
+- Immediate SEV1: any private-data exposure, cross-workspace access, secret/token disclosure, public mutation not 405, or deployment receipt mismatch.
+- SEV2: page/API/health fails 5 consecutive probes, three consecutive sync failures, current snapshot age exceeds 24 hours without an explicit paused state, database unavailable, or backup/restore evidence missing at a required gate.
+- Cost alert: notify at `$40`, restrict nonessential ingestion at `$60`, and stop new sync/deployment work at the `$75` monthly ceiling. Existing sanitized public read-only delivery remains available when safe.
+
+### Incident ownership and response
+
+- Cherry is decision owner. The assigned Builder/operator performs containment only within the approved runbook. Fresh UX & Product QA and Release Audit remain independent and cannot be replaced by the operator.
+- SEV1 target: acknowledge/notify Cherry within 15 minutes; disable the private surface, revoke affected sessions, rotate exposed secrets, preserve evidence without raw credentials, and keep the public snapshot only if redaction/isolation is independently unaffected.
+- SEV2 target: acknowledge within 1 hour and restore or establish a safe degraded read-only state within the K4 eight-hour RTO.
+- SEV3 documentation/UX drift is triaged by the next working day and cannot silently change a Gate.
+- Every incident receipt records severity, detected/contained/recovered timestamps, affected deployment/snapshot IDs, actions, verification and follow-up owner. It never includes tokens, email or secret values.
+
+### Cost and purchasing boundary
+
+- OUTCOME recurring infrastructure ceiling for this phase: **USD 75 per month**, including new Supabase, Vercel, Clerk and supporting metered usage attributable to OUTCOME.
+- Existing Apple Developer membership and separately approved domain registration are outside the monthly ceiling; any new annual, one-time or paid add-on purchase still requires explicit Cherry approval.
+- Supabase Pro's current base price is USD 25/month with a default spend cap for covered overages. PITR currently starts at an additional USD 100/month and is therefore outside this phase.
+- Vercel Spend Management requires Pro; the current Hobby project does not upgrade automatically. If a later approved Pro upgrade occurs, configure spend alerts/action before promotion.
+
+### Staged rollout and rollback acceptance
+
+1. Local: migrations, synthetic fixtures, RLS/authorization negatives and provider adapters without production secrets.
+2. Isolated preview: development provider instances and synthetic/non-private Package data only.
+3. Cherry-only production read-only: one canonical owner and Cherry Note/OUTCOME allowlist; no mutations or background autonomous sync.
+4. Fresh affected UX & Product QA on the exact candidate.
+5. Separate fresh Release Audit covering auth, RLS, deletion/export, restore, cost and rollback receipts.
+6. Cherry MacBook/mobile acceptance on the exact production candidate.
+7. External public MVP remains a separate explicit release decision.
+
+Rollback triggers: any SEV1, failed isolation test, migration/receipt mismatch, failed restore verification, uncontrolled cost, or candidate regression. Rollback disables the private surface/feature binding, re-points to the last verified deployment when safe, revokes affected sessions, and restores the last verified database state only through the approved K4 runbook. Rollback success requires page/API health, private deny checks, public 405/redaction, receipt parity and data-integrity evidence.
+
+Official references reviewed on 2026-08-25 KST:
+
+- Clerk rate limits: https://clerk.com/docs/guides/how-clerk-works/system-limits
+- Vercel WAF rate limiting: https://vercel.com/docs/vercel-firewall/vercel-waf/rate-limiting
+- Vercel Spend Management: https://vercel.com/docs/spend-management
+- Supabase cost controls: https://supabase.com/docs/guides/platform/cost-control
+- Supabase pricing: https://supabase.com/pricing
+- Supabase backups: https://supabase.com/docs/guides/platform/backups
+
 ## Surface contract
 
 ### Public snapshot
@@ -237,8 +305,9 @@ Changelog boundary: the 2026 Data API change means new tables are not assumed to
 4. Approve collected account fields, retention window, deletion/export process, and audit retention.
 5. Approve storage/hosting region, operational owner, recovery objective, and monthly cost ceiling.
 6. **Approved 2026-08-25 KST:** one owner-viewer workspace, server-derived membership, Cherry Note/OUTCOME-only private allowlist, capability matrix, negative authorization tests, secret ownership and audit boundary.
-7. Approve or revise the K4 recommendation: Supabase Pro Seoul, durable schema ownership, append-only snapshots, 90/365-day retention, 30-day deletion window, JSON export, managed backups, migration/restore procedure and RPO/RTO targets.
+7. **Approved 2026-08-25 KST:** Supabase Pro Seoul, durable schema ownership, append-only snapshots, 90/365-day retention, 30-day deletion window, JSON export, managed backups, migration/restore procedure and RPO/RTO targets.
+8. Approve or revise the K5 recommendation: abuse caps, operational metrics/alerts, incident ownership, USD 75 monthly ceiling, staged rollout and rollback acceptance.
 
 ## Builder entry condition
 
-Builder work may start only after K1-K6 in `GATES_PHASE2_ACCOUNT_ACCESS_DEFINITION.md` are evidence-closed by Cherry decisions. K1-K3 approval alone does not authorize provider installation or product code. The first implementation contract must then name provider, environment, exact allowed paths, red-first isolation tests, secret boundary, migration/rollback, preview verification, fresh UX & Product QA, and separate Release Audit. It must not add live collector relay, dispatch, project creation, billing, or release mutation by implication.
+Builder work may start only after K1-K6 in `GATES_PHASE2_ACCOUNT_ACCESS_DEFINITION.md` are evidence-closed by Cherry decisions. K1-K4 approval alone does not authorize provider installation or product code. The first implementation contract must then name provider, environment, exact allowed paths, red-first isolation tests, secret boundary, migration/rollback, preview verification, fresh UX & Product QA, and separate Release Audit. It must not add live collector relay, dispatch, project creation, billing, or release mutation by implication.

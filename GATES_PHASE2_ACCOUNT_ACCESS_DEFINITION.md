@@ -13,9 +13,9 @@ Decision contract: `docs/PHASE2_ACCOUNT_ACCESS_CONTRACT.md` (추천 초안이며
 - [x] K3: 작업공간 간 격리, 프로젝트 가시성, 최소 권한, 비밀정보 소유권과 감사 경계가 승인된다.
   PROVES: security
   EVIDENCE: 2026-08-25 KST Cherry가 직전 K3 recommendation 승인 요청에 `연속진행`으로 답해 단일 owner-viewer, server-derived workspace membership, Cherry Note/OUTCOME allowlist, deny-by-default negative tests, private secret ownership과 redacted audit boundary를 승인했다. 이 결정은 K3에만 적용되며 K4-K6와 provider/database/product mutation을 승인하지 않는다.
-- [ ] K4: 영속 저장소, 배포본 최신성, 삭제·내보내기, 보존 기간, 이전과 백업·복구 계약이 승인된다.
+- [x] K4: 영속 저장소, 배포본 최신성, 삭제·내보내기, 보존 기간, 이전과 백업·복구 계약이 승인된다.
   PROVES: architecture
-  EVIDENCE: pending
+  EVIDENCE: 2026-08-25 KST Cherry가 직전 K4 approval 요청에 `중단 지시 이전까지 연속 계속 진행`으로 답해 Supabase Pro Seoul, append-only snapshot/current pointer, immutable deployment receipt, 90/365-day retention, 30-day deletion, JSON export, daily 7-day backup, migration/restore, RPO 24h/RTO 8h 계약을 승인했다. 실제 paid resource/database/secret 생성은 별도 외부 mutation 경계로 남는다.
 - [ ] K5: 오남용 방지, 관측, 사고 대응, 비용 상한, 단계적 적용과 되돌리기 수용 조건이 승인된다.
   PROVES: operations
   EVIDENCE: pending
