@@ -1,6 +1,6 @@
 {
   "schemaVersion": 2,
-  "observedAt": "2026-08-25T06:36:37.271Z",
+  "observedAt": "2026-08-25T22:20:13.445Z",
   "projects": [
     {
       "status": "conflict",
@@ -1696,10 +1696,10 @@
     {
       "status": "valid",
       "errors": [],
-      "observedAt": "2026-08-25T06:36:30.125Z",
+      "observedAt": "2026-08-25T22:19:52.552Z",
       "sourceFreshness": {
         "state": "observed",
-        "observedAt": "2026-08-25T06:36:30.125Z"
+        "observedAt": "2026-08-25T22:19:52.552Z"
       },
       "project": {
         "id": "outcome",
@@ -2498,22 +2498,22 @@
         },
         {
           "id": "outcome-phase-2",
-          "title": "Phase 2 · Public Multi-project Service",
-          "purpose": "여러 프로젝트를 계정 기반 공개 서비스에서 안전하게 전환·조회한다.",
-          "completion": "stable public hosting, multi-project portfolio, and account access are evidence-closed.",
+          "title": "Phase 2 · Account-scoped Project Service",
+          "purpose": "로그인한 계정이 권한을 가진 프로젝트만 안전하게 전환·조회하며 프로젝트 데이터의 공개 모드는 두지 않는다.",
+          "completion": "stable hosted entry, account-scoped project portfolio, private data boundary, and account access are evidence-closed.",
           "scopes": [
             {
               "id": "outcome-phase-2-public-hosting",
-              "title": "Stable public delivery",
-              "purpose": "임시 tunnel이 아닌 안정 주소와 운영 경계를 정의한다.",
+              "title": "Stable hosted entry",
+              "purpose": "임시 tunnel이 아닌 안정 주소에서 로그인 진입점과 운영 경계를 정의한다.",
               "stages": [
                 {
                   "id": "outcome-stage-stable-snapshot-host",
-                  "title": "Stable snapshot host",
-                  "purpose": "Mac origin과 임시 tunnel에 의존하지 않는 고정 HTTPS 주소에서 정제된 Package 스냅샷을 제공한다.",
+                  "title": "Stable hosted shell",
+                  "purpose": "Mac origin과 임시 tunnel에 의존하지 않는 고정 HTTPS 주소를 제공하되 Phase 2에서는 프로젝트 payload를 인증 전 공개하지 않는다.",
                   "dependsOn": [],
                   "expectedDurationMinutes": null,
-                  "gatePurpose": "Stable snapshot host acceptance checklist",
+                  "gatePurpose": "Stable hosted shell acceptance checklist",
                   "gate": {
                     "gates": [
                       {
@@ -2601,18 +2601,18 @@
             },
             {
               "id": "outcome-phase-2-project-portfolio",
-              "title": "Multi-project portfolio",
-              "purpose": "OUTCOME, Cherry Note, Cherry Picker 등 등록 프로젝트를 같은 Package 의미로 전환·조회한다.",
+              "title": "Account project portfolio",
+              "purpose": "OUTCOME, Cherry Note와 이후 등록 프로젝트를 계정 membership 안에서만 같은 Package 의미로 전환·조회한다.",
               "stages": [
                 {
                   "id": "outcome-stage-project-portfolio-foundation",
-                  "title": "Registered Package portfolio foundation",
-                  "purpose": "명시적 레지스트리와 Package 표시 metadata로 세 번째 이후 프로젝트도 코드별 하드코딩 없이 같은 읽기 전용 결과 지도에 등록한다.",
+                  "title": "Registered Package project model",
+                  "purpose": "명시적 레지스트리와 Package 표시 metadata로 프로젝트를 등록하되 가시성은 서버가 확인한 계정 membership이 결정한다.",
                   "dependsOn": [
                     "outcome-stage-stable-snapshot-host"
                   ],
                   "expectedDurationMinutes": null,
-                  "gatePurpose": "Registered Package portfolio foundation acceptance checklist",
+                  "gatePurpose": "Registered Package project model acceptance checklist",
                   "gate": {
                     "gates": [
                       {
@@ -2706,7 +2706,7 @@
                 {
                   "id": "outcome-stage-account-access-definition",
                   "title": "계정 접근 계약 정의",
-                  "purpose": "공개 배포본과 인증된 비공개 작업공간의 사용자·권한·데이터·운영 경계를 구현 전에 Cherry 결정으로 고정한다.",
+                  "purpose": "로그인 전 데이터 없는 진입점과 인증된 프로젝트 작업공간의 사용자·권한·데이터·운영 경계를 구현 전에 Cherry 결정으로 고정한다.",
                   "dependsOn": [
                     "outcome-stage-project-portfolio-foundation"
                   ],
@@ -2782,7 +2782,7 @@
                     "closed": 6,
                     "available": true,
                     "sourceRef": "GATES_PHASE2_ACCOUNT_ACCESS_DEFINITION.md",
-                    "observedAt": "2026-08-25T02:26:52.949Z"
+                    "observedAt": "2026-08-25T22:09:59.938Z"
                   },
                   "sourceState": "present",
                   "state": "complete",
@@ -3306,7 +3306,7 @@
                         "id": "P1",
                         "stageId": "outcome-stage-account-access-hosted-identity-preview",
                         "title": "Cherry가 HP1의 정확한 외부 변경 범위를 명시적으로 승인한다.",
-                        "closed": false,
+                        "closed": true,
                         "groupCode": "P",
                         "groupLabel": null,
                         "proves": "cherry_decision"
@@ -3315,7 +3315,7 @@
                         "id": "P2",
                         "stageId": "outcome-stage-account-access-hosted-identity-preview",
                         "title": "클러크 개발 환경이 초대 전용·단일 소유자·조직 및 임의 가입 없음으로 생성되고 민감정보를 가린 영수증이 고정된다.",
-                        "closed": false,
+                        "closed": true,
                         "groupCode": "P",
                         "groupLabel": null,
                         "proves": "security"
@@ -3324,7 +3324,7 @@
                         "id": "P3",
                         "stageId": "outcome-stage-account-access-hosted-identity-preview",
                         "title": "구글 공용 개발 로그인, 이메일 코드 대체 경로, 인증 후 애플 연결만 허용, 다른 사용자 거부와 권한 철회가 직접 검증된다.",
-                        "closed": false,
+                        "closed": true,
                         "groupCode": "P",
                         "groupLabel": null,
                         "proves": "implementation"
@@ -3333,7 +3333,7 @@
                         "id": "P4",
                         "stageId": "outcome-stage-account-access-hosted-identity-preview",
                         "title": "버셀 미리보기 전용 연결값과 변경 불가 미리보기 배포가 생성되고 운영 주소와 설정은 비활성 상태를 유지한다.",
-                        "closed": false,
+                        "closed": true,
                         "groupCode": "P",
                         "groupLabel": null,
                         "proves": "evidence"
@@ -3363,21 +3363,122 @@
                         "name": "개발 인증 직접 검수",
                         "sourceName": "P",
                         "total": 6,
-                        "closed": 0
+                        "closed": 4
                       }
                     ],
                     "total": 6,
-                    "closed": 0,
+                    "closed": 4,
                     "available": true,
                     "sourceRef": "GATES_PHASE2_ACCOUNT_ACCESS_HOSTED_IDENTITY_PREVIEW.md",
-                    "observedAt": "2026-08-25T05:21:17.063Z"
+                    "observedAt": "2026-08-25T13:40:53.025Z"
                   },
                   "sourceState": "present",
                   "state": "active",
                   "axes": {
-                    "implementation": "pending",
+                    "implementation": "evidence_closed",
                     "test": "pending",
-                    "evidence": "pending",
+                    "evidence": "partially_evidenced",
+                    "independentQa": "not_sourced",
+                    "cherryAcceptance": "not_sourced",
+                    "release": "not_sourced"
+                  }
+                },
+                {
+                  "id": "outcome-stage-account-only-private-project-preview",
+                  "title": "계정 전용 프로젝트 미리보기",
+                  "purpose": "OUTCOME과 Cherry Note를 인증된 Cherry 계정의 비공개 프로젝트로 제공하고 인증 전 프로젝트 payload와 과거 대시보드 경로를 닫는다.",
+                  "dependsOn": [
+                    "outcome-stage-account-access-hosted-identity-preview"
+                  ],
+                  "expectedDurationMinutes": null,
+                  "gatePurpose": "계정 전용 프로젝트 미리보기 acceptance checklist",
+                  "gate": {
+                    "gates": [
+                      {
+                        "id": "N1",
+                        "stageId": "outcome-stage-account-only-private-project-preview",
+                        "title": "Cherry가 공개 대시보드 제품 모드를 폐기하고 계정별 허용 프로젝트만 제공하는 경계를 승인한다.",
+                        "closed": true,
+                        "groupCode": "N",
+                        "groupLabel": null,
+                        "proves": "cherry_decision"
+                      },
+                      {
+                        "id": "N2",
+                        "stageId": "outcome-stage-account-only-private-project-preview",
+                        "title": "로그인 전 HTML, route와 API에는 프로젝트 이름·Package·NOW·Gate·hierarchy payload가 없고 기존 대시보드 URL은 로그인 진입점으로 수렴한다.",
+                        "closed": true,
+                        "groupCode": "N",
+                        "groupLabel": null,
+                        "proves": "privacy"
+                      },
+                      {
+                        "id": "N3",
+                        "stageId": "outcome-stage-account-only-private-project-preview",
+                        "title": "인증된 canonical Cherry owner는 서버가 결정한 membership으로 OUTCOME과 Cherry Note 정확히 두 프로젝트만 읽는다.",
+                        "closed": true,
+                        "groupCode": "N",
+                        "groupLabel": null,
+                        "proves": "authorization"
+                      },
+                      {
+                        "id": "N4",
+                        "stageId": "outcome-stage-account-only-private-project-preview",
+                        "title": "익명·다른 owner·만료·철회·위조 project selector는 프로젝트 존재를 노출하지 않고 거부되며 모든 write는 405 또는 database deny다.",
+                        "closed": true,
+                        "groupCode": "N",
+                        "groupLabel": null,
+                        "proves": "security"
+                      },
+                      {
+                        "id": "N5",
+                        "stageId": "outcome-stage-account-only-private-project-preview",
+                        "title": "비공개 프로젝트 snapshot은 서버에서만 읽고 client bundle, public asset, public API 또는 fallback payload로 복제되지 않는다.",
+                        "closed": true,
+                        "groupCode": "N",
+                        "groupLabel": null,
+                        "proves": "source_boundary"
+                      },
+                      {
+                        "id": "N6",
+                        "stageId": "outcome-stage-account-only-private-project-preview",
+                        "title": "인증된 workspace에서 프로젝트 전환과 Project → Phase → Scope → Stage → Gate, 실제 현재 위치와 선택 위치가 desktop/mobile에서 유지된다.",
+                        "closed": true,
+                        "groupCode": "N",
+                        "groupLabel": null,
+                        "proves": "product_ux"
+                      },
+                      {
+                        "id": "N7",
+                        "stageId": "outcome-stage-account-only-private-project-preview",
+                        "title": "exact Preview candidate가 배포되고 로그인 owner 2 projects, 익명 0 project payload, Production 불변과 rollback이 비민감 영수증으로 고정된다.",
+                        "closed": false,
+                        "groupCode": "N",
+                        "groupLabel": null,
+                        "proves": "hosted_preview"
+                      }
+                    ],
+                    "groups": [
+                      {
+                        "code": "N",
+                        "name": "계정 전용 프로젝트 전환",
+                        "sourceName": "N",
+                        "total": 7,
+                        "closed": 6
+                      }
+                    ],
+                    "total": 7,
+                    "closed": 6,
+                    "available": true,
+                    "sourceRef": "GATES_PHASE2_ACCOUNT_ONLY_PRIVATE_PROJECT_PREVIEW.md",
+                    "observedAt": "2026-08-25T22:19:52.552Z"
+                  },
+                  "sourceState": "present",
+                  "state": "locked",
+                  "axes": {
+                    "implementation": "not_sourced",
+                    "test": "not_sourced",
+                    "evidence": "partially_evidenced",
                     "independentQa": "not_sourced",
                     "cherryAcceptance": "not_sourced",
                     "release": "not_sourced"
@@ -3388,7 +3489,7 @@
                   "title": "호스팅 데이터 격리 검증",
                   "purpose": "별도 승인된 격리 수파베이스 미리보기에서 합성 패키지 데이터, 실제 행 단위 접근 제어, 생명주기와 복원을 검증한다.",
                   "dependsOn": [
-                    "outcome-stage-account-access-hosted-identity-preview"
+                    "outcome-stage-account-only-private-project-preview"
                   ],
                   "expectedDurationMinutes": null,
                   "gatePurpose": "호스팅 데이터 격리 검증 acceptance checklist",
@@ -3634,13 +3735,13 @@
                 },
                 {
                   "id": "outcome-stage-account-access-cherry-acceptance",
-                  "title": "Cherry 최종 승인",
-                  "purpose": "두 독립 검증을 통과해 정확히 고정된 후보를 Cherry가 맥북과 모바일에서 직접 판정한다.",
+                  "title": "호스팅 후보 Cherry 승인",
+                  "purpose": "HP1+HP2 호스팅 후보의 두 독립 검증을 통과한 exact pin을 Cherry가 맥북과 모바일에서 직접 판정한다.",
                   "dependsOn": [
                     "outcome-stage-account-access-hosted-preview-release-audit"
                   ],
                   "expectedDurationMinutes": null,
-                  "gatePurpose": "Cherry 최종 승인 acceptance checklist",
+                  "gatePurpose": "호스팅 후보 Cherry 승인 acceptance checklist",
                   "gate": {
                     "gates": [
                       {
@@ -3683,7 +3784,7 @@
                     "groups": [
                       {
                         "code": "C",
-                        "name": "Cherry 실제 사용 승인",
+                        "name": "호스팅 후보 실제 사용 승인",
                         "sourceName": "C",
                         "total": 4,
                         "closed": 0
@@ -3705,6 +3806,412 @@
                     "cherryAcceptance": "pending",
                     "release": "not_sourced"
                   }
+                },
+                {
+                  "id": "outcome-stage-account-access-production-resource-preparation",
+                  "title": "운영 자원 준비",
+                  "purpose": "별도 HP3-A 승인 아래 운영 provider·data·host 자원을 private-disabled staged candidate와 비민감 영수증으로 준비한다.",
+                  "dependsOn": [
+                    "outcome-stage-account-access-cherry-acceptance"
+                  ],
+                  "expectedDurationMinutes": null,
+                  "gatePurpose": "운영 자원 준비 acceptance checklist",
+                  "gate": {
+                    "gates": [
+                      {
+                        "id": "H1",
+                        "stageId": "outcome-stage-account-access-production-resource-preparation",
+                        "title": "HP1·HP2, hosted fresh QA·별도 Audit·Cherry hosted candidate 승인이 같은 계보의 실제 영수증으로 끝나고 Cherry가 exact HP3-A 자원 준비 범위를 승인한다.",
+                        "closed": false,
+                        "groupCode": "H",
+                        "groupLabel": null,
+                        "proves": "cherry_decision"
+                      },
+                      {
+                        "id": "H2",
+                        "stageId": "outcome-stage-account-access-production-resource-preparation",
+                        "title": "owned production domain·DNS·provider·billing owner, Google publishing, Apple web eligibility, Vercel staged topology와 월 예상 비용이 결정되고 $75 ceiling 안이다.",
+                        "closed": false,
+                        "groupCode": "H",
+                        "groupLabel": null,
+                        "proves": "evidence"
+                      },
+                      {
+                        "id": "H3",
+                        "stageId": "outcome-stage-account-access-production-resource-preparation",
+                        "title": "Clerk production, Google OAuth와 Apple web credential이 owner-only·exact origin/redirect/return URL로 준비되고 private surface는 비활성, secret disclosure는 0이다.",
+                        "closed": false,
+                        "groupCode": "H",
+                        "groupLabel": null,
+                        "proves": "security"
+                      },
+                      {
+                        "id": "H4",
+                        "stageId": "outcome-stage-account-access-production-resource-preparation",
+                        "title": "Supabase Pro Seoul에 exact migration·grant·RLS를 적용하고 합성 data만으로 managed backup, isolated restore, deletion-ledger replay와 RPO/RTO 목표를 검증한다.",
+                        "closed": false,
+                        "groupCode": "H",
+                        "groupLabel": null,
+                        "proves": "test"
+                      },
+                      {
+                        "id": "H5",
+                        "stageId": "outcome-stage-account-access-production-resource-preparation",
+                        "title": "Production 전용 환경 이름 8개와 immutable staged deployment가 값 없이 고정되고 domain traffic·real data·canonical owner 접근은 열리지 않는다.",
+                        "closed": false,
+                        "groupCode": "H",
+                        "groupLabel": null,
+                        "proves": "implementation"
+                      },
+                      {
+                        "id": "H6",
+                        "stageId": "outcome-stage-account-access-production-resource-preparation",
+                        "title": "exact candidate·provider/domain/data/cost/rollback 영수증과 별도 HP3-B QA window 승인이 고정되고, Builder/operator의 제한된 검수 창 외 private traffic은 차단된다.",
+                        "closed": false,
+                        "groupCode": "H",
+                        "groupLabel": null,
+                        "proves": "cherry_decision"
+                      }
+                    ],
+                    "groups": [
+                      {
+                        "code": "H",
+                        "name": "운영 자원 준비",
+                        "sourceName": "H",
+                        "total": 6,
+                        "closed": 0
+                      }
+                    ],
+                    "total": 6,
+                    "closed": 0,
+                    "available": true,
+                    "sourceRef": "GATES_PHASE2_ACCOUNT_ACCESS_PRODUCTION_RESOURCE_PREPARATION.md",
+                    "observedAt": "2026-08-25T10:11:54.125Z"
+                  },
+                  "sourceState": "present",
+                  "state": "locked",
+                  "axes": {
+                    "implementation": "pending",
+                    "test": "pending",
+                    "evidence": "pending",
+                    "independentQa": "not_sourced",
+                    "cherryAcceptance": "not_sourced",
+                    "release": "not_sourced"
+                  }
+                },
+                {
+                  "id": "outcome-stage-account-access-production-ux-product-qa",
+                  "title": "운영 후보 독립 검수",
+                  "purpose": "새 검수자가 exact production candidate의 실제 provider·domain·MacBook/mobile 제품 여정을 독립 반증한다.",
+                  "dependsOn": [
+                    "outcome-stage-account-access-production-resource-preparation"
+                  ],
+                  "expectedDurationMinutes": null,
+                  "gatePurpose": "운영 후보 독립 검수 acceptance checklist",
+                  "gate": {
+                    "gates": [
+                      {
+                        "id": "Q1",
+                        "stageId": "outcome-stage-account-access-production-ux-product-qa",
+                        "title": "fresh reviewer가 exact commit·tree·deployment·migration·provider/domain/environment-name receipt, 별도 HP3-B QA window와 이전 QA 세션·판정 재사용 0건을 확인한다.",
+                        "closed": false,
+                        "groupCode": "Q",
+                        "groupLabel": null,
+                        "proves": "evidence"
+                      },
+                      {
+                        "id": "Q2",
+                        "stageId": "outcome-stage-account-access-production-ux-product-qa",
+                        "title": "승인된 격리 검수 창에서 Google·email code·linked Apple, logout·expiry·revocation·other-owner deny와 Cherry Note·OUTCOME 탐색을 MacBook/mobile system browser로 검증한다.",
+                        "closed": false,
+                        "groupCode": "Q",
+                        "groupLabel": null,
+                        "proves": "test"
+                      },
+                      {
+                        "id": "Q3",
+                        "stageId": "outcome-stage-account-access-production-ux-product-qa",
+                        "title": "production domain·cookie·origin·redirect, loading/empty/stale/conflict/unavailable/recovery, 200% zoom·keyboard·touch와 public/private 구분에서 거짓 완료·정보 노출 0건을 확인한다.",
+                        "closed": false,
+                        "groupCode": "Q",
+                        "groupLabel": null,
+                        "proves": "test"
+                      },
+                      {
+                        "id": "Q4",
+                        "stageId": "outcome-stage-account-access-production-ux-product-qa",
+                        "title": "검수 종료 뒤 Builder/operator가 window를 재차단하고 보고서는 PASS_UX_PRODUCT_QA_ONLY 또는 FAIL로 끝나며 Audit, Cherry acceptance, activation, traffic cutover, release 권한을 주장하지 않는다.",
+                        "closed": false,
+                        "groupCode": "Q",
+                        "groupLabel": null,
+                        "proves": "evidence"
+                      }
+                    ],
+                    "groups": [
+                      {
+                        "code": "Q",
+                        "name": "운영 후보 사용성·제품 검수",
+                        "sourceName": "Q",
+                        "total": 4,
+                        "closed": 0
+                      }
+                    ],
+                    "total": 4,
+                    "closed": 0,
+                    "available": true,
+                    "sourceRef": "GATES_PHASE2_ACCOUNT_ACCESS_PRODUCTION_UX_PRODUCT_QA.md",
+                    "observedAt": "2026-08-25T10:11:54.125Z"
+                  },
+                  "sourceState": "present",
+                  "state": "locked",
+                  "axes": {
+                    "implementation": "not_sourced",
+                    "test": "pending",
+                    "evidence": "pending",
+                    "independentQa": "not_sourced",
+                    "cherryAcceptance": "not_sourced",
+                    "release": "not_sourced"
+                  }
+                },
+                {
+                  "id": "outcome-stage-account-access-production-release-audit",
+                  "title": "운영 후보 출시 감사",
+                  "purpose": "별도의 새 감사자가 같은 production candidate의 auth·RLS·data lifecycle·operations·cost·rollback을 독립 판정한다.",
+                  "dependsOn": [
+                    "outcome-stage-account-access-production-ux-product-qa"
+                  ],
+                  "expectedDurationMinutes": null,
+                  "gatePurpose": "운영 후보 출시 감사 acceptance checklist",
+                  "gate": {
+                    "gates": [
+                      {
+                        "id": "A1",
+                        "stageId": "outcome-stage-account-access-production-release-audit",
+                        "title": "fresh auditor가 QA PASS와 exact commit·tree·deployment·migration·provider/domain/data receipt, reviewer 독립성과 실행 재현 절차를 확인한다.",
+                        "closed": false,
+                        "groupCode": "A",
+                        "groupLabel": null,
+                        "proves": "evidence"
+                      },
+                      {
+                        "id": "A2",
+                        "stageId": "outcome-stage-account-access-production-release-audit",
+                        "title": "실제 session·owner-only authorization, anon/other/forged/revoked/write deny, RLS·redaction·CSRF/origin·public 405와 secret/client 노출 0이 통과한다.",
+                        "closed": false,
+                        "groupCode": "A",
+                        "groupLabel": null,
+                        "proves": "security"
+                      },
+                      {
+                        "id": "A3",
+                        "stageId": "outcome-stage-account-access-production-release-audit",
+                        "title": "managed backup·isolated restore·deletion ledger replay, RPO/RTO, health/alert/WAF, $40/$60/$75 비용 stop과 deployment+environment rollback이 재현된다.",
+                        "closed": false,
+                        "groupCode": "A",
+                        "groupLabel": null,
+                        "proves": "test"
+                      },
+                      {
+                        "id": "A4",
+                        "stageId": "outcome-stage-account-access-production-release-audit",
+                        "title": "보고서가 PASS_RELEASE_AUDIT_ONLY 또는 FAIL로 끝나며 Cherry acceptance, production activation, release, Phase 완료 권한을 주장하지 않는다.",
+                        "closed": false,
+                        "groupCode": "A",
+                        "groupLabel": null,
+                        "proves": "evidence"
+                      }
+                    ],
+                    "groups": [
+                      {
+                        "code": "A",
+                        "name": "운영 후보 출시 감사",
+                        "sourceName": "A",
+                        "total": 4,
+                        "closed": 0
+                      }
+                    ],
+                    "total": 4,
+                    "closed": 0,
+                    "available": true,
+                    "sourceRef": "GATES_PHASE2_ACCOUNT_ACCESS_PRODUCTION_RELEASE_AUDIT.md",
+                    "observedAt": "2026-08-25T10:10:52.491Z"
+                  },
+                  "sourceState": "present",
+                  "state": "locked",
+                  "axes": {
+                    "implementation": "not_sourced",
+                    "test": "pending",
+                    "evidence": "pending",
+                    "independentQa": "not_sourced",
+                    "cherryAcceptance": "not_sourced",
+                    "release": "not_sourced"
+                  }
+                },
+                {
+                  "id": "outcome-stage-account-access-production-cherry-acceptance",
+                  "title": "Cherry 운영 후보 승인",
+                  "purpose": "두 독립 검증을 통과한 exact production candidate를 Cherry가 직접 판정하되 activation 권한과 분리한다.",
+                  "dependsOn": [
+                    "outcome-stage-account-access-production-release-audit"
+                  ],
+                  "expectedDurationMinutes": null,
+                  "gatePurpose": "Cherry 운영 후보 승인 acceptance checklist",
+                  "gate": {
+                    "gates": [
+                      {
+                        "id": "C1",
+                        "stageId": "outcome-stage-account-access-production-cherry-acceptance",
+                        "title": "exact production candidate가 fresh UX & Product QA PASS와 separate Release Audit PASS를 같은 commit·tree·deployment·migration·receipt에서 가진다.",
+                        "closed": false,
+                        "groupCode": "C",
+                        "groupLabel": null,
+                        "proves": "cherry_acceptance"
+                      },
+                      {
+                        "id": "C2",
+                        "stageId": "outcome-stage-account-access-production-cherry-acceptance",
+                        "title": "Cherry가 MacBook/mobile에서 실제 Google·email code·linked Apple, logout·recovery·deny와 두 프로젝트 read-only 탐색을 직접 수용한다.",
+                        "closed": false,
+                        "groupCode": "C",
+                        "groupLabel": null,
+                        "proves": "cherry_acceptance"
+                      },
+                      {
+                        "id": "C3",
+                        "stageId": "outcome-stage-account-access-production-cherry-acceptance",
+                        "title": "Cherry가 domain, 비용, data/restore, 관측, rollback 한계와 activation 후 canonical owner-only 범위를 이해하고 production candidate를 명시적으로 승인한다.",
+                        "closed": false,
+                        "groupCode": "C",
+                        "groupLabel": null,
+                        "proves": "cherry_decision"
+                      },
+                      {
+                        "id": "C4",
+                        "stageId": "outcome-stage-account-access-production-cherry-acceptance",
+                        "title": "이 판정은 candidate acceptance일 뿐이며 별도 HP3-D activation, public-service release, Phase 2 완료와 외부 완료가 열려 있음을 확인한다.",
+                        "closed": false,
+                        "groupCode": "C",
+                        "groupLabel": null,
+                        "proves": "cherry_acceptance"
+                      }
+                    ],
+                    "groups": [
+                      {
+                        "code": "C",
+                        "name": "Cherry 운영 후보 승인",
+                        "sourceName": "C",
+                        "total": 4,
+                        "closed": 0
+                      }
+                    ],
+                    "total": 4,
+                    "closed": 0,
+                    "available": true,
+                    "sourceRef": "GATES_PHASE2_ACCOUNT_ACCESS_PRODUCTION_CHERRY_ACCEPTANCE.md",
+                    "observedAt": "2026-08-25T10:10:52.491Z"
+                  },
+                  "sourceState": "present",
+                  "state": "locked",
+                  "axes": {
+                    "implementation": "not_sourced",
+                    "test": "not_sourced",
+                    "evidence": "pending",
+                    "independentQa": "not_sourced",
+                    "cherryAcceptance": "pending",
+                    "release": "not_sourced"
+                  }
+                },
+                {
+                  "id": "outcome-stage-account-access-production-activation",
+                  "title": "운영 활성화",
+                  "purpose": "별도 HP3-D 승인 아래 canonical Cherry owner의 private read-only 접근만 열고 15분·24시간 관측과 rollback 영수증을 고정한다.",
+                  "dependsOn": [
+                    "outcome-stage-account-access-production-cherry-acceptance"
+                  ],
+                  "expectedDurationMinutes": null,
+                  "gatePurpose": "운영 활성화 acceptance checklist",
+                  "gate": {
+                    "gates": [
+                      {
+                        "id": "L1",
+                        "stageId": "outcome-stage-account-access-production-activation",
+                        "title": "Cherry가 exact candidate·domain·cost·rollback receipt를 참조한 HP3-D 운영 활성화 범위를 별도로 승인한다.",
+                        "closed": false,
+                        "groupCode": "L",
+                        "groupLabel": null,
+                        "proves": "cherry_decision"
+                      },
+                      {
+                        "id": "L2",
+                        "stageId": "outcome-stage-account-access-production-activation",
+                        "title": "activation operator가 exact staged deployment에만 production domain을 연결하고 OUTCOME_PRIVATE_SURFACE_ENABLED를 열며 다른 deployment·environment·DNS는 변경하지 않는다.",
+                        "closed": false,
+                        "groupCode": "L",
+                        "groupLabel": null,
+                        "proves": "implementation"
+                      },
+                      {
+                        "id": "L3",
+                        "stageId": "outcome-stage-account-access-production-activation",
+                        "title": "canonical owner의 실제 read-only 접근과 Google·email code·linked Apple이 통과하고 public signup, other owner, unregistered project, mutation은 계속 거부된다.",
+                        "closed": false,
+                        "groupCode": "L",
+                        "groupLabel": null,
+                        "proves": "test"
+                      },
+                      {
+                        "id": "L4",
+                        "stageId": "outcome-stage-account-access-production-activation",
+                        "title": "최초 15분 집중 관측에서 page/API/health, auth/RLS deny, public 405·redaction·receipt, database와 비용 stop에 SEV1/SEV2가 0이다.",
+                        "closed": false,
+                        "groupCode": "L",
+                        "groupLabel": null,
+                        "proves": "evidence"
+                      },
+                      {
+                        "id": "L5",
+                        "stageId": "outcome-stage-account-access-production-activation",
+                        "title": "24시간 안정 관측과 backup age·restore readiness·rollback target·비용 추정이 통과하고 실패 시 private-first rollback이 재검증된다.",
+                        "closed": false,
+                        "groupCode": "L",
+                        "groupLabel": null,
+                        "proves": "test"
+                      },
+                      {
+                        "id": "L6",
+                        "stageId": "outcome-stage-account-access-production-activation",
+                        "title": "activation receipt가 exact actor·time·pin·environment-name digest·관측·rollback을 값 없이 고정하며 public-service release, Phase 2 closure와 external completion은 별도다.",
+                        "closed": false,
+                        "groupCode": "L",
+                        "groupLabel": null,
+                        "proves": "evidence"
+                      }
+                    ],
+                    "groups": [
+                      {
+                        "code": "L",
+                        "name": "운영 접근 활성화",
+                        "sourceName": "L",
+                        "total": 6,
+                        "closed": 0
+                      }
+                    ],
+                    "total": 6,
+                    "closed": 0,
+                    "available": true,
+                    "sourceRef": "GATES_PHASE2_ACCOUNT_ACCESS_PRODUCTION_ACTIVATION.md",
+                    "observedAt": "2026-08-25T10:10:52.491Z"
+                  },
+                  "sourceState": "present",
+                  "state": "locked",
+                  "axes": {
+                    "implementation": "pending",
+                    "test": "pending",
+                    "evidence": "pending",
+                    "independentQa": "not_sourced",
+                    "cherryAcceptance": "not_sourced",
+                    "release": "not_sourced"
+                  }
                 }
               ]
             }
@@ -3712,23 +4219,734 @@
         },
         {
           "id": "outcome-phase-3",
-          "title": "Phase 3 · Definition Pending",
-          "purpose": "Cherry가 Phase 2와 Phase 4 사이의 제품 목적을 결정하기 전까지 기능과 진행을 추론하지 않는다.",
-          "completion": "Cherry-approved Phase 3 Outcome Contract exists.",
+          "title": "Phase 3 · Existing Session Operations",
+          "purpose": "여러 PC와 외부 Codex/Claude에 이미 존재하는 역할 세션을 프로젝트에 비공개로 연결·관찰하고 Planner-only 경로로 업무를 전달해 증거 영수증을 회수한다.",
+          "completion": "private session registry, multi-PC observation, Planner-only routing, evidence continuity, fresh QA, separate fresh Audit, and Cherry physical acceptance are evidence-closed.",
           "scopes": [
             {
-              "id": "outcome-phase-3-definition",
-              "title": "Purpose definition pending",
-              "purpose": "Phase 3 목적·범위·Stage·Gate를 Cherry와 정의한다.",
-              "stages": []
+              "id": "outcome-phase-3-session-registry",
+              "title": "Private session registry",
+              "purpose": "프로젝트와 Planner·Builder·UX & Product QA·Release Audit의 실제 기존 세션 binding을 비공개 단일 source로 관리한다.",
+              "stages": [
+                {
+                  "id": "outcome-stage-phase3-codex-adapter-spike",
+                  "title": "Codex adapter technical spike",
+                  "purpose": "Codex existing session observation·instruction delivery의 supported interface, auth·terms·limit·cost와 safe fallback을 증명한다.",
+                  "dependsOn": [],
+                  "expectedDurationMinutes": null,
+                  "gatePurpose": "Codex adapter technical spike acceptance checklist",
+                  "gate": {
+                    "gates": [
+                      {
+                        "id": "S1",
+                        "stageId": "outcome-stage-phase3-codex-adapter-spike",
+                        "title": "Codex app/API/CLI/local interface의 공식 지원 범위, 인증, 약관, 호출 한도, 비용, version lifecycle과 Mac mini 사용 허용 여부가 primary source로 고정된다.",
+                        "closed": false,
+                        "groupCode": "S",
+                        "groupLabel": null,
+                        "proves": "technical_diligence"
+                      },
+                      {
+                        "id": "S2",
+                        "stageId": "outcome-stage-phase3-codex-adapter-spike",
+                        "title": "existing thread/session을 project+role에 식별·관찰하는 최소 read interface가 raw private store 변조나 unsupported scraping 없이 재현된다.",
+                        "closed": false,
+                        "groupCode": "S",
+                        "groupLabel": null,
+                        "proves": "implementation"
+                      },
+                      {
+                        "id": "S3",
+                        "stageId": "outcome-stage-phase3-codex-adapter-spike",
+                        "title": "Planner instruction을 exact existing target session으로 전달하는 지원 interface, acknowledgement 의미, timeout와 duplicate 동작이 synthetic/no-op proof로 검증된다.",
+                        "closed": false,
+                        "groupCode": "S",
+                        "groupLabel": null,
+                        "proves": "test"
+                      },
+                      {
+                        "id": "S4",
+                        "stageId": "outcome-stage-phase3-codex-adapter-spike",
+                        "title": "Codex source model을 OUTCOME binding·observation·instruction·receipt domain으로 정규화하는 adapter mapping과 unsupported/null/conflict 의미가 고정된다.",
+                        "closed": false,
+                        "groupCode": "S",
+                        "groupLabel": null,
+                        "proves": "architecture"
+                      },
+                      {
+                        "id": "S5",
+                        "stageId": "outcome-stage-phase3-codex-adapter-spike",
+                        "title": "token, raw session/thread/task/turn ID, local path, prompt/result가 public surface와 logs에서 0건이며 least-privilege secret storage·rotation·revocation이 검증된다.",
+                        "closed": false,
+                        "groupCode": "S",
+                        "groupLabel": null,
+                        "proves": "security"
+                      },
+                      {
+                        "id": "S6",
+                        "stageId": "outcome-stage-phase3-codex-adapter-spike",
+                        "title": "GO/NO-GO가 exact evidence로 판정되고 NO-GO 시 read-only observation, manual open/deep-link 또는 unbound fallback 중 지원 가능한 최소 경로만 선택된다.",
+                        "closed": false,
+                        "groupCode": "S",
+                        "groupLabel": null,
+                        "proves": "evidence"
+                      }
+                    ],
+                    "groups": [
+                      {
+                        "code": "S",
+                        "name": "Codex 연결 기술 실사",
+                        "sourceName": "S",
+                        "total": 6,
+                        "closed": 0
+                      }
+                    ],
+                    "total": 6,
+                    "closed": 0,
+                    "available": true,
+                    "sourceRef": "GATES_PHASE3_CODEX_ADAPTER_TECHNICAL_SPIKE.md",
+                    "observedAt": "2026-08-25T10:30:16.160Z"
+                  },
+                  "sourceState": "present",
+                  "state": "queued",
+                  "axes": {
+                    "implementation": "pending",
+                    "test": "pending",
+                    "evidence": "pending",
+                    "independentQa": "not_sourced",
+                    "cherryAcceptance": "not_sourced",
+                    "release": "not_sourced"
+                  }
+                },
+                {
+                  "id": "outcome-stage-phase3-private-session-registry",
+                  "title": "Private role-session registry candidate",
+                  "purpose": "binding schema, uniqueness, lifecycle, secret redaction, audit와 rollback을 immutable candidate로 증명한다.",
+                  "dependsOn": [
+                    "outcome-stage-phase3-codex-adapter-spike"
+                  ],
+                  "expectedDurationMinutes": null,
+                  "gatePurpose": "Private role-session registry candidate acceptance checklist",
+                  "gate": {
+                    "gates": [
+                      {
+                        "id": "R1",
+                        "stageId": "outcome-stage-phase3-private-session-registry",
+                        "title": "project, role, provider, private locator, binding version, status, bound/revoked timestamps를 가진 schema와 불변조건이 구현된다.",
+                        "closed": false,
+                        "groupCode": "R",
+                        "groupLabel": null,
+                        "proves": "implementation"
+                      },
+                      {
+                        "id": "R2",
+                        "stageId": "outcome-stage-phase3-private-session-registry",
+                        "title": "project+role당 active binding 최대 1개와 compare-and-swap bind/rebind가 concurrency test로 증명된다.",
+                        "closed": false,
+                        "groupCode": "R",
+                        "groupLabel": null,
+                        "proves": "test"
+                      },
+                      {
+                        "id": "R3",
+                        "stageId": "outcome-stage-phase3-private-session-registry",
+                        "title": "missing, duplicate, cross-project, unsupported-role, stale-version binding이 fail closed한다.",
+                        "closed": false,
+                        "groupCode": "R",
+                        "groupLabel": null,
+                        "proves": "test"
+                      },
+                      {
+                        "id": "R4",
+                        "stageId": "outcome-stage-phase3-private-session-registry",
+                        "title": "raw session ID, provider locator, credential이 public API·HTML·bundle·log에 0건 노출된다.",
+                        "closed": false,
+                        "groupCode": "R",
+                        "groupLabel": null,
+                        "proves": "security"
+                      },
+                      {
+                        "id": "R5",
+                        "stageId": "outcome-stage-phase3-private-session-registry",
+                        "title": "bind, revoke, replace의 actor·reason·before/after가 immutable audit history로 재현된다.",
+                        "closed": false,
+                        "groupCode": "R",
+                        "groupLabel": null,
+                        "proves": "evidence"
+                      },
+                      {
+                        "id": "R6",
+                        "stageId": "outcome-stage-phase3-private-session-registry",
+                        "title": "disable/rollback 후 write가 차단되고 기존 public-safe 연결 상태와 audit evidence가 보존된다.",
+                        "closed": false,
+                        "groupCode": "R",
+                        "groupLabel": null,
+                        "proves": "rollback"
+                      }
+                    ],
+                    "groups": [
+                      {
+                        "code": "R",
+                        "name": "비공개 역할 세션 연결",
+                        "sourceName": "R",
+                        "total": 6,
+                        "closed": 0
+                      }
+                    ],
+                    "total": 6,
+                    "closed": 0,
+                    "available": true,
+                    "sourceRef": "GATES_PHASE3_PRIVATE_SESSION_REGISTRY.md",
+                    "observedAt": "2026-08-25T10:23:04.378Z"
+                  },
+                  "sourceState": "present",
+                  "state": "locked",
+                  "axes": {
+                    "implementation": "pending",
+                    "test": "pending",
+                    "evidence": "pending",
+                    "independentQa": "not_sourced",
+                    "cherryAcceptance": "not_sourced",
+                    "release": "not_sourced"
+                  }
+                }
+              ]
+            },
+            {
+              "id": "outcome-phase-3-observation-relay",
+              "title": "Multi-PC observation relay",
+              "purpose": "관찰 위치가 달라도 availability·freshness·NOW 출처를 같은 의미로 제공한다.",
+              "stages": [
+                {
+                  "id": "outcome-stage-phase3-multi-pc-observation",
+                  "title": "Cross-device observation continuity candidate",
+                  "purpose": "두 관찰 위치와 stale·offline·conflict·redaction·recovery를 source-grounded candidate로 증명한다.",
+                  "dependsOn": [
+                    "outcome-stage-phase3-private-session-registry"
+                  ],
+                  "expectedDurationMinutes": null,
+                  "gatePurpose": "Cross-device observation continuity candidate acceptance checklist",
+                  "gate": {
+                    "gates": [
+                      {
+                        "id": "O1",
+                        "stageId": "outcome-stage-phase3-multi-pc-observation",
+                        "title": "observation event가 project, role, binding version, source host, sequence, observed_at, availability, redacted NOW를 보존한다.",
+                        "closed": false,
+                        "groupCode": "O",
+                        "groupLabel": null,
+                        "proves": "implementation"
+                      },
+                      {
+                        "id": "O2",
+                        "stageId": "outcome-stage-phase3-multi-pc-observation",
+                        "title": "Mac mini와 MacBook/모바일 원격 중 서로 다른 두 관찰 위치에서 같은 binding 의미와 freshness가 증명된다.",
+                        "closed": false,
+                        "groupCode": "O",
+                        "groupLabel": null,
+                        "proves": "real_use"
+                      },
+                      {
+                        "id": "O3",
+                        "stageId": "outcome-stage-phase3-multi-pc-observation",
+                        "title": "missing, stale, offline, unknown, conflicting observation을 active/NOW/progress로 합성하지 않는다.",
+                        "closed": false,
+                        "groupCode": "O",
+                        "groupLabel": null,
+                        "proves": "test"
+                      },
+                      {
+                        "id": "O4",
+                        "stageId": "outcome-stage-phase3-multi-pc-observation",
+                        "title": "duplicate와 out-of-order sequence가 최신 valid projection을 덮지 않고 conflict evidence를 남긴다.",
+                        "closed": false,
+                        "groupCode": "O",
+                        "groupLabel": null,
+                        "proves": "test"
+                      },
+                      {
+                        "id": "O5",
+                        "stageId": "outcome-stage-phase3-multi-pc-observation",
+                        "title": "observation payload의 raw IDs, path, prompt/result, credentials가 public projection과 logs에서 redacted된다.",
+                        "closed": false,
+                        "groupCode": "O",
+                        "groupLabel": null,
+                        "proves": "security"
+                      },
+                      {
+                        "id": "O6",
+                        "stageId": "outcome-stage-phase3-multi-pc-observation",
+                        "title": "source disconnect/reconnect, sequence gap, relay disable/restore의 복구와 read-only fallback이 증명된다.",
+                        "closed": false,
+                        "groupCode": "O",
+                        "groupLabel": null,
+                        "proves": "rollback"
+                      }
+                    ],
+                    "groups": [
+                      {
+                        "code": "O",
+                        "name": "다중 PC 관찰 연속성",
+                        "sourceName": "O",
+                        "total": 6,
+                        "closed": 0
+                      }
+                    ],
+                    "total": 6,
+                    "closed": 0,
+                    "available": true,
+                    "sourceRef": "GATES_PHASE3_MULTI_PC_OBSERVATION_RELAY.md",
+                    "observedAt": "2026-08-25T10:23:04.378Z"
+                  },
+                  "sourceState": "present",
+                  "state": "locked",
+                  "axes": {
+                    "implementation": "pending",
+                    "test": "pending",
+                    "evidence": "pending",
+                    "independentQa": "not_sourced",
+                    "cherryAcceptance": "not_sourced",
+                    "release": "not_sourced"
+                  }
+                }
+              ]
+            },
+            {
+              "id": "outcome-phase-3-planner-routing",
+              "title": "Planner-only work routing",
+              "purpose": "Cherry 요청을 project Planner가 유일한 routing authority로 검증해 exact target role에 전달한다.",
+              "stages": [
+                {
+                  "id": "outcome-stage-phase3-planner-routing",
+                  "title": "Planner-routed instruction candidate",
+                  "purpose": "target validation, idempotency, receipt, timeout·cancel·wrong-binding denial과 dispatch 안전 경계를 증명한다.",
+                  "dependsOn": [
+                    "outcome-stage-phase3-multi-pc-observation"
+                  ],
+                  "expectedDurationMinutes": null,
+                  "gatePurpose": "Planner-routed instruction candidate acceptance checklist",
+                  "gate": {
+                    "gates": [
+                      {
+                        "id": "T1",
+                        "stageId": "outcome-stage-phase3-planner-routing",
+                        "title": "instruction ledger가 immutable instruction ID, project, Planner binding, target role/binding, intent, scope, timestamps와 상태 전이를 보존한다.",
+                        "closed": false,
+                        "groupCode": "T",
+                        "groupLabel": null,
+                        "proves": "implementation"
+                      },
+                      {
+                        "id": "T2",
+                        "stageId": "outcome-stage-phase3-planner-routing",
+                        "title": "Planner 이외의 직접 role dispatch와 cross-project/wrong-role/wrong-binding route가 fail closed한다.",
+                        "closed": false,
+                        "groupCode": "T",
+                        "groupLabel": null,
+                        "proves": "security"
+                      },
+                      {
+                        "id": "T3",
+                        "stageId": "outcome-stage-phase3-planner-routing",
+                        "title": "idempotency key와 attempt ID가 duplicate request/retry에서 단일 logical instruction과 receipt를 보장한다.",
+                        "closed": false,
+                        "groupCode": "T",
+                        "groupLabel": null,
+                        "proves": "test"
+                      },
+                      {
+                        "id": "T4",
+                        "stageId": "outcome-stage-phase3-planner-routing",
+                        "title": "queued, delivered, acknowledged, timed_out, cancelled, failed 상태가 receipt 없이 success로 승격되지 않는다.",
+                        "closed": false,
+                        "groupCode": "T",
+                        "groupLabel": null,
+                        "proves": "test"
+                      },
+                      {
+                        "id": "T5",
+                        "stageId": "outcome-stage-phase3-planner-routing",
+                        "title": "timeout, provider unavailable, replaced binding, cancellation과 bounded/manual retry가 안전하게 동작한다.",
+                        "closed": false,
+                        "groupCode": "T",
+                        "groupLabel": null,
+                        "proves": "rollback"
+                      },
+                      {
+                        "id": "T6",
+                        "stageId": "outcome-stage-phase3-planner-routing",
+                        "title": "실제 provider dispatch는 Cherry-authorized proof window와 allowlisted project/role 밖에서 비활성이고 임의 shell/file/release mutation을 허용하지 않는다.",
+                        "closed": false,
+                        "groupCode": "T",
+                        "groupLabel": null,
+                        "proves": "security"
+                      },
+                      {
+                        "id": "T7",
+                        "stageId": "outcome-stage-phase3-planner-routing",
+                        "title": "OUTCOME+Cherry Note 중 승인 프로젝트에서 단일 routed task가 Planner→target receipt까지 immutable candidate evidence로 증명된다.",
+                        "closed": false,
+                        "groupCode": "T",
+                        "groupLabel": null,
+                        "proves": "real_use"
+                      }
+                    ],
+                    "groups": [
+                      {
+                        "code": "T",
+                        "name": "Planner 경유 업무 전달",
+                        "sourceName": "T",
+                        "total": 7,
+                        "closed": 0
+                      }
+                    ],
+                    "total": 7,
+                    "closed": 0,
+                    "available": true,
+                    "sourceRef": "GATES_PHASE3_PLANNER_WORK_ROUTING.md",
+                    "observedAt": "2026-08-25T10:23:04.378Z"
+                  },
+                  "sourceState": "present",
+                  "state": "locked",
+                  "axes": {
+                    "implementation": "pending",
+                    "test": "pending",
+                    "evidence": "pending",
+                    "independentQa": "not_sourced",
+                    "cherryAcceptance": "not_sourced",
+                    "release": "not_sourced"
+                  }
+                }
+              ]
+            },
+            {
+              "id": "outcome-phase-3-evidence-continuity",
+              "title": "Evidence return and continuity",
+              "purpose": "instruction, role result, evidence pointer, Gate 판정과 session replacement history를 분리해 검증 가능한 연속성을 보존한다.",
+              "stages": [
+                {
+                  "id": "outcome-stage-phase3-evidence-continuity",
+                  "title": "Evidence receipt and recovery candidate",
+                  "purpose": "immutable correlation, result/evidence 분리, rebind recovery, audit와 fail-closed integrity를 증명한다.",
+                  "dependsOn": [
+                    "outcome-stage-phase3-planner-routing"
+                  ],
+                  "expectedDurationMinutes": null,
+                  "gatePurpose": "Evidence receipt and recovery candidate acceptance checklist",
+                  "gate": {
+                    "gates": [
+                      {
+                        "id": "E1",
+                        "stageId": "outcome-stage-phase3-evidence-continuity",
+                        "title": "instruction, delivery receipt, role result, evidence pointer, candidate pin이 별도 entity와 immutable correlation로 보존된다.",
+                        "closed": false,
+                        "groupCode": "E",
+                        "groupLabel": null,
+                        "proves": "implementation"
+                      },
+                      {
+                        "id": "E2",
+                        "stageId": "outcome-stage-phase3-evidence-continuity",
+                        "title": "role result가 evidence 또는 Gate closure로 자동 승격되지 않고 QA/Audit/Cherry authority가 분리된다.",
+                        "closed": false,
+                        "groupCode": "E",
+                        "groupLabel": null,
+                        "proves": "test"
+                      },
+                      {
+                        "id": "E3",
+                        "stageId": "outcome-stage-phase3-evidence-continuity",
+                        "title": "receipt mismatch, candidate mismatch, missing hash, revoked binding의 evidence attach가 fail closed한다.",
+                        "closed": false,
+                        "groupCode": "E",
+                        "groupLabel": null,
+                        "proves": "security"
+                      },
+                      {
+                        "id": "E4",
+                        "stageId": "outcome-stage-phase3-evidence-continuity",
+                        "title": "session replacement 뒤 old/new binding과 미확인 instruction을 재구성하고 자동 오배송 없이 explicit recovery한다.",
+                        "closed": false,
+                        "groupCode": "E",
+                        "groupLabel": null,
+                        "proves": "rollback"
+                      },
+                      {
+                        "id": "E5",
+                        "stageId": "outcome-stage-phase3-evidence-continuity",
+                        "title": "public-safe receipt/result pointer와 private payload가 분리되고 export·retention·deletion·audit 계약이 검증된다.",
+                        "closed": false,
+                        "groupCode": "E",
+                        "groupLabel": null,
+                        "proves": "privacy"
+                      },
+                      {
+                        "id": "E6",
+                        "stageId": "outcome-stage-phase3-evidence-continuity",
+                        "title": "restart/offline/partial failure 뒤 ledger replay가 duplicate result나 false completion 없이 같은 상태를 복원한다.",
+                        "closed": false,
+                        "groupCode": "E",
+                        "groupLabel": null,
+                        "proves": "test"
+                      }
+                    ],
+                    "groups": [
+                      {
+                        "code": "E",
+                        "name": "증거 영수증과 복구",
+                        "sourceName": "E",
+                        "total": 6,
+                        "closed": 0
+                      }
+                    ],
+                    "total": 6,
+                    "closed": 0,
+                    "available": true,
+                    "sourceRef": "GATES_PHASE3_EVIDENCE_CONTINUITY.md",
+                    "observedAt": "2026-08-25T10:23:04.379Z"
+                  },
+                  "sourceState": "present",
+                  "state": "locked",
+                  "axes": {
+                    "implementation": "pending",
+                    "test": "pending",
+                    "evidence": "pending",
+                    "independentQa": "not_sourced",
+                    "cherryAcceptance": "not_sourced",
+                    "release": "not_sourced"
+                  }
+                },
+                {
+                  "id": "outcome-stage-phase3-fresh-ux-product-qa",
+                  "title": "Fresh UX & Product QA",
+                  "purpose": "분리된 fresh reviewer가 동일 immutable candidate의 이해 가능성, 실패 복구, multi-device real-use와 false completion을 반증한다.",
+                  "dependsOn": [
+                    "outcome-stage-phase3-evidence-continuity"
+                  ],
+                  "expectedDurationMinutes": null,
+                  "gatePurpose": "Fresh UX & Product QA acceptance checklist",
+                  "gate": {
+                    "gates": [
+                      {
+                        "id": "Q1",
+                        "stageId": "outcome-stage-phase3-fresh-ux-product-qa",
+                        "title": "exact commit/tree/artifact와 four-scope Gate evidence가 immutable QA input으로 고정된다.",
+                        "closed": false,
+                        "groupCode": "Q",
+                        "groupLabel": null,
+                        "proves": "evidence"
+                      },
+                      {
+                        "id": "Q2",
+                        "stageId": "outcome-stage-phase3-fresh-ux-product-qa",
+                        "title": "desktop과 mobile에서 role binding, freshness, NOW, routed state, result/evidence 차이를 30초 안에 이해하는 과업이 직접 관찰된다.",
+                        "closed": false,
+                        "groupCode": "Q",
+                        "groupLabel": null,
+                        "proves": "ux_product_qa"
+                      },
+                      {
+                        "id": "Q3",
+                        "stageId": "outcome-stage-phase3-fresh-ux-product-qa",
+                        "title": "unbound/stale/offline/conflict/timeout/rebind/receipt mismatch와 public redaction 실패 상태가 오해 없이 fail closed하는지 반증한다.",
+                        "closed": false,
+                        "groupCode": "Q",
+                        "groupLabel": null,
+                        "proves": "test"
+                      },
+                      {
+                        "id": "Q4",
+                        "stageId": "outcome-stage-phase3-fresh-ux-product-qa",
+                        "title": "fresh reviewer가 PASS/FAIL, residual issues, false-completion count와 정확한 downstream 권한을 별도 영수증으로 판정한다.",
+                        "closed": false,
+                        "groupCode": "Q",
+                        "groupLabel": null,
+                        "proves": "ux_product_qa"
+                      }
+                    ],
+                    "groups": [
+                      {
+                        "code": "Q",
+                        "name": "사용성·제품 독립 검수",
+                        "sourceName": "Q",
+                        "total": 4,
+                        "closed": 0
+                      }
+                    ],
+                    "total": 4,
+                    "closed": 0,
+                    "available": true,
+                    "sourceRef": "GATES_PHASE3_EXISTING_SESSION_OPERATIONS_QA.md",
+                    "observedAt": "2026-08-25T10:23:04.379Z"
+                  },
+                  "sourceState": "present",
+                  "state": "locked",
+                  "axes": {
+                    "implementation": "not_sourced",
+                    "test": "pending",
+                    "evidence": "pending",
+                    "independentQa": "pending",
+                    "cherryAcceptance": "not_sourced",
+                    "release": "not_sourced"
+                  }
+                },
+                {
+                  "id": "outcome-stage-phase3-release-audit",
+                  "title": "Separate fresh Release Audit",
+                  "purpose": "QA 뒤 별도 fresh auditor가 동일 immutable candidate의 runtime·privacy·regression·rollback과 proof scope를 감사한다.",
+                  "dependsOn": [
+                    "outcome-stage-phase3-fresh-ux-product-qa"
+                  ],
+                  "expectedDurationMinutes": null,
+                  "gatePurpose": "Separate fresh Release Audit acceptance checklist",
+                  "gate": {
+                    "gates": [
+                      {
+                        "id": "A1",
+                        "stageId": "outcome-stage-phase3-release-audit",
+                        "title": "QA가 검증한 exact commit/tree/artifact와 QA receipt가 audit input으로 고정되고 ancestry/hash가 일치한다.",
+                        "closed": false,
+                        "groupCode": "A",
+                        "groupLabel": null,
+                        "proves": "evidence"
+                      },
+                      {
+                        "id": "A2",
+                        "stageId": "outcome-stage-phase3-release-audit",
+                        "title": "registry, observation, routing, receipt runtime과 public/private boundary, mutation denial, secret leak 0이 직접 검증된다.",
+                        "closed": false,
+                        "groupCode": "A",
+                        "groupLabel": null,
+                        "proves": "release_audit"
+                      },
+                      {
+                        "id": "A3",
+                        "stageId": "outcome-stage-phase3-release-audit",
+                        "title": "duplicate/out-of-order/timeout/offline/rebind/restart/rollback과 package/test/build regression이 재현된다.",
+                        "closed": false,
+                        "groupCode": "A",
+                        "groupLabel": null,
+                        "proves": "test"
+                      },
+                      {
+                        "id": "A4",
+                        "stageId": "outcome-stage-phase3-release-audit",
+                        "title": "fresh auditor가 PASS/FAIL, residual risk, rollback receipt와 정확한 Cherry acceptance 권한만 발행한다.",
+                        "closed": false,
+                        "groupCode": "A",
+                        "groupLabel": null,
+                        "proves": "release_audit"
+                      }
+                    ],
+                    "groups": [
+                      {
+                        "code": "A",
+                        "name": "독립 출시 감사",
+                        "sourceName": "A",
+                        "total": 4,
+                        "closed": 0
+                      }
+                    ],
+                    "total": 4,
+                    "closed": 0,
+                    "available": true,
+                    "sourceRef": "GATES_PHASE3_EXISTING_SESSION_OPERATIONS_RELEASE_AUDIT.md",
+                    "observedAt": "2026-08-25T10:23:04.379Z"
+                  },
+                  "sourceState": "present",
+                  "state": "locked",
+                  "axes": {
+                    "implementation": "not_sourced",
+                    "test": "pending",
+                    "evidence": "pending",
+                    "independentQa": "not_sourced",
+                    "cherryAcceptance": "not_sourced",
+                    "release": "pending"
+                  }
+                },
+                {
+                  "id": "outcome-stage-phase3-cherry-acceptance",
+                  "title": "Cherry physical acceptance",
+                  "purpose": "Cherry가 두 프로젝트·두 관찰 위치·단일 routed task를 실제로 사용해 Phase 3 결과와 경계를 명시적으로 수용한다.",
+                  "dependsOn": [
+                    "outcome-stage-phase3-release-audit"
+                  ],
+                  "expectedDurationMinutes": null,
+                  "gatePurpose": "Cherry physical acceptance acceptance checklist",
+                  "gate": {
+                    "gates": [
+                      {
+                        "id": "C1",
+                        "stageId": "outcome-stage-phase3-cherry-acceptance",
+                        "title": "Cherry가 OUTCOME과 Cherry Note의 실제 연결/미연결 역할, freshness, NOW와 current Gate 경계를 30초 안에 정확히 설명한다.",
+                        "closed": false,
+                        "groupCode": "C",
+                        "groupLabel": null,
+                        "proves": "cherry_acceptance"
+                      },
+                      {
+                        "id": "C2",
+                        "stageId": "outcome-stage-phase3-cherry-acceptance",
+                        "title": "Cherry가 한 작업 요청을 project Planner에 입력하고 target role receipt와 result/evidence 분리를 실제로 확인한다.",
+                        "closed": false,
+                        "groupCode": "C",
+                        "groupLabel": null,
+                        "proves": "cherry_acceptance"
+                      },
+                      {
+                        "id": "C3",
+                        "stageId": "outcome-stage-phase3-cherry-acceptance",
+                        "title": "Cherry가 stale/offline/rebind/timeout 또는 mismatch 실패 상태와 안전 복구를 실제 화면에서 수용한다.",
+                        "closed": false,
+                        "groupCode": "C",
+                        "groupLabel": null,
+                        "proves": "cherry_acceptance"
+                      },
+                      {
+                        "id": "C4",
+                        "stageId": "outcome-stage-phase3-cherry-acceptance",
+                        "title": "Cherry가 Phase 3 acceptance를 명시적으로 승인하고 release·Phase transition·external completion은 별도 결정으로 남긴다.",
+                        "closed": false,
+                        "groupCode": "C",
+                        "groupLabel": null,
+                        "proves": "cherry_acceptance"
+                      }
+                    ],
+                    "groups": [
+                      {
+                        "code": "C",
+                        "name": "Cherry 실제 사용 승인",
+                        "sourceName": "C",
+                        "total": 4,
+                        "closed": 0
+                      }
+                    ],
+                    "total": 4,
+                    "closed": 0,
+                    "available": true,
+                    "sourceRef": "GATES_PHASE3_EXISTING_SESSION_OPERATIONS_CHERRY_ACCEPTANCE.md",
+                    "observedAt": "2026-08-25T10:23:04.380Z"
+                  },
+                  "sourceState": "present",
+                  "state": "locked",
+                  "axes": {
+                    "implementation": "not_sourced",
+                    "test": "not_sourced",
+                    "evidence": "pending",
+                    "independentQa": "not_sourced",
+                    "cherryAcceptance": "pending",
+                    "release": "not_sourced"
+                  }
+                }
+              ]
             }
           ]
         },
         {
           "id": "outcome-phase-4",
           "title": "Phase 4 · In-OUTCOME Development",
-          "purpose": "Codex/Claude 화면 없이 OUTCOME 안에서 프로젝트 생성, 역할 세션 구성, 작업 대화를 수행한다.",
-          "completion": "project creation, four-role session creation, linked chat, and end-to-end development are evidence-closed.",
+          "purpose": "Codex/Claude 화면 없이 OUTCOME 안에서 프로젝트 생성, 역할 세션 구성, Codex 수준의 실시간 작업 타임라인과 제어를 수행한다.",
+          "completion": "project creation, four-role session creation, session workspace, and end-to-end development are evidence-closed.",
           "scopes": [
             {
               "id": "outcome-phase-4-project-creation",
@@ -3744,8 +4962,8 @@
             },
             {
               "id": "outcome-phase-4-linked-chat",
-              "title": "Session-linked chat and control",
-              "purpose": "OUTCOME 안에서 역할별 작업 지시와 결과 대화를 수행한다.",
+              "title": "Codex-level session workspace",
+              "purpose": "OUTCOME 안에서 역할별 메시지 streaming, 계획, 도구 실행, 파일 변경·diff, 테스트, 승인 요청, 중단·재시도와 재연결을 하나의 source-grounded 작업 타임라인으로 제공한다.",
               "stages": []
             },
             {
@@ -3795,9 +5013,9 @@
           "localCandidate": {
             "state": "available",
             "branch": "main",
-            "ahead": 0,
+            "ahead": 31,
             "behind": 0,
-            "sync": "synced"
+            "sync": "ahead"
           },
           "published": {
             "state": "connected",
@@ -3821,7 +5039,7 @@
       "next": {
         "phaseId": "outcome-phase-2",
         "scopeId": "outcome-phase-2-account-service",
-        "stageId": "outcome-stage-account-access-hosted-data-preview"
+        "stageId": "outcome-stage-account-only-private-project-preview"
       },
       "bindings": [
         {
@@ -3879,7 +5097,7 @@
   ],
   "snapshot": {
     "boundary": "deployment_snapshot",
-    "capturedAt": "2026-08-25T06:36:37.271Z",
+    "capturedAt": "2026-08-25T22:20:13.445Z",
     "source": "sanitized_public_projection",
     "liveSessionRelay": false,
     "refreshBehavior": "new_deployment_required"

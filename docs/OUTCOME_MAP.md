@@ -126,29 +126,29 @@ phases:
             gates_file: GATES_OUTCOME_MVP.md#C1-C2
 
   - id: outcome-phase-2
-    title: Phase 2 · Public Multi-project Service
-    purpose: 여러 프로젝트를 계정 기반 공개 서비스에서 안전하게 전환·조회한다.
-    completion: stable public hosting, multi-project portfolio, and account access are evidence-closed.
+    title: Phase 2 · Account-scoped Project Service
+    purpose: 로그인한 계정이 권한을 가진 프로젝트만 안전하게 전환·조회하며 프로젝트 데이터의 공개 모드는 두지 않는다.
+    completion: stable hosted entry, account-scoped project portfolio, private data boundary, and account access are evidence-closed.
     scopes:
       - id: outcome-phase-2-public-hosting
-        title: Stable public delivery
-        purpose: 임시 tunnel이 아닌 안정 주소와 운영 경계를 정의한다.
+        title: Stable hosted entry
+        purpose: 임시 tunnel이 아닌 안정 주소에서 로그인 진입점과 운영 경계를 정의한다.
         stages:
           - id: outcome-stage-stable-snapshot-host
-            title: Stable snapshot host
-            purpose: Mac origin과 임시 tunnel에 의존하지 않는 고정 HTTPS 주소에서 정제된 Package 스냅샷을 제공한다.
+            title: Stable hosted shell
+            purpose: Mac origin과 임시 tunnel에 의존하지 않는 고정 HTTPS 주소를 제공하되 Phase 2에서는 프로젝트 payload를 인증 전 공개하지 않는다.
             depends_on: []
             gates_file: GATES_PHASE2_STABLE_SNAPSHOT_HOST.md#S1-S6
             gate_groups:
               - code: S
                 primary_label: 안정적 스냅샷 호스트
       - id: outcome-phase-2-project-portfolio
-        title: Multi-project portfolio
-        purpose: OUTCOME, Cherry Note, Cherry Picker 등 등록 프로젝트를 같은 Package 의미로 전환·조회한다.
+        title: Account project portfolio
+        purpose: OUTCOME, Cherry Note와 이후 등록 프로젝트를 계정 membership 안에서만 같은 Package 의미로 전환·조회한다.
         stages:
           - id: outcome-stage-project-portfolio-foundation
-            title: Registered Package portfolio foundation
-            purpose: 명시적 레지스트리와 Package 표시 metadata로 세 번째 이후 프로젝트도 코드별 하드코딩 없이 같은 읽기 전용 결과 지도에 등록한다.
+            title: Registered Package project model
+            purpose: 명시적 레지스트리와 Package 표시 metadata로 프로젝트를 등록하되 가시성은 서버가 확인한 계정 membership이 결정한다.
             depends_on: [outcome-stage-stable-snapshot-host]
             gates_file: GATES_PHASE2_PROJECT_PORTFOLIO_FOUNDATION.md#P1-P6
             gate_groups:
@@ -160,7 +160,7 @@ phases:
         stages:
           - id: outcome-stage-account-access-definition
             title: 계정 접근 계약 정의
-            purpose: 공개 배포본과 인증된 비공개 작업공간의 사용자·권한·데이터·운영 경계를 구현 전에 Cherry 결정으로 고정한다.
+            purpose: 로그인 전 데이터 없는 진입점과 인증된 프로젝트 작업공간의 사용자·권한·데이터·운영 경계를 구현 전에 Cherry 결정으로 고정한다.
             depends_on: [outcome-stage-project-portfolio-foundation]
             gates_file: GATES_PHASE2_ACCOUNT_ACCESS_DEFINITION.md#K1-K6
             gate_groups:
@@ -214,10 +214,18 @@ phases:
             gate_groups:
               - code: P
                 primary_label: 개발 인증 직접 검수
+          - id: outcome-stage-account-only-private-project-preview
+            title: 계정 전용 프로젝트 미리보기
+            purpose: OUTCOME과 Cherry Note를 인증된 Cherry 계정의 비공개 프로젝트로 제공하고 인증 전 프로젝트 payload와 과거 대시보드 경로를 닫는다.
+            depends_on: [outcome-stage-account-access-hosted-identity-preview]
+            gates_file: GATES_PHASE2_ACCOUNT_ONLY_PRIVATE_PROJECT_PREVIEW.md#N1-N7
+            gate_groups:
+              - code: N
+                primary_label: 계정 전용 프로젝트 전환
           - id: outcome-stage-account-access-hosted-data-preview
             title: 호스팅 데이터 격리 검증
             purpose: 별도 승인된 격리 수파베이스 미리보기에서 합성 패키지 데이터, 실제 행 단위 접근 제어, 생명주기와 복원을 검증한다.
-            depends_on: [outcome-stage-account-access-hosted-identity-preview]
+            depends_on: [outcome-stage-account-only-private-project-preview]
             gates_file: GATES_PHASE2_ACCOUNT_ACCESS_HOSTED_DATA_PREVIEW.md#D1-D7
             gate_groups:
               - code: D

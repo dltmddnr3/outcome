@@ -4,6 +4,7 @@ import { TokenVerificationError, TokenVerificationErrorReason } from '@clerk/bac
 
 const DAY_MS = 86_400_000
 const ALLOWED_PROJECTS = Object.freeze(['cherry-note', 'outcome'])
+const PRIVATE_PREVIEW_WORKSPACE = 'account-only-preview'
 const CLERK_AUTH_REASONS = new Set([
   ...Object.values(TokenVerificationErrorReason),
   'client-uat-but-no-session-token',
@@ -190,23 +191,31 @@ export function createHostedPreviewRuntime({ environment = {}, providerGateway, 
   }
 }
 
-export function createHostedIdentityRuntime({ environment = {}, clerkClientFactory = createClerkClient, tokenVerifier = verifyToken, now = Date.now } = {}) {
+export function createSealedPackageStore({ sealedSnapshot, ownerSubject } = {}) {
+  const projects = Array.isArray(sealedSnapshot?.projects) ? sealedSnapshot.projects : []
+  const byId = new Map(projects.map((projection) => [projection?.project?.id, projection]))
+  if (!ownerSubject || projects.length !== ALLOWED_PROJECTS.length || byId.size !== ALLOWED_PROJECTS.length || !ALLOWED_PROJECTS.every((id) => byId.has(id))) throw new Error('sealed_package_snapshot_invalid')
+  const sealedProjects = ALLOWED_PROJECTS.map((id) => Object.freeze({ id, workspaceId: PRIVATE_PREVIEW_WORKSPACE, state: 'active', projection: structuredClone(byId.get(id)) }))
+  return Object.freeze({
+    membershipsForSubject(subject) { return subject === ownerSubject ? [{ workspaceId: PRIVATE_PREVIEW_WORKSPACE, subject, role: 'owner-viewer', state: 'active' }] : [] },
+    workspace(id) { return id === PRIVATE_PREVIEW_WORKSPACE ? { id, state: 'active' } : null },
+    projectsForWorkspace(id) { return id === PRIVATE_PREVIEW_WORKSPACE ? sealedProjects.map((project) => structuredClone(project)) : [] },
+  })
+}
+
+export function createHostedIdentityRuntime({ environment = {}, sealedSnapshot, clerkClientFactory = createClerkClient, tokenVerifier = verifyToken, now = Date.now } = {}) {
   if (!readHostedIdentityConfiguration(environment).enabled) return null
   const bindings = readBindings(environment, HOSTED_IDENTITY_ENV)
   const gateway = createClerkBackendGateway({ environment, clerkClientFactory, tokenVerifier })
   const provider = createClerkHostedAuthProvider({ gateway, ownerSubject: bindings.ownerSubject, now })
-  const store = {
-    async membershipsForSubject() { throw accountError('private_workspace_unavailable', 503) },
-    async workspace() { throw accountError('private_workspace_unavailable', 503) },
-    async projectsForWorkspace() { throw accountError('private_workspace_unavailable', 503) },
-  }
+  const store = createSealedPackageStore({ sealedSnapshot, ownerSubject: bindings.ownerSubject })
   const service = createAccountAccessService({ authProvider: { verify: provider.verify, signOut: provider.signOut, revokeAll: ({ subject: _subject }) => provider.revokeAll({ operatorAuthorized: true }) }, store, ownerSubject: bindings.ownerSubject, now })
   return {
     service,
     allowedOrigin: bindings.privateAllowedOrigin,
     publishableKey: bindings.clerkPublishableKey,
     rollbackDeployment: bindings.rollbackDeployment,
-    dataReady: false,
-    mode: 'hosted_identity_adapter',
+    dataReady: true,
+    mode: 'account_only_private_snapshot',
   }
 }

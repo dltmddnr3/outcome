@@ -44,6 +44,22 @@ const states = {
 }
 
 try {
+  for (const viewport of [{ name: 'legacy-desktop', width: 1440, height: 900 }, { name: 'legacy-mobile', width: 390, height: 844 }]) {
+    for (const pathname of ['/', '/cherry-note-dashboard', '/workspace']) {
+      const context = await browser.newContext({ viewport, reducedMotion: 'reduce' })
+      const page = await context.newPage()
+      let publicPayloadRequests = 0
+      page.on('request', (request) => { if (['/api/dashboard', '/api/dashboard/cherry-note'].includes(new URL(request.url()).pathname)) publicPayloadRequests += 1 })
+      await page.route('**/api/private/config', (route) => route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ enabled: true, access: 'private_read_only', providers: [], sessionMaximumDays: 7, completionAuthority: false }) }))
+      await page.route('**/api/private/workspace', (route) => route.fulfill({ status: 401, contentType: 'application/json', body: JSON.stringify({ error: 'authentication_required' }) }))
+      await page.goto(`${base}${pathname}`)
+      await page.locator('[data-state-code="login"]').waitFor()
+      const boundary = await page.evaluate(() => ({ projects: document.querySelectorAll('[data-private-project]').length, dashboard: document.querySelectorAll('.oc-dashboard').length, overflow: document.documentElement.scrollWidth - document.documentElement.clientWidth }))
+      if (publicPayloadRequests !== 0 || boundary.projects !== 0 || boundary.dashboard !== 0 || boundary.overflow !== 0) throw new Error(`${viewport.name}${pathname} account-only convergence failed requests=${publicPayloadRequests} ${JSON.stringify(boundary)}`)
+      await context.close()
+    }
+  }
+
   for (const viewport of [{ name: 'macbook', width: 1440, height: 900 }, { name: 'mobile', width: 390, height: 844 }, { name: 'phone', width: 375, height: 812 }]) {
     for (const [state, fixture] of Object.entries(states)) {
       const context = await browser.newContext({ viewport, reducedMotion: 'reduce' })
@@ -148,7 +164,7 @@ try {
     await context.close()
   }
   if (transitions.length !== 6 || transitions.filter(([action]) => action === 'login').length !== 3 || transitions.filter(([action]) => action === 'logout').length !== 3) throw new Error(`injected transition count failed ${JSON.stringify(transitions)}`)
-  console.log(`account access browser PASS: Clerk SDK browser markers present with no server callback/session-token handoff; 3 viewports x ${Object.keys(states).length} settled states + loading + ready login/logout hierarchy; login=${JSON.stringify(loginMeasurements)}; mobile/phone 200% zoom overflow=0; touch>=44; current-vs-selected preserved`)
+  console.log(`account access browser PASS: account-only legacy convergence=6/6 with anonymous project payload requests=0; Clerk SDK browser markers present with no server callback/session-token handoff; 3 viewports x ${Object.keys(states).length} settled states + loading + ready login/logout hierarchy; login=${JSON.stringify(loginMeasurements)}; mobile/phone 200% zoom overflow=0; touch>=44; current-vs-selected preserved`)
 } finally {
   server.close(); await once(server, 'close'); await browser.close()
 }

@@ -10,7 +10,7 @@ if (process.env.OUTCOME_ASSERT_BUILT !== '1') {
   const fixture = finalizeDeploymentSnapshot({ source, commit: '1111111111111111111111111111111111111111', tree: '2222222222222222222222222222222222222222', asset: 'index-test.js' })
   writeFileSync(new URL('../api/deployment-snapshot.mjs', import.meta.url), `export default ${JSON.stringify(fixture)}\n`, 'utf8')
 }
-const { handleStableHostRequest } = await import('../api/index.mjs')
+const { createStableHostRequestHandler, handleStableHostRequest } = await import('../api/index.mjs')
 const { default: snapshot } = await import('../api/deployment-snapshot.mjs')
 
 const request = (method, pathname) => handleStableHostRequest({ method, pathname })
@@ -50,6 +50,23 @@ test('stable host exposes a disabled provider-neutral private contract and fails
   assert.deepEqual(config.body.providers.map((provider) => provider.id), ['google', 'apple', 'email_code'])
   assert.deepEqual(request('GET', '/api/private/workspace'), { status: 401, body: { error: 'authentication_required' } })
   assert.doesNotMatch(JSON.stringify(config.body), /secret|subject|token|VITE_/i)
+})
+
+test('complete identity configuration closes legacy public project APIs even when runtime construction fails', async () => {
+  const environment = {
+    OUTCOME_PRIVATE_SURFACE_ENABLED: '1',
+    OUTCOME_CLERK_PUBLISHABLE_KEY: 'pk_test_boundary',
+    OUTCOME_CLERK_SECRET_KEY: 'sk_test_boundary',
+    OUTCOME_OWNER_SUBJECT: 'synthetic-owner',
+    OUTCOME_PRIVATE_ALLOWED_ORIGIN: 'https://preview.invalid',
+    OUTCOME_PRIVATE_ROLLBACK_DEPLOYMENT: 'rollback-preview',
+  }
+  for (const runtimeFactory of [async () => { throw new Error('construction failed') }, async () => null]) {
+    const privateRequest = createStableHostRequestHandler({ environment, runtimeFactory })
+    for (const pathname of ['/api/dashboard', '/api/dashboard/cherry-note']) assert.deepEqual(await privateRequest({ method: 'GET', pathname }), { status: 404, body: { error: 'not_found' } })
+    assert.deepEqual(await privateRequest({ method: 'GET', pathname: '/api/auth/session' }), { status: 200, body: { authenticated: false, publicReadOnly: false } })
+    assert.equal(JSON.stringify(await privateRequest({ method: 'GET', pathname: '/api/dashboard' })).includes('Cherry Note'), false)
+  }
 })
 
 test('stable host rejects every mutation and unknown GET fails closed', () => {

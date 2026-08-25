@@ -70,11 +70,16 @@ export function createStableHostRequestHandler({ environment = process.env, runt
   let runtimePromise
   const selectedRuntime = async () => {
     if (!configured || typeof runtimeFactory !== 'function') return null
-    runtimePromise ??= Promise.resolve().then(() => runtimeFactory({ environment, clerkClientFactory, tokenVerifier: clerkTokenVerifier })).then((value) => validRuntime(value) ? value : null).catch(() => null)
+    runtimePromise ??= Promise.resolve().then(() => runtimeFactory({ environment, sealedSnapshot: snapshot, clerkClientFactory, tokenVerifier: clerkTokenVerifier })).then((value) => validRuntime(value) ? value : null).catch(() => null)
     return runtimePromise
   }
   return async ({ method = 'GET', pathname = '/', headers = {}, body, origin } = {}) => {
-    if (!pathname.startsWith('/api/private/')) return handleStableHostRequest({ method, pathname })
+    if (!pathname.startsWith('/api/private/')) {
+      if (configured && method === 'GET' && ['/api/dashboard', '/api/dashboard/cherry-note'].includes(pathname)) return result(404, { error: 'not_found' })
+      if (configured && method === 'GET' && pathname === '/api/auth/session') return result(200, { authenticated: false, publicReadOnly: false })
+      if (configured && method === 'GET' && pathname === '/api/health') return result(200, { status: 'available', access: 'authentication_required', source: 'private_snapshot' })
+      return handleStableHostRequest({ method, pathname })
+    }
     const hosted = await selectedRuntime()
     if (!hosted) return handleStableHostRequest({ method, pathname })
     if (method === 'GET' && pathname === '/api/private/config') return result(200, { ...privateAccessPublicConfig(true), publishableKey: hosted.publishableKey })
@@ -89,13 +94,18 @@ export function createStableHostRequestHandler({ environment = process.env, runt
       }
     }
     if (method === 'GET' && pathname === '/api/private/workspace') return handlePrivateAccessRequest({ method, pathname, token: privateSessionToken(headers), service: hosted.service })
-    return result(405, { error: 'read_only' })
+    return method === 'GET' ? result(404, { error: 'not_found' }) : result(405, { error: 'read_only' })
   }
 }
-const requestPath = (request) => {
+export const requestPath = (request) => {
+  const url = new URL(request.url ?? '/', 'https://outcome.invalid')
   const queryPath = Array.isArray(request.query?.path) ? request.query.path.join('/') : request.query?.path
-  if (queryPath) return `/api/${String(queryPath).replace(/^\/+/, '')}`
-  return new URL(request.url ?? '/', 'https://outcome.invalid').pathname
+  if (queryPath) {
+    url.searchParams.delete('path')
+    const search = url.searchParams.toString()
+    return `/api/${String(queryPath).replace(/^\/+/, '')}${search ? `?${search}` : ''}`
+  }
+  return `${url.pathname}${url.search}`
 }
 
 const hostedRequest = createStableHostRequestHandler({ logger: console })

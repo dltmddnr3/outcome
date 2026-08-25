@@ -9,6 +9,7 @@ import {
   HOSTED_IDENTITY_ENV,
   createClerkBackendGateway,
   createHostedIdentityRuntime,
+  createSealedPackageStore,
   readHostedDataConfiguration,
   readHostedIdentityConfiguration,
   safeClerkAuthReason,
@@ -61,6 +62,16 @@ const clerkClientFactory = ({ unavailable = false, revoked = false } = {}) => ()
   },
 })
 
+test('sealed Package store accepts exactly the server-owned two-project snapshot and rejects drift', () => {
+  const store = createSealedPackageStore({ sealedSnapshot: deploymentFixture, ownerSubject: owner })
+  assert.deepEqual(store.membershipsForSubject(owner), [{ workspaceId: 'account-only-preview', subject: owner, role: 'owner-viewer', state: 'active' }])
+  assert.deepEqual(store.membershipsForSubject('other-owner'), [])
+  assert.deepEqual(store.projectsForWorkspace('account-only-preview').map((project) => project.id), ['cherry-note', 'outcome'])
+  for (const projects of [deploymentFixture.projects.slice(0, 1), [...deploymentFixture.projects, { project: { id: 'forged', name: 'Forged' } }], deploymentFixture.projects.map((project) => ({ ...project, project: { ...project.project, id: 'unknown' } }))]) {
+    assert.throws(() => createSealedPackageStore({ sealedSnapshot: { projects }, ownerSubject: owner }), /sealed_package_snapshot_invalid/)
+  }
+})
+
 test('HP1 identity configuration is complete without any HP2 or hosted-page URL binding', () => {
   assert.deepEqual(Object.values(HOSTED_IDENTITY_ENV), Object.keys(identityEnvironment))
   assert.equal(Object.values(HOSTED_IDENTITY_ENV).some((name) => name.includes('SUPABASE') || name.includes('SIGN_IN_URL') || name.includes('ACCOUNT_URL')), false)
@@ -91,8 +102,8 @@ test('official backend adapter verifies an explicit token with pinned secret and
   }
 })
 
-test('identity-only handler exposes publishable key, verifies owner, denies HP2 data, and never mints session cookies', async () => {
-  const runtimeFactory = ({ environment }) => createHostedIdentityRuntime({ environment, clerkClientFactory: clerkClientFactory(), tokenVerifier, now })
+test('identity-only account mode exposes publishable key, verifies owner, serves exactly the sealed projects, and never mints session cookies', async () => {
+  const runtimeFactory = ({ environment, sealedSnapshot }) => createHostedIdentityRuntime({ environment, sealedSnapshot, clerkClientFactory: clerkClientFactory(), tokenVerifier, now })
   const { createStableHostRequestHandler } = await import('../api/index.mjs')
   const request = createStableHostRequestHandler({ environment: identityEnvironment, runtimeFactory })
 
@@ -107,8 +118,15 @@ test('identity-only handler exposes publishable key, verifies owner, denies HP2 
     assert.deepEqual(await request({ method: 'GET', pathname: '/api/private/session', headers: { authorization: `Bearer ${token}` } }), { status: 401, body: { error: 'authentication_required' } })
   }
   assert.deepEqual(await request({ method: 'GET', pathname: '/api/private/session', headers: { authorization: 'Bearer verifier-outage' } }), { status: 503, body: { error: 'authentication_unavailable' } })
-  assert.deepEqual(await request({ method: 'GET', pathname: '/api/private/workspace', headers: { cookie: '__session=sdk-valid' } }), { status: 503, body: { error: 'private_workspace_unavailable' } })
-  assert.deepEqual(await request({ method: 'GET', pathname: '/api/private/workspace', headers: { authorization: 'Bearer sdk-valid' } }), { status: 503, body: { error: 'private_workspace_unavailable' } })
+  for (const headers of [{ cookie: '__session=sdk-valid' }, { authorization: 'Bearer sdk-valid' }]) {
+    const workspace = await request({ method: 'GET', pathname: '/api/private/workspace', headers })
+    assert.equal(workspace.status, 200)
+    assert.deepEqual(workspace.body.workspace.projects.map((project) => project.project.id).sort(), ['cherry-note', 'outcome'])
+    assert.equal(workspace.body.workspace.completionAuthority, false)
+  }
+  assert.deepEqual(await request({ method: 'GET', pathname: '/api/private/workspace?project=forged', headers: { authorization: 'Bearer sdk-valid' } }), { status: 404, body: { error: 'not_found' } })
+  assert.deepEqual(await request({ method: 'GET', pathname: '/api/dashboard' }), { status: 404, body: { error: 'not_found' } })
+  assert.deepEqual(await request({ method: 'GET', pathname: '/api/dashboard/cherry-note' }), { status: 404, body: { error: 'not_found' } })
 
   for (const body of [{ sessionToken: 'sdk-valid' }, { sessionToken: 'client-json-token' }]) {
     const callback = await request({ method: 'POST', pathname: '/api/private/auth/callback', origin: 'https://preview.invalid', body })
@@ -116,9 +134,10 @@ test('identity-only handler exposes publishable key, verifies owner, denies HP2 
     assert.equal(callback.headers, undefined)
   }
 
-  const revoked = createStableHostRequestHandler({ environment: identityEnvironment, runtimeFactory: ({ environment }) => createHostedIdentityRuntime({ environment, clerkClientFactory: clerkClientFactory({ revoked: true }), tokenVerifier, now }) })
+  const revoked = createStableHostRequestHandler({ environment: identityEnvironment, runtimeFactory: ({ environment, sealedSnapshot }) => createHostedIdentityRuntime({ environment, sealedSnapshot, clerkClientFactory: clerkClientFactory({ revoked: true }), tokenVerifier, now }) })
   assert.deepEqual(await revoked({ method: 'GET', pathname: '/api/private/session', headers: { cookie: '__session=sdk-valid' } }), { status: 401, body: { error: 'session_revoked' } })
-  const unavailable = createStableHostRequestHandler({ environment: identityEnvironment, runtimeFactory: ({ environment }) => createHostedIdentityRuntime({ environment, clerkClientFactory: clerkClientFactory({ unavailable: true }), tokenVerifier, now }) })
+  assert.deepEqual(await revoked({ method: 'GET', pathname: '/api/private/workspace', headers: { cookie: '__session=sdk-valid' } }), { status: 401, body: { error: 'session_revoked' } })
+  const unavailable = createStableHostRequestHandler({ environment: identityEnvironment, runtimeFactory: ({ environment, sealedSnapshot }) => createHostedIdentityRuntime({ environment, sealedSnapshot, clerkClientFactory: clerkClientFactory({ unavailable: true }), tokenVerifier, now }) })
   assert.deepEqual(await unavailable({ method: 'GET', pathname: '/api/private/session', headers: { cookie: '__session=sdk-valid' } }), { status: 503, body: { error: 'authentication_unavailable' } })
 })
 
@@ -143,11 +162,17 @@ test('default production creation point selects complete HP1 and fails partial o
   }
 })
 
+test('Vercel rewrite preserves forged private selector queries for fail-closed routing', async () => {
+  const { requestPath } = await import('../api/index.mjs')
+  assert.equal(requestPath({ url: '/api?path=private%2Fworkspace&project=forged', query: { path: 'private/workspace', project: 'forged' } }), '/api/private/workspace?project=forged')
+  assert.equal(requestPath({ url: '/api/private/workspace?project=forged', query: {} }), '/api/private/workspace?project=forged')
+})
+
 test('private session diagnostics expose only auth-source and safe error enums', async () => {
   const { createStableHostRequestHandler } = await import('../api/index.mjs')
   const diagnostics = []
   const logger = { info: (...items) => diagnostics.push(items) }
-  const runtimeFactory = ({ environment }) => createHostedIdentityRuntime({ environment, clerkClientFactory: clerkClientFactory(), tokenVerifier, now })
+  const runtimeFactory = ({ environment, sealedSnapshot }) => createHostedIdentityRuntime({ environment, sealedSnapshot, clerkClientFactory: clerkClientFactory(), tokenVerifier, now })
   const request = createStableHostRequestHandler({ environment: identityEnvironment, runtimeFactory, logger })
   const encoded = (value) => Buffer.from(JSON.stringify(value)).toString('base64url')
   const jwt = `${encoded({ alg: 'RS256', kid: 'sensitive-key-id' })}.${encoded({ azp: identityEnvironment.OUTCOME_PRIVATE_ALLOWED_ORIGIN, exp: 4_102_444_800, iat: 1, sub: 'sensitive-subject', sid: 'sensitive-session' })}.sensitive-signature`
@@ -174,8 +199,9 @@ test('private session diagnostics expose only auth-source and safe error enums',
   const clerkDiagnostics = []
   const withReason = (reason) => createStableHostRequestHandler({
     environment: identityEnvironment,
-    runtimeFactory: ({ environment }) => createHostedIdentityRuntime({
+    runtimeFactory: ({ environment, sealedSnapshot }) => createHostedIdentityRuntime({
       environment,
+      sealedSnapshot,
       clerkClientFactory: clerkClientFactory(),
       tokenVerifier: async () => { throw verificationError(reason) },
       now,

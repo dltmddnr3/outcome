@@ -71,8 +71,8 @@ function DashboardEntry() {
 export function OutcomeApp() {
   const privatePath = window.location.pathname.startsWith('/workspace')
   const [config, setConfig] = useState<Awaited<ReturnType<typeof fetchPrivateAccessConfig>> | null>(null)
-  useEffect(() => { if (privatePath) void fetchPrivateAccessConfig().then(setConfig).catch(() => setConfig({ enabled: false, access: 'private_read_only', providers: [], sessionMaximumDays: 7, completionAuthority: false })) }, [privatePath])
-  if (!privatePath) return <DashboardEntry />
+  useEffect(() => { void fetchPrivateAccessConfig().then(setConfig).catch(() => setConfig({ enabled: false, access: 'private_read_only', providers: [], sessionMaximumDays: 7, completionAuthority: false })) }, [])
   if (config === null) return <AccountWorkspace state="loading" />
+  if (!privatePath && !config.enabled) return <DashboardEntry />
   return <PrivateWorkspaceEntry config={config} />
 }

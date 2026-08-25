@@ -87,7 +87,7 @@ export function AccountWorkspace({ state = 'unavailable', workspace, ownerVerifi
       </div>
     </section>}
     <footer>
-      <span>허용 범위 · Cherry Note / OUTCOME</span>
+      <span>서버에서 허용된 프로젝트만 표시</span>
       <code>completionAuthority=false</code>
     </footer>
   </main>

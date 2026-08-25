@@ -1,7 +1,7 @@
 # OUTCOME Contract · MVP
 
-Updated: 2026-08-25 KST
-Status: **Phase 1 internal-use Local MVP accepted · external public MVP not accepted**
+Updated: 2026-08-26 KST
+Status: **Phase 1 internal-use Local MVP accepted · Phase 2 account-scoped project service current**
 
 ## Package identity
 
@@ -26,6 +26,15 @@ Status: **Phase 1 internal-use Local MVP accepted · external public MVP not acc
 - GitHub activity never substitutes for Gate closure, independent QA, Release Audit, or Cherry acceptance.
 - Repository identity is non-secret Package metadata. Tokens, credentials, local paths, and provider-specific bindings remain in the runtime registry.
 - A missing or mismatched remote is shown as `unbound` or `conflict`; a connected empty remote is shown as `not_published / empty_remote`, never as progress or conflict.
+
+## Phase 2 account-only product boundary
+
+- Approval: `2026-08-26 KST` Cherry confirmed that OUTCOME has no public-dashboard product mode; it has only projects visible to accounts that are authorized for them.
+- Signed-out visitors receive only the brand, login and recovery entry. Project names, Package hierarchy, NOW, Gate state and project payload are not public content.
+- Signed-in visibility is derived server-side from account membership. Client route, selector, project ID or prior public URL never grants access.
+- Initial Cherry account projects are exactly `OUTCOME` and `Cherry Note`; both appear inside the same private workspace and retain the canonical `Project → Phase → Scope → Stage → Gate` semantics.
+- The former public read-only dashboard was a Phase 1 remote-feedback transport, not a lasting product tier. Phase 2 Preview must remove its project payload before any Production transition is considered.
+- Preview implementation does not authorize Production, Supabase, Clerk configuration, DNS/domain, release, or external completion.
 
 ## Phase contract
 
@@ -128,7 +137,7 @@ MVP는 아래 조건이 모두 증명될 때 완료입니다.
 
 - Phase 1 내부사용 Local MVP 종료: 2026-08-25 KST Cherry의 명시적 `내부사용기준 종료 승인`으로 위 완료 조건과 Cherry 수용이 닫혔다.
 - 승인 경계: 같은 결정에서 Cherry가 `외부 공개수준의 mvp는 아님`을 명시했으므로 외부 공개 수준 MVP, release approval, 외부 서비스 완료는 미승인이다.
-- Phase 2 진입: 다중 프로젝트 공개 서비스의 남은 경계인 계정 접근 계약 K1–K6 정의부터 진행한다.
+- Phase 2 진입: 계정별 비공개 프로젝트 서비스의 남은 경계인 계정 접근, 프로젝트 가시성, 호스팅 데이터와 운영 활성화를 순서대로 진행한다.
 - `MVP_SCOPE_CLOSED`는 Phase 1 내부사용 Local MVP 범위의 종료만 뜻하며 `EXTERNAL_OUTCOME_COMPLETE`와 항상 구분합니다.
 
 ## 8. Final acceptance axes

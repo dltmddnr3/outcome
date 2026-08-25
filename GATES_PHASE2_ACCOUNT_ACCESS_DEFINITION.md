@@ -4,6 +4,8 @@ Outcome: 계정 구현을 시작하기 전에 공개 배포본과 인증된 비�
 
 Decision contract: `docs/PHASE2_ACCOUNT_ACCESS_CONTRACT.md` (추천 초안이며 Gate evidence가 아님)
 
+Superseding product boundary: `2026-08-26 KST` Cherry가 공개 대시보드 제품 모드를 두지 않고 계정별 허용 프로젝트만 제공한다고 확정했다. 아래 K1의 당시 공개 정제 스냅샷 결정은 Phase 1 원격 피드백의 역사적 증거로 보존하며, 현재 Phase 2 제품 의미는 `docs/OUTCOME_CONTRACT.md#phase-2-account-only-product-boundary`와 `GATES_PHASE2_ACCOUNT_ONLY_PRIVATE_PROJECT_PREVIEW.md`가 우선한다.
+
 - [x] K1: Cherry가 1차 사용자 범위와 공개 화면·비공개 작업공간의 분리를 승인한다.
   PROVES: cherry_decision
   EVIDENCE: 2026-08-25 KST Cherry가 `네 의견대로 진행`으로 추천안인 `공개 정제 스냅샷 유지 + Cherry 단독 private workspace + self-signup/invitation 비활성`을 승인했다. 이 결정은 K1에만 적용되며 K2-K6, provider 설치, 계정 생성과 구현을 승인하지 않는다.

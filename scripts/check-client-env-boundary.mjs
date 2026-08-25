@@ -1,5 +1,6 @@
 import { readdirSync, readFileSync } from 'node:fs'
 import { spawnSync } from 'node:child_process'
+import sealedSource from '../snapshot/outcome-package-source.json' with { type: 'json' }
 
 const output = '.outcome-runtime/client-env-boundary-dist'
 const synthetic = Object.freeze({
@@ -21,4 +22,7 @@ if (leaked.length) throw new Error(`Vercel client metadata leaked into productio
 for (const marker of ['oauth_google', 'oauth_apple', '/workspace/sso-callback']) {
   if (!bundle.includes(marker)) throw new Error(`Clerk browser integration missing after client env filtering: ${marker}`)
 }
-console.log(`client env boundary PASS: Vercel Git metadata leaks=0; Clerk browser markers=3; assets=${assets.length}`)
+const privatePayloadMarkers = sealedSource.projects.flatMap((project) => [project.project.outcome, project.phases?.[0]?.purpose, project.phases?.[0]?.scopes?.[0]?.stages?.[0]?.gate?.gates?.[0]?.title]).filter((value) => typeof value === 'string' && value.length > 24)
+if (privatePayloadMarkers.some((marker) => bundle.includes(marker))) throw new Error('sealed Package projection leaked into public client assets')
+if (bundle.includes('허용 범위 · Cherry Note / OUTCOME')) throw new Error('private project allowlist leaked into public client copy')
+console.log(`client env boundary PASS: Vercel Git metadata leaks=0; sealed Package payload leaks=0/${privatePayloadMarkers.length}; Clerk browser markers=3; assets=${assets.length}`)
