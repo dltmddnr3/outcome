@@ -1,6 +1,6 @@
 {
   "schemaVersion": 2,
-  "observedAt": "2026-08-25T04:13:39.739Z",
+  "observedAt": "2026-08-25T04:21:58.299Z",
   "projects": [
     {
       "status": "conflict",
@@ -3216,9 +3216,9 @@
           "localCandidate": {
             "state": "available",
             "branch": "main",
-            "ahead": 1,
+            "ahead": 0,
             "behind": 0,
-            "sync": "ahead"
+            "sync": "synced"
           },
           "published": {
             "state": "connected",
@@ -3300,7 +3300,7 @@
   ],
   "snapshot": {
     "boundary": "deployment_snapshot",
-    "capturedAt": "2026-08-25T04:13:39.739Z",
+    "capturedAt": "2026-08-25T04:21:58.299Z",
     "source": "sanitized_public_projection",
     "liveSessionRelay": false,
     "refreshBehavior": "new_deployment_required"
