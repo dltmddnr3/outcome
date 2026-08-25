@@ -22,7 +22,7 @@ Base: `0f88e71d2c8c` / tree `65c419a440b4`
 ## Final local evidence
 
 - `npm test`: 60 frontend and 95 Node tests passed.
-- `npm run test:account-access`: 15 Node and 3 UI tests passed.
+- `npm run test:account-access`: 16 Node and 3 UI tests passed.
 - `npm run test:account-access-browser`: two viewports, nine settled states, loading, 200% zoom, touch targets at least 44 px, and zero horizontal overflow/intersection passed.
 - `npm run test:security`: 28 tests passed; stable snapshot disclosure scan found zero prohibited disclosures and zero Gate evidence fields.
 - `npm run check:public-boundary`: API, HTML, bundle and rendered UI prohibited identifier hits were zero.

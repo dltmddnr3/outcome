@@ -10,7 +10,7 @@ Outcome: 승인된 K1-K6 계약을 벗어나지 않는 Cherry-only authenticated
   EVIDENCE: public boundary prohibited hits 0; mutation matrix 32/32=405 and API read_only JSON 28/28; security suite 28 passed; stable GET contract remains sanitized and private workspace denies when disabled.
 - [ ] I3: Google primary, Apple linked access, email-code fallback의 provider-neutral auth boundary와 session/logout/revoke/recovery failure states가 red-first tests로 구현된다.
   PROVES: implementation
-  EVIDENCE: provider-neutral synthetic auth tests cover Google primary, Apple linked-only, email-code recovery, seven-day maximum, logout, revoke, expiry and provider outage; 15 account Node tests passed.
+  EVIDENCE: provider-neutral synthetic auth tests cover Google primary, Apple linked-only, email-code recovery, seven-day maximum, logout, revoke, expiry and provider outage; 16 account Node tests passed.
 - [ ] I4: server-derived owner/workspace membership, two-project allowlist, RLS contract와 forged/cross-workspace deny tests가 구현된다.
   PROVES: security
   EVIDENCE: BLOCKED for actual Postgres/RLS execution because Docker daemon is unavailable and no service start was authorized. Static migration contract and two-workspace synthetic deny tests pass but do not close I4.
