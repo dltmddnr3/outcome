@@ -1,6 +1,6 @@
 {
   "schemaVersion": 2,
-  "observedAt": "2026-08-25T03:57:18.622Z",
+  "observedAt": "2026-08-25T04:13:39.739Z",
   "projects": [
     {
       "status": "conflict",
@@ -1696,10 +1696,10 @@
     {
       "status": "valid",
       "errors": [],
-      "observedAt": "2026-08-25T03:57:08.253Z",
+      "observedAt": "2026-08-25T04:13:16.591Z",
       "sourceFreshness": {
         "state": "observed",
-        "observedAt": "2026-08-25T03:57:08.253Z"
+        "observedAt": "2026-08-25T04:13:16.591Z"
       },
       "project": {
         "id": "outcome",
@@ -3040,7 +3040,7 @@
                     "closed": 0,
                     "available": true,
                     "sourceRef": "GATES_PHASE2_ACCOUNT_ACCESS_RELEASE_AUDIT.md",
-                    "observedAt": "2026-08-25T02:25:32.362Z"
+                    "observedAt": "2026-08-25T04:13:16.591Z"
                   },
                   "sourceState": "present",
                   "state": "active",
@@ -3300,7 +3300,7 @@
   ],
   "snapshot": {
     "boundary": "deployment_snapshot",
-    "capturedAt": "2026-08-25T03:57:18.622Z",
+    "capturedAt": "2026-08-25T04:13:39.739Z",
     "source": "sanitized_public_projection",
     "liveSessionRelay": false,
     "refreshBehavior": "new_deployment_required"
