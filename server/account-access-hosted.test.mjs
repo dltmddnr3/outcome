@@ -29,7 +29,6 @@ const completeEnvironment = Object.fromEntries([
   ['OUTCOME_PRIVATE_ALLOWED_ORIGIN', 'https://preview.invalid'],
   ['OUTCOME_SUPABASE_URL', 'https://database.invalid'],
   ['OUTCOME_SUPABASE_PUBLISHABLE_KEY', 'database-publishable-test-value'],
-  ['OUTCOME_SUPABASE_SECRET_KEY', 'database-server-test-value'],
   ['OUTCOME_PRIVATE_ROLLBACK_DEPLOYMENT', 'last-verified-preview'],
 ])
 
@@ -128,7 +127,7 @@ test('Supabase REST gateway uses the existing private schema with the verified s
 })
 
 test('Vercel handler stays disabled for absent or partial env and selects only complete injected adapters', async () => {
-  for (const environment of [{}, { ...completeEnvironment, OUTCOME_SUPABASE_SECRET_KEY: undefined }]) {
+  for (const environment of [{}, { ...completeEnvironment, OUTCOME_SUPABASE_PUBLISHABLE_KEY: undefined }]) {
     const request = createStableHostRequestHandler({ environment })
     assert.equal((await request({ method: 'GET', pathname: '/api/private/config' })).body.enabled, false)
     assert.deepEqual(await request({ method: 'GET', pathname: '/api/private/workspace' }), { status: 401, body: { error: 'authentication_required' } })
@@ -154,13 +153,28 @@ test('Vercel handler stays disabled for absent or partial env and selects only c
   assert.deepEqual(await request({ method: 'POST', pathname: '/api/dashboard' }), { status: 405, body: { error: 'read_only' } })
 })
 
+test('rejected null or malformed runtime factories preserve the exact disabled boundary', async () => {
+  const factories = [
+    async () => { throw new Error('adapter initialization failed') },
+    async () => null,
+    async () => ({}),
+    async () => ({ service: {}, transition: {}, allowedOrigin: 'https://preview.invalid' }),
+  ]
+  for (const runtimeFactory of factories) {
+    const request = createStableHostRequestHandler({ environment: completeEnvironment, runtimeFactory })
+    assert.deepEqual(await request({ method: 'GET', pathname: '/api/private/config' }), { status: 200, body: { enabled: false, access: 'private_read_only', providers: [{ id: 'google', mode: 'primary' }, { id: 'apple', mode: 'linked_only' }, { id: 'email_code', mode: 'fallback_recovery' }], sessionMaximumDays: 7, completionAuthority: false } })
+    assert.deepEqual(await request({ method: 'GET', pathname: '/api/private/workspace' }), { status: 401, body: { error: 'authentication_required' } })
+    assert.deepEqual(await request({ method: 'POST', pathname: '/api/private/auth/login' }), { status: 405, body: { error: 'read_only' } })
+  }
+})
+
 test('default stable Vercel boundary remains disabled, private-denied and mutation-closed', async () => {
   const request = createStableHostRequestHandler({ environment: {} })
   const serialized = JSON.stringify([
     await request({ method: 'GET', pathname: '/api/private/config' }),
     await request({ method: 'GET', pathname: '/api/private/workspace' }),
   ])
-  assert.doesNotMatch(serialized, /synthetic-owner|server-test-value|database-server-test-value/)
+  assert.doesNotMatch(serialized, /synthetic-owner|server-test-value/)
   for (const pathname of ['/api/dashboard', '/api/private/config', '/api/private/workspace', '/api/private/auth/login']) {
     assert.equal((await request({ method: 'POST', pathname })).status, 405)
   }

@@ -2,7 +2,7 @@ import snapshot from './deployment-snapshot.mjs'
 import { privateAccessPublicConfig } from '../server/account-access-api.mjs'
 import { handlePrivateAccessRequest } from '../server/account-access-api.mjs'
 import { AccountAccessError } from '../server/account-access.mjs'
-import { readHostedPreviewConfiguration } from '../server/account-access-hosted.mjs'
+import { HOSTED_PREVIEW_ENV, readHostedPreviewConfiguration } from '../server/account-access-hosted.mjs'
 
 const result = (status, body) => ({ status, body })
 
@@ -22,11 +22,18 @@ const sessionCookie = (token, maxAge) => `__session=${token}; Path=/; HttpOnly; 
 
 export function createStableHostRequestHandler({ environment = process.env, runtimeFactory } = {}) {
   const configured = readHostedPreviewConfiguration(environment).enabled
-  let runtime
+  const configuredOrigin = typeof environment?.[HOSTED_PREVIEW_ENV.privateAllowedOrigin] === 'string' ? environment[HOSTED_PREVIEW_ENV.privateAllowedOrigin].trim() : ''
+  const validRuntime = (value) => value?.allowedOrigin === configuredOrigin
+    && typeof value?.service?.readWorkspace === 'function'
+    && typeof value?.service?.authenticate === 'function'
+    && typeof value?.transition?.begin === 'function'
+    && typeof value?.transition?.appleLink === 'function'
+    && typeof value?.transition?.end === 'function'
+  let runtimePromise
   const selectedRuntime = async () => {
     if (!configured || !runtimeFactory) return null
-    if (runtime === undefined) runtime = await runtimeFactory({ environment })
-    return runtime
+    runtimePromise ??= Promise.resolve().then(() => runtimeFactory({ environment })).then((value) => validRuntime(value) ? value : null).catch(() => null)
+    return runtimePromise
   }
   return async ({ method = 'GET', pathname = '/', headers = {}, body, origin } = {}) => {
     if (!pathname.startsWith('/api/private/')) return handleStableHostRequest({ method, pathname })

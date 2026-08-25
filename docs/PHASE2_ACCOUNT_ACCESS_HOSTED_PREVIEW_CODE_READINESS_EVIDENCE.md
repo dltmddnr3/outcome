@@ -18,10 +18,11 @@ Status: `CODE CANDIDATE · NO_EXTERNAL_MUTATION`
    - RED: tests 2, pass 1, fail 1 because the hosted redirect was not consumed.
    - GREEN: tests 2, pass 2, fail 0; hosted redirect is consumed while the injected synthetic transition does not navigate.
 3. A hostile provider redirect is rejected by the provider boundary; only the configured Clerk origins are accepted.
+4. Runtime factory rejection was reproduced as an escaped `adapter initialization failed` error before correction. Null and malformed adapters are now normalized to the same disabled config, workspace `401` and mutation `405` boundary.
 
 ## Implemented contract
 
-- Complete configuration plus an explicitly supplied hosted runtime adapter is required before the private handler can become enabled. Absent configuration, any partial binding, flag removal or missing adapter returns the existing disabled config, workspace `401` and mutation `405` contract.
+- Complete least-privilege configuration plus an explicitly supplied valid hosted runtime adapter is required before the private handler can become enabled. Absent configuration, any partial binding, flag removal, missing adapter, rejected factory or malformed adapter returns the existing disabled config, workspace `401` and mutation `405` contract.
 - The credential-free Clerk boundary verifies canonical subject, seven-day maximum/expiry, revocation and wrong-owner denial; starts Google or email-code; permits Apple only as an authenticated owner link operation; supports logout and operator revocation; and maps provider failure closed.
 - The hosted store boundary passes the verified session token and server-derived subject/workspace into the `outcome_private` REST/RLS surface, filters to Cherry Note and OUTCOME, and maps store/RLS failure to one deny-by-default error without fallback.
 - The Vercel private route enforces explicit activation, complete bindings, allowed origin, secure HttpOnly SameSite cookie attributes and provider redirect origin validation. The unchanged public handler remains the default and preserves its existing response bodies.
@@ -39,17 +40,18 @@ Status: `CODE CANDIDATE · NO_EXTERNAL_MUTATION`
 - `OUTCOME_PRIVATE_ALLOWED_ORIGIN`
 - `OUTCOME_SUPABASE_URL`
 - `OUTCOME_SUPABASE_PUBLISHABLE_KEY`
-- `OUTCOME_SUPABASE_SECRET_KEY`
 - `OUTCOME_PRIVATE_ROLLBACK_DEPLOYMENT`
 
 Only names are recorded. No values, email, provider subject, token, cookie, connection string or private project payload is present in this evidence.
 
+`OUTCOME_SUPABASE_SECRET_KEY` is reserved only as a possible future server-ingestion contract. The verified-user read-only REST/RLS gateway does not use it, and it is not an HP0 activation binding or prerequisite.
+
 ## Final verification
 
-- `npm run test:account-access`: Node 24/24 and Vitest 7/7 PASS.
+- `npm run test:account-access`: Node 25/25 and Vitest 7/7 PASS.
 - `npm run test:account-access-browser`: 3 viewports × 9 settled states plus loading and ready login/logout hierarchy PASS; mobile and phone 200% zoom overflow 0; touch targets at least 44px.
 - `npm run test:security`: 28/28 PASS; stable snapshot prohibited disclosures 0 and Gate evidence fields 0.
-- `npm test`: frontend 66/66 and Node 103/103 PASS.
+- `npm test`: frontend 66/66 and Node 104/104 PASS.
 - `npm run test:browser`: assertion tests 16/16 and deterministic 3-project fixture across 4 viewports PASS; overflow, clipping and unexpected English 0.
 - `npm run test:stable-browser`: 2-project snapshot across 4 viewports PASS; source groups 8/8, overflow, clipping and unexpected English 0.
 - `npm run check:public-boundary`: prohibited identifiers 0.

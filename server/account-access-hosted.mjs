@@ -13,7 +13,6 @@ export const HOSTED_PREVIEW_ENV = Object.freeze({
   privateAllowedOrigin: 'OUTCOME_PRIVATE_ALLOWED_ORIGIN',
   supabaseUrl: 'OUTCOME_SUPABASE_URL',
   supabasePublishableKey: 'OUTCOME_SUPABASE_PUBLISHABLE_KEY',
-  supabaseSecretKey: 'OUTCOME_SUPABASE_SECRET_KEY',
   rollbackDeployment: 'OUTCOME_PRIVATE_ROLLBACK_DEPLOYMENT',
 })
 
