@@ -54,6 +54,19 @@ test('constructor and every mutation reject non-primitive or coercive input befo
   }
 })
 
+test('constructor accepts exactly the authorized synthetic source set and nothing else', () => {
+  for (const source_hosts of [
+    ['source-a'],
+    ['source-b'],
+    ['source-a', 'source-b', 'source-c'],
+    ['source-a', 'source-a'],
+    ['source-c'],
+  ]) assert.throws(() => createPhase3ObservationRelay(config({ source_hosts })), /configuration_invalid/)
+
+  assert.doesNotThrow(() => createPhase3ObservationRelay(config({ source_hosts: ['source-a', 'source-b'] })))
+  assert.doesNotThrow(() => createPhase3ObservationRelay(config({ source_hosts: ['source-b', 'source-a'] })))
+})
+
 test('valid ingest preserves the public event and exact duplicate is idempotent', () => {
   const relay = createPhase3ObservationRelay(config())
   const accepted = relay.ingest(event())
@@ -126,6 +139,60 @@ test('allowlists, timestamps and prohibited summary shapes fail atomically', () 
   }
 })
 
+test('all prohibited raw summary families fail before mutation while ordinary public text remains usable', () => {
+  const prohibited = [
+    'session_id=synthetic-opaque-123',
+    'session-id: synthetic-opaque-123',
+    'sessionId synthetic-opaque-123',
+    'thread id=synthetic-opaque-123',
+    '01890f47-6a7b-7cc3-98a2-123456789abc',
+    '00000000-0000-0000-0000-000000000000',
+    'codex://synthetic/opaque-123',
+    'provider_locator=synthetic://opaque-123',
+    'api_key=sk-synthetic-not-a-real-secret',
+    'sk_test_syntheticnotreal',
+    'access-token: synthetic-not-a-real-secret',
+    'credential=synthetic-not-a-real-secret',
+    '/etc/passwd',
+    '/opt/outcome/private.json',
+    'path=/usr/local/private.json',
+    'C:/synthetic/private.txt',
+    'D:\\synthetic\\private.txt',
+    '\\\\synthetic-server\\private-share\\file.txt',
+    '//synthetic-server/private-share/file.txt',
+    'prompt=raw synthetic request',
+    'prompt -> raw synthetic request',
+    'result: raw synthetic response',
+    'result=>raw synthetic response',
+    'prompt|raw synthetic request',
+  ]
+  const relay = createPhase3ObservationRelay(config())
+  const loggable = []
+  for (const now_summary of prohibited) {
+    const before = snapshot(relay)
+    let failure
+    try { relay.ingest(event({ now_summary })) } catch (error) { failure = error }
+    assert.match(failure?.message ?? '', /summary_prohibited/)
+    loggable.push(failure.name, failure.message, JSON.stringify(relay.read()))
+    assert.deepEqual(relay.read(), before)
+  }
+  const serialized = loggable.join('\n')
+  for (const raw of prohibited) assert.equal(serialized.includes(raw), false)
+
+  for (const [index, now_summary] of [
+    '한국어 공개 작업 요약 확인 중',
+    'Public build verification is running',
+    'API 연동 상태 확인 중',
+    'Provider health check complete',
+    'Result verification complete',
+    'prompt 개선 작업 진행 중',
+    'docs/summary.md 상대 경로 문서 검토',
+    'https://example.invalid/public-status 확인',
+  ].entries()) {
+    assert.equal(relay.ingest(event({ sequence: index + 1, now_summary })).status, 'accepted')
+  }
+})
+
 test('disconnect and reconnect use CAS while gap resync opens a new monotonic baseline', () => {
   const relay = createPhase3ObservationRelay(config())
   relay.ingest(event())
@@ -190,6 +257,16 @@ test('clock failure, re-entry and response materialization failure never partial
   globalThis.structuredClone = () => { throw new Error('clone failure') }
   try { assert.throws(() => cloneFailure.ingest(event()), /materialization_failed/) } finally { globalThis.structuredClone = originalClone }
   assert.deepEqual(cloneFailure.read(), { enabled: true, registry_revision: 7, projections: [], evidence: [] })
+})
+
+test('finite clock outside ISO range fails as clock_unavailable without consuming evidence IDs', () => {
+  let clock = 9_000_000_000_000_000
+  const relay = createPhase3ObservationRelay(config({ now: () => clock }))
+  assert.throws(() => relay.ingest(event()), (error) => error?.name === 'Phase3ObservationError' && error?.code === 'clock_unavailable')
+  clock = BASE_TIME
+  assert.deepEqual(relay.read(), { enabled: true, registry_revision: 7, projections: [], evidence: [] })
+  assert.equal(relay.ingest(event()).status, 'accepted')
+  assert.deepEqual(relay.read().evidence.map((item) => item.evidence_id), [1])
 })
 
 test('serialized public projection and evidence contain zero prohibited raw values', () => {

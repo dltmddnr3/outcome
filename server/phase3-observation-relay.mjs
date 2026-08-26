@@ -2,9 +2,23 @@ const FUTURE_TOLERANCE_MS = 5_000
 const AVAILABILITY = new Set(['available', 'idle', 'offline', 'unknown'])
 const EVENT_KEYS = new Set(['project_id', 'role', 'binding_version', 'source_host', 'sequence', 'observed_at', 'availability', 'now_summary'])
 const CONFIG_KEYS = new Set(['project_ids', 'roles', 'binding_versions', 'source_hosts', 'freshness_ms', 'registry_revision', 'now', 'enabled'])
+const AUTHORIZED_SOURCE_HOSTS = new Set(['source-a', 'source-b'])
 const SAFE_ID = /^[a-z][a-z0-9-]{0,63}$/
-const UUID = /\b[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}\b/i
-const PROHIBITED_SUMMARY = /(?:\bsession\b|\bthread(?:_id)?\b|\bprovider\b|\blocator\b|\bprompt\s*:|\bresult\s*:|\bcredential\b|\bbearer\b|\btoken\b|\bcookie\b|(?:^|\s)\/(?:Users|home|tmp|var|private|Volumes)\/|[A-Za-z]:\\)/i
+const PROHIBITED_SUMMARY = [
+  /\b[0-9a-f]{8}(?:-[0-9a-f]{4}){3}-[0-9a-f]{12}\b/i,
+  /\b(?:session|thread)[ _-]*id\b\s*(?:(?:=|:|=>|->)\s*)?[a-z0-9][a-z0-9._:-]{2,}/i,
+  /\b(?:codex|claude|clerk|provider|session|thread):\/\/\S+/i,
+  /\bprovider[ _-]*(?:locator|url|uri)\b\s*(?:=|:|=>|->)\s*\S+/i,
+  /\b(?:api[ _-]*key|access[ _-]*token|secret[ _-]*key|private[ _-]*key|credential|password)\b\s*(?:=|:|=>|->)\s*\S+/i,
+  /\b(?:sk-(?:[a-z0-9_-]{8,})|(?:sk|pk)_(?:live|test)_[a-z0-9_-]{4,}|gh[pousr]_[a-z0-9_-]{8,})\b/i,
+  /\bbearer\s+\S+/i,
+  /\bcookie\b\s*(?:=|:)\s*\S+/i,
+  /(?:^|[\s=(])\/(?!\/)\S+/,
+  /(?<![:/])\/\/\S+/,
+  /(?:^|[^\\])\\\\\S+/,
+  /\b[a-z]:[\\/]\S+/i,
+  /\b(?:prompt|result)\b\s*(?:=|:|=>|->|\|)\s*\S+/i,
+]
 
 export class Phase3ObservationError extends Error {
   constructor(code) {
@@ -32,7 +46,7 @@ const canonicalIso = (value) => {
 }
 const safeSummary = (value) => value === undefined || (
   typeof value === 'string' && value.length > 0 && value.length <= 160 && value.trim() === value &&
-  !/[\u0000-\u001f\u007f]/.test(value) && !UUID.test(value) && !PROHIBITED_SUMMARY.test(value)
+  !/[\u0000-\u001f\u007f]/.test(value) && !PROHIBITED_SUMMARY.some((pattern) => pattern.test(value))
 )
 const materialize = (value) => {
   try { return structuredClone(value) } catch { fail('materialization_failed') }
@@ -89,6 +103,7 @@ export function createPhase3ObservationRelay(options) {
     fail('configuration_invalid')
   }
   if (!positiveInteger(freshnessMs) || !positiveInteger(registryRevision) || typeof now !== 'function' || typeof enabled !== 'boolean') fail('configuration_invalid')
+  if (sourceHosts.length !== AUTHORIZED_SOURCE_HOSTS.size || !sourceHosts.every((value) => AUTHORIZED_SOURCE_HOSTS.has(value))) fail('configuration_invalid')
 
   const allowed = {
     projects: new Set(projectIds), roles: new Set(roles), bindingVersions: new Set(bindingVersions), sourceHosts: new Set(sourceHosts),
@@ -100,6 +115,7 @@ export function createPhase3ObservationRelay(options) {
     try {
       const value = now()
       if (typeof value !== 'number' || !Number.isFinite(value)) fail('clock_unavailable')
+      new Date(value).toISOString()
       return value
     } catch (error) {
       if (error instanceof Phase3ObservationError) throw error
