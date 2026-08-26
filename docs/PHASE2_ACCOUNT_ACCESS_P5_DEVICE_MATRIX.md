@@ -2,9 +2,11 @@
 
 상태: `P5 OPEN · OBSERVED 10/19 · COMPLETION CLAIM 금지`
 
-기준 후보: Preview deployment `dpl_A7wUkQoZ45jUoY1nF6e7EJ4ttKZT` · source commit `ea4a4e542142ac9c5ee27372a47ffef3b51957fd` · state `READY`
+기준 후보: Preview deployment `dpl_Gf9sidpNc2sh7HNt2ChpHJywDCbG` · source commit `c194f3297d728020d6af16bef29ddb179b339b32` · state `READY`
 
 이 행렬은 실제 MacBook Chrome과 모바일 시스템 브라우저에서 직접 관측한 항목만 `PASS`로 기록한다. 자동 테스트, Account Portal P3 결과, 세션 활동 또는 구현 존재는 P5 실기기 PASS를 대신하지 않는다.
+
+인증 실패 상태 교정 `C1-C5 5/5`와 Preview 배포 `D1-D6 6/6`은 완료됐지만, 새 후보의 실제 만료·철회·제공자 장애 관측은 아직 없다.
 
 ## 현재 관측
 
