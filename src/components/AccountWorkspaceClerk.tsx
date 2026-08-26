@@ -1,5 +1,5 @@
 import { AuthenticateWithRedirectCallback, ClerkProvider, useAuth, useSignIn, useUser } from '@clerk/react'
-import { type FormEvent, useEffect, useState } from 'react'
+import { type FormEvent, useEffect, useRef, useState } from 'react'
 import { fetchPrivateOwnerSession, fetchPrivateWorkspace, type PrivateWorkspaceView } from '../lib/api'
 import { AccountWorkspace, type AccountWorkspaceState } from './AccountWorkspace'
 
@@ -14,6 +14,22 @@ export async function requireHostedSessionToken(getToken: () => Promise<string |
   const sessionToken = await getToken()
   if (!sessionToken) throw new Error('authentication_required')
   return sessionToken
+}
+
+type HostedGoogleSignIn = { sso: (parameters: typeof hostedGoogleSsoParameters) => Promise<{ error: unknown }> }
+type HostedGoogleAttempt = 'returned' | 'failed' | 'unavailable' | 'ignored'
+export async function attemptHostedGoogleSignIn(signIn: HostedGoogleSignIn | null | undefined, lock: { current: boolean }): Promise<HostedGoogleAttempt> {
+  if (lock.current) return 'ignored'
+  if (!signIn) return 'unavailable'
+  lock.current = true
+  try {
+    const result = await signIn.sso(hostedGoogleSsoParameters)
+    return result.error ? 'failed' : 'returned'
+  } catch {
+    return 'failed'
+  } finally {
+    lock.current = false
+  }
 }
 
 const hostedFailureStates: Readonly<Record<string, AccountWorkspaceState>> = Object.freeze({
@@ -39,7 +55,7 @@ export async function returnToHostedLogin(signOut: HostedSignOut) {
 
 function HostedWorkspaceBody() {
   const { isLoaded, isSignedIn, getToken, signOut } = useAuth()
-  const { signIn } = useSignIn()
+  const { signIn, errors: signInErrors, fetchStatus } = useSignIn()
   const { user } = useUser()
   const [state, setState] = useState<AccountWorkspaceState>(isLoaded && !isSignedIn ? 'login' : 'loading')
   const [ownerVerified, setOwnerVerified] = useState(false)
@@ -48,6 +64,9 @@ function HostedWorkspaceBody() {
   const [code, setCode] = useState('')
   const [codeSent, setCodeSent] = useState(false)
   const [error, setError] = useState<string | null>(null)
+  const [googlePending, setGooglePending] = useState(false)
+  const googleLock = useRef(false)
+  const googleBusy = googlePending || fetchStatus === 'fetching'
 
   useEffect(() => {
     if (!isLoaded) return
@@ -63,11 +82,18 @@ function HostedWorkspaceBody() {
       })
   }, [getToken, isLoaded, isSignedIn])
 
+  useEffect(() => {
+    if (signInErrors.global || signInErrors.raw) setError('인증을 시작하지 못했습니다. 다시 시도해 주세요.')
+  }, [signInErrors.global, signInErrors.raw])
+
   const google = async () => {
+    if (googleBusy || googleLock.current) return
     setError(null)
-    if (!signIn) { setError('인증 공급자를 불러오지 못했습니다.'); return }
-    const result = await signIn.sso(hostedGoogleSsoParameters)
-    if (result?.error) setError('Google 로그인을 시작하지 못했습니다.')
+    setGooglePending(true)
+    const result = await attemptHostedGoogleSignIn(signIn, googleLock)
+    if (result === 'unavailable') setError('인증 공급자를 불러오지 못했습니다. 다시 시도해 주세요.')
+    else if (result !== 'ignored') setError('Google 로그인을 시작하지 못했습니다. 다시 시도해 주세요.')
+    setGooglePending(false)
   }
   const sendCode = async (event: FormEvent) => {
     event.preventDefault(); setError(null)
@@ -87,7 +113,7 @@ function HostedWorkspaceBody() {
     if (redirect) window.location.assign(redirect.href)
   }
   const loginContent = <div className="account-workspace__actions" data-clerk-browser-auth="true">
-    <button className="account-workspace__google" type="button" data-touch-target="44" data-private-login-provider="google" onClick={() => void google()}>Google로 계속</button>
+    <button className="account-workspace__google" type="button" data-touch-target="44" data-private-login-provider="google" data-google-start-pending={googleBusy} aria-busy={googleBusy} disabled={googleBusy} onClick={() => void google()}>{googleBusy ? 'Google 로그인 시작 중…' : 'Google로 계속'}</button>
     <div className="account-workspace__separator" aria-hidden="true"><span>또는</span></div>
     <form className="account-workspace__fallback" onSubmit={codeSent ? verifyCode : sendCode}>
       <strong>이메일로 확인</strong>

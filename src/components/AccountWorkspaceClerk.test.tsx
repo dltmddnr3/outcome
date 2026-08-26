@@ -1,16 +1,16 @@
 import { renderToStaticMarkup } from 'react-dom/server'
 import { describe, expect, it, vi } from 'vitest'
 
-const clerkAuth = vi.hoisted(() => ({ isSignedIn: false }))
+const clerkAuth = vi.hoisted(() => ({ isSignedIn: false, fetchStatus: 'idle' as 'idle' | 'fetching' }))
 vi.mock('@clerk/react', () => ({
   ClerkProvider: ({ children, publishableKey }: { children: React.ReactNode; publishableKey: string }) => <div data-clerk-provider={publishableKey}>{children}</div>,
   AuthenticateWithRedirectCallback: ({ transferable }: { transferable: boolean }) => <div data-clerk-redirect-callback="true" data-transferable={String(transferable)} />,
   useAuth: () => ({ isLoaded: true, isSignedIn: clerkAuth.isSignedIn, getToken: vi.fn().mockResolvedValue(null), signOut: vi.fn() }),
-  useSignIn: () => ({ signIn: {}, fetchStatus: 'idle' }),
+  useSignIn: () => ({ signIn: {}, errors: { global: null, raw: null }, fetchStatus: clerkAuth.fetchStatus }),
   useUser: () => ({ user: null }),
 }))
 
-import { HostedClerkWorkspace, hostedFailureState, hostedGoogleSsoParameters, requestHostedEmailCode, requireHostedSessionToken, returnToHostedLogin } from './AccountWorkspaceClerk'
+import { attemptHostedGoogleSignIn, HostedClerkWorkspace, hostedFailureState, hostedGoogleSsoParameters, requestHostedEmailCode, requireHostedSessionToken, returnToHostedLogin } from './AccountWorkspaceClerk'
 
 describe('Clerk browser session boundary', () => {
   it('mounts ClerkProvider with the runtime publishable key and real SDK callback component', () => {
@@ -33,6 +33,40 @@ describe('Clerk browser session boundary', () => {
 
   it('maps Clerk Core 3 callback and completed-session destinations exactly', () => {
     expect(hostedGoogleSsoParameters).toEqual({ strategy: 'oauth_google', redirectCallbackUrl: '/workspace/sso-callback', redirectUrl: '/workspace' })
+  })
+
+  it('fails safely for absent, rejected, thrown, and returned-without-navigation Google starts', async () => {
+    const lock = { current: false }
+    const returned = vi.fn().mockResolvedValue({ error: null })
+    await expect(attemptHostedGoogleSignIn(undefined, lock)).resolves.toBe('unavailable')
+    await expect(attemptHostedGoogleSignIn({ sso: vi.fn().mockResolvedValue({ error: new Error('raw-provider-detail') }) }, lock)).resolves.toBe('failed')
+    await expect(attemptHostedGoogleSignIn({ sso: vi.fn().mockRejectedValue(new Error('raw-provider-secret')) }, lock)).resolves.toBe('failed')
+    await expect(attemptHostedGoogleSignIn({ sso: returned }, lock)).resolves.toBe('returned')
+    expect(returned).toHaveBeenCalledWith(hostedGoogleSsoParameters)
+    expect(lock.current).toBe(false)
+  })
+
+  it('keeps one Google start pending and rejects a duplicate click', async () => {
+    let resolve!: (value: { error: null }) => void
+    const pending = new Promise<{ error: null }>((done) => { resolve = done })
+    const sso = vi.fn(() => pending)
+    const lock = { current: false }
+    const first = attemptHostedGoogleSignIn({ sso }, lock)
+    await expect(attemptHostedGoogleSignIn({ sso }, lock)).resolves.toBe('ignored')
+    expect(sso).toHaveBeenCalledOnce()
+    expect(lock.current).toBe(true)
+    resolve({ error: null })
+    await expect(first).resolves.toBe('returned')
+    expect(lock.current).toBe(false)
+  })
+
+  it('shows Clerk fetching as a disabled Korean starting state', () => {
+    clerkAuth.fetchStatus = 'fetching'
+    const html = renderToStaticMarkup(<HostedClerkWorkspace publishableKey="pk_test_browser" pathname="/workspace" />)
+    clerkAuth.fetchStatus = 'idle'
+    expect(html).toContain('Google 로그인 시작 중…')
+    expect(html).toContain('data-google-start-pending="true"')
+    expect(html).toContain('disabled=""')
   })
 
   it('does not advance email-code state while the Clerk sign-in resource is absent or rejects', async () => {
