@@ -8,7 +8,7 @@ const clock = () => {
 }
 
 const createRegistry = () => createProjectRoleBindingRegistry({ projectIds: ['outcome', 'cherry-note'], now: clock() })
-const metadata = { actorClass: 'planner', reason: 'approved synthetic registry test' }
+const metadata = { actorClass: 'planner', reason: 'approved_synthetic_registry_test' }
 const bind = (registry, overrides = {}) => registry.bind({
   projectId: 'outcome',
   role: 'builder',
@@ -113,6 +113,61 @@ test('raw locator credential and absolute path shaped values are rejected', () =
     assert.deepEqual(bind(registry, { locatorRef }), { ok: false, error: 'invalid_locator' })
     assert.deepEqual(registry.inspectState(), before)
   }
+})
+
+test('audit reason rejects private identifier credential and path shaped values without mutation', () => {
+  const prohibited = [
+    'session 123e4567-e89b-12d3-a456-426614174000',
+    'thread abcdefghijklmnop',
+    'from /Users/cherry/private',
+    'uses C:\\Users\\cherry\\private',
+    'uses sk-proj-secretvalue',
+    'credential_token',
+  ]
+  for (const reason of prohibited) {
+    const registry = createRegistry()
+    const before = registry.inspectState()
+    assert.deepEqual(bind(registry, { reason }), { ok: false, error: 'invalid_reason' })
+    assert.deepEqual(registry.inspectState(), before)
+  }
+})
+
+test('re-entrant clock mutation fails closed and preserves one active binding per scope', () => {
+  let registry
+  let nestedResult
+  let armed = true
+  const now = () => {
+    if (armed) {
+      armed = false
+      nestedResult = bind(registry, { locatorRef: 'synthetic:builder_nested' })
+    }
+    return '2026-08-26T00:00:00.000Z'
+  }
+  registry = createProjectRoleBindingRegistry({ projectIds: ['outcome', 'cherry-note'], now })
+  const outerResult = bind(registry)
+  assert.deepEqual(nestedResult, { ok: false, error: 'mutation_in_progress' })
+  assert.equal(outerResult.ok, true)
+  assert.equal(registry.inspectState().bindings.filter((row) => row.status === 'active').length, 1)
+  assert.equal(registry.auditHistory().length, 1)
+})
+
+test('clock is materialized before commit and clock failure leaves state unchanged', () => {
+  let secondCallCount = 0
+  const oneShotClock = () => {
+    secondCallCount += 1
+    if (secondCallCount > 1) throw new Error('clock_failure')
+    return '2026-08-26T00:00:00.000Z'
+  }
+  const oneShotRegistry = createProjectRoleBindingRegistry({ projectIds: ['outcome'], now: oneShotClock })
+  assert.equal(bind(oneShotRegistry).ok, true)
+  assert.equal(secondCallCount, 1)
+  assert.equal(oneShotRegistry.inspectState().bindings.length, 1)
+  assert.equal(oneShotRegistry.auditHistory().length, 1)
+
+  const failedRegistry = createProjectRoleBindingRegistry({ projectIds: ['outcome'], now: () => { throw new Error('clock_failure') } })
+  const before = failedRegistry.inspectState()
+  assert.deepEqual(bind(failedRegistry), { ok: false, error: 'clock_unavailable' })
+  assert.deepEqual(failedRegistry.inspectState(), before)
 })
 
 test('revoked and replaced bindings cannot be reused', () => {
