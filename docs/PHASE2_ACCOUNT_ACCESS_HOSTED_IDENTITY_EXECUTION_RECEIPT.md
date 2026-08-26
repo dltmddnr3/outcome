@@ -138,3 +138,14 @@ P5는 잔여 행렬이 남아 있어 `OPEN`이다. 이 재검증 단독으로는
 - 판정: MacBook Google 재로그인 owner/session/workspace 성공 경로 `PASS`; P5 실기기 행렬 `11/19`.
 
 MacBook/mobile email code·만료·철회·인증 제공자 장애 `8/19`는 계속 미실행이다. P5, HP1과 상위 완료 상태는 계속 `OPEN`이다.
+
+## P5 current candidate 모바일 Google 로그인 재검증
+
+- exact Preview: deployment `dpl_3MYfocjsQ6XvTrCoTNXE6Pp4U7wY` · source `4613372adbec17e35c2498e55ab4210cc8b33c34` · `READY`
+- 사용자 직접 확인: `2026-08-26 KST` Cherry가 모바일 Google 로그인을 확인했다.
+- 서버 대조: `/api/private/config` `4`, `/api/private/session` `3`, `/api/private/workspace` `3`; 총 `10/10` HTTP `200`.
+- 판정: current candidate의 모바일 Google 로그인·callback·로그인 중·준비·로그아웃·재로그인 복구 `PASS`.
+- 후보 경계: Google 시작 코드가 popup/finalize 방식으로 바뀌었으므로 이전 후보의 MacBook Google 로그인·재로그인 관측은 current candidate PASS로 승계하지 않는다.
+- 현재 행렬: `9/19`; MacBook Google 로그인·재로그인, 양쪽 email code·만료·철회·인증 제공자 장애 `10/19`가 남아 있다.
+
+계정·이메일·token·cookie·raw identifier는 관측하거나 기록하지 않았다. P5, HP1, HP2, hosted QA, Release Audit, Cherry acceptance, Production, Phase 2와 `EXTERNAL_OUTCOME_COMPLETE`는 계속 열려 있다.
