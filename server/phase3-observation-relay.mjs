@@ -3,23 +3,15 @@ const AVAILABILITY = new Set(['available', 'idle', 'offline', 'unknown'])
 const EVENT_KEYS = new Set(['project_id', 'role', 'binding_version', 'source_host', 'sequence', 'observed_at', 'availability', 'now_summary'])
 const CONFIG_KEYS = new Set(['project_ids', 'roles', 'binding_versions', 'source_hosts', 'freshness_ms', 'registry_revision', 'now', 'enabled'])
 const AUTHORIZED_SOURCE_HOSTS = new Set(['source-a', 'source-b'])
-const MAX_CANONICAL_SUMMARY_LENGTH = 320
+const NOW_STATES = new Set([
+  '작업 준비 중',
+  '구현 진행 중',
+  '테스트 실행 중',
+  '검수 진행 중',
+  '결과 정리 중',
+  '응답 대기 중',
+])
 const SAFE_ID = /^[a-z][a-z0-9-]{0,63}$/
-const PROHIBITED_SUMMARY = [
-  /\b[0-9a-f]{8}(?:-[0-9a-f]{4}){3}-[0-9a-f]{12}\b/i,
-  /\b(?:session|thread)[ ._-]*id\b\s*(?:(?:=|:|=>|->|\|)\s*)?[a-z0-9][a-z0-9._:-]{2,}/i,
-  /\b(?!https:\/\/)[a-z][a-z0-9+.-]*:\/\/\S+/i,
-  /\bprovider[ ._-]*(?:locator|url|uri)\b\s*(?:=|:|=>|->|\|)\s*\S+/i,
-  /\b(?:api[ ._-]*key|access[ ._-]*token|secret[ ._-]*key|private[ ._-]*key|credential|password)\b\s*(?:=|:|=>|->|\|)\s*\S+/i,
-  /\b(?:sk-(?:[a-z0-9_-]{8,})|(?:sk|pk)_(?:live|test)_[a-z0-9_-]{4,}|gh[pousr]_[a-z0-9_-]{8,})\b/i,
-  /\bbearer\s+\S+/i,
-  /\bcookie\b\s*(?:=|:)\s*\S+/i,
-  /(?:^|[\s=("'])\/(?!\/)\S+/,
-  /(?<![:/])\/\/\S+/,
-  /(?:^|[^\\])\\\\\S+/,
-  /\b[a-z]:[\\/]\S+/i,
-  /\b(?:prompt|result)\b\s*(?:=|:|=>|->|\||\/)\s*\S+/i,
-]
 
 export class Phase3ObservationError extends Error {
   constructor(code) {
@@ -63,45 +55,9 @@ const canonicalIso = (value) => {
   const parsed = Date.parse(value)
   return Number.isFinite(parsed) && new Date(parsed).toISOString() === value
 }
-const canonicalSummary = (value) => {
-  let canonical = value.normalize('NFKC')
-  if (canonical.length > MAX_CANONICAL_SUMMARY_LENGTH) fail('summary_prohibited')
-  const malformedPercent = () => /%(?![0-9a-f]{2}|(?:\s|$))/i.test(canonical)
-  if (malformedPercent()) fail('summary_prohibited')
-  for (let pass = 0; pass < 2 && /%[0-9a-f]{2}/i.test(canonical); pass += 1) {
-    try { canonical = decodeURIComponent(canonical).normalize('NFKC') } catch { fail('summary_prohibited') }
-    if (canonical.length > MAX_CANONICAL_SUMMARY_LENGTH || malformedPercent()) fail('summary_prohibited')
-  }
-  if (/%[0-9a-f]{2}/i.test(canonical)) fail('summary_prohibited')
-  return canonical
-}
-const hasDisallowedScheme = (value) => {
-  const schemes = value.matchAll(/(?:^|\s)([a-z][a-z0-9+.-]*):(?=\S)/gi)
-  for (const match of schemes) {
-    const scheme = match[1].toLowerCase()
-    const schemeStart = match.index + match[0].lastIndexOf(match[1])
-    if (scheme !== 'https' || value.slice(schemeStart, schemeStart + 8).toLowerCase() !== 'https://') return true
-  }
-  return false
-}
-const hasSensitiveStructure = (value) => {
-  const semantic = value.replace(/[\p{P}\s|]+/gu, ' ').trim()
-  return [
-    /\b(?:session|thread) (?:id|token)(?:\s*[=>]\s*|\s+)\S+/i,
-    /\bprovider (?:locator|url|uri)(?:\s*[=>]\s*|\s+)\S+/i,
-    /\b(?:api|private|secret) key(?:\s*[=>]\s*|\s+)\S+/i,
-    /\b(?:credential|password)(?:\s*[=>]\s*|\s+)\S+/i,
-    /\b(?:prompt|result) raw(?:\s*[=>]\s*|\s+)\S+/i,
-    /\b(?:prompt|result)\s*[=>]\s*\S+/i,
-  ].some((pattern) => pattern.test(semantic))
-}
-const safeSummary = (value) => {
-  if (value === undefined) return true
-  if (typeof value !== 'string' || value.length === 0 || value.length > 160 || value.trim() !== value) return false
-  const canonical = canonicalSummary(value)
-  return !/[\u0000-\u001f\u007f]/.test(canonical) && !hasDisallowedScheme(canonical) &&
-    !hasSensitiveStructure(canonical) && !PROHIBITED_SUMMARY.some((pattern) => pattern.test(canonical))
-}
+const safeSummary = (value, availability) => value === null || (
+  availability === 'available' && typeof value === 'string' && NOW_STATES.has(value)
+)
 const materialize = (value) => {
   try { return structuredClone(value) } catch { fail('materialization_failed') }
 }
@@ -126,14 +82,14 @@ function validateEvent(input, allowed) {
   const value = {
     project_id: inputRecord.project_id, role: inputRecord.role, binding_version: inputRecord.binding_version,
     source_host: inputRecord.source_host, sequence: inputRecord.sequence, observed_at: inputRecord.observed_at,
-    availability: inputRecord.availability, ...(inputRecord.now_summary === undefined ? {} : { now_summary: inputRecord.now_summary }),
+    availability: inputRecord.availability, now_summary: inputRecord.now_summary,
   }
   if (!safeString(value.project_id) || !safeString(value.role) || !positiveInteger(value.binding_version) ||
       !safeString(value.source_host, /^source-[a-z0-9]+$/) || !positiveInteger(value.sequence) ||
       typeof value.availability !== 'string' || !AVAILABILITY.has(value.availability)) fail('input_invalid')
   if (!allowed.projects.has(value.project_id) || !allowed.roles.has(value.role) || !allowed.bindingVersions.has(value.binding_version) || !allowed.sourceHosts.has(value.source_host)) fail('scope_not_allowed')
   if (!canonicalIso(value.observed_at)) fail('timestamp_invalid')
-  if (!safeSummary(value.now_summary)) fail('summary_prohibited')
+  if (!safeSummary(value.now_summary, value.availability)) fail('summary_prohibited')
   return value
 }
 
@@ -184,7 +140,7 @@ export function createPhase3ObservationRelay(options) {
       project_id: event.project_id, role: event.role, binding_version: event.binding_version,
       source_host: event.source_host, sequence: event.sequence, availability,
       freshness_class: freshnessClass, observed_at: event.observed_at,
-      ...(!unavailable && !stale && event.now_summary !== undefined ? { now_summary: event.now_summary } : {}),
+      now_summary: !unavailable && !stale ? event.now_summary : null,
     }
   }
   const publicState = (candidate, clock) => ({

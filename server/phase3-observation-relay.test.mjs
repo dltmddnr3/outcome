@@ -4,6 +4,14 @@ import test from 'node:test'
 import { createPhase3ObservationRelay } from './phase3-observation-relay.mjs'
 
 const BASE_TIME = Date.parse('2026-08-26T08:00:00.000Z')
+const NOW_STATES = [
+  '작업 준비 중',
+  '구현 진행 중',
+  '테스트 실행 중',
+  '검수 진행 중',
+  '결과 정리 중',
+  '응답 대기 중',
+]
 const config = (overrides = {}) => ({
   project_ids: ['outcome'],
   roles: ['builder'],
@@ -23,7 +31,7 @@ const event = (overrides = {}) => ({
   sequence: 1,
   observed_at: '2026-08-26T08:00:00.000Z',
   availability: 'available',
-  now_summary: '공개 가능한 합성 작업 요약',
+  now_summary: '구현 진행 중',
   ...overrides,
 })
 const snapshot = (relay) => structuredClone(relay.read())
@@ -73,7 +81,7 @@ test('valid ingest preserves the public event and exact duplicate is idempotent'
   assert.equal(accepted.status, 'accepted')
   assert.deepEqual(accepted.projection, {
     project_id: 'outcome', role: 'builder', binding_version: 1, source_host: 'source-a', sequence: 1,
-    availability: 'available', freshness_class: 'fresh', observed_at: '2026-08-26T08:00:00.000Z', now_summary: '공개 가능한 합성 작업 요약',
+    availability: 'available', freshness_class: 'fresh', observed_at: '2026-08-26T08:00:00.000Z', now_summary: '구현 진행 중',
   })
   const before = snapshot(relay)
   assert.equal(relay.ingest(event()).status, 'duplicate')
@@ -84,7 +92,7 @@ test('valid ingest preserves the public event and exact duplicate is idempotent'
 test('conflicting duplicate, lower sequence and gap preserve last sequence but remove NOW', () => {
   const duplicate = createPhase3ObservationRelay(config())
   duplicate.ingest(event({ sequence: 2 }))
-  assert.equal(duplicate.ingest(event({ sequence: 2, availability: 'idle' })).status, 'conflict')
+  assert.equal(duplicate.ingest(event({ sequence: 2, availability: 'idle', now_summary: null })).status, 'conflict')
   assert.equal(duplicate.read().evidence.at(-1).reason_code, 'duplicate_conflict')
 
   const lower = createPhase3ObservationRelay(config())
@@ -99,24 +107,24 @@ test('conflicting duplicate, lower sequence and gap preserve last sequence but r
   const view = relay.read()
   assert.equal(view.projections[0].sequence, 2)
   assert.equal(view.projections[0].availability, 'conflicting')
-  assert.equal('now_summary' in view.projections[0], false)
+  assert.equal(view.projections[0].now_summary, null)
   assert.deepEqual(view.evidence.map((item) => item.evidence_id), [1, 2, 3])
   assert.deepEqual(view.evidence.map((item) => item.reason_code), ['accepted', 'sequence_gap', 'resync_required'])
 })
 
-test('freshness and unavailable states never expose NOW or synthesize progress', () => {
+test('freshness and unavailable states expose null NOW and never synthesize progress', () => {
   let clock = BASE_TIME
   const relay = createPhase3ObservationRelay(config({ now: () => clock }))
   relay.ingest(event())
   clock += 60_001
   assert.deepEqual(relay.read().projections[0], {
     project_id: 'outcome', role: 'builder', binding_version: 1, source_host: 'source-a', sequence: 1,
-    availability: 'available', freshness_class: 'stale', observed_at: '2026-08-26T08:00:00.000Z',
+    availability: 'available', freshness_class: 'stale', observed_at: '2026-08-26T08:00:00.000Z', now_summary: null,
   })
   for (const availability of ['idle', 'offline', 'unknown']) {
     const item = createPhase3ObservationRelay(config())
-    item.ingest(event({ availability, now_summary: undefined }))
-    assert.equal('now_summary' in item.read().projections[0], false)
+    item.ingest(event({ availability, now_summary: null }))
+    assert.equal(item.read().projections[0].now_summary, null)
   }
   assert.doesNotMatch(JSON.stringify(relay.read()), /progress|completion|approval|dispatch|active/i)
 })
@@ -140,7 +148,17 @@ test('allowlists, timestamps and prohibited summary shapes fail atomically', () 
   }
 })
 
-test('all prohibited raw summary families fail before mutation while ordinary public text remains usable', () => {
+test('finite NOW vocabulary accepts exactly six states and preserves each exact primitive string', () => {
+  for (const now_summary of NOW_STATES) {
+    const relay = createPhase3ObservationRelay(config())
+    const accepted = relay.ingest(event({ now_summary }))
+    assert.equal(accepted.status, 'accepted')
+    assert.equal(accepted.projection.now_summary, now_summary)
+    assert.equal(relay.read().projections[0].now_summary, now_summary)
+  }
+})
+
+test('every non-vocabulary string including prior F1 F5 F7 and former controls fails atomically', () => {
   const prohibited = [
     'session_id=synthetic-opaque-123',
     'session-id: synthetic-opaque-123',
@@ -166,40 +184,6 @@ test('all prohibited raw summary families fail before mutation while ordinary pu
     'result: raw synthetic response',
     'result=>raw synthetic response',
     'prompt|raw synthetic request',
-  ]
-  const relay = createPhase3ObservationRelay(config())
-  const loggable = []
-  for (const now_summary of prohibited) {
-    const before = snapshot(relay)
-    let failure
-    try { relay.ingest(event({ now_summary })) } catch (error) { failure = error }
-    assert.match(failure?.message ?? '', /summary_prohibited/)
-    loggable.push(failure.name, failure.message, JSON.stringify(relay.read()))
-    assert.deepEqual(relay.read(), before)
-  }
-  const serialized = loggable.join('\n')
-  for (const raw of prohibited) assert.equal(serialized.includes(raw), false)
-
-  for (const [index, now_summary] of [
-    '한국어 공개 작업 요약 확인 중',
-    'Public build verification is running',
-    'API 연동 상태 확인 중',
-    'Provider health check complete',
-    'Result verification complete',
-    'prompt 개선 작업 진행 중',
-    'docs/summary.md 상대 경로 문서 검토',
-    'https://example.invalid/public-status 확인',
-    'Observation is 50% complete',
-    'Ｆｕｌｌｗｉｄｔｈ 공개 요약',
-  ].entries()) {
-    const accepted = relay.ingest(event({ sequence: index + 1, now_summary }))
-    assert.equal(accepted.status, 'accepted')
-    assert.equal(accepted.projection.now_summary, now_summary)
-  }
-})
-
-test('canonicalized alternate representations reject all 12 fresh re-QA bypasses and preserve 10 controls', () => {
-  const prohibited = [
     'SeSsIoN_ID | synthetic-opaque-123',
     'THREAD.ID=synthetic-opaque-123',
     'session_id%3Dsynthetic-opaque-123',
@@ -212,40 +196,6 @@ test('canonicalized alternate representations reject all 12 fresh re-QA bypasses
     '%2Fopt%2Fsynthetic%2Fprivate.txt',
     'prompt%3Draw synthetic request',
     'RESULT／raw synthetic response',
-  ]
-  for (const now_summary of prohibited) {
-    const relay = createPhase3ObservationRelay(config())
-    const before = snapshot(relay)
-    let failure
-    try { relay.ingest(event({ now_summary })) } catch (error) { failure = error }
-    assert.equal(failure?.code, 'summary_prohibited')
-    assert.deepEqual(relay.read(), before)
-    assert.equal(JSON.stringify({ error: failure?.code, state: relay.read() }).includes(now_summary), false)
-  }
-
-  const relay = createPhase3ObservationRelay(config())
-  const controls = [
-    '한국어 공개 작업 요약 확인 중',
-    'Public build verification is running',
-    'API integration check complete',
-    'Provider health check complete',
-    'Result verification complete',
-    'Prompt quality review in progress',
-    'docs/public-summary.md review',
-    './docs/public-summary.md review',
-    '../docs/public-summary.md review',
-    'https://example.invalid/public/status?page=summary',
-  ]
-  for (const [index, now_summary] of controls.entries()) {
-    const accepted = relay.ingest(event({ sequence: index + 1, now_summary }))
-    assert.equal(accepted.status, 'accepted')
-    assert.equal(accepted.projection.now_summary, now_summary)
-  }
-  assert.deepEqual(relay.read().evidence.map((item) => item.evidence_id), controls.map((_, index) => index + 1))
-})
-
-test('structural summary policy rejects all exact 17 F5 delimiter escape and scheme cases', () => {
-  const prohibited = [
     'session/id=synthetic-opaque-123',
     'thread:id=synthetic-opaque-123',
     'thread・id=synthetic-opaque-123',
@@ -263,6 +213,61 @@ test('structural summary policy rejects all exact 17 F5 delimiter escape and sch
     'urn:synthetic:opaque-123',
     'ssh:synthetic@example.invalid',
     'synthetic:opaque-123',
+    'session+id+synthetic-opaque-123',
+    'session→id→synthetic-opaque-123',
+    'session＝id＝synthetic-opaque-123',
+    'session∕id=synthetic-opaque-123',
+    'thread+token=synthetic-opaque-123',
+    'provider+locator=synthetic:opaque-123',
+    'api+key=synthetic-not-real',
+    'private+key=synthetic-not-real',
+    'secret→key→synthetic-not-real',
+    'prompt+raw=synthetic request',
+    'result∕raw=synthetic response',
+    'session identifier=synthetic-opaque-123',
+    'thread identifier synthetic-opaque-123',
+    '(mailto:synthetic@example.invalid)',
+    '[ssh:synthetic@example.invalid]',
+    'public—urn:synthetic:opaque-123',
+    'see→file:/opt/synthetic/private.txt',
+    'link=synthetic:opaque-123',
+    '[/opt/synthetic/private.txt]',
+    '{/opt/synthetic/private.txt}',
+    '`/opt/synthetic/private.txt`',
+    'path,/opt/synthetic/private.txt',
+    '~/synthetic/private.txt',
+    '한국어 공개 작업 요약 확인 중',
+    'Public build verification is running',
+    'API 연동 상태 확인 중',
+    'Provider health check complete',
+    'Result verification complete',
+    'prompt 개선 작업 진행 중',
+    'docs/summary.md 상대 경로 문서 검토',
+    'https://example.invalid/public-status 확인',
+    'Observation is 50% complete',
+    'Coverage is 75% complete',
+    'Public status code is 100%25',
+    '(https://example.invalid/public/status)',
+    '[https://example.invalid/public/status]',
+    'Ｆｕｌｌｗｉｄｔｈ 공개 요약',
+    'API integration check complete',
+    'Provider health check complete',
+    'Result verification complete',
+    'Prompt quality review in progress',
+    'Prompt/result wording review',
+    'docs/public-summary.md review',
+    './docs/public-summary.md review',
+    '../docs/public-summary.md review',
+    'https://example.invalid/public/status?page=summary',
+    '',
+    ' 구현 진행 중',
+    '구현 진행 중 ',
+    '구현 진행중',
+    '구현　진행　중',
+    '%EA%B5%AC%ED%98%84%20%EC%A7%84%ED%96%89%20%EC%A4%91',
+    'Ｇｏｏｇｌｅ 확인 중',
+    'a'.repeat(160),
+    'a'.repeat(321),
   ]
   for (const now_summary of prohibited) {
     const relay = createPhase3ObservationRelay(config())
@@ -271,33 +276,34 @@ test('structural summary policy rejects all exact 17 F5 delimiter escape and sch
     try { relay.ingest(event({ now_summary })) } catch (error) { failure = error }
     assert.equal(failure?.code, 'summary_prohibited')
     assert.deepEqual(relay.read(), before)
-    assert.equal(JSON.stringify({ code: failure?.code, state: relay.read() }).includes(now_summary), false)
-    assert.equal(relay.ingest(event()).status, 'accepted')
+    if (now_summary.length > 0) assert.equal(JSON.stringify({ code: failure?.code, state: relay.read() }).includes(now_summary), false)
+    assert.equal(relay.ingest(event({ now_summary: NOW_STATES[0] })).status, 'accepted')
     assert.deepEqual(relay.read().evidence.map((item) => item.evidence_id), [1])
   }
 })
 
-test('canonical expansion enforces exact 320 accepted and 321 rejected boundaries', () => {
-  const ligature = '\uFDFA'
-  const canonical320 = ligature.repeat(17) + 'a'.repeat(14)
-  const canonical321 = ligature.repeat(17) + 'a'.repeat(15)
-  assert.equal(canonical320.normalize('NFKC').length, 320)
-  assert.equal(canonical321.normalize('NFKC').length, 321)
+test('NOW accepts null by availability, rejects non-null when unavailable, and rejects missing or non-primitive values', () => {
+  for (const availability of ['available', 'idle', 'offline', 'unknown']) {
+    const relay = createPhase3ObservationRelay(config())
+    assert.equal(relay.ingest(event({ availability, now_summary: null })).projection.now_summary, null)
+  }
+  for (const availability of ['idle', 'offline', 'unknown']) {
+    const relay = createPhase3ObservationRelay(config())
+    const before = snapshot(relay)
+    assert.throws(() => relay.ingest(event({ availability, now_summary: NOW_STATES[0] })), /summary_prohibited/)
+    assert.deepEqual(relay.read(), before)
+  }
 
-  const relay = createPhase3ObservationRelay(config())
-  assert.equal(relay.ingest(event({ now_summary: canonical320 })).status, 'accepted')
-  assert.equal(relay.read().projections[0].now_summary, canonical320)
-  const accepted = snapshot(relay)
-  assert.throws(() => relay.ingest(event({ sequence: 2, now_summary: canonical321 })), /summary_prohibited/)
-  assert.deepEqual(relay.read(), accepted)
-  assert.equal(relay.ingest(event({ sequence: 2 })).status, 'accepted')
-  assert.deepEqual(relay.read().evidence.map((item) => item.evidence_id), [1, 2])
-
-  const expanded = createPhase3ObservationRelay(config())
-  assert.throws(() => expanded.ingest(event({ now_summary: ligature.repeat(20) })), /summary_prohibited/)
-  assert.deepEqual(expanded.read(), { enabled: true, registry_revision: 7, projections: [], evidence: [] })
-  assert.equal(expanded.ingest(event()).status, 'accepted')
-  assert.deepEqual(expanded.read().evidence.map((item) => item.evidence_id), [1])
+  const hostile = [undefined, new String(NOW_STATES[0]), Symbol('NOW'), {}, []]
+  let proxyTouched = false
+  hostile.push(new Proxy({}, { get() { proxyTouched = true; throw new Error('proxy touched') } }))
+  for (const now_summary of hostile) {
+    const relay = createPhase3ObservationRelay(config())
+    const before = snapshot(relay)
+    assert.throws(() => relay.ingest(event({ now_summary })), /summary_prohibited/)
+    assert.deepEqual(relay.read(), before)
+  }
+  assert.equal(proxyTouched, false)
 })
 
 test('accessor-bearing mutation envelopes cannot re-enter or consume evidence', () => {
@@ -359,7 +365,7 @@ test('disconnect and reconnect use CAS while gap resync opens a new monotonic ba
   let projection = relay.read().projections[0]
   assert.equal(projection.availability, 'offline')
   assert.equal(projection.sequence, 1)
-  assert.equal('now_summary' in projection, false)
+  assert.equal(projection.now_summary, null)
   assert.equal(relay.ingest(event({ sequence: 2, observed_at: '2026-08-26T08:00:01.000Z' })).status, 'conflict')
   projection = relay.read().projections[0]
   assert.equal(projection.availability, 'offline')
@@ -374,7 +380,7 @@ test('disconnect and reconnect use CAS while gap resync opens a new monotonic ba
   projection = relay.read().projections[0]
   assert.equal(projection.sequence, 5)
   assert.equal(projection.freshness_class, 'fresh')
-  assert.equal(projection.now_summary, '공개 가능한 합성 작업 요약')
+  assert.equal(projection.now_summary, '구현 진행 중')
 })
 
 test('disable blocks writes, restore requires registry CAS, and failures are deep-equal', () => {
