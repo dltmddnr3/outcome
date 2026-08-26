@@ -81,7 +81,7 @@ export function AccountWorkspace({ state = 'unavailable', workspace, ownerVerifi
         <p className="account-workspace__adapter-note">검증용 공급자 중립 전환 · 실제 OAuth 연결 아님</p>
       </div>)}
       {ownerVerified && onAppleLink && <div className="account-workspace__verified-actions"><button type="button" data-touch-target="44" data-private-link-provider="apple" disabled={busy !== null} onClick={() => void transition('logout', onAppleLink)}>Apple 계정 연결</button><small>소유자 계정에 읽기 전용으로 연결합니다.</small></div>}
-      {state === 'session_expired' && <button type="button" data-touch-target="44">다시 로그인</button>}
+      {state === 'session_expired' && onLogout && <button type="button" data-touch-target="44" data-private-session-retry="true" disabled={busy !== null} onClick={() => void transition('logout', onLogout)}>{busy === 'logout' ? '로그아웃 중…' : '다시 로그인'}</button>}
       {state === 'safe_degraded' && <p className="account-workspace__notice">변경 기능 없음 · 자동 동기화 없음 · 마지막 검증 시각 유지</p>}
       {transitionError && <p className="account-workspace__transition-error" role="alert">{transitionError}</p>}
     </section>

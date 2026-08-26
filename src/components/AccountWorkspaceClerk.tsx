@@ -16,6 +16,27 @@ export async function requireHostedSessionToken(getToken: () => Promise<string |
   return sessionToken
 }
 
+const hostedFailureStates: Readonly<Record<string, AccountWorkspaceState>> = Object.freeze({
+  authentication_required: 'login',
+  session_expired: 'session_expired',
+  session_revoked: 'session_expired',
+  authentication_unavailable: 'unavailable',
+  private_workspace_unavailable: 'unavailable',
+  membership_conflict: 'conflict',
+  owner_mismatch: 'access_denied',
+  membership_inactive: 'access_denied',
+  project_access_denied: 'access_denied',
+})
+
+export function hostedFailureState(reason: unknown): AccountWorkspaceState {
+  return reason instanceof Error ? hostedFailureStates[reason.message] ?? 'unavailable' : 'unavailable'
+}
+
+type HostedSignOut = (options: { redirectUrl: string }) => Promise<unknown>
+export async function returnToHostedLogin(signOut: HostedSignOut) {
+  await signOut({ redirectUrl: '/workspace' })
+}
+
 function HostedWorkspaceBody() {
   const { isLoaded, isSignedIn, getToken, signOut } = useAuth()
   const { signIn } = useSignIn()
@@ -35,7 +56,11 @@ function HostedWorkspaceBody() {
       .then((sessionToken) => fetchPrivateOwnerSession(sessionToken).then(() => sessionToken))
       .then((sessionToken) => { setOwnerVerified(true); return fetchPrivateWorkspace(sessionToken) })
       .then((value) => { setWorkspace(value.workspace); setState('ready') })
-      .catch((reason) => { setWorkspace(undefined); if (!(reason instanceof Error && reason.message === 'private_workspace_unavailable')) setOwnerVerified(false); setState(reason instanceof Error && reason.message === 'private_workspace_unavailable' ? 'unavailable' : 'access_denied') })
+      .catch((reason) => {
+        setWorkspace(undefined)
+        if (!(reason instanceof Error && reason.message === 'private_workspace_unavailable')) setOwnerVerified(false)
+        setState(hostedFailureState(reason))
+      })
   }, [getToken, isLoaded, isSignedIn])
 
   const google = async () => {
@@ -72,7 +97,7 @@ function HostedWorkspaceBody() {
     <span className="account-workspace__apple-note">Apple은 소유자 로그인 확인 후 연결</span>
     <p className="account-workspace__adapter-note">Clerk 브라우저 세션 · 회원가입 전환 차단</p>
   </div>
-  return <AccountWorkspace state={state} workspace={workspace} ownerVerified={ownerVerified} sessionPresent={Boolean(isSignedIn)} loginContent={loginContent} onLogout={isSignedIn ? async () => { await signOut({ redirectUrl: '/workspace' }) } : undefined} onAppleLink={ownerVerified ? linkApple : undefined} transitionError={error} />
+  return <AccountWorkspace state={state} workspace={workspace} ownerVerified={ownerVerified} sessionPresent={Boolean(isSignedIn)} loginContent={loginContent} onLogout={isSignedIn ? () => returnToHostedLogin(signOut) : undefined} onAppleLink={ownerVerified ? linkApple : undefined} transitionError={error} />
 }
 
 export function HostedClerkWorkspace({ publishableKey, pathname = window.location.pathname }: { publishableKey: string; pathname?: string }) {

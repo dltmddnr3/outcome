@@ -10,7 +10,7 @@ vi.mock('@clerk/react', () => ({
   useUser: () => ({ user: null }),
 }))
 
-import { HostedClerkWorkspace, hostedGoogleSsoParameters, requestHostedEmailCode, requireHostedSessionToken } from './AccountWorkspaceClerk'
+import { HostedClerkWorkspace, hostedFailureState, hostedGoogleSsoParameters, requestHostedEmailCode, requireHostedSessionToken, returnToHostedLogin } from './AccountWorkspaceClerk'
 
 describe('Clerk browser session boundary', () => {
   it('mounts ClerkProvider with the runtime publishable key and real SDK callback component', () => {
@@ -46,6 +46,30 @@ describe('Clerk browser session boundary', () => {
     await expect(requireHostedSessionToken(getToken)).resolves.toBe('sdk-issued-session')
     expect(getToken).toHaveBeenCalledOnce()
     await expect(requireHostedSessionToken(async () => null)).rejects.toThrow('authentication_required')
+  })
+
+  it('maps every approved hosted failure code without treating unknown errors as access denial', () => {
+    const cases = [
+      ['authentication_required', 'login'],
+      ['session_expired', 'session_expired'],
+      ['session_revoked', 'session_expired'],
+      ['authentication_unavailable', 'unavailable'],
+      ['private_workspace_unavailable', 'unavailable'],
+      ['membership_conflict', 'conflict'],
+      ['owner_mismatch', 'access_denied'],
+      ['membership_inactive', 'access_denied'],
+      ['project_access_denied', 'access_denied'],
+    ] as const
+    for (const [code, expected] of cases) expect(hostedFailureState(new Error(code))).toBe(expected)
+    expect(hostedFailureState(new Error('provider_internal_detail'))).toBe('unavailable')
+    expect(hostedFailureState(null)).toBe('unavailable')
+  })
+
+  it('returns an expired Clerk session to login through SDK sign-out only', async () => {
+    const signOut = vi.fn().mockResolvedValue(undefined)
+    await returnToHostedLogin(signOut)
+    expect(signOut).toHaveBeenCalledOnce()
+    expect(signOut).toHaveBeenCalledWith({ redirectUrl: '/workspace' })
   })
 
   it('keeps SDK logout recovery visible before server owner verification without exposing Apple', () => {

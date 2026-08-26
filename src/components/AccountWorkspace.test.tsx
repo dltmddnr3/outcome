@@ -41,10 +41,13 @@ describe('account workspace presentation contract', () => {
   })
 
   it('marks status announcements, touch controls and no completion authority', () => {
-    const html = render('session_expired')
+    const html = renderToStaticMarkup(<AccountWorkspace state="session_expired" sessionPresent onLogout={async () => {}} />)
     expect(html).toContain('role="alert"')
     expect(html).toContain('data-touch-target="44"')
+    expect(html).toContain('data-private-session-retry="true"')
+    expect(html).toContain('다시 로그인')
     expect(html).toContain('data-completion-authority="false"')
+    expect(render('session_expired')).not.toContain('data-private-session-retry="true"')
   })
 
   it('ready 상태는 두 프로젝트와 Project→Phase→Scope→Stage→Gate 및 실제 현재 위치를 렌더링한다', () => {
