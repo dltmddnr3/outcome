@@ -14,6 +14,9 @@ const failure = (error) => ({ ok: false, error })
 const validReason = (value) =>
   typeof value === 'string' && SAFE_REASON.test(value) && !PROHIBITED_REASON_PART.test(value)
 
+const validLocator = (value) =>
+  typeof value === 'string' && SYNTHETIC_LOCATOR.test(value) && !PROHIBITED_VALUE.test(value)
+
 const bindingKey = (projectId, role) => `${projectId}:${role}`
 
 export function createProjectRoleBindingRegistry({ projectIds, enabled = true, now = () => new Date().toISOString() } = {}) {
@@ -110,7 +113,7 @@ export function createProjectRoleBindingRegistry({ projectIds, enabled = true, n
     if (scopeError) return failure(scopeError)
     const metadataError = validateMutationMetadata({ actorClass, reason })
     if (metadataError) return failure(metadataError)
-    if (!SYNTHETIC_LOCATOR.test(locatorRef ?? '') || PROHIBITED_VALUE.test(locatorRef)) return failure('invalid_locator')
+    if (!validLocator(locatorRef)) return failure('invalid_locator')
     const scope = bindingKey(projectId, role)
     if (activeByScope.has(scope)) return failure('duplicate_active_binding')
     const prior = [...bindings.values()].filter((binding) => binding.project_id === projectId && binding.role === role)
@@ -145,7 +148,7 @@ export function createProjectRoleBindingRegistry({ projectIds, enabled = true, n
     if (disabled) return disabled
     const metadataError = validateMutationMetadata({ actorClass, reason })
     if (metadataError) return failure(metadataError)
-    if (!SYNTHETIC_LOCATOR.test(locatorRef ?? '') || PROHIBITED_VALUE.test(locatorRef)) return failure('invalid_locator')
+    if (!validLocator(locatorRef)) return failure('invalid_locator')
     const resolved = resolveActive({ bindingId, projectId, role, providerClass })
     if (resolved.error) return failure(resolved.error)
     const current = resolved.binding

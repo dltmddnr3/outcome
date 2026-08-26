@@ -115,6 +115,29 @@ test('raw locator credential and absolute path shaped values are rejected', () =
   }
 })
 
+test('non-string locator values fail closed without schema coercion or mutation', () => {
+  const values = [new String('synthetic:builder_alpha'), Symbol('synthetic:builder_alpha'), { value: 'synthetic:builder_alpha' }]
+  for (const locatorRef of values) {
+    const registry = createRegistry()
+    const before = registry.inspectState()
+    assert.deepEqual(bind(registry, { locatorRef }), { ok: false, error: 'invalid_locator' })
+    assert.deepEqual(registry.inspectState(), before)
+  }
+})
+
+test('coercible locator objects are rejected without invoking user coercion', () => {
+  const registry = createRegistry()
+  const before = registry.inspectState()
+  let coercions = 0
+  const locatorRef = new Proxy({}, { get(target, property) {
+    if (property === 'toString') return () => { coercions += 1; return 'synthetic:builder_alpha' }
+    return Reflect.get(target, property)
+  } })
+  assert.deepEqual(bind(registry, { locatorRef }), { ok: false, error: 'invalid_locator' })
+  assert.equal(coercions, 0)
+  assert.deepEqual(registry.inspectState(), before)
+})
+
 test('audit reason rejects private identifier credential and path shaped values without mutation', () => {
   const prohibited = [
     'session 123e4567-e89b-12d3-a456-426614174000',
