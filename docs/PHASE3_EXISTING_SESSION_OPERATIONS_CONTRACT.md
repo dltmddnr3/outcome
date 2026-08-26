@@ -67,7 +67,7 @@ Completion conditions:
 - fresh UX & Product QA Q1–Q4, 별도 fresh Release Audit A1–A4, Cherry physical acceptance C1–C4가 동일 immutable candidate를 순서대로 닫는다.
 - Phase 3 실행 Gate 43개가 실제 증거로 모두 닫혀도 release와 `EXTERNAL_OUTCOME_COMPLETE`는 별도 Cherry 결정이다.
 
-Definition evidence와 구현 인계 문서는 Phase 3 실행 진행률로 계산하지 않는다. 현재 Phase 3 실행 상태는 `0/43`이며 Phase 2가 current인 동안 Phase 3은 locked future phase다.
+Definition evidence와 구현 인계 문서는 Phase 3 실행 진행률로 계산하지 않는다. 2026-08-26 KST synthetic/no-op Technical Spike S1–S6가 exact evidence로 닫혀 현재 Phase 3 실행 상태는 `6/43`이다. production relay 판정은 `NO_GO`, fallback은 `UNBOUND_MANUAL_NAVIGATION`이며 Private Registry 이후 Stage는 잠겨 있다. Phase 2가 current인 동안 Phase 3은 locked future phase다.
 
 ## Scope와 Stage
 

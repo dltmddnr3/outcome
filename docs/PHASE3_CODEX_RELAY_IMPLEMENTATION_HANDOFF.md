@@ -1,8 +1,15 @@
 # OUTCOME Phase 3 · Codex Relay 구현 인계 계약
 
-Updated: 2026-08-25 KST
+Updated: 2026-08-26 KST
 
-Status: **DECISION-CLOSED · TECHNICAL SPIKE REQUIRED · NO IMPLEMENTATION AUTHORITY**
+Status: **TECHNICAL SPIKE COMPLETE · PRODUCTION RELAY NO-GO · REGISTRY LOCKED**
+
+Post-spike decision:
+
+- exact Builder candidate `77356fcacc0cc8d318583ca3566ee0b479286b61` / tree `1f2444f095a9a82a16d0fee9c6cdcace4a28b078` closed only S1–S6 through synthetic/no-op evidence
+- production relay is `NO_GO`; smallest fallback is `UNBOUND_MANUAL_NAVIGATION`
+- native project+role binding is unsupported and provider idempotency, timeout retry, limits, cost, unattended permission, integration terms and credential lifecycle remain unresolved
+- Registry implementation remains locked. No actual session observation, instruction delivery, provider resource, push or deploy is authorized
 
 Decision set P3-IMPLEMENTATION-1: APPROVED
 
@@ -43,7 +50,7 @@ Current code has projection primitives, not a Phase 3 control plane.
 - current Package tests는 role binding history, stale, NOW/progress 분리와 public redaction을 검증한다. 실제 Codex session 관찰·전달 가능성을 증명하지 않는다.
 - `docs/SOURCE_OF_TRUTH.md`는 local Codex task store를 source 후보로 언급하지만 지원 API, read consistency, write authority와 provider 약관 증거가 아니다.
 
-따라서 Builder는 먼저 Codex adapter technical spike를 수행해야 한다. private store 구조를 추측하거나 기존 tests를 실연동 증거로 승격하면 안 된다.
+Codex adapter technical spike는 synthetic/no-op으로 완료됐지만 production relay는 `NO_GO`다. private store 구조를 추측하거나 synthetic tests를 실연동 증거로 승격하면 안 되며, Registry implementation은 별도 재승인 전까지 열리지 않는다.
 
 ## Service structure
 
@@ -210,7 +217,7 @@ event는 schema version, event ID, entity version, occurred_at, actor class와 c
 
 ## Technical spike
 
-첫 Builder slice는 `GATES_PHASE3_CODEX_ADAPTER_TECHNICAL_SPIKE.md#S1-S6`만 수행한다.
+첫 Builder slice `GATES_PHASE3_CODEX_ADAPTER_TECHNICAL_SPIKE.md#S1-S6`는 synthetic/no-op evidence로 완료됐다. 이 결과는 production relay나 다음 Registry slice 권한이 아니다.
 
 ### Required evidence
 
@@ -338,7 +345,7 @@ Initial recipient role: `Builder`
 
 Initial slice: `Codex adapter technical spike only`
 
-Handoff state: `TECHNICAL_SPIKE_MANUALLY_DISPATCHED · BUILDER_IN_PROGRESS · NOT_RELAY_PROOF`
+Handoff state: `TECHNICAL_SPIKE_COMPLETE · PRODUCTION_RELAY_NO_GO · REGISTRY_LOCKED`
 
 First proof behavior state: `APPROVED_NOT_EXECUTED`
 
