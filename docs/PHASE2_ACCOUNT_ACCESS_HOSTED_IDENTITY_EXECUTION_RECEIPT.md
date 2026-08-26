@@ -149,3 +149,13 @@ MacBook/mobile email code·만료·철회·인증 제공자 장애 `8/19`는 계
 - 현재 행렬: `9/19`; MacBook Google 로그인·재로그인, 양쪽 email code·만료·철회·인증 제공자 장애 `10/19`가 남아 있다.
 
 계정·이메일·token·cookie·raw identifier는 관측하거나 기록하지 않았다. P5, HP1, HP2, hosted QA, Release Audit, Cherry acceptance, Production, Phase 2와 `EXTERNAL_OUTCOME_COMPLETE`는 계속 열려 있다.
+
+## P5 current candidate 모바일 email code 로그인
+
+- exact Preview: deployment `dpl_3MYfocjsQ6XvTrCoTNXE6Pp4U7wY` · source `4613372adbec17e35c2498e55ab4210cc8b33c34` · `READY`
+- 사용자 직접 확인: `2026-08-26 KST` Cherry가 모바일 email code 대체 로그인과 준비 화면 복귀를 완료했다.
+- 서버 대조: 최근 `/api/private/config` `3`, `/api/private/session` `2`, `/api/private/workspace` `2`; 총 `7/7` HTTP `200`.
+- 판정: current candidate의 모바일 email code 대체 로그인 `PASS`; P5 행렬 `10/19`.
+- 잔여: MacBook Google 로그인·재로그인·email code, 양쪽 세션 만료·운영자 철회·인증 제공자 장애 `9/19`.
+
+이메일·인증 코드·계정 식별자·token·cookie는 관측하거나 기록하지 않았다. P5와 상위 완료 상태는 계속 `OPEN`이다.
