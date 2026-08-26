@@ -125,6 +125,19 @@ try {
     if (await page.locator('[data-private-project]').count() !== 2) throw new Error(`${viewport.name} project controls missing`)
     const shell = await page.evaluate(() => ({ sidebar: Boolean(document.querySelector('.oc-global-nav')), journey: Boolean(document.querySelector('.oc-outcome-map')), current: document.querySelectorAll('[aria-current=step]').length, overflow: document.documentElement.scrollWidth - document.documentElement.clientWidth }))
     if (!shell.sidebar || !shell.journey || shell.current < 3 || shell.overflow !== 0) throw new Error(`${viewport.name} existing shell failed ${JSON.stringify(shell)}`)
+    if (viewport.width <= 390) {
+      await page.locator('.oc-outcome-map').evaluate((element) => element.scrollIntoView({ block: 'start' }))
+      await page.evaluate(() => window.scrollBy(0, 320))
+      const hierarchyFlow = await page.evaluate(() => {
+        const intersects = (left, right) => left.right > right.left && right.right > left.left && left.bottom > right.top && right.bottom > left.top
+        const wrapper = document.querySelector('.oc-hierarchy-sticky')
+        const action = document.querySelector('.oc-show-current-button')?.getBoundingClientRect()
+        const visibleOptions = [...document.querySelectorAll('[role=option]')].map((element) => element.getBoundingClientRect()).filter((box) => box.bottom > 0 && box.top < innerHeight)
+        return { position: wrapper ? getComputedStyle(wrapper).position : 'missing', overlap: action ? visibleOptions.filter((box) => intersects(action, box)).length : -1, overflow: document.documentElement.scrollWidth - document.documentElement.clientWidth }
+      })
+      if (hierarchyFlow.position !== 'static' || hierarchyFlow.overlap !== 0 || hierarchyFlow.overflow !== 0) throw new Error(`${viewport.name} mobile hierarchy flow failed ${JSON.stringify(hierarchyFlow)}`)
+      await page.evaluate(() => window.scrollTo(0, 0))
+    }
     if (process.env.OUTCOME_ACCOUNT_UX_SCREENSHOTS === '1' && ['macbook-ready', 'mobile-ready'].includes(viewport.name)) await page.screenshot({ path: `${screenshotDirectory}/${viewport.name}-${viewport.width}x${viewport.height}-shell.png`, fullPage: true })
     if (viewport.width <= 390) {
       await page.locator('.oc-nav-trigger').click()

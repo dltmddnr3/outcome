@@ -1,6 +1,7 @@
 import assert from 'node:assert/strict'
+import { readFileSync } from 'node:fs'
 import test from 'node:test'
-import { assertDashboardMeasurement, assertMobileStickyMeasurement, assertSourceGroupOccurrences, sourceLabeledGroupStageKeys } from './browser-assertions.mjs'
+import { assertDashboardMeasurement, assertMobileHierarchyFlowMeasurement, assertSourceGroupOccurrences, sourceLabeledGroupStageKeys } from './browser-assertions.mjs'
 
 const passingMeasurement = () => ({
   documentOverflow: 0, clippedDescendants: [], ellipsisTruncation: [], viewportEscape: [], siblingIntersections: [], roleDescendantIntersections: [], roleStatusOverflow: [], undersizedText: [], lowContrastText: [], undersizedControls: [], unexpectedEnglish: [], translationFallback: [], activeAnimationCount: 0, heroHeight: 352,
@@ -32,6 +33,12 @@ test('mobile hierarchy clarity fails closed when the three tabs or visible activ
   assert.throws(() => assertDashboardMeasurement('mobile/outcome', { ...passingMeasurement(), mobileHierarchyTruth: false }), /mobileHierarchyTruth=false/)
 })
 
+test('mobile hierarchy controls stay in document flow instead of floating over options', () => {
+  const styles = readFileSync(new URL('../src/styles.css', import.meta.url), 'utf8')
+  assert.match(styles, /@media\(max-width:759px\)\{[\s\S]*?\.oc-hierarchy-sticky\{position:static;z-index:auto;top:auto\}/)
+  assert.match(styles, /@media\(max-width:759px\)[\s\S]*?\.oc-workbench \.oc-hierarchy-sticky\{position:static\b/)
+})
+
 test('workspace sidebar fails closed when its IA or truthful disabled boundary disappears', () => {
   assert.throws(() => assertDashboardMeasurement('desktop/outcome', { ...passingMeasurement(), workspaceSidebarTruth: false }), /workspaceSidebarTruth=false/)
   assert.throws(() => assertDashboardMeasurement('desktop/outcome', { ...passingMeasurement(), refinedVisualSystemTruth: false }), /refinedVisualSystemTruth=false/)
@@ -57,11 +64,12 @@ test('H12 geometry regressions fail closed for oversized Hero, hidden mobile Map
   assert.throws(() => assertDashboardMeasurement('mobile-390x844/outcome', { ...passingMeasurement(), heroGeometry: false, heroHeight: 230.5 }), /heroGeometry=false.*heroHeight=230\.5/)
 })
 
-test('mobile sticky context requires exact scroll retention and ordered visible band plus actual-current header', () => {
-  const passing = { scrollY: 960, viewportHeight: 844, wrapperTop: 0, bandTop: 0, bandBottom: 82, headerTop: 82, headerBottom: 148 }
-  assert.doesNotThrow(() => assertMobileStickyMeasurement('mobile-390x844/outcome', passing))
-  assert.throws(() => assertMobileStickyMeasurement('mobile-390x844/outcome', { ...passing, wrapperTop: -369.17, bandTop: -369.17, headerTop: -222.28 }), /wrapperTop=-369.17/)
-  assert.throws(() => assertMobileStickyMeasurement('mobile-390x844/outcome', { ...passing, scrollY: 958 }), /scrollY=958/)
+test('mobile hierarchy flow requires static positioning and zero option overlap after scrolling', () => {
+  const passing = { scrollY: 960, wrapperPosition: 'static', actionOverlapCount: 0 }
+  assert.doesNotThrow(() => assertMobileHierarchyFlowMeasurement('mobile-390x844/outcome', passing))
+  assert.throws(() => assertMobileHierarchyFlowMeasurement('mobile-390x844/outcome', { ...passing, wrapperPosition: 'sticky' }), /wrapperPosition=sticky/)
+  assert.throws(() => assertMobileHierarchyFlowMeasurement('mobile-390x844/outcome', { ...passing, actionOverlapCount: 1 }), /actionOverlapCount=1/)
+  assert.throws(() => assertMobileHierarchyFlowMeasurement('mobile-390x844/outcome', { ...passing, scrollY: 958 }), /scrollY=958/)
 })
 
 test('role geometry fails closed unless every name and status stays on one line without intersections or overflow', () => {

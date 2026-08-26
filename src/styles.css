@@ -460,7 +460,8 @@ body:has(.account-workspace){min-width:0}
 
 @media(max-width:759px){
   .oc-workbench{margin-bottom:16px;overflow:visible}
-  .oc-workbench .oc-hierarchy-sticky{position:sticky;z-index:4;top:0}
+  .oc-hierarchy-sticky{position:static;z-index:auto;top:auto}
+  .oc-workbench .oc-hierarchy-sticky{position:static;z-index:auto;top:auto}
   .oc-mobile-breadcrumb{grid-template-columns:repeat(3,minmax(0,1fr))}
   .oc-map-columns{display:block;height:auto;min-height:280px;border-bottom:1px solid var(--oc-rule)}
   .oc-map-column{display:none;border-right:0}
