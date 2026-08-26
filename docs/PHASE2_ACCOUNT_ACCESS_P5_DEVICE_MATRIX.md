@@ -2,11 +2,11 @@
 
 상태: `P5 OPEN · CURRENT-CANDIDATE OBSERVED 10/19 · COMPLETION CLAIM 금지`
 
-기준 후보: Preview deployment `dpl_3MYfocjsQ6XvTrCoTNXE6Pp4U7wY` · source commit `4613372adbec17e35c2498e55ab4210cc8b33c34` · state `READY`
+기준 후보: Preview deployment `dpl_4P1AusHZo37fTCY92oUpVk1CrmHP` · source commit `ebac7d538152fddc432fcdb4d1ee7b80a6cbe87b` · source tree `83cb4182f086b3cc0ad1634fd2b44d3c6c151fc1` · state `READY`
 
-이 행렬은 실제 MacBook Chrome과 모바일 시스템 브라우저에서 직접 관측한 항목만 `PASS`로 기록한다. 자동 테스트, Account Portal P3 결과, 세션 활동 또는 구현 존재는 P5 실기기 PASS를 대신하지 않는다.
+이 행렬은 실제 MacBook Chrome과 모바일 시스템 브라우저에서 직접 관측한 항목만 `PASS`로 기록한다. 자동 테스트, Account Portal P3 결과, 세션 활동, 구현 존재 또는 Preview READY는 P5 실기기 PASS를 대신하지 않는다.
 
-인증 실패 상태 교정 `C1-C5 5/5`와 Preview 배포 `D1-D6 6/6`은 완료됐다. Clerk Development의 모바일 검수 세션 단일 철회 뒤 이전 ready tab이 일반 첫 로그인으로 오분류되어 실제 철회 흐름은 `FAIL · 교정 필요`다. SDK가 세션을 먼저 제거해 private API 요청이 없었던 것은 안전한 경로이며 실패 사유가 아니다. 실제 만료·제공자 장애도 아직 관측되지 않았다.
+인증 실패 상태 교정 `C1-C5 5/5`와 이전 Preview 배포 `D1-D6 6/6`은 완료됐다. 철회 UX 교정 candidate `ebac7d538152fddc432fcdb4d1ee7b80a6cbe87b`도 Preview `dpl_4P1AusHZo37fTCY92oUpVk1CrmHP`로 READY지만, 새 단일 철회 재검수는 아직 실행하지 않았다. 이전 Clerk Development 모바일 철회에서 ready tab이 일반 첫 로그인으로 오분류된 실제 결과는 계속 `FAIL · 교정 필요`다. SDK가 세션을 먼저 제거해 private API 요청이 없었던 것은 안전한 경로이며 실패 사유가 아니다. 실제 만료·제공자 장애도 아직 관측되지 않았다.
 
 ## 현재 관측
 
