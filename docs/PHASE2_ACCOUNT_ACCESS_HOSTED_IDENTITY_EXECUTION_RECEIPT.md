@@ -1,6 +1,6 @@
 # Phase 2 · 개발 인증 미리보기 실행 영수증
 
-상태: `P4 EVIDENCE CLOSED · P5-P6 OPEN`
+상태: `P4/P6 EVIDENCE CLOSED · P5 OPEN · HP1 OPEN`
 
 ## 승인과 기준선
 
@@ -44,7 +44,8 @@
 - P2: `CLOSED · DEVELOPMENT SINGLE-OWNER BOUNDARY ONLY`
 - P3: `CLOSED · G/E/A/D/R 5/5 PASS`
 - P4: `CLOSED · PREVIEW-ONLY IMMUTABLE DEPLOYMENT`
-- P5-P6: `OPEN · NOT PROVEN`
+- P5: `OPEN · DIRECT DEVICE MATRIX INCOMPLETE`
+- P6: `CLOSED · REDACTED PREVIEW/COST/ROLLBACK RECEIPT`
 - rollback 승인: `2026-08-25 KST Cherry 승인`
 - rollback 결과: 이전 exact Production deployment로 rebuild 없이 공개 별칭 복구
 - 복구 영수증: `9cbf834196e3982a7822c422a9a9b18a74d66692` / `d33a2cf61157c369e4121f4e38fd3ada97a24038` / `index-B_ICbkfO.js`
@@ -55,7 +56,7 @@
 - `HOSTED_IDENTITY_PREVIEW_ONLY`: `false`
 - `EXTERNAL_OUTCOME_COMPLETE`: `false`
 
-이 영수증은 P2·P3·P4만 증명한다. MacBook/mobile 전체 흐름 검수, P6 최종 영수증, HP1 완료, Production release 또는 Phase 완료를 증명하지 않는다.
+이 영수증은 P2·P3·P4·P6만 증명한다. MacBook/mobile P5 전체 흐름 검수, HP1 완료, Production release 또는 Phase 완료를 증명하지 않는다. P6 상세는 `docs/PHASE2_ACCOUNT_ACCESS_P6_FINAL_RECEIPT.md`에 있다.
 
 ## P3 직접 검증 결과
 
