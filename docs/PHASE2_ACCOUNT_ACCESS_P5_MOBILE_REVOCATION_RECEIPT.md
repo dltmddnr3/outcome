@@ -1,6 +1,6 @@
 # Phase 2 · P5 모바일 운영자 세션 철회 실행 영수증
 
-판정: `REVOCATION EXECUTED · USER OBSERVATION AND RECOVERY PENDING · P5 OPEN`
+판정: `REVOCATION EXECUTED · MOBILE UX FAIL · CORRECTION REQUIRED · P5 OPEN`
 
 ## 고정 기준선
 
@@ -20,17 +20,15 @@
 
 계정명·이메일·IP·user/session/application/instance ID·token·cookie·code·secret은 기록하지 않았다.
 
-## 아직 증명되지 않은 항목
+## 모바일 실기기 관측
 
-아래 세 항목은 모바일의 실제 다음 요청과 새 로그인이 필요하므로 아직 PASS가 아니다.
+Cherry가 철회된 모바일 세션의 같은 탭을 새로고침했다. private project payload는 사라졌지만 일반 `로그인 필요 · Cherry 계정으로 확인` 화면이 표시됐다. 계약한 `로그인이 만료되었습니다`와 `다시 로그인`은 표시되지 않았다.
 
-1. private payload가 사라지고 `로그인이 만료되었습니다`와 작동하는 `다시 로그인`이 표시된다.
-2. private session/workspace 요청이 `401`과 안전한 승인 코드로 fail-closed 된다.
-3. 동일 owner가 다시 로그인한 뒤 준비 화면과 session/workspace `200/200`이 복구된다.
+같은 관측 창의 exact Preview runtime을 읽기 전용으로 확인했지만 private session/workspace 요청과 HTTP `401`은 `0`이었다. Clerk SDK가 signed-out을 먼저 확정해 제품이 private API를 호출하기 전에 일반 로그인 상태로 전환한 소스 분기와 일치한다.
 
-따라서 모바일 운영자 세션 철회 행은 `관측·복구 대기`이며 P5 수치는 `10/19`로 유지한다.
+따라서 모바일 운영자 세션 철회 행은 `FAIL · 교정 필요`이며 P5 수치는 `10/19`로 유지한다. 새 Builder candidate·Preview·별도 승인 철회 재검수 전에는 PASS로 바꾸지 않는다.
 
-실행 후 exact Preview의 최근 runtime을 읽기 전용으로 집계했을 때 private config `200` 한 건만 있었고, 새 private session/workspace 요청과 `401`은 아직 없었다. 이는 오류가 아니라 모바일의 다음 요청이 발생하지 않았다는 뜻이며 PASS 증거로 사용하지 않는다.
+재로그인 복구는 아직 수행하지 않았다. 이 FAIL 기록은 private payload가 제거된 보안 경계만 인정하며 만료 UX나 복구를 승인하지 않는다.
 
 ## 되돌리기와 경계
 
