@@ -47,4 +47,4 @@ Code regression 시 직전 READY Preview `dpl_A7wUkQoZ45jUoY1nF6e7EJ4ttKZT` / co
 
 ## Remaining work
 
-P5 실기기 행렬은 계속 `10/19`다. MacBook Google 재로그인 복구와 MacBook/mobile email code·만료·철회·인증 제공자 장애가 미실행이다. 이 배포는 P5, HP1, HP2, hosted QA, Release Audit, Cherry acceptance, Production, Phase 2 또는 `EXTERNAL_OUTCOME_COMPLETE`를 닫지 않는다.
+배포 후 Cherry의 MacBook Google 재로그인 완료 확인과 동일 Preview의 session/workspace HTTP `200/200` 집계가 일치해 P5 실기기 행렬은 `11/19`다. MacBook/mobile email code·만료·철회·인증 제공자 장애 `8/19`가 미실행이다. 이 배포는 P5, HP1, HP2, hosted QA, Release Audit, Cherry acceptance, Production, Phase 2 또는 `EXTERNAL_OUTCOME_COMPLETE`를 닫지 않는다.

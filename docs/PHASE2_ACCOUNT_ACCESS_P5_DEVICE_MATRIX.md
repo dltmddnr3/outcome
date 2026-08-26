@@ -1,6 +1,6 @@
 # Phase 2 · Hosted Identity P5 실기기 완료 행렬
 
-상태: `P5 OPEN · OBSERVED 10/19 · COMPLETION CLAIM 금지`
+상태: `P5 OPEN · OBSERVED 11/19 · COMPLETION CLAIM 금지`
 
 기준 후보: Preview deployment `dpl_Gf9sidpNc2sh7HNt2ChpHJywDCbG` · source commit `c194f3297d728020d6af16bef29ddb179b339b32` · state `READY`
 
@@ -16,7 +16,7 @@
 | MacBook Chrome | 로그인 중 표시 | `PASS` | 권한 확인 뒤 준비 화면 전환 관측 |
 | MacBook Chrome | 준비 화면 | `PASS` | 비공개 프로젝트 2개와 workspace 준비 상태 관측 |
 | MacBook Chrome | 로그아웃 | `PASS` | 동일 `/workspace` 로그인 화면 복귀 관측 |
-| MacBook Chrome | Google 재로그인 복구 | `OPEN` | 계정 선택 화면 이후 owner 선택과 준비 화면 복귀 필요 |
+| MacBook Chrome | Google 재로그인 복구 | `PASS` | Cherry 완료 확인 + Preview session/workspace 요청 HTTP `200/200` |
 | MacBook Chrome | email code 대체 로그인 | `OPEN` | 동일 owner가 코드를 직접 입력하고 준비 화면 복귀 확인 필요 |
 | MacBook Chrome | 세션 만료 | `OPEN` | 만료된 세션의 다음 요청이 로그인 화면으로 fail-closed 되는지 확인 필요 |
 | MacBook Chrome | 운영자 세션 철회 | `OPEN` | Clerk Development 철회 뒤 다음 요청에서 로그인 화면 복귀 확인 필요 |

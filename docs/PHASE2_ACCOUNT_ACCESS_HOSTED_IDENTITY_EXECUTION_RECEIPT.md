@@ -128,3 +128,13 @@ P5는 잔여 행렬이 남아 있어 `OPEN`이다. 이 재검증 단독으로는
 - 인증 전환 중 화면은 내부 권한·서버·completion authority 진단을 제거하고 `로그인 중`·`잠시만 기다려 주세요.`만 표시한다. 세션이 남은 장기 지연에는 `로그인 취소`만 복구 동작으로 유지한다.
 - 자동 검증은 1440×900·390×844·375×812에서 loading aria-busy `true`, technical visible copy hit `0`, horizontal overflow `0`을 확인했다.
 - email code·만료·철회·인증 제공자 장애와 맥북 잔여 행렬은 미실행이므로 P5는 계속 `OPEN`이다. P6은 별도 최종 영수증 Gate로 이후 닫혔다.
+
+## P5 MacBook Google 재로그인 재검증
+
+- exact Preview: deployment `dpl_Gf9sidpNc2sh7HNt2ChpHJywDCbG` · source `c194f3297d728020d6af16bef29ddb179b339b32` · `READY`
+- 사용자 직접 확인: `2026-08-26 KST` Cherry가 MacBook Google 재로그인을 `완료`로 확인했다.
+- 서버 대조: 최근 비민감 runtime 집계에서 `/api/private/config` `3`, `/api/private/session` `1`, `/api/private/workspace` `1`; 총 `5/5`가 HTTP `200`이었다.
+- 후속 상태: 읽기 전용으로 다시 확인했을 때 해당 탭은 로그인 화면이었다. 계정·token·cookie·raw identifier는 관측하거나 기록하지 않았고 세션 지속성을 별도 PASS로 확장하지 않는다.
+- 판정: MacBook Google 재로그인 owner/session/workspace 성공 경로 `PASS`; P5 실기기 행렬 `11/19`.
+
+MacBook/mobile email code·만료·철회·인증 제공자 장애 `8/19`는 계속 미실행이다. P5, HP1과 상위 완료 상태는 계속 `OPEN`이다.
