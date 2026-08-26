@@ -16,6 +16,6 @@ Outcome: 만료·철회·제공자 장애가 접근 거부로 뭉개지지 않�
   EVIDENCE: unknown/raw 오류는 `unavailable` 상태만 반환; security 29/29 PASS, public boundary prohibited identifiers=0
 - [x] C5: 제품·전체·보안·빌드·공개 경계 회귀가 통과하고 외부 상태 변경 없이 exact candidate가 고정된다.
   PROVES: evidence
-  EVIDENCE: dashboard 78/78; full frontend 81/81 + Node 112/112; isolated build PASS (`index-rrlaqkOi.js`, `index-DfyTr5bf.css`); exact Git receipt는 Builder handoff에 기록
+  EVIDENCE: exact candidate `8b66ab8a321c29a32f5c0fe481a0f6d18b22833b` / tree `8d66919a2b7cd53fb0332aa623708011ed66a92b`; dashboard 78/78; full frontend 81/81 + Node 112/112; isolated build PASS (`index-rrlaqkOi.js`, `index-DfyTr5bf.css`); independent Planner review PASS
 
 ABANDON: 이 Gate의 완료는 P5 실기기 PASS, HP1 완료, provider 설정 변경, Preview deploy, Production release 또는 `EXTERNAL_OUTCOME_COMPLETE`가 아니다.
