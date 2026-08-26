@@ -23,4 +23,4 @@ Outcome: 실제 기존 역할 세션을 project-scoped private registry에 안�
 
 ABANDON: 이 Stage는 새 provider session 생성, 실제 업무 dispatch, 공개 credential, Phase 3 entry·completion을 수행하지 않는다.
 
-Closure receipt: fresh independent `PASS_INDEPENDENT_QA_ONLY` report `70071fd5a7ca3f7ac7b29369075f129342e2969f` / tree `dc097fbefe245cbac92ee561f3a5c338556c4892`; Registry R1-R6만 evidence-closed다. Release Audit·Cherry acceptance·Phase 3 completion·실제 provider binding은 별도이며 계속 open이다.
+Closure receipt: Builder revalidation `d6b4296aad4ffc00a547a53e4db582a58132d4f9` / tree `a0e44759d24622d7dc35ec9896a1b78a4a1d39d8`와 fresh independent `PASS_INDEPENDENT_QA_ONLY` report `70071fd5a7ca3f7ac7b29369075f129342e2969f` / tree `dc097fbefe245cbac92ee561f3a5c338556c4892`를 함께 충족했다. `false_completion_count=1` 역할 경계 이력은 보존하며 Registry R1-R6만 evidence-closed다. Release Audit·Cherry acceptance·Phase 3 completion·실제 provider binding은 별도 open이다.
