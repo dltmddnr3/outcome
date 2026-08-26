@@ -128,7 +128,90 @@ function canonicalSignature(value) {
 }
 
 function validatePublicKey(value) {
-  return value instanceof KeyObject && value.type === 'public' && value.asymmetricKeyType === 'ed25519'
+  if (isProxy(value)) return false
+  try {
+    return value instanceof KeyObject && value.type === 'public' && value.asymmetricKeyType === 'ed25519'
+  } catch {
+    return false
+  }
+}
+
+function assertExactIndependentClone(original, candidate, originalToCandidate = new Map(), candidateToOriginal = new Map()) {
+  if (original === null) {
+    if (candidate !== null) fail('materialization_failed')
+    return
+  }
+  if (typeof original !== 'object') {
+    if (!['string', 'number', 'boolean'].includes(typeof original) ||
+        (typeof original === 'number' && !Number.isSafeInteger(original)) ||
+        !Object.is(candidate, original)) fail('materialization_failed')
+    return
+  }
+  if (candidate === null || typeof candidate !== 'object' || isProxy(original) || isProxy(candidate) || candidate === original) fail('materialization_failed')
+
+  if (originalToCandidate.has(original)) {
+    if (originalToCandidate.get(original) !== candidate) fail('materialization_failed')
+    return
+  }
+  if (candidateToOriginal.has(candidate)) fail('materialization_failed')
+  originalToCandidate.set(original, candidate)
+  candidateToOriginal.set(candidate, original)
+
+  const originalArray = Array.isArray(original)
+  if (Array.isArray(candidate) !== originalArray) fail('materialization_failed')
+  let originalPrototype
+  let candidatePrototype
+  let originalDescriptors
+  let candidateDescriptors
+  try {
+    originalPrototype = Object.getPrototypeOf(original)
+    candidatePrototype = Object.getPrototypeOf(candidate)
+    originalDescriptors = Object.getOwnPropertyDescriptors(original)
+    candidateDescriptors = Object.getOwnPropertyDescriptors(candidate)
+  } catch { fail('materialization_failed') }
+  const expectedPrototype = originalArray ? Array.prototype : Object.prototype
+  if (originalPrototype !== expectedPrototype || candidatePrototype !== expectedPrototype) fail('materialization_failed')
+
+  const originalKeys = Reflect.ownKeys(originalDescriptors)
+  const candidateKeys = Reflect.ownKeys(candidateDescriptors)
+  if (originalKeys.length !== candidateKeys.length || originalKeys.some((key) => typeof key !== 'string' || !Object.hasOwn(candidateDescriptors, key))) fail('materialization_failed')
+  for (const key of originalKeys) {
+    const source = originalDescriptors[key]
+    const output = candidateDescriptors[key]
+    if (!source || !output || !Object.hasOwn(source, 'value') || !Object.hasOwn(output, 'value')) fail('materialization_failed')
+    if (key === 'length' && originalArray) {
+      if (source.enumerable || output.enumerable || source.value !== output.value) fail('materialization_failed')
+      continue
+    }
+    if (!source.enumerable || !output.enumerable) fail('materialization_failed')
+    assertExactIndependentClone(source.value, output.value, originalToCandidate, candidateToOriginal)
+  }
+}
+
+function freezeResponseGraph(value, seen = new Set()) {
+  if (value === null) return
+  if (typeof value !== 'object') {
+    if (!['string', 'number', 'boolean'].includes(typeof value) ||
+        (typeof value === 'number' && !Number.isSafeInteger(value))) fail('materialization_failed')
+    return
+  }
+  if (isProxy(value) || seen.has(value)) fail('materialization_failed')
+  seen.add(value)
+  const array = Array.isArray(value)
+  let prototype
+  let descriptors
+  try {
+    prototype = Object.getPrototypeOf(value)
+    descriptors = Object.getOwnPropertyDescriptors(value)
+  } catch { fail('materialization_failed') }
+  if (prototype !== (array ? Array.prototype : Object.prototype)) fail('materialization_failed')
+  for (const [key, descriptor] of Object.entries(descriptors)) {
+    if (array && key === 'length') continue
+    if (!descriptor?.enumerable || !Object.hasOwn(descriptor, 'value')) fail('materialization_failed')
+    freezeResponseGraph(descriptor.value, seen)
+  }
+  if (Reflect.ownKeys(descriptors).some((key) => typeof key !== 'string')) fail('materialization_failed')
+  try { Object.freeze(value) } catch { fail('materialization_failed') }
 }
 
 const sourceKey = (value) => `${value.project_id ?? value.projectId}:${value.role}:${value.binding_version ?? value.bindingVersion}:${value.source_ref ?? value.sourceRef}:${value.source_version ?? value.sourceVersion}`
@@ -219,7 +302,8 @@ export function createPhase3ObserverBridge(options) {
   const verifySignature = config.verify_signature ?? ((publicKey, bytes, signature) => nodeVerify(null, bytes, publicKey, signature))
   const digest = config.digest ?? ((bytes) => createHash('sha256').update(bytes).digest('hex'))
   const clone = config.clone ?? structuredClone
-  if (typeof now !== 'function' || typeof verifySignature !== 'function' || typeof digest !== 'function' || typeof clone !== 'function' ||
+  if (typeof now !== 'function' || isProxy(now) || typeof verifySignature !== 'function' || isProxy(verifySignature) ||
+      typeof digest !== 'function' || isProxy(digest) || typeof clone !== 'function' || isProxy(clone) ||
       (config.enabled !== undefined && typeof config.enabled !== 'boolean')) fail('configuration_invalid')
 
   let state = {
@@ -253,10 +337,11 @@ export function createPhase3ObserverBridge(options) {
   }
 
   const materializeResponse = (value) => {
+    freezeResponseGraph(value)
     let result
     try { result = clone(value) } catch { fail('materialization_failed') }
     if (reentryAttempted) fail('reentrant_mutation')
-    if (typeof result !== 'object' || result === null || isProxy(result)) fail('materialization_failed')
+    assertExactIndependentClone(value, result)
     return result
   }
 

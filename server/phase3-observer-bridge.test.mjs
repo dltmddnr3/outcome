@@ -85,6 +85,11 @@ test('constructor requires exact primitive registrations and exactly two viewer 
   const proxy = new Proxy({ sources: [source], viewers, freshness_ms: FRESHNESS_MS }, { get() { proxyHits += 1 }, ownKeys() { proxyHits += 1 } })
   expectCode(() => createPhase3ObserverBridge(proxy), 'configuration_invalid')
   assert.equal(proxyHits, 0)
+
+  let dependencyTrapHits = 0
+  const proxyClock = new Proxy(() => BASE_TIME, { apply() { dependencyTrapHits += 1; return BASE_TIME } })
+  expectCode(() => createPhase3ObserverBridge({ sources: [source], viewers, freshness_ms: FRESHNESS_MS, now: proxyClock }), 'configuration_invalid')
+  assert.equal(dependencyTrapHits, 0)
 })
 
 test('canonical bytes are fixed-order length-prefixed UTF-8 with a stable digest', () => {
@@ -327,6 +332,142 @@ test('clock, crypto, digest, clone and dependency reentry failures leave state a
   reentryBridge = reentryFixture.bridge
   expectCode(() => reentryBridge.ingest({ ...reentryFixture.unsigned(), signature: Buffer.alloc(64).toString('base64url') }), 'reentrant_mutation')
   assert.equal(reentryBridge.read(reentryFixture.viewer()).ledger_revision, 0)
+})
+
+test('clone output substitutions fail atomically before state publication', () => {
+  const ingestAttacks = [
+    ['extra prohibited fields', (value) => ({ ...structuredClone(value), signature: 'private', progress: 100 })],
+    ['missing field', (value) => {
+      const output = structuredClone(value)
+      delete output.status
+      return output
+    }],
+    ['changed field', (value) => ({ ...structuredClone(value), ledger_revision: 99 })],
+    ['same original object', (value) => value],
+    ['accessor output', (value) => {
+      const output = structuredClone(value)
+      Object.defineProperty(output, 'status', { enumerable: true, get: () => value.status })
+      return output
+    }],
+    ['outer Proxy', (value) => new Proxy(structuredClone(value), {})],
+    ['function value', (value) => ({ ...structuredClone(value), status: () => 'accepted' })],
+    ['symbol value', (value) => ({ ...structuredClone(value), status: Symbol('accepted') })],
+    ['mutated draft response', (value) => {
+      value.progress = 100
+      return structuredClone(value)
+    }],
+  ]
+
+  for (const [label, substitute] of ingestAttacks) {
+    let attack = true
+    const fixture = makeFixture({ clone: (value) => attack ? substitute(value) : structuredClone(value) })
+    expectCode(() => fixture.bridge.ingest(fixture.signed()), 'materialization_failed')
+    attack = false
+    assert.deepEqual(fixture.bridge.read(fixture.viewer()), {
+      status: 'ok',
+      ledger_revision: 0,
+      projections: [{
+        project_id: 'outcome', role: 'builder', binding_version: 1, status_code: null,
+        freshness_class: 'unknown', observed_time_class: 'unavailable', ledger_revision: 0,
+        accepted_count: 0, conflict_count: 0,
+      }],
+    }, label)
+    assert.deepEqual(fixture.bridge.audit(fixture.viewer()), { status: 'ok', ledger_revision: 0, entries: [] }, label)
+    assert.deepEqual(fixture.bridge.ingest(fixture.signed()), { status: 'accepted', ledger_revision: 1 }, label)
+  }
+
+  const readAttacks = [
+    ['nested Proxy', (value, onTrap) => {
+      const output = structuredClone(value)
+      output.projections = new Proxy(output.projections, { get() { onTrap(); return undefined }, ownKeys() { onTrap(); return [] } })
+      return output
+    }],
+    ['altered array shape', (value) => {
+      const output = structuredClone(value)
+      output.projections.push(structuredClone(output.projections[0]))
+      return output
+    }],
+    ['altered nested value', (value) => {
+      const output = structuredClone(value)
+      output.projections[0].status_code = '테스트 실행 중'
+      return output
+    }],
+    ['shared nested identity', (value) => ({ ...structuredClone(value), projections: value.projections })],
+  ]
+
+  for (const [label, substitute] of readAttacks) {
+    let attack = false
+    let trapHits = 0
+    const fixture = makeFixture({ clone: (value) => attack ? substitute(value, () => { trapHits += 1 }) : structuredClone(value) })
+    fixture.bridge.ingest(fixture.signed())
+    const before = fixture.bridge.read(fixture.viewer())
+    const beforeAudit = fixture.bridge.audit(fixture.viewer())
+    attack = true
+    expectCode(() => fixture.bridge.read(fixture.viewer()), 'materialization_failed')
+    attack = false
+    assert.equal(trapHits, 0, label)
+    assert.deepEqual(fixture.bridge.read(fixture.viewer()), before, label)
+    assert.deepEqual(fixture.bridge.audit(fixture.viewer()), beforeAudit, label)
+  }
+})
+
+test('public-key Proxy traps are rejected before evaluation while real Ed25519 rotation works', () => {
+  const base = makeFixture()
+  let constructorTrapHits = 0
+  const constructorProxy = new Proxy(base.keys.publicKey, {
+    get() { constructorTrapHits += 1; throw new Error('must not run') },
+    getPrototypeOf() { constructorTrapHits += 1; throw new Error('must not run') },
+  })
+  expectCode(() => createPhase3ObserverBridge({
+    sources: [{ ...base.source, public_key: constructorProxy }],
+    viewers: base.viewers,
+    freshness_ms: FRESHNESS_MS,
+  }), 'configuration_invalid')
+  assert.equal(constructorTrapHits, 0)
+
+  const fixture = makeFixture()
+  const replacement = generateKeyPairSync('ed25519')
+  let rotationTrapHits = 0
+  let nestedCode = null
+  const rotationProxy = new Proxy(replacement.publicKey, {
+    get() {
+      rotationTrapHits += 1
+      try { fixture.bridge.disable({ expected_ledger_revision: 0 }) } catch (error) { nestedCode = error.code }
+      throw new Error('must not run')
+    },
+    getPrototypeOf() {
+      rotationTrapHits += 1
+      throw new Error('must not run')
+    },
+  })
+  expectCode(() => fixture.bridge.rotateKey({
+    project_id: 'outcome', role: 'builder', binding_version: 1, source_ref: 'source_alpha_01', source_version: 1,
+    expected_key_version: 1, new_key_version: 2, new_public_key: rotationProxy, expected_registry_revision: 1,
+  }), 'input_invalid')
+  assert.equal(rotationTrapHits, 0)
+  assert.equal(nestedCode, null)
+  assert.deepEqual(fixture.bridge.audit(fixture.viewer()), { status: 'ok', ledger_revision: 0, entries: [] })
+
+  const rsa = generateKeyPairSync('rsa', { modulusLength: 2048 })
+  expectCode(() => createPhase3ObserverBridge({
+    sources: [{ ...base.source, public_key: rsa.publicKey }],
+    viewers: base.viewers,
+    freshness_ms: FRESHNESS_MS,
+  }), 'configuration_invalid')
+  expectCode(() => createPhase3ObserverBridge({
+    sources: [{ ...base.source, public_key: base.keys.privateKey }],
+    viewers: base.viewers,
+    freshness_ms: FRESHNESS_MS,
+  }), 'configuration_invalid')
+
+  assert.deepEqual(fixture.bridge.rotateKey({
+    project_id: 'outcome', role: 'builder', binding_version: 1, source_ref: 'source_alpha_01', source_version: 1,
+    expected_key_version: 1, new_key_version: 2, new_public_key: replacement.publicKey, expected_registry_revision: 1,
+  }), { status: 'key_rotated', ledger_revision: 1, registry_revision: 2 })
+  assert.equal(fixture.bridge.revokeKey({
+    project_id: 'outcome', role: 'builder', binding_version: 1, source_ref: 'source_alpha_01', source_version: 1,
+    expected_key_version: 2, expected_registry_revision: 2,
+  }).status, 'key_revoked')
 })
 
 test('every lifecycle envelope rejects Proxy traps before evaluation and consumes no revision', () => {
