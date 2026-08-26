@@ -16,18 +16,37 @@ export async function requireHostedSessionToken(getToken: () => Promise<string |
   return sessionToken
 }
 
-type HostedGoogleSignIn = { sso: (parameters: typeof hostedGoogleSsoParameters) => Promise<{ error: unknown }> }
-type HostedGoogleAttempt = 'returned' | 'failed' | 'unavailable' | 'ignored'
-export async function attemptHostedGoogleSignIn(signIn: HostedGoogleSignIn | null | undefined, lock: { current: boolean }): Promise<HostedGoogleAttempt> {
+type HostedGoogleNavigate = (input: { decorateUrl: (url: string) => string }) => void | Promise<void>
+type HostedGoogleSignIn = {
+  status: string
+  sso: (parameters: typeof hostedGoogleSsoParameters & { popup: Window }) => Promise<{ error: unknown }>
+  finalize: (parameters: { navigate: HostedGoogleNavigate }) => Promise<{ error: unknown }>
+}
+type HostedGoogleAttempt = 'complete' | 'failed' | 'incomplete' | 'popup_blocked' | 'unavailable' | 'ignored'
+const openHostedGooglePopup = () => window.open('about:blank', 'outcome-google-auth', 'popup,width=600,height=800')
+const navigateHostedWorkspace: HostedGoogleNavigate = ({ decorateUrl }) => window.location.assign(decorateUrl('/workspace'))
+export function hostedGoogleAttemptError(result: HostedGoogleAttempt) {
+  if (result === 'unavailable') return '인증 공급자를 불러오지 못했습니다. 다시 시도해 주세요.'
+  if (result === 'popup_blocked') return 'Google 로그인 창을 열 수 없습니다. 팝업을 허용한 뒤 다시 시도해 주세요.'
+  if (result === 'failed' || result === 'incomplete') return 'Google 로그인을 완료하지 못했습니다. 다시 시도해 주세요.'
+  return null
+}
+export async function attemptHostedGoogleSignIn(signIn: HostedGoogleSignIn | null | undefined, lock: { current: boolean }, openPopup: () => Window | null = openHostedGooglePopup, navigate: HostedGoogleNavigate = navigateHostedWorkspace): Promise<HostedGoogleAttempt> {
   if (lock.current) return 'ignored'
   if (!signIn) return 'unavailable'
   lock.current = true
+  const popup = openPopup()
+  if (!popup) { lock.current = false; return 'popup_blocked' }
   try {
-    const result = await signIn.sso(hostedGoogleSsoParameters)
-    return result.error ? 'failed' : 'returned'
+    const result = await signIn.sso({ ...hostedGoogleSsoParameters, popup })
+    if (result.error) return 'failed'
+    if (signIn.status !== 'complete') return 'incomplete'
+    const finalized = await signIn.finalize({ navigate })
+    return finalized.error ? 'failed' : 'complete'
   } catch {
     return 'failed'
   } finally {
+    if (!popup.closed) popup.close()
     lock.current = false
   }
 }
@@ -91,8 +110,7 @@ function HostedWorkspaceBody() {
     setError(null)
     setGooglePending(true)
     const result = await attemptHostedGoogleSignIn(signIn, googleLock)
-    if (result === 'unavailable') setError('인증 공급자를 불러오지 못했습니다. 다시 시도해 주세요.')
-    else if (result !== 'ignored') setError('Google 로그인을 시작하지 못했습니다. 다시 시도해 주세요.')
+    setError(hostedGoogleAttemptError(result))
     setGooglePending(false)
   }
   const sendCode = async (event: FormEvent) => {

@@ -10,7 +10,7 @@ vi.mock('@clerk/react', () => ({
   useUser: () => ({ user: null }),
 }))
 
-import { attemptHostedGoogleSignIn, HostedClerkWorkspace, hostedFailureState, hostedGoogleSsoParameters, requestHostedEmailCode, requireHostedSessionToken, returnToHostedLogin } from './AccountWorkspaceClerk'
+import { attemptHostedGoogleSignIn, HostedClerkWorkspace, hostedFailureState, hostedGoogleAttemptError, hostedGoogleSsoParameters, requestHostedEmailCode, requireHostedSessionToken, returnToHostedLogin } from './AccountWorkspaceClerk'
 
 describe('Clerk browser session boundary', () => {
   it('mounts ClerkProvider with the runtime publishable key and real SDK callback component', () => {
@@ -35,28 +35,66 @@ describe('Clerk browser session boundary', () => {
     expect(hostedGoogleSsoParameters).toEqual({ strategy: 'oauth_google', redirectCallbackUrl: '/workspace/sso-callback', redirectUrl: '/workspace' })
   })
 
-  it('fails safely for absent, rejected, thrown, and returned-without-navigation Google starts', async () => {
+  it('opens the documented popup synchronously and finalizes a completed Google sign-in', async () => {
     const lock = { current: false }
-    const returned = vi.fn().mockResolvedValue({ error: null })
+    let opened = false
+    const popup = { close: vi.fn(), closed: false } as unknown as Window
+    const navigate = vi.fn()
+    const finalize = vi.fn().mockImplementation(async ({ navigate: finalizeNavigate }) => {
+      expect(opened).toBe(true)
+      expect(finalizeNavigate).toBe(navigate)
+      return { error: null }
+    })
+    const sso = vi.fn().mockImplementation(async (parameters) => {
+      expect(opened).toBe(true)
+      expect(parameters).toEqual({ ...hostedGoogleSsoParameters, popup })
+      return { error: null }
+    })
+    const signIn = { status: 'complete', sso, finalize }
+    await expect(attemptHostedGoogleSignIn(signIn, lock, () => { opened = true; return popup }, navigate)).resolves.toBe('complete')
+    expect(sso).toHaveBeenCalledOnce()
+    expect(finalize).toHaveBeenCalledOnce()
+    expect(popup.close).toHaveBeenCalledOnce()
+  })
+
+  it('fails safely for absent, blocked-popup, rejected, thrown, and incomplete Google starts', async () => {
+    const lock = { current: false }
+    const popup = { close: vi.fn(), closed: false } as unknown as Window
+    const incomplete = { status: 'needs_first_factor', sso: vi.fn().mockResolvedValue({ error: null }), finalize: vi.fn() }
     await expect(attemptHostedGoogleSignIn(undefined, lock)).resolves.toBe('unavailable')
-    await expect(attemptHostedGoogleSignIn({ sso: vi.fn().mockResolvedValue({ error: new Error('raw-provider-detail') }) }, lock)).resolves.toBe('failed')
-    await expect(attemptHostedGoogleSignIn({ sso: vi.fn().mockRejectedValue(new Error('raw-provider-secret')) }, lock)).resolves.toBe('failed')
-    await expect(attemptHostedGoogleSignIn({ sso: returned }, lock)).resolves.toBe('returned')
-    expect(returned).toHaveBeenCalledWith(hostedGoogleSsoParameters)
+    await expect(attemptHostedGoogleSignIn(incomplete, lock, () => null)).resolves.toBe('popup_blocked')
+    expect(incomplete.sso).not.toHaveBeenCalled()
+    await expect(attemptHostedGoogleSignIn({ ...incomplete, sso: vi.fn().mockResolvedValue({ error: new Error('raw-provider-detail') }) }, lock, () => popup)).resolves.toBe('failed')
+    await expect(attemptHostedGoogleSignIn({ ...incomplete, sso: vi.fn().mockRejectedValue(new Error('raw-provider-secret')) }, lock, () => popup)).resolves.toBe('failed')
+    await expect(attemptHostedGoogleSignIn(incomplete, lock, () => popup)).resolves.toBe('incomplete')
+    expect(incomplete.finalize).not.toHaveBeenCalled()
+    expect(popup.close).toHaveBeenCalledTimes(3)
     expect(lock.current).toBe(false)
+  })
+
+  it('maps popup/mobile fallback and provider failures to bounded Korean copy only', () => {
+    expect(hostedGoogleAttemptError('popup_blocked')).toContain('팝업을 허용')
+    expect(hostedGoogleAttemptError('unavailable')).toContain('다시 시도')
+    expect(hostedGoogleAttemptError('failed')).toBe('Google 로그인을 완료하지 못했습니다. 다시 시도해 주세요.')
+    expect(hostedGoogleAttemptError('incomplete')).toBe('Google 로그인을 완료하지 못했습니다. 다시 시도해 주세요.')
+    expect(hostedGoogleAttemptError('complete')).toBeNull()
+    expect(hostedGoogleAttemptError('ignored')).toBeNull()
+    expect(JSON.stringify((['popup_blocked', 'unavailable', 'failed', 'incomplete'] as const).map(hostedGoogleAttemptError))).not.toMatch(/raw-provider|token|cookie|secret/i)
   })
 
   it('keeps one Google start pending and rejects a duplicate click', async () => {
     let resolve!: (value: { error: null }) => void
     const pending = new Promise<{ error: null }>((done) => { resolve = done })
+    const popup = { close: vi.fn(), closed: false } as unknown as Window
     const sso = vi.fn(() => pending)
     const lock = { current: false }
-    const first = attemptHostedGoogleSignIn({ sso }, lock)
-    await expect(attemptHostedGoogleSignIn({ sso }, lock)).resolves.toBe('ignored')
+    const signIn = { status: 'needs_first_factor', sso, finalize: vi.fn() }
+    const first = attemptHostedGoogleSignIn(signIn, lock, () => popup)
+    await expect(attemptHostedGoogleSignIn(signIn, lock, () => popup)).resolves.toBe('ignored')
     expect(sso).toHaveBeenCalledOnce()
     expect(lock.current).toBe(true)
     resolve({ error: null })
-    await expect(first).resolves.toBe('returned')
+    await expect(first).resolves.toBe('incomplete')
     expect(lock.current).toBe(false)
   })
 
