@@ -12,8 +12,8 @@ import { canonicalObserverBridgeBytes } from './phase3-observer-bridge.mjs'
 const BASE = Date.parse('2026-08-27T00:00:00.000Z')
 const owner = Object.freeze({ account_ref: 'account_owner_01', workspace_id: 'workspace_main', project_ids: ['outcome'] })
 const viewers = Object.freeze([
-  { viewer_ref: 'viewer_workstation_01', viewer_class: 'workstation', project_ids: ['outcome'] },
-  { viewer_ref: 'viewer_remote_01', viewer_class: 'remote_device', project_ids: ['outcome'] },
+  { workspace_id: 'workspace_main', viewer_ref: 'viewer_workstation_01', viewer_class: 'workstation', project_ids: ['outcome'] },
+  { workspace_id: 'workspace_main', viewer_ref: 'viewer_remote_01', viewer_class: 'remote_device', project_ids: ['outcome'] },
 ])
 const binding = Object.freeze({ workspace_id: 'workspace_main', project_id: 'outcome', role: 'builder', binding_version: 1, source_ref: 'source_alpha_01' })
 const expectCode = (fn, code) => assert.throws(fn, (error) => error instanceof HostedObserverBridgeError && error.code === code)
@@ -218,4 +218,141 @@ test('responses and serialized state contain no authority or prohibited data', (
   const output = fixture.bridge.read({ auth_context: { token: 'owner' }, viewer_ref: 'viewer_workstation_01', viewer_class: 'workstation', project_id: 'outcome' })
   assert.doesNotMatch(JSON.stringify(output), /prompt|result|session|thread|turn|credential|private.?key|signature|certificate|progress|gate|approval|completion/i)
   assert.equal(output.completionAuthority, undefined)
+})
+
+test('QA RED F1 rejects same project name across a different authorized workspace', () => {
+  const fixture = makeFixture({ authorize_viewer: () => ({ account_ref: 'account_other_01', workspace_id: 'workspace_other', project_ids: ['outcome'] }) })
+  const certificate = fixture.complete(fixture.begin())
+  fixture.ingest(certificate)
+  expectCode(() => fixture.bridge.read({ auth_context: { token: 'owner' }, viewer_ref: 'viewer_workstation_01', viewer_class: 'workstation', project_id: 'outcome' }), 'access_denied')
+})
+
+test('F1 binds registrations, sources and reads to workspace even when project IDs collide', () => {
+  const otherBinding = { ...binding, workspace_id: 'workspace_other', source_ref: 'source_other_01' }
+  const multiViewers = [
+    ...viewers,
+    { workspace_id: 'workspace_other', viewer_ref: 'viewer_other_workstation_01', viewer_class: 'workstation', project_ids: ['outcome'] },
+    { workspace_id: 'workspace_other', viewer_ref: 'viewer_other_remote_01', viewer_class: 'remote_device', project_ids: ['outcome'] },
+  ]
+  const fixture = makeFixture({
+    bindings: [binding, otherBinding], viewers: multiViewers,
+    authorize_viewer: (context) => context?.token === 'other'
+      ? { account_ref: 'account_other_01', workspace_id: 'workspace_other', project_ids: ['outcome'] }
+      : owner,
+  })
+  const certificate = fixture.complete(fixture.begin())
+  fixture.ingest(certificate)
+  expectCode(() => fixture.bridge.read({ auth_context: { token: 'other' }, viewer_ref: 'viewer_other_workstation_01', viewer_class: 'workstation', project_id: 'outcome' }), 'access_denied')
+  assert.equal(fixture.bridge.read({ auth_context: { token: 'owner' }, viewer_ref: 'viewer_workstation_01', viewer_class: 'workstation', project_id: 'outcome' }).projections.length, 1)
+})
+
+test('QA RED F2 rejects inherited prototype authority without store consumption', () => {
+  let storeCommits = 0
+  const fixture = makeFixture({
+    transaction_store: { commit: () => { storeCommits += 1; return true } },
+    authorize_owner: (context) => context.token === 'owner' ? owner : null,
+  })
+  const polluted = JSON.parse('{"__proto__":{"token":"owner"}}')
+  expectCode(() => fixture.bridge.createEnrollment({ auth_context: polluted, ...binding, mode: 'enroll', idempotency_key: 'polluted-key-01' }), 'access_denied')
+  assert.equal(storeCommits, 0)
+})
+
+test('F2 rejects inherited, accessor and Proxy auth without callback or trap execution', () => {
+  let callbacks = 0
+  let storeCommits = 0
+  const fixture = makeFixture({
+    transaction_store: { commit: () => { storeCommits += 1; return true } },
+    authorize_owner: (context) => context.token === 'owner' ? owner : null,
+  })
+  const inherited = Object.create({ token: 'owner' })
+  const accessor = {}
+  Object.defineProperty(accessor, 'token', { enumerable: true, get() { callbacks += 1; return 'owner' } })
+  const proxy = new Proxy({}, { get() { callbacks += 1; return 'owner' }, ownKeys() { callbacks += 1; return ['token'] } })
+  const nullPrototypeMissing = Object.create(null)
+  for (const auth_context of [inherited, accessor, proxy, nullPrototypeMissing]) {
+    expectCode(() => fixture.bridge.createEnrollment({ auth_context, ...binding, mode: 'enroll', idempotency_key: 'authority-key-01' }), 'access_denied')
+  }
+  assert.equal(callbacks, 0)
+  assert.equal(storeCommits, 0)
+})
+
+test('QA RED F4 rotation keeps immutable count and revision then resumes monotonically', () => {
+  const fixture = makeFixture()
+  const first = fixture.complete(fixture.begin())
+  fixture.ingest(first)
+  const before = fixture.bridge.read({ auth_context: { token: 'owner' }, viewer_ref: 'viewer_workstation_01', viewer_class: 'workstation', project_id: 'outcome' }).projections[0]
+  const rotation = fixture.bridge.createEnrollment({ auth_context: { token: 'owner' }, ...binding, mode: 'rotate', idempotency_key: 'rotation-red-01' })
+  const keys = generateKeyPairSync('ed25519')
+  const spki = keys.publicKey.export({ format: 'der', type: 'spki' }).toString('base64url')
+  const proof = sign(null, canonicalEnrollmentBytes({ ...rotation.enrollment_scope, challenge_ref: rotation.challenge_ref, challenge_nonce: rotation.challenge_nonce, public_key_spki: spki }), keys.privateKey).toString('base64url')
+  const second = fixture.bridge.completeEnrollment({ challenge_ref: rotation.challenge_ref, public_key_spki: spki, proof_signature: proof })
+  const afterResponse = fixture.bridge.read({ auth_context: { token: 'owner' }, viewer_ref: 'viewer_workstation_01', viewer_class: 'workstation', project_id: 'outcome' })
+  const after = afterResponse.projections[0]
+  assert.equal(after.accepted_count, before.accepted_count)
+  assert.ok(after.ledger_revision > before.ledger_revision)
+  assert.equal(after.status_code, null)
+  assert.equal(after.freshness_class, 'unknown')
+  assert.deepEqual(fixture.bridge.read({ auth_context: { token: 'owner' }, viewer_ref: 'viewer_remote_01', viewer_class: 'remote_device', project_id: 'outcome' }), afterResponse)
+  const unsigned = { schema_version: 1, project_id: 'outcome', role: 'builder', binding_version: 1, source_ref: 'source_alpha_01', source_version: 1, key_version: 2, sequence: 2, observed_at: new Date(BASE).toISOString(), expires_at: new Date(BASE + 60_000).toISOString(), status_code: '테스트 실행 중' }
+  const event = { ...unsigned, signature: sign(null, canonicalObserverBridgeBytes(unsigned), keys.privateKey).toString('base64url') }
+  const request = { certificate_ref: second.certificate_ref, request_id: 'request_rotated_02', nonce: 'nonce_rotated_02', event }
+  const result = fixture.bridge.ingest({ ...request, request_signature: sign(null, canonicalHostedRequestBytes(request), keys.privateKey).toString('base64url') })
+  assert.ok(result.ledger_revision > after.ledger_revision)
+  const resumed = fixture.bridge.read({ auth_context: { token: 'owner' }, viewer_ref: 'viewer_workstation_01', viewer_class: 'workstation', project_id: 'outcome' }).projections[0]
+  assert.equal(resumed.accepted_count, before.accepted_count + 1)
+  assert.equal(resumed.status_code, '테스트 실행 중')
+})
+
+test('QA RED F5 expires challenge at the exact 300-second instant', () => {
+  for (const [elapsed, accepted] of [[299_999, true], [300_000, false], [300_001, false]]) {
+    const fixture = makeFixture()
+    const challenge = fixture.begin()
+    fixture.setClock(BASE + elapsed)
+    if (accepted) assert.equal(fixture.complete(challenge).status, 'source_active')
+    else expectCode(() => fixture.complete(challenge), 'enrollment_invalid')
+  }
+})
+
+test('F5 expiry failures consume no entropy or store revision', () => {
+  let entropyCalls = 0
+  let storeCommits = 0
+  let clock = BASE
+  const fixture = makeFixture({
+    now: () => clock,
+    random_bytes: (length) => { entropyCalls += 1; return Buffer.alloc(length, entropyCalls) },
+    transaction_store: { commit: () => { storeCommits += 1; return true } },
+  })
+  const challenge = fixture.begin()
+  const before = { entropyCalls, storeCommits }
+  clock = BASE + 300_000
+  expectCode(() => fixture.complete(challenge), 'enrollment_invalid')
+  assert.deepEqual({ entropyCalls, storeCommits }, before)
+})
+
+test('QA RED F6 semantic enrollment retry ignores property insertion order', () => {
+  const fixture = makeFixture()
+  const first = fixture.begin()
+  const reversed = Object.fromEntries(Object.entries({ auth_context: { token: 'owner' }, ...binding, mode: 'enroll', idempotency_key: 'enroll-key-01' }).reverse())
+  assert.deepEqual(fixture.bridge.createEnrollment(reversed), first)
+})
+
+test('F6 null-prototype semantic retry is immutable and changed scope conflicts', () => {
+  let entropyCalls = 0
+  let storeCommits = 0
+  const plannerBinding = { ...binding, role: 'planner', source_ref: 'source_planner_01' }
+  const fixture = makeFixture({
+    bindings: [binding, plannerBinding],
+    random_bytes: (length) => { entropyCalls += 1; return Buffer.alloc(length, entropyCalls) },
+    transaction_store: { commit: () => { storeCommits += 1; return true } },
+  })
+  const first = fixture.begin()
+  const before = { entropyCalls, storeCommits }
+  const retry = Object.create(null)
+  for (const [key, value] of Object.entries({ idempotency_key: 'enroll-key-01', mode: 'enroll', source_ref: binding.source_ref, binding_version: 1, role: 'builder', project_id: 'outcome', workspace_id: 'workspace_main', auth_context: { token: 'owner' } })) {
+    Object.defineProperty(retry, key, { value, enumerable: true })
+  }
+  assert.deepEqual(fixture.bridge.createEnrollment(retry), first)
+  assert.deepEqual({ entropyCalls, storeCommits }, before)
+  expectCode(() => fixture.bridge.createEnrollment({ auth_context: { token: 'owner' }, ...plannerBinding, mode: 'enroll', idempotency_key: 'enroll-key-01' }), 'idempotency_conflict')
+  assert.deepEqual({ entropyCalls, storeCommits }, before)
 })

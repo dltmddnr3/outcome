@@ -14,8 +14,9 @@ const CHALLENGE_MS = 300_000
 const FRESHNESS_MS = 60_000
 const CONFIG_FIELDS = new Set(['feature_enabled', 'ingest_enabled', 'bindings', 'viewers', 'authorize_owner', 'authorize_viewer', 'now', 'random_bytes', 'verify_signature', 'clone', 'domain_bridge_factory', 'transaction_store', 'max_body_bytes', 'rate_limit_count', 'rate_window_ms'])
 const BINDING_FIELDS = new Set(['workspace_id', 'project_id', 'role', 'binding_version', 'source_ref'])
-const VIEWER_FIELDS = new Set(['viewer_ref', 'viewer_class', 'project_ids'])
+const VIEWER_FIELDS = new Set(['workspace_id', 'viewer_ref', 'viewer_class', 'project_ids'])
 const AUTH_FIELDS = new Set(['account_ref', 'workspace_id', 'project_ids'])
+const AUTH_CONTEXT_FIELDS = new Set(['token'])
 const ENROLL_FIELDS = new Set(['auth_context', 'workspace_id', 'project_id', 'role', 'binding_version', 'source_ref', 'mode', 'idempotency_key'])
 const COMPLETE_FIELDS = new Set(['challenge_ref', 'public_key_spki', 'proof_signature'])
 const INGEST_FIELDS = new Set(['certificate_ref', 'request_id', 'nonce', 'event', 'request_signature', 'body_bytes'])
@@ -23,6 +24,7 @@ const EVENT_FIELDS = new Set(['schema_version', 'project_id', 'role', 'binding_v
 const READ_FIELDS = new Set(['auth_context', 'viewer_ref', 'viewer_class', 'project_id'])
 const REVOKE_FIELDS = new Set(['auth_context', 'certificate_ref', 'expected_revision'])
 const ENROLLMENT_CANONICAL_FIELDS = Object.freeze(['workspace_id', 'project_id', 'role', 'binding_version', 'source_ref', 'source_version', 'key_version', 'mode', 'challenge_ref', 'challenge_nonce', 'public_key_spki'])
+const ENROLLMENT_FINGERPRINT_FIELDS = Object.freeze(['account_ref', 'workspace_id', 'project_id', 'role', 'binding_version', 'source_ref', 'mode'])
 
 export class HostedObserverBridgeError extends Error {
   constructor(code) {
@@ -51,11 +53,11 @@ function ownRecord(value, allowed, required = allowed, code = 'input_invalid') {
   const keys = Reflect.ownKeys(descriptors)
   if (keys.some((key) => typeof key !== 'string' || !allowed.has(key))) fail(code)
   if ([...required].some((key) => !Object.hasOwn(descriptors, key))) fail(code)
-  const result = {}
+  const result = Object.create(null)
   for (const key of keys) {
     const descriptor = descriptors[key]
     if (!descriptor?.enumerable || !Object.hasOwn(descriptor, 'value')) fail(code)
-    result[key] = descriptor.value
+    Object.defineProperty(result, key, { value: descriptor.value, enumerable: true, writable: true, configurable: true })
   }
   return result
 }
@@ -73,24 +75,6 @@ function ownArray(value, materialize, code = 'configuration_invalid') {
     const descriptor = descriptors[String(index)]
     if (!descriptor?.enumerable || !Object.hasOwn(descriptor, 'value')) fail(code)
     output.push(materialize(descriptor.value))
-  }
-  return output
-}
-
-function opaqueData(value, depth = 0, code = 'input_invalid') {
-  if (depth > 5) fail(code)
-  if (value === null || typeof value === 'string' || typeof value === 'boolean' || (typeof value === 'number' && Number.isSafeInteger(value))) return value
-  if (Array.isArray(value)) return ownArray(value, (item) => opaqueData(item, depth + 1, code), code)
-  if (typeof value !== 'object' || isProxy(value)) fail(code)
-  let descriptors
-  let prototype
-  try { descriptors = Object.getOwnPropertyDescriptors(value); prototype = Object.getPrototypeOf(value) } catch { fail(code) }
-  if (prototype !== Object.prototype && prototype !== null) fail(code)
-  const output = {}
-  for (const key of Reflect.ownKeys(descriptors)) {
-    const descriptor = descriptors[key]
-    if (typeof key !== 'string' || !descriptor?.enumerable || !Object.hasOwn(descriptor, 'value')) fail(code)
-    output[key] = opaqueData(descriptor.value, depth + 1, code)
   }
   return output
 }
@@ -135,7 +119,7 @@ function cloneState(state) {
     storeRevision: state.storeRevision,
     revision: state.revision,
     challenges: new Map([...state.challenges].map(([key, value]) => [key, { ...value, scope: { ...value.scope }, response: { ...value.response, enrollment_scope: { ...value.response.enrollment_scope } } }])),
-    sources: new Map([...state.sources].map(([key, value]) => [key, { ...value, actions: value.actions.map((action) => ({ at: action.at, event: { ...action.event } })) }])),
+    sources: new Map([...state.sources].map(([key, value]) => [key, { ...value, actions: value.actions.map((action) => ({ ...action, input: action.input ? { ...action.input } : undefined, event: action.event ? { ...action.event } : undefined })) }])),
     certificates: new Map(state.certificates),
     replays: new Map([...state.replays].map(([key, value]) => [key, { ...value, response: { ...value.response } }])),
     idempotency: new Map([...state.idempotency].map(([key, value]) => [key, { ...value, response: { ...value.response, enrollment_scope: { ...value.response.enrollment_scope } } }])),
@@ -147,7 +131,7 @@ function persistenceSnapshot(state) {
   return {
     revision: state.revision,
     challenges: [...state.challenges.values()].map((value) => ({ scope: { ...value.scope }, challenge_ref: value.response.challenge_ref, challenge_nonce: value.challengeNonce, issued_at: value.issuedAt, expires_at: value.expiresAt, consumed: value.consumed })),
-    sources: [...state.sources.values()].map((value) => ({ workspace_id: value.workspace_id, project_id: value.project_id, role: value.role, binding_version: value.binding_version, source_ref: value.source_ref, source_version: value.source_version, key_version: value.key_version, certificate_ref: value.certificate_ref, public_key_spki: value.public_key_spki, status: value.status, actions: value.actions.map((action) => ({ at: action.at, event: { ...action.event } })) })),
+    sources: [...state.sources.values()].map((value) => ({ workspace_id: value.workspace_id, project_id: value.project_id, role: value.role, binding_version: value.binding_version, source_ref: value.source_ref, source_version: value.source_version, key_version: value.key_version, certificate_ref: value.certificate_ref, public_key_spki: value.public_key_spki, status: value.status, actions: value.actions.map((action) => ({ type: action.type, at: action.at, event: action.event ? { ...action.event } : undefined, key_version: action.input?.new_key_version, public_key_spki: action.public_key_spki })) })),
     replay: [...state.replays.entries()].map(([key, value]) => ({ key, digest: value.digest, response: { ...value.response } })),
   }
 }
@@ -219,11 +203,12 @@ function materializeBinding(value) {
 
 function materializeViewer(value) {
   const item = ownRecord(value, VIEWER_FIELDS, VIEWER_FIELDS, 'configuration_invalid')
-  if (!privateRef(item.viewer_ref) || !VIEWER_CLASSES.has(item.viewer_class)) fail('configuration_invalid')
+  if (!safeId(item.workspace_id) || !privateRef(item.viewer_ref) || !VIEWER_CLASSES.has(item.viewer_class)) fail('configuration_invalid')
   return { ...item, project_ids: stringArray(item.project_ids) }
 }
 
 const bindingKey = (value) => `${value.workspace_id}:${value.project_id}:${value.role}:${value.binding_version}:${value.source_ref}`
+const viewerKey = (value) => `${value.workspace_id}:${value.viewer_ref}`
 
 export function createHostedObserverBridge(options = {}) {
   let config
@@ -234,7 +219,13 @@ export function createHostedObserverBridge(options = {}) {
     bindings = ownArray(config.bindings, materializeBinding)
     viewers = ownArray(config.viewers, materializeViewer)
   } catch { fail('configuration_invalid') }
-  if (bindings.length === 0 || new Set(bindings.map(bindingKey)).size !== bindings.length || viewers.length !== 2 || new Set(viewers.map((value) => value.viewer_ref)).size !== 2 || new Set(viewers.map((value) => value.viewer_class)).size !== 2 || !viewers.some((value) => value.viewer_class === 'workstation') || !viewers.some((value) => value.viewer_class === 'remote_device')) fail('configuration_invalid')
+  if (bindings.length === 0 || new Set(bindings.map(bindingKey)).size !== bindings.length || viewers.length < 2 || new Set(viewers.map(viewerKey)).size !== viewers.length) fail('configuration_invalid')
+  const workspaces = new Set(bindings.map((value) => value.workspace_id))
+  if (viewers.some((viewer) => !workspaces.has(viewer.workspace_id) || viewer.project_ids.some((projectId) => !bindings.some((binding) => binding.workspace_id === viewer.workspace_id && binding.project_id === projectId)))) fail('configuration_invalid')
+  for (const workspaceId of workspaces) {
+    const registered = viewers.filter((viewer) => viewer.workspace_id === workspaceId)
+    if (registered.length !== 2 || new Set(registered.map((viewer) => viewer.viewer_class)).size !== 2 || !registered.some((viewer) => viewer.viewer_class === 'workstation') || !registered.some((viewer) => viewer.viewer_class === 'remote_device')) fail('configuration_invalid')
+  }
   const dependencyFunctions = ['authorize_owner', 'authorize_viewer']
   for (const field of dependencyFunctions) if (typeof config[field] !== 'function' || isProxy(config[field])) fail('configuration_invalid')
   const now = config.now ?? Date.now
@@ -300,7 +291,8 @@ export function createHostedObserverBridge(options = {}) {
   const callAuth = (kind, context) => {
     let result
     let safeContext
-    try { safeContext = opaqueData(context, 0, 'access_denied') } catch { fail('access_denied') }
+    try { safeContext = ownRecord(context, AUTH_CONTEXT_FIELDS, AUTH_CONTEXT_FIELDS, 'access_denied') } catch { fail('access_denied') }
+    if (typeof safeContext.token !== 'string' || safeContext.token.length === 0 || safeContext.token.length > 1024) fail('access_denied')
     try { result = config[kind](safeContext) } catch { fail('auth_unavailable') }
     if (reentry) fail('reentrant_operation')
     if (result === null) fail('access_denied')
@@ -319,6 +311,12 @@ export function createHostedObserverBridge(options = {}) {
     if (!allowed) fail('access_denied')
     return auth
   }
+
+  const enrollmentFingerprint = (auth, value) => createHash('sha256').update(serializeFixed(
+    'OUTCOME_OBSERVER_BRIDGE_ENROLLMENT_IDEMPOTENCY_V1',
+    ENROLLMENT_FINGERPRINT_FIELDS,
+    { account_ref: auth.account_ref, workspace_id: auth.workspace_id, project_id: value.project_id, role: value.role, binding_version: value.binding_version, source_ref: value.source_ref, mode: value.mode },
+  )).digest('hex')
 
   const entropyRef = (prefix, length = 18) => {
     let bytes
@@ -340,9 +338,10 @@ export function createHostedObserverBridge(options = {}) {
 
   const buildDomain = (source, clockValue) => {
     let activeClock = clockValue
+    let registryRevision = 1
     const create = () => domainFactory({
-      sources: [{ project_id: source.project_id, role: source.role, binding_version: source.binding_version, source_ref: source.source_ref, source_version: source.source_version, key_version: source.key_version, public_key: source.public_key, status: 'active' }],
-      viewers: viewers.map((viewer) => ({ ...viewer, status: 'active' })),
+      sources: [{ project_id: source.project_id, role: source.role, binding_version: source.binding_version, source_ref: source.source_ref, source_version: source.source_version, key_version: source.initial_key_version, public_key: source.initial_public_key, status: 'active' }],
+      viewers: viewers.filter((viewer) => viewer.workspace_id === source.workspace_id).map((viewer) => ({ viewer_ref: viewer.viewer_ref, viewer_class: viewer.viewer_class, project_ids: [...viewer.project_ids], status: 'active' })),
       freshness_ms: FRESHNESS_MS,
       now: () => activeClock,
       enabled: true,
@@ -352,11 +351,18 @@ export function createHostedObserverBridge(options = {}) {
     if (reentry || !domain || isProxy(domain) || typeof domain.ingest !== 'function' || typeof domain.read !== 'function') fail('domain_unavailable')
     for (const action of source.actions) {
       activeClock = action.at
-      try { domain.ingest(action.event) } catch { fail('domain_unavailable') }
+      try {
+        if (action.type === 'ingest') domain.ingest(action.event)
+        else if (action.type === 'rotate') {
+          domain.rotateKey(action.input)
+          registryRevision += 1
+        } else if (action.type === 'resync') domain.resync(action.input)
+        else fail('domain_unavailable')
+      } catch { fail('domain_unavailable') }
       if (reentry) fail('reentrant_operation')
     }
     activeClock = clockValue
-    return domain
+    return { domain, registryRevision }
   }
 
   return Object.freeze({
@@ -369,13 +375,14 @@ export function createHostedObserverBridge(options = {}) {
         requireFeature()
         const value = ownRecord(input, ENROLL_FIELDS, ENROLL_FIELDS)
         if (!safeId(value.workspace_id) || !safeId(value.project_id) || !ROLES.has(value.role) || !positiveInteger(value.binding_version) || !privateRef(value.source_ref) || !MODES.has(value.mode) || !idempotencyKey(value.idempotency_key)) fail('input_invalid')
-        requireOwnerScope(value.auth_context, value)
+        const auth = requireOwnerScope(value.auth_context, value)
         const scopeKey = bindingKey(value)
         const current = draft.sources.get(scopeKey)
         if (value.mode === 'rotate' && (!current || current.status !== 'active')) fail('access_denied')
         if (value.mode === 'enroll' && current?.status === 'active') fail('enrollment_conflict')
-        const fingerprint = createHash('sha256').update(JSON.stringify({ ...value, auth_context: undefined })).digest('hex')
-        const prior = draft.idempotency.get(value.idempotency_key)
+        const fingerprint = enrollmentFingerprint(auth, value)
+        const idempotencyScopeKey = `${auth.account_ref}:${auth.workspace_id}:${value.idempotency_key}`
+        const prior = draft.idempotency.get(idempotencyScopeKey)
         if (prior) {
           if (prior.fingerprint !== fingerprint) fail('idempotency_conflict')
           return { commit: false, response: prior.response }
@@ -388,7 +395,7 @@ export function createHostedObserverBridge(options = {}) {
         const scope = { workspace_id: value.workspace_id, project_id: value.project_id, role: value.role, binding_version: value.binding_version, source_ref: value.source_ref, source_version: sourceVersion, key_version: keyVersion, mode: value.mode }
         const response = { status: 'challenge_created', challenge_ref: challengeRef, challenge_nonce: challengeNonce, expires_at: new Date(issued + CHALLENGE_MS).toISOString(), enrollment_scope: { ...scope } }
         draft.challenges.set(challengeRef, { scope, challengeNonce, issuedAt: issued, expiresAt: issued + CHALLENGE_MS, consumed: false, response })
-        draft.idempotency.set(value.idempotency_key, { fingerprint, response })
+        draft.idempotency.set(idempotencyScopeKey, { fingerprint, response })
         return { commit: true, response }
       })
     },
@@ -399,7 +406,8 @@ export function createHostedObserverBridge(options = {}) {
         const value = ownRecord(input, COMPLETE_FIELDS, COMPLETE_FIELDS)
         if (!privateRef(value.challenge_ref) || typeof value.public_key_spki !== 'string') fail('input_invalid')
         const challenge = draft.challenges.get(value.challenge_ref)
-        if (!challenge || challenge.consumed || clock() > challenge.expiresAt) fail('enrollment_invalid')
+        const completedAt = clock()
+        if (!challenge || challenge.consumed || completedAt >= challenge.expiresAt) fail('enrollment_invalid')
         const publicKey = publicKeyFromSpki(value.public_key_spki)
         const bytes = canonicalEnrollmentBytes({ ...challenge.scope, challenge_ref: value.challenge_ref, challenge_nonce: challenge.challengeNonce, public_key_spki: value.public_key_spki })
         verify(publicKey.key, bytes, value.proof_signature, 'enrollment_invalid')
@@ -409,7 +417,30 @@ export function createHostedObserverBridge(options = {}) {
         if (challenge.scope.mode === 'enroll' && current?.status === 'active') fail('enrollment_conflict')
         if ([...draft.sources.values()].some((source) => source.public_key_digest === publicKey.digest && source.status === 'active')) fail('enrollment_conflict')
         const certificateRef = entropyRef('certificate')
-        const source = { ...challenge.scope, certificate_ref: certificateRef, public_key: publicKey.key, public_key_spki: publicKey.spki, public_key_digest: publicKey.digest, status: 'active', actions: [], history_count: (current?.history_count ?? 0) + (current?.actions.length ?? 0) }
+        let actions = []
+        let initialPublicKey = publicKey.key
+        let initialPublicKeySpki = publicKey.spki
+        let initialKeyVersion = challenge.scope.key_version
+        let lastSequence = 0
+        let domainLedgerRevision = 0
+        let domainRegistryRevision = 1
+        let needsResync = false
+        if (challenge.scope.mode === 'rotate') {
+          const rebuilt = buildDomain(current, completedAt)
+          const rotateInput = { project_id: current.project_id, role: current.role, binding_version: current.binding_version, source_ref: current.source_ref, source_version: current.source_version, expected_registry_revision: rebuilt.registryRevision, expected_key_version: current.key_version, new_key_version: challenge.scope.key_version, new_public_key: publicKey.key }
+          let rotated
+          try { rotated = rebuilt.domain.rotateKey(rotateInput) } catch { fail('domain_unavailable') }
+          if (reentry || rotated?.status !== 'key_rotated') fail('domain_unavailable')
+          actions = [...current.actions, { type: 'rotate', at: completedAt, input: rotateInput, public_key_spki: publicKey.spki }]
+          initialPublicKey = current.initial_public_key
+          initialPublicKeySpki = current.initial_public_key_spki
+          initialKeyVersion = current.initial_key_version
+          lastSequence = current.last_sequence
+          domainLedgerRevision = rotated.ledger_revision
+          domainRegistryRevision = rotated.registry_revision
+          needsResync = true
+        }
+        const source = { ...challenge.scope, certificate_ref: certificateRef, public_key: publicKey.key, public_key_spki: publicKey.spki, public_key_digest: publicKey.digest, initial_public_key: initialPublicKey, initial_public_key_spki: initialPublicKeySpki, initial_key_version: initialKeyVersion, status: 'active', actions, last_sequence: lastSequence, domain_ledger_revision: domainLedgerRevision, domain_registry_revision: domainRegistryRevision, needs_resync: needsResync }
         draft.sources.set(scopeKey, source)
         draft.certificates.set(certificateRef, scopeKey)
         if (current) current.status = 'replaced'
@@ -431,7 +462,7 @@ export function createHostedObserverBridge(options = {}) {
         const requestBytes = canonicalHostedRequestBytes({ certificate_ref: value.certificate_ref, request_id: value.request_id, nonce: value.nonce, event: value.event })
         verify(source.public_key, requestBytes, value.request_signature, 'signature_invalid')
         const digest = createHash('sha256').update(requestBytes).update(value.request_signature).digest('hex')
-        const replayKey = `${value.certificate_ref}:${value.request_id}:${value.nonce}`
+        const replayKey = `${source.workspace_id}:${bindingKey(source)}:${value.certificate_ref}:${value.request_id}:${value.nonce}`
         const prior = draft.replays.get(replayKey)
         if (prior) {
           if (prior.digest !== digest) fail('request_conflict')
@@ -440,17 +471,34 @@ export function createHostedObserverBridge(options = {}) {
         const nowValue = clock()
         const recent = (draft.rate.get(value.certificate_ref) ?? []).filter((time) => nowValue - time < rateWindowMs)
         if (recent.length >= rateLimitCount) fail('rate_limited')
-        const domain = buildDomain(source, nowValue)
+        const rebuilt = buildDomain(source, nowValue)
         let domainResponse
-        try { domainResponse = domain.ingest(value.event) } catch (error) {
+        let action
+        try {
+          if (source.needs_resync) {
+            const resyncInput = { expected_ledger_revision: source.domain_ledger_revision, expected_last_sequence: source.last_sequence, event: value.event }
+            domainResponse = rebuilt.domain.resync(resyncInput)
+            action = { type: 'resync', at: nowValue, input: resyncInput, event: { ...value.event } }
+          } else {
+            domainResponse = rebuilt.domain.ingest(value.event)
+            action = { type: 'ingest', at: nowValue, event: { ...value.event } }
+          }
+        } catch (error) {
           if (error?.code === 'signature_invalid') fail('signature_invalid')
           if (['out_of_order', 'resync_required'].includes(error?.code)) fail('sequence_conflict')
           fail('domain_unavailable')
         }
         if (domainResponse?.status === 'conflict') fail('sequence_conflict')
-        if (!domainResponse || !['accepted', 'duplicate'].includes(domainResponse.status) || !nonNegativeInteger(domainResponse.ledger_revision)) fail('domain_unavailable')
-        const response = { status: domainResponse.status, ledger_revision: domainResponse.ledger_revision }
-        if (domainResponse.status === 'accepted') source.actions.push({ at: nowValue, event: { ...value.event } })
+        if (!domainResponse || !['accepted', 'duplicate', 'resynced'].includes(domainResponse.status) || !nonNegativeInteger(domainResponse.ledger_revision)) fail('domain_unavailable')
+        const status = domainResponse.status === 'resynced' ? 'accepted' : domainResponse.status
+        const response = { status, ledger_revision: domainResponse.ledger_revision }
+        if (domainResponse.status !== 'duplicate') {
+          source.actions.push(action)
+          source.last_sequence = value.event.sequence
+          source.domain_ledger_revision = domainResponse.ledger_revision
+          source.domain_registry_revision = rebuilt.registryRevision
+          source.needs_resync = false
+        }
         draft.replays.set(replayKey, { digest, response })
         draft.rate.set(value.certificate_ref, [...recent, nowValue])
         draft.revision += 1
@@ -465,13 +513,13 @@ export function createHostedObserverBridge(options = {}) {
         if (!privateRef(value.viewer_ref) || !VIEWER_CLASSES.has(value.viewer_class) || !safeId(value.project_id)) fail('access_denied')
         const auth = callAuth('authorize_viewer', value.auth_context)
         if (!auth.project_ids.includes(value.project_id)) fail('access_denied')
-        const viewer = viewers.find((item) => item.viewer_ref === value.viewer_ref && item.viewer_class === value.viewer_class && item.project_ids.includes(value.project_id))
+        const viewer = viewers.find((item) => item.workspace_id === auth.workspace_id && item.viewer_ref === value.viewer_ref && item.viewer_class === value.viewer_class && item.project_ids.includes(value.project_id))
         if (!viewer) fail('access_denied')
-        const source = [...draft.sources.values()].find((item) => item.project_id === value.project_id && item.status === 'active')
-        if (!source) return { commit: false, response: { status: 'ok', ledger_revision: 0, projections: [] } }
-        const domain = buildDomain(source, clock())
+        const source = [...draft.sources.values()].find((item) => item.workspace_id === auth.workspace_id && item.project_id === value.project_id && item.status === 'active')
+        if (!source) fail('access_denied')
+        const rebuilt = buildDomain(source, clock())
         let response
-        try { response = domain.read({ viewer_ref: value.viewer_ref, viewer_class: value.viewer_class, project_id: value.project_id }) } catch { fail('domain_unavailable') }
+        try { response = rebuilt.domain.read({ viewer_ref: value.viewer_ref, viewer_class: value.viewer_class, project_id: value.project_id }) } catch { fail('domain_unavailable') }
         return { commit: false, response }
       })
     },
