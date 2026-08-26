@@ -1,6 +1,6 @@
 import test from 'node:test'
 import assert from 'node:assert/strict'
-import { createHash, generateKeyPairSync, sign } from 'node:crypto'
+import { createHash, createPublicKey, generateKeyPairSync, sign } from 'node:crypto'
 
 import {
   OBSERVER_BRIDGE_NOW_STATES,
@@ -464,6 +464,90 @@ test('public-key Proxy traps are rejected before evaluation while real Ed25519 r
     project_id: 'outcome', role: 'builder', binding_version: 1, source_ref: 'source_alpha_01', source_version: 1,
     expected_key_version: 1, new_key_version: 2, new_public_key: replacement.publicKey, expected_registry_revision: 1,
   }), { status: 'key_rotated', ledger_revision: 1, registry_revision: 2 })
+  assert.equal(fixture.bridge.revokeKey({
+    project_id: 'outcome', role: 'builder', binding_version: 1, source_ref: 'source_alpha_01', source_version: 1,
+    expected_key_version: 2, expected_registry_revision: 2,
+  }).status, 'key_revoked')
+})
+
+test('decorated public keys are rejected without caller behavior at constructor and rotation', () => {
+  const decorations = [
+    ['equals method', (key, hit) => Object.defineProperty(key, 'equals', { configurable: true, value: () => { hit(); return false } })],
+    ['export method', (key, hit) => Object.defineProperty(key, 'export', { configurable: true, value: () => { hit(); throw new Error('must not run') } })],
+    ['type accessor', (key, hit) => Object.defineProperty(key, 'type', { configurable: true, get: () => { hit(); return 'public' } })],
+    ['asymmetric type accessor', (key, hit) => Object.defineProperty(key, 'asymmetricKeyType', { configurable: true, get: () => { hit(); return 'ed25519' } })],
+    ['non-enumerable property', (key) => Object.defineProperty(key, 'hidden', { configurable: true, value: 'value' })],
+    ['generic accessor', (key, hit) => Object.defineProperty(key, 'probe', { configurable: true, get: () => { hit(); return 'value' } })],
+    ['symbol accessor', (key, hit) => Object.defineProperty(key, Symbol('probe'), { configurable: true, get: () => { hit(); return 'value' } })],
+  ]
+
+  for (const [label, decorate] of decorations) {
+    const base = makeFixture()
+    const constructorKeys = generateKeyPairSync('ed25519')
+    let constructorHits = 0
+    decorate(constructorKeys.publicKey, () => { constructorHits += 1 })
+    expectCode(() => createPhase3ObserverBridge({
+      sources: [{ ...base.source, public_key: constructorKeys.publicKey }],
+      viewers: base.viewers,
+      freshness_ms: FRESHNESS_MS,
+    }), 'configuration_invalid')
+    assert.equal(constructorHits, 0, `constructor ${label}`)
+
+    const fixture = makeFixture()
+    const replacement = generateKeyPairSync('ed25519')
+    let rotationHits = 0
+    decorate(replacement.publicKey, () => { rotationHits += 1 })
+    expectCode(() => fixture.bridge.rotateKey({
+      project_id: 'outcome', role: 'builder', binding_version: 1, source_ref: 'source_alpha_01', source_version: 1,
+      expected_key_version: 1, new_key_version: 2, new_public_key: replacement.publicKey, expected_registry_revision: 1,
+    }), 'input_invalid')
+    assert.equal(rotationHits, 0, `rotation ${label}`)
+    assert.deepEqual(fixture.bridge.audit(fixture.viewer()), { status: 'ok', ledger_revision: 0, entries: [] }, label)
+  }
+})
+
+test('server-owned key snapshots ignore retained caller mutation and deny canonical same-key rotation', () => {
+  const fixture = makeFixture()
+  const originalDer = fixture.keys.publicKey.export({ format: 'der', type: 'spki' })
+  const cleanSameKey = createPublicKey({ key: Buffer.from(originalDer), format: 'der', type: 'spki' })
+  let callbackHits = 0
+  Object.defineProperty(fixture.keys.publicKey, 'equals', {
+    configurable: true,
+    value: () => { callbackHits += 1; return false },
+  })
+
+  assert.deepEqual(fixture.bridge.ingest(fixture.signed()), { status: 'accepted', ledger_revision: 1 })
+  assert.equal(callbackHits, 0)
+  expectCode(() => fixture.bridge.rotateKey({
+    project_id: 'outcome', role: 'builder', binding_version: 1, source_ref: 'source_alpha_01', source_version: 1,
+    expected_key_version: 1, new_key_version: 2, new_public_key: cleanSameKey, expected_registry_revision: 1,
+  }), 'input_invalid')
+  expectCode(() => fixture.bridge.rotateKey({
+    project_id: 'outcome', role: 'builder', binding_version: 1, source_ref: 'source_alpha_01', source_version: 1,
+    expected_key_version: 1, new_key_version: 2, new_public_key: fixture.keys.publicKey, expected_registry_revision: 1,
+  }), 'input_invalid')
+  assert.equal(callbackHits, 0)
+  assert.deepEqual(fixture.bridge.audit(fixture.viewer()), {
+    status: 'ok', ledger_revision: 1,
+    entries: [{ action: 'ingest', reason_code: 'accepted', ledger_revision: 1 }],
+  })
+
+  const replacement = generateKeyPairSync('ed25519')
+  assert.deepEqual(fixture.bridge.rotateKey({
+    project_id: 'outcome', role: 'builder', binding_version: 1, source_ref: 'source_alpha_01', source_version: 1,
+    expected_key_version: 1, new_key_version: 2, new_public_key: replacement.publicKey, expected_registry_revision: 1,
+  }), { status: 'key_rotated', ledger_revision: 2, registry_revision: 2 })
+  Object.defineProperty(replacement.publicKey, 'export', {
+    configurable: true,
+    value: () => { callbackHits += 1; throw new Error('must not run') },
+  })
+  const rotatedEvent = fixture.signed({ key_version: 2, sequence: 2 }, replacement.privateKey)
+  assert.deepEqual(fixture.bridge.resync({
+    expected_ledger_revision: 2,
+    expected_last_sequence: 1,
+    event: rotatedEvent,
+  }), { status: 'resynced', ledger_revision: 3 })
+  assert.equal(callbackHits, 0)
   assert.equal(fixture.bridge.revokeKey({
     project_id: 'outcome', role: 'builder', binding_version: 1, source_ref: 'source_alpha_01', source_version: 1,
     expected_key_version: 2, expected_registry_revision: 2,

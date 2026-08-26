@@ -1,4 +1,4 @@
-import { createHash, verify as nodeVerify, KeyObject } from 'node:crypto'
+import { createHash, createPublicKey, timingSafeEqual, verify as nodeVerify } from 'node:crypto'
 import { isProxy } from 'node:util/types'
 
 const FUTURE_TOLERANCE_MS = 5_000
@@ -39,6 +39,23 @@ const CONFIG_FIELDS = new Set(['sources', 'viewers', 'freshness_ms', 'now', 'ena
 const SOURCE_FIELDS = new Set(['project_id', 'role', 'binding_version', 'source_ref', 'source_version', 'key_version', 'public_key', 'status'])
 const VIEWER_FIELDS = new Set(['viewer_ref', 'viewer_class', 'project_ids', 'status'])
 const VIEWER_INPUT_FIELDS = new Set(['viewer_ref', 'viewer_class', 'project_id'])
+
+const NATIVE_KEY_TEMPLATE = createPublicKey({
+  key: Buffer.concat([Buffer.from('302a300506032b6570032100', 'hex'), Buffer.alloc(32)]),
+  format: 'der',
+  type: 'spki',
+})
+const NATIVE_PUBLIC_KEY_PROTOTYPE = Object.getPrototypeOf(NATIVE_KEY_TEMPLATE)
+const NATIVE_ASYMMETRIC_KEY_PROTOTYPE = Object.getPrototypeOf(NATIVE_PUBLIC_KEY_PROTOTYPE)
+const NATIVE_KEY_PROTOTYPE = Object.getPrototypeOf(NATIVE_ASYMMETRIC_KEY_PROTOTYPE)
+const NATIVE_PUBLIC_KEY_EXPORT = Object.getOwnPropertyDescriptor(NATIVE_PUBLIC_KEY_PROTOTYPE, 'export').value
+const NATIVE_KEY_TYPE_GETTER = Object.getOwnPropertyDescriptor(NATIVE_KEY_PROTOTYPE, 'type').get
+const NATIVE_ASYMMETRIC_TYPE_GETTER = Object.getOwnPropertyDescriptor(NATIVE_ASYMMETRIC_KEY_PROTOTYPE, 'asymmetricKeyType').get
+const NATIVE_KEY_BASE_DESCRIPTORS = Object.getOwnPropertyDescriptors(NATIVE_KEY_TEMPLATE)
+Reflect.apply(NATIVE_ASYMMETRIC_TYPE_GETTER, NATIVE_KEY_TEMPLATE, [])
+const NATIVE_KEY_CACHED_DESCRIPTORS = Object.getOwnPropertyDescriptors(NATIVE_KEY_TEMPLATE)
+const NATIVE_KEY_ALLOWED_KEYS = new Set(Reflect.ownKeys(NATIVE_KEY_CACHED_DESCRIPTORS))
+const NATIVE_KEY_REQUIRED_KEYS = new Set(Reflect.ownKeys(NATIVE_KEY_BASE_DESCRIPTORS))
 
 export const OBSERVER_BRIDGE_NOW_STATES = NOW_STATES
 
@@ -127,13 +144,57 @@ function canonicalSignature(value) {
   return decoded
 }
 
-function validatePublicKey(value) {
-  if (isProxy(value)) return false
+function hasPristineNativeKeyShape(value) {
+  if (typeof value !== 'object' || value === null || isProxy(value)) return false
+  let prototype
+  let descriptors
   try {
-    return value instanceof KeyObject && value.type === 'public' && value.asymmetricKeyType === 'ed25519'
-  } catch {
-    return false
+    prototype = Object.getPrototypeOf(value)
+    descriptors = Object.getOwnPropertyDescriptors(value)
+  } catch { return false }
+  if (prototype !== NATIVE_PUBLIC_KEY_PROTOTYPE) return false
+  const keys = Reflect.ownKeys(descriptors)
+  if (keys.some((key) => !NATIVE_KEY_ALLOWED_KEYS.has(key)) || [...NATIVE_KEY_REQUIRED_KEYS].some((key) => !Object.hasOwn(descriptors, key))) return false
+  for (const key of keys) {
+    const expected = NATIVE_KEY_CACHED_DESCRIPTORS[key]
+    const actual = descriptors[key]
+    if (!expected || !actual || !Object.hasOwn(expected, 'value') || !Object.hasOwn(actual, 'value') ||
+        actual.enumerable !== expected.enumerable || actual.configurable !== expected.configurable ||
+        actual.writable !== expected.writable) return false
+    if (typeof expected.value !== 'object' && actual.value !== expected.value) return false
+    if (typeof expected.value === 'object' && (typeof actual.value !== 'object' || actual.value === null || isProxy(actual.value))) return false
   }
+  return true
+}
+
+function snapshotPublicKey(value, code) {
+  if (!hasPristineNativeKeyShape(value)) fail(code)
+  let exported
+  try {
+    exported = Reflect.apply(NATIVE_PUBLIC_KEY_EXPORT, value, [{ format: 'der', type: 'spki' }])
+  } catch { fail(code) }
+  if (!Buffer.isBuffer(exported)) fail(code)
+  const canonicalDer = Buffer.from(exported)
+  let owned
+  let ownedDer
+  let ownedType
+  let ownedAsymmetricType
+  try {
+    owned = createPublicKey({ key: canonicalDer, format: 'der', type: 'spki' })
+    ownedType = Reflect.apply(NATIVE_KEY_TYPE_GETTER, owned, [])
+    ownedAsymmetricType = Reflect.apply(NATIVE_ASYMMETRIC_TYPE_GETTER, owned, [])
+    ownedDer = Reflect.apply(NATIVE_PUBLIC_KEY_EXPORT, owned, [{ format: 'der', type: 'spki' }])
+  } catch { fail(code) }
+  if (ownedType !== 'public' || ownedAsymmetricType !== 'ed25519' || !Buffer.isBuffer(ownedDer) ||
+      canonicalDer.length !== ownedDer.length || !timingSafeEqual(canonicalDer, ownedDer)) fail(code)
+  try { Object.freeze(owned) } catch { fail(code) }
+  return { publicKey: owned, publicKeyDer: canonicalDer.toString('base64') }
+}
+
+function samePublicKey(left, right) {
+  const leftBytes = Buffer.from(left, 'base64')
+  const rightBytes = Buffer.from(right, 'base64')
+  return leftBytes.length === rightBytes.length && timingSafeEqual(leftBytes, rightBytes)
 }
 
 function assertExactIndependentClone(original, candidate, originalToCandidate = new Map(), candidateToOriginal = new Map()) {
@@ -221,8 +282,8 @@ function materializeSource(value) {
   const source = ownDataRecord(value, SOURCE_FIELDS, SOURCE_FIELDS, 'configuration_invalid')
   if (!safeId(source.project_id) || !ROLES.has(source.role) || !positiveInteger(source.binding_version) ||
       !safePrivateRef(source.source_ref) || !positiveInteger(source.source_version) ||
-      !positiveInteger(source.key_version) || !validatePublicKey(source.public_key) ||
-      !REGISTRATION_STATUS.has(source.status)) fail('configuration_invalid')
+      !positiveInteger(source.key_version) || !REGISTRATION_STATUS.has(source.status)) fail('configuration_invalid')
+  const key = snapshotPublicKey(source.public_key, 'configuration_invalid')
   return {
     projectId: source.project_id,
     role: source.role,
@@ -230,7 +291,8 @@ function materializeSource(value) {
     sourceRef: source.source_ref,
     sourceVersion: source.source_version,
     keyVersion: source.key_version,
-    publicKey: source.public_key,
+    publicKey: key.publicKey,
+    publicKeyDer: key.publicKeyDer,
     status: source.status,
     keyStatus: source.status,
     needsResync: false,
@@ -295,7 +357,7 @@ export function createPhase3ObserverBridge(options) {
   if (viewers.some((viewer) => [...viewer.projectIds].sort().join(':') !== viewerProjectContract)) fail('configuration_invalid')
   for (let left = 0; left < sources.length; left += 1) {
     for (let right = left + 1; right < sources.length; right += 1) {
-      try { if (sources[left].publicKey.equals(sources[right].publicKey)) fail('configuration_invalid') } catch (error) { if (error instanceof ObserverBridgeError) throw error; fail('configuration_invalid') }
+      if (samePublicKey(sources[left].publicKeyDer, sources[right].publicKeyDer)) fail('configuration_invalid')
     }
   }
   const now = config.now ?? Date.now
@@ -585,16 +647,14 @@ export function createPhase3ObserverBridge(options) {
         ensureWritable(draft)
         const fields = new Set([...keyScopeInputFields, 'new_key_version', 'new_public_key'])
         const value = ownDataRecord(input, fields, fields)
+        const key = snapshotPublicKey(value.new_public_key, 'input_invalid')
         const { source } = resolveOperationSource(value, draft, fields)
-        if (source.keyStatus !== 'active' || !positiveInteger(value.new_key_version) || value.new_key_version <= source.keyVersion || !validatePublicKey(value.new_public_key)) fail('input_invalid')
-        try {
-          if (source.publicKey.equals(value.new_public_key) || [...draft.sources.values()].some((candidate) => candidate !== source && candidate.publicKey.equals(value.new_public_key))) fail('input_invalid')
-        } catch (error) {
-          if (error instanceof ObserverBridgeError) throw error
-          fail('crypto_unavailable')
-        }
+        if (source.keyStatus !== 'active' || !positiveInteger(value.new_key_version) || value.new_key_version <= source.keyVersion) fail('input_invalid')
+        if (samePublicKey(source.publicKeyDer, key.publicKeyDer) ||
+            [...draft.sources.values()].some((candidate) => candidate !== source && samePublicKey(candidate.publicKeyDer, key.publicKeyDer))) fail('input_invalid')
         source.keyVersion = value.new_key_version
-        source.publicKey = value.new_public_key
+        source.publicKey = key.publicKey
+        source.publicKeyDer = key.publicKeyDer
         source.keyStatus = 'active'
         source.needsResync = true
         draft.registryRevision += 1
