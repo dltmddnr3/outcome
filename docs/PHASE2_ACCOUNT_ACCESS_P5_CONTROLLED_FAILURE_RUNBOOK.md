@@ -8,8 +8,9 @@ MacBook 검수를 기다리는 동안 모바일의 세션 철회·인증 제공�
 
 ## 고정 기준선
 
-- current source: `4613372adbec17e35c2498e55ab4210cc8b33c34`
-- current Preview: `dpl_3MYfocjsQ6XvTrCoTNXE6Pp4U7wY` · `READY`
+- current source: `ebac7d538152fddc432fcdb4d1ee7b80a6cbe87b`
+- current tree: `83cb4182f086b3cc0ad1634fd2b44d3c6c151fc1`
+- current Preview: `dpl_4P1AusHZo37fTCY92oUpVk1CrmHP` · `READY`
 - stable Preview alias: `https://outcome-git-codex-hp1-session-bearer-white-castle.vercel.app/workspace`
 - current P5 matrix: `10/19`; P5 `OPEN`
 - Production·Supabase·DNS·domain·release mutation: 금지
@@ -42,7 +43,7 @@ MacBook 검수를 기다리는 동안 모바일의 세션 철회·인증 제공�
 
 1. current Preview에서 모바일 owner 준비 화면과 session/workspace HTTP `200/200`을 고정한다.
 2. Clerk Dashboard에서 해당 모바일 검수 세션 하나만 식별한다. session ID와 기기·계정 식별자는 영수증에 기록하지 않는다.
-3. 실행 직전 Cherry의 `모바일 세션 철회 승인`을 받는다.
+3. 실행 직전 Cherry의 `모바일 세션 철회 승인`을 받는다. 2026-08-26 재검수에서는 Cherry가 교정 Preview 배포 완료 보고 직후 승인했으며 승인 시각부터 10분 안에 정확한 대상 식별이 끝날 때만 사용한다.
 4. Development의 정확한 대상 세션 하나만 철회한다. 전체 세션 철회는 금지한다.
 5. 모바일에서 새로고침 또는 다음 workspace 요청을 수행한다.
 
