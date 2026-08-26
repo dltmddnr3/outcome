@@ -110,3 +110,12 @@ P5는 잔여 행렬이 남아 있어 `OPEN`이다. 이 재검증은 P6, HP1 완�
 - live routing: Google callback은 `200 text/html`, title `OUTCOME`, asset `index-BQhQu5vc.js`; Apple callback 직접 탐색은 Vercel 404가 아니라 OUTCOME callback 처리 후 Clerk Development sign-in으로 전환됐다.
 
 이 교정은 콜백 전달만 증명한다. 모바일 실제 Google 로그인 완료 후 준비 상태 복귀와 나머지 P5 행렬은 다시 실측해야 하므로 P5는 `OPEN`이다.
+
+## P5 모바일 Google 준비 상태 재검증
+
+- 사용자 직접 확인: `2026-08-26 KST` 교정된 안정 주소에서 모바일 Google 로그인과 콜백 후 OUTCOME 준비 화면 복귀를 확인했다.
+- 서버 대조: exact Preview `dpl_ChSioyuH3Wb1LsqD9UVYtVqJBoFV`에서 `/api/private/config` `2`회, `/api/private/session` `1`회, `/api/private/workspace` `1`회가 관측됐고 총 `4/4` 요청이 HTTP `200`이었다.
+- 판정: 모바일 시스템 브라우저의 Google 로그인·콜백·불러오는 중·준비 흐름은 `PASS`.
+- 잔여: 모바일 로그아웃·email code·만료·철회·인증 제공자 장애와 맥북 Google 재로그인 복구·email code·만료·철회·인증 제공자 장애는 아직 열려 있다.
+
+P5와 P6은 잔여 행렬 때문에 계속 `OPEN`이다.
