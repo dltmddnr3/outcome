@@ -120,7 +120,7 @@ try {
     await page.goto(`${base}/workspace`)
     await page.locator('[data-state-code="login"]').waitFor()
     await page.locator('[data-private-login-provider=google]').focus(); await page.keyboard.press('Enter')
-    await page.locator('[data-state-code="loading"]').waitFor()
+    await page.locator('.account-workspace__loading').waitFor()
     await page.locator('.oc-dashboard').waitFor()
     if (await page.locator('[data-private-project]').count() !== 2) throw new Error(`${viewport.name} project controls missing`)
     const shell = await page.evaluate(() => ({ sidebar: Boolean(document.querySelector('.oc-global-nav')), journey: Boolean(document.querySelector('.oc-outcome-map')), current: document.querySelectorAll('[aria-current=step]').length, overflow: document.documentElement.scrollWidth - document.documentElement.clientWidth }))
@@ -170,7 +170,15 @@ try {
     await page.route('**/api/private/config', (route) => route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ enabled: true }) }))
     await page.route('**/api/private/workspace', async (route) => { await new Promise((resolve) => setTimeout(resolve, 1_000)); await route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ workspace: {} }) }) })
     await page.goto(`${base}/workspace`)
-    await page.locator('[data-state-code="loading"]').waitFor()
+    await page.locator('.account-workspace__loading').waitFor()
+    const loading = await page.evaluate(() => ({
+      title: document.querySelector('.account-workspace__loading h1')?.textContent?.trim(),
+      detail: document.querySelector('.account-workspace__loading p')?.textContent?.trim(),
+      technicalCopy: ['Cherry 전용 비공개 워크스페이스', '권한 확인 중', '서버에서', 'completionAuthority=false'].filter((value) => document.body.innerText.includes(value)),
+      overflow: document.documentElement.scrollWidth - document.documentElement.clientWidth,
+      busy: document.querySelector('.account-workspace__loading')?.getAttribute('aria-busy'),
+    }))
+    if (loading.title !== '로그인 중' || loading.detail !== '잠시만 기다려 주세요.' || loading.technicalCopy.length || loading.overflow !== 0 || loading.busy !== 'true') throw new Error(`${viewport.name} simplified loading failed ${JSON.stringify(loading)}`)
     if (viewport.width <= 390) await page.evaluate(() => { document.documentElement.style.zoom = '2' })
     if (await page.evaluate(() => document.documentElement.scrollWidth - document.documentElement.clientWidth) !== 0) throw new Error(`${viewport.name} 200% zoom horizontal overflow`)
     await context.close()

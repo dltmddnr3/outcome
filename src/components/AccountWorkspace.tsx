@@ -1,6 +1,6 @@
 export const accountWorkspaceStateCopy = {
   login: { title: 'Cherry 계정으로 확인', detail: '승인된 한 명의 소유자만 비공개 프로젝트를 볼 수 있습니다.' },
-  loading: { title: '비공개 결과를 확인하는 중', detail: '인증과 프로젝트 권한을 서버에서 확인하고 있습니다.' },
+  loading: { title: '로그인 중', detail: '잠시만 기다려 주세요.' },
   empty: { title: '연결된 프로젝트가 없습니다', detail: '프로젝트를 임의로 대신 표시하지 않습니다.' },
   stale: { title: '마지막 확인 결과를 표시합니다', detail: '새 수집이 확인될 때까지 기존 스냅샷 시간을 유지합니다.' },
   conflict: { title: '계정 연결을 확인할 수 없습니다', detail: '서로 충돌하는 워크스페이스 정보가 있어 접근을 중단했습니다.' },
@@ -13,7 +13,7 @@ export const accountWorkspaceStateCopy = {
 
 const accountWorkspaceStateLabel: Record<keyof typeof accountWorkspaceStateCopy, string> = {
   login: '로그인 필요',
-  loading: '권한 확인 중',
+  loading: '로그인 중',
   empty: '연결된 프로젝트 없음',
   stale: '마지막 확인 결과',
   conflict: '계정 연결 충돌',
@@ -55,6 +55,14 @@ export function AccountWorkspace({ state = 'unavailable', workspace, ownerVerifi
   const choosePhase = (phaseId: string) => { if (!project) return; const nextPhase = project.phases.find((item) => item.id === phaseId); const nextScope = nextPhase?.scopes.find((item) => item.id === project.current.scopeId) ?? nextPhase?.scopes[0]; const nextStage = nextScope?.stages.find((item) => item.id === project.current.stageId) ?? nextScope?.stages[0]; setSelection({ projectId: project.project.id, phaseId, scopeId: nextScope?.id ?? '', stageId: nextStage?.id ?? '' }) }
   const chooseScope = (scopeId: string) => { if (!project || !phase) return; const nextScope = phase.scopes.find((item) => item.id === scopeId); const nextStage = nextScope?.stages.find((item) => item.id === project.current.stageId) ?? nextScope?.stages[0]; setSelection({ projectId: project.project.id, phaseId: phase.id, scopeId, stageId: nextStage?.id ?? '' }) }
   const chooseStage = (stageId: string) => { if (project && phase && scope) setSelection({ projectId: project.project.id, phaseId: phase.id, scopeId: scope.id, stageId }) }
+  if (state === 'loading') return <main className="account-workspace account-workspace--loading" data-account-state="loading" data-completion-authority="false">
+    <section className="account-workspace__loading" role="status" aria-live="polite" aria-busy="true">
+      <span className="account-workspace__loading-signal" aria-hidden="true"><i /><i /><i /></span>
+      <h1>{accountWorkspaceStateCopy.loading.title}</h1>
+      <p>{accountWorkspaceStateCopy.loading.detail}</p>
+      {sessionPresent && onLogout && <button className="account-workspace__loading-cancel" type="button" data-private-logout="true" onClick={() => void transition('logout', onLogout)}>로그인 취소</button>}
+    </section>
+  </main>
   if (state === 'ready' && workspace?.dashboard) return <OutcomeDashboard initialData={workspace.dashboard} onUnauthorized={() => undefined} onLogout={onLogout} />
   return <main className="account-workspace" data-account-state={state} data-completion-authority="false">
     <header className="account-workspace__header">

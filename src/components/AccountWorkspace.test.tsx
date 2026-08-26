@@ -12,13 +12,21 @@ const readyWorkspace = { projects: [
 
 describe('account workspace presentation contract', () => {
   it('renders every safe private state with Korean primary copy and a private/read-only distinction', () => {
-    for (const state of ['login', 'loading', 'empty', 'stale', 'conflict', 'unavailable', 'session_expired', 'access_denied', 'safe_degraded'] as const) {
+    for (const state of ['login', 'empty', 'stale', 'conflict', 'unavailable', 'session_expired', 'access_denied', 'safe_degraded'] as const) {
       const html = render(state)
       expect(html).toContain(accountWorkspaceStateCopy[state].title)
       expect(html).toContain('Cherry 전용 비공개 워크스페이스')
       expect(html).toContain('읽기 전용')
       expect(html).toContain('completionAuthority')
     }
+  })
+
+  it('로그인 중에는 내부 권한·서버 진단 대신 진행 상태만 표시한다', () => {
+    const html = render('loading')
+    expect(html).toContain('account-workspace--loading')
+    expect(html).toContain('로그인 중')
+    expect(html).toContain('잠시만 기다려 주세요')
+    for (const hidden of ['Cherry 전용 비공개 워크스페이스', '권한 확인 중', '서버에서', 'completionAuthority=false']) expect(html).not.toContain(hidden)
   })
 
   it('shows Google primary, email-code fallback and Apple linked-only without self-signup', () => {
