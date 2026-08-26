@@ -16,6 +16,32 @@ export async function requireHostedSessionToken(getToken: () => Promise<string |
   return sessionToken
 }
 
+type HostedTabStorage = Pick<Storage, 'getItem' | 'setItem' | 'removeItem'>
+const hostedOwnerReadyKey = 'outcome.owner-ready'
+const currentTabStorage = (): HostedTabStorage | undefined => typeof sessionStorage === 'undefined' ? undefined : sessionStorage
+export function hostedSignedOutState(storage: HostedTabStorage | undefined = currentTabStorage()): AccountWorkspaceState {
+  try { return storage?.getItem(hostedOwnerReadyKey) === '1' ? 'session_expired' : 'login' } catch { return 'login' }
+}
+export function markHostedOwnerReady(storage: HostedTabStorage | undefined = currentTabStorage()) {
+  try { storage?.setItem(hostedOwnerReadyKey, '1') } catch { /* tab storage unavailable; same-render state remains authoritative */ }
+}
+export function clearHostedOwnerReady(storage: HostedTabStorage | undefined = currentTabStorage()) {
+  try { storage?.removeItem(hostedOwnerReadyKey) } catch { /* tab storage unavailable */ }
+}
+
+type HostedOwnerLoaders = {
+  owner: (sessionToken: string) => Promise<{ authenticated: true; owner: true }>
+  workspace: (sessionToken: string) => Promise<{ workspace: PrivateWorkspaceView }>
+}
+const hostedOwnerLoaders: HostedOwnerLoaders = { owner: fetchPrivateOwnerSession, workspace: fetchPrivateWorkspace }
+export async function confirmHostedOwnerWorkspace(sessionToken: string, storage: HostedTabStorage | undefined = currentTabStorage(), loaders: HostedOwnerLoaders = hostedOwnerLoaders, ownerConfirmed: () => void = () => undefined) {
+  await loaders.owner(sessionToken)
+  ownerConfirmed()
+  const value = await loaders.workspace(sessionToken)
+  markHostedOwnerReady(storage)
+  return value.workspace
+}
+
 type HostedGoogleNavigate = (input: { decorateUrl: (url: string) => string }) => void | Promise<void>
 type HostedGoogleSignIn = {
   status: string
@@ -68,7 +94,8 @@ export function hostedFailureState(reason: unknown): AccountWorkspaceState {
 }
 
 type HostedSignOut = (options: { redirectUrl: string }) => Promise<unknown>
-export async function returnToHostedLogin(signOut: HostedSignOut) {
+export async function returnToHostedLogin(signOut: HostedSignOut, storage: HostedTabStorage | undefined = currentTabStorage()) {
+  clearHostedOwnerReady(storage)
   await signOut({ redirectUrl: '/workspace' })
 }
 
@@ -76,7 +103,8 @@ function HostedWorkspaceBody() {
   const { isLoaded, isSignedIn, getToken, signOut } = useAuth()
   const { signIn, errors: signInErrors, fetchStatus } = useSignIn()
   const { user } = useUser()
-  const [state, setState] = useState<AccountWorkspaceState>(isLoaded && !isSignedIn ? 'login' : 'loading')
+  const [ownerWasReady, setOwnerWasReady] = useState(() => hostedSignedOutState() === 'session_expired')
+  const [state, setState] = useState<AccountWorkspaceState>(isLoaded && !isSignedIn ? hostedSignedOutState() : 'loading')
   const [ownerVerified, setOwnerVerified] = useState(false)
   const [workspace, setWorkspace] = useState<PrivateWorkspaceView>()
   const [email, setEmail] = useState('')
@@ -89,11 +117,10 @@ function HostedWorkspaceBody() {
 
   useEffect(() => {
     if (!isLoaded) return
-    if (!isSignedIn) { setOwnerVerified(false); setState('login'); setWorkspace(undefined); return }
+    if (!isSignedIn) { setOwnerVerified(false); setState(ownerWasReady || hostedSignedOutState() === 'session_expired' ? 'session_expired' : 'login'); setWorkspace(undefined); return }
     void requireHostedSessionToken(getToken)
-      .then((sessionToken) => fetchPrivateOwnerSession(sessionToken).then(() => sessionToken))
-      .then((sessionToken) => { setOwnerVerified(true); return fetchPrivateWorkspace(sessionToken) })
-      .then((value) => { setWorkspace(value.workspace); setState('ready') })
+      .then((sessionToken) => confirmHostedOwnerWorkspace(sessionToken, undefined, undefined, () => setOwnerVerified(true)))
+      .then((value) => { setOwnerWasReady(true); setWorkspace(value); setState('ready') })
       .catch((reason) => {
         setWorkspace(undefined)
         if (!(reason instanceof Error && reason.message === 'private_workspace_unavailable')) setOwnerVerified(false)
@@ -130,6 +157,14 @@ function HostedWorkspaceBody() {
     const redirect = result?.verification?.externalVerificationRedirectURL
     if (redirect) window.location.assign(redirect.href)
   }
+  const returnToLogin = async () => {
+    clearHostedOwnerReady()
+    setOwnerWasReady(false)
+    setOwnerVerified(false)
+    setWorkspace(undefined)
+    setState('login')
+    await returnToHostedLogin(signOut)
+  }
   const loginContent = <div className="account-workspace__actions" data-clerk-browser-auth="true">
     <button className="account-workspace__google" type="button" data-touch-target="44" data-private-login-provider="google" data-google-start-pending={googleBusy} aria-busy={googleBusy} disabled={googleBusy} onClick={() => void google()}>{googleBusy ? 'Google 로그인 시작 중…' : 'Google로 계속'}</button>
     <div className="account-workspace__separator" aria-hidden="true"><span>또는</span></div>
@@ -141,7 +176,7 @@ function HostedWorkspaceBody() {
     <span className="account-workspace__apple-note">Apple은 소유자 로그인 확인 후 연결</span>
     <p className="account-workspace__adapter-note">Clerk 브라우저 세션 · 회원가입 전환 차단</p>
   </div>
-  return <AccountWorkspace state={state} workspace={workspace} ownerVerified={ownerVerified} sessionPresent={Boolean(isSignedIn)} loginContent={loginContent} onLogout={isSignedIn ? () => returnToHostedLogin(signOut) : undefined} onAppleLink={ownerVerified ? linkApple : undefined} transitionError={error} />
+  return <AccountWorkspace state={state} workspace={workspace} ownerVerified={ownerVerified} sessionPresent={Boolean(isSignedIn)} loginContent={loginContent} onLogout={isSignedIn || ownerWasReady ? returnToLogin : undefined} onAppleLink={ownerVerified ? linkApple : undefined} transitionError={error} />
 }
 
 export function HostedClerkWorkspace({ publishableKey, pathname = window.location.pathname }: { publishableKey: string; pathname?: string }) {

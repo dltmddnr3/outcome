@@ -10,7 +10,17 @@ vi.mock('@clerk/react', () => ({
   useUser: () => ({ user: null }),
 }))
 
-import { attemptHostedGoogleSignIn, HostedClerkWorkspace, hostedFailureState, hostedGoogleAttemptError, hostedGoogleSsoParameters, requestHostedEmailCode, requireHostedSessionToken, returnToHostedLogin } from './AccountWorkspaceClerk'
+import { attemptHostedGoogleSignIn, clearHostedOwnerReady, confirmHostedOwnerWorkspace, HostedClerkWorkspace, hostedFailureState, hostedGoogleAttemptError, hostedGoogleSsoParameters, hostedSignedOutState, markHostedOwnerReady, requestHostedEmailCode, requireHostedSessionToken, returnToHostedLogin } from './AccountWorkspaceClerk'
+
+const tabStorage = () => {
+  const values = new Map<string, string>()
+  return {
+    getItem: (key: string) => values.get(key) ?? null,
+    setItem: (key: string, value: string) => { values.set(key, value) },
+    removeItem: (key: string) => { values.delete(key) },
+    entries: () => [...values.entries()],
+  }
+}
 
 describe('Clerk browser session boundary', () => {
   it('mounts ClerkProvider with the runtime publishable key and real SDK callback component', () => {
@@ -29,6 +39,47 @@ describe('Clerk browser session boundary', () => {
     expect(html).toContain('for="private-email"')
     expect(html).not.toContain('/api/private/auth/callback')
     expect(html).not.toContain('sessionToken')
+  })
+
+  it('distinguishes first signed-out from same-tab operator revocation and reload using one fixed boolean', () => {
+    const storage = tabStorage()
+    expect(hostedSignedOutState(storage)).toBe('login')
+    markHostedOwnerReady(storage)
+    expect(hostedSignedOutState(storage)).toBe('session_expired')
+    expect(storage.entries()).toEqual([['outcome.owner-ready', '1']])
+    clearHostedOwnerReady(storage)
+    expect(hostedSignedOutState(storage)).toBe('login')
+    expect(storage.entries()).toEqual([])
+  })
+
+  it('renders reload after operator revocation as expired with a real retry, while first visit stays login', () => {
+    const storage = tabStorage()
+    vi.stubGlobal('sessionStorage', storage)
+    expect(renderToStaticMarkup(<HostedClerkWorkspace publishableKey="pk_test_browser" pathname="/workspace" />)).toContain('data-state-code="login"')
+    markHostedOwnerReady(storage)
+    const revoked = renderToStaticMarkup(<HostedClerkWorkspace publishableKey="pk_test_browser" pathname="/workspace" />)
+    vi.unstubAllGlobals()
+    expect(revoked).toContain('data-state-code="session_expired"')
+    expect(revoked).toContain('로그인이 만료되었습니다')
+    expect(revoked).toContain('data-private-session-retry="true"')
+    expect(revoked).not.toContain('data-private-logout="true"')
+    expect(revoked).not.toContain('data-private-project=')
+  })
+
+  it('writes the marker only after owner and workspace readiness both succeed', async () => {
+    const storage = tabStorage()
+    await expect(confirmHostedOwnerWorkspace('opaque-session', storage, {
+      owner: vi.fn().mockResolvedValue({ authenticated: true, owner: true }),
+      workspace: vi.fn().mockRejectedValue(new Error('private_workspace_unavailable')),
+    })).rejects.toThrow('private_workspace_unavailable')
+    expect(storage.entries()).toEqual([])
+    const workspace = { viewState: 'ready' }
+    await expect(confirmHostedOwnerWorkspace('opaque-session', storage, {
+      owner: vi.fn().mockResolvedValue({ authenticated: true, owner: true }),
+      workspace: vi.fn().mockResolvedValue({ workspace }),
+    })).resolves.toEqual(workspace)
+    expect(storage.entries()).toEqual([['outcome.owner-ready', '1']])
+    expect(JSON.stringify(storage.entries())).not.toMatch(/opaque-session|identity|email|token|cookie|provider/i)
   })
 
   it('maps Clerk Core 3 callback and completed-session destinations exactly', () => {
@@ -138,8 +189,11 @@ describe('Clerk browser session boundary', () => {
   })
 
   it('returns an expired Clerk session to login through SDK sign-out only', async () => {
-    const signOut = vi.fn().mockResolvedValue(undefined)
-    await returnToHostedLogin(signOut)
+    const storage = tabStorage()
+    markHostedOwnerReady(storage)
+    const signOut = vi.fn().mockImplementation(async () => { expect(storage.entries()).toEqual([]) })
+    await returnToHostedLogin(signOut, storage)
+    expect(storage.entries()).toEqual([])
     expect(signOut).toHaveBeenCalledOnce()
     expect(signOut).toHaveBeenCalledWith({ redirectUrl: '/workspace' })
   })
