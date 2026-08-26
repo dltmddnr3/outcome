@@ -84,7 +84,7 @@ P3 판정: `G/E/A/D/R 5/5 PASS`. 이 판정은 P4 Vercel Preview 환경, P5 MacB
 - 공개 Production 불변: `9cbf834196e3` / `d33a2cf61157` / `index-B_ICbkfO.js`
 - 공개 검증: 화면/API `200/200`; mutation `32/32=405`; API read-only JSON `28/28`; 공개 경계 금지 식별자 `0`
 
-P4 판정: `PASS`. Preview는 Vercel 인증 보호 아래 있으며 실제 MacBook/mobile 로그인·불러오는 중·준비·로그아웃·만료·철회·제공자 장애 흐름은 P5에서 별도로 실측한다. P4는 P5/P6, HP1 완료, HP2, Production release 또는 Phase 완료를 증명하지 않는다.
+P4 판정: `PASS`. Preview는 Vercel 인증 보호 아래 있으며 실제 MacBook/mobile 로그인·불러오는 중·준비·로그아웃·만료·철회·제공자 장애 흐름은 P5에서 별도로 실측한다. P4 단독으로는 당시 열려 있던 P5/P6, HP1 완료, HP2, Production release 또는 Phase 완료를 증명하지 않는다.
 
 ## P5 맥북 현재 후보 재검증
 
@@ -98,7 +98,7 @@ P4 판정: `PASS`. Preview는 Vercel 인증 보호 아래 있으며 실제 MacBo
 - 재로그인: Google 계정 선택 화면까지 정상 전환됐다. canonical owner 선택과 준비 상태 복귀는 사용자 선택 대기이므로 아직 통과로 기록하지 않는다.
 - 잔여: 맥북 Google 재로그인 복구·email code·만료·철회·인증 제공자 장애, 모바일 시스템 브라우저 전체 행렬은 미실행이다.
 
-P5는 잔여 행렬이 남아 있어 `OPEN`이다. 이 재검증은 P6, HP1 완료, HP2, 독립 검수, 출시 감사, Cherry 승인, 출시 또는 `EXTERNAL_OUTCOME_COMPLETE`를 닫지 않는다.
+P5는 잔여 행렬이 남아 있어 `OPEN`이다. 이 재검증 단독으로는 당시 열려 있던 P6, HP1 완료, HP2, 독립 검수, 출시 감사, Cherry 승인, 출시 또는 `EXTERNAL_OUTCOME_COMPLETE`를 닫지 않는다.
 
 ## P5 모바일 콜백 404 교정
 
@@ -119,7 +119,7 @@ P5는 잔여 행렬이 남아 있어 `OPEN`이다. 이 재검증은 P6, HP1 완�
 - 판정: 모바일 시스템 브라우저의 Google 로그인·콜백·불러오는 중·준비 흐름은 `PASS`.
 - 잔여: 모바일 로그아웃·email code·만료·철회·인증 제공자 장애와 맥북 Google 재로그인 복구·email code·만료·철회·인증 제공자 장애는 아직 열려 있다.
 
-P5와 P6은 잔여 행렬 때문에 계속 `OPEN`이다.
+이 관측 시점에는 P5와 P6이 모두 `OPEN`이었다. 이후 P6 영수증만 별도 Gate로 닫혔고 P5는 계속 `OPEN`이다.
 
 ## P5 모바일 재로그인과 로딩 화면 교정
 
@@ -127,4 +127,4 @@ P5와 P6은 잔여 행렬 때문에 계속 `OPEN`이다.
 - 모바일 Google 로그인·콜백·불러오는 중·준비·로그아웃·재로그인 복구는 `PASS`다.
 - 인증 전환 중 화면은 내부 권한·서버·completion authority 진단을 제거하고 `로그인 중`·`잠시만 기다려 주세요.`만 표시한다. 세션이 남은 장기 지연에는 `로그인 취소`만 복구 동작으로 유지한다.
 - 자동 검증은 1440×900·390×844·375×812에서 loading aria-busy `true`, technical visible copy hit `0`, horizontal overflow `0`을 확인했다.
-- email code·만료·철회·인증 제공자 장애와 맥북 잔여 행렬은 미실행이므로 P5·P6은 계속 `OPEN`이다.
+- email code·만료·철회·인증 제공자 장애와 맥북 잔여 행렬은 미실행이므로 P5는 계속 `OPEN`이다. P6은 별도 최종 영수증 Gate로 이후 닫혔다.
