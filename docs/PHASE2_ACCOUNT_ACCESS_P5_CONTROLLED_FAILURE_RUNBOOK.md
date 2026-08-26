@@ -49,7 +49,7 @@ MacBook 검수를 기다리는 동안 모바일의 세션 철회·인증 제공�
 ### PASS
 
 - private project payload가 사라지고 `로그인이 만료되었습니다`와 작동하는 `다시 로그인`만 보인다.
-- 다음 private session/workspace 요청은 `401`이고 안전한 승인 코드만 반환한다.
+- Clerk SDK가 철회 세션을 먼저 제거하면 private session/workspace 요청은 발생하지 않는다. stale token 요청이 실제로 발생하면 `401`과 안전한 승인 코드만 반환한다. 두 경로 모두 private payload는 `0`이어야 한다.
 - Google 또는 email code 재로그인 후 준비 화면과 session/workspace `200/200`이 복구된다.
 
 ### 되돌리기

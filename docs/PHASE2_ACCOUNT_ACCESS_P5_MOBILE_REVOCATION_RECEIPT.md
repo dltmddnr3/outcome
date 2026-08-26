@@ -24,9 +24,9 @@
 
 Cherry가 철회된 모바일 세션의 같은 탭을 새로고침했다. private project payload는 사라졌지만 일반 `로그인 필요 · Cherry 계정으로 확인` 화면이 표시됐다. 계약한 `로그인이 만료되었습니다`와 `다시 로그인`은 표시되지 않았다.
 
-같은 관측 창의 exact Preview runtime을 읽기 전용으로 확인했지만 private session/workspace 요청과 HTTP `401`은 `0`이었다. Clerk SDK가 signed-out을 먼저 확정해 제품이 private API를 호출하기 전에 일반 로그인 상태로 전환한 소스 분기와 일치한다.
+같은 관측 창의 exact Preview runtime에서 private session/workspace 요청과 HTTP `401`은 `0`이었다. 이는 Clerk SDK가 철회 세션을 먼저 제거한 안전한 경로와 일치하며, 그 자체는 실패가 아니다. 실제 실패는 이전 ready 세션의 tab context가 있었는데도 제품이 만료 안내가 아닌 일반 첫 로그인으로 오분류한 점이다.
 
-따라서 모바일 운영자 세션 철회 행은 `FAIL · 교정 필요`이며 P5 수치는 `10/19`로 유지한다. 새 Builder candidate·Preview·별도 승인 철회 재검수 전에는 PASS로 바꾸지 않는다.
+따라서 모바일 운영자 세션 철회 행은 `FAIL · 교정 필요`이며 P5 수치는 `10/19`로 유지한다. 새 Builder candidate·Preview·별도 승인 철회 재검수에서 만료 안내와 private payload `0`, 그리고 `no private request` 또는 stale-token `401` 중 실제 SDK 경로를 확인하기 전에는 PASS로 바꾸지 않는다.
 
 재로그인 복구는 아직 수행하지 않았다. 이 FAIL 기록은 private payload가 제거된 보안 경계만 인정하며 만료 UX나 복구를 승인하지 않는다.
 

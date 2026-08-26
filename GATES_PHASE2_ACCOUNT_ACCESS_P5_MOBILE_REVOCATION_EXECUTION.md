@@ -12,9 +12,9 @@ Outcome: 승인된 Clerk Development 모바일 검수 세션 하나의 철회 �
   EVIDENCE: Clerk Dashboard 직접 관측에서 실행 전 모바일 활성 행 `1`, 단일 `Revoke device` 확인창 제출 뒤 모바일 활성 행 `0`; 데스크톱 활성 행은 실행 전후 `2`로 유지됐다. 전체 기기 철회는 실행하지 않았다.
 - [x] R3: 제품 화면·401·재로그인 복구가 관측 전 상태로 명시되고 실기기 PASS로 승격되지 않는다.
   PROVES: progress_integrity
-  CHECK: rg -q 'USER OBSERVATION AND RECOVERY PENDING' docs/PHASE2_ACCOUNT_ACCESS_P5_MOBILE_REVOCATION_RECEIPT.md && rg -q 'P5 수치는 `10/19`로 유지' docs/PHASE2_ACCOUNT_ACCESS_P5_MOBILE_REVOCATION_RECEIPT.md && rg -q '관측·복구 대기' docs/PHASE2_ACCOUNT_ACCESS_P5_DEVICE_MATRIX.md && echo R3_PASS
+  CHECK: rg -q 'MOBILE UX FAIL' docs/PHASE2_ACCOUNT_ACCESS_P5_MOBILE_REVOCATION_RECEIPT.md && rg -q 'P5 수치는 `10/19`로 유지' docs/PHASE2_ACCOUNT_ACCESS_P5_MOBILE_REVOCATION_RECEIPT.md && rg -q 'FAIL · 교정 필요' docs/PHASE2_ACCOUNT_ACCESS_P5_DEVICE_MATRIX.md && echo R3_PASS
   EXPECT: R3_PASS
-  EVIDENCE: 만료 화면, private API `401`, 새 로그인 `200/200` 세 조건을 모두 미증명으로 기록하고 행렬 수치를 유지했다.
+  EVIDENCE: private payload 제거와 SDK no-request는 확인됐지만 만료 화면·다시 로그인·새 로그인 복구는 미증명이고 일반 로그인 오분류가 FAIL로 기록됐다. 행렬 수치는 유지했다.
 - [x] R4: 실행 영수증에 계정·credential·raw identifier가 없다.
   PROVES: privacy
   CHECK: test "$(rg -n '[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,}|\b(?:sk|pk|ghp|github_pat|xox[baprs])[-_][A-Za-z0-9_-]+\b|/Users/|\b[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}\b|\b(?:[0-9]{1,3}\.){3}[0-9]{1,3}\b' docs/PHASE2_ACCOUNT_ACCESS_P5_MOBILE_REVOCATION_RECEIPT.md | wc -l | tr -d ' ')" = 0 && echo R4_PASS

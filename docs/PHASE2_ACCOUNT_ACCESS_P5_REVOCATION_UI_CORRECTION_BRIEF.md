@@ -6,7 +6,7 @@
 
 current candidate `4613372adbec17e35c2498e55ab4210cc8b33c34`와 Preview `dpl_3MYfocjsQ6XvTrCoTNXE6Pp4U7wY`에서 Clerk Development의 모바일 검수 세션 하나만 철회했다. Cherry가 같은 모바일 탭을 새로고침한 화면은 private project payload 없이 일반 `로그인 필요 · Cherry 계정으로 확인`을 표시했다.
 
-계약한 `로그인이 만료되었습니다`와 `다시 로그인`은 표시되지 않았다. 같은 관측 창의 exact Preview runtime에는 private session/workspace 요청과 HTTP `401`도 없었다. 따라서 모바일 운영자 철회 행은 PASS가 아니라 `FAIL · CORRECTION REQUIRED`다.
+계약한 `로그인이 만료되었습니다`와 `다시 로그인`은 표시되지 않았다. 같은 관측 창의 exact Preview runtime에는 private session/workspace 요청이 없었다. Clerk SDK가 철회 세션을 먼저 제거한 이 no-request 경로는 안전하지만, 이전 ready tab을 일반 첫 로그인으로 오분류한 UX 때문에 모바일 운영자 철회 행은 `FAIL · CORRECTION REQUIRED`다.
 
 ## 원인
 
@@ -60,4 +60,4 @@ current candidate `4613372adbec17e35c2498e55ab4210cc8b33c34`와 Preview `dpl_3MY
 - 민감정보·storage·rollback 경계
 - `GATES_PHASE2_ACCOUNT_ACCESS_P5_REVOCATION_UI_CORRECTION.md` 증거 갱신
 
-Builder terminal은 `CANDIDATE_READY_ONLY` 또는 `BLOCKED`다. 다음 권한은 Planner의 exact candidate 재검증뿐이며 push·Preview deploy·실기기 재철회는 별도 경계다.
+Builder 결과 `5686120d03b821c2aa4f10ea989ff67af07a759a` / tree `a90f43649dc8de0070b0450aff17dfa97a80933e`는 Parent 재검증을 통과한 `CANDIDATE_READY_ONLY`다. push·Preview deploy·실기기 재철회는 별도 승인 경계다.

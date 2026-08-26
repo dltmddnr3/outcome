@@ -9,9 +9,9 @@ Outcome: 실제 모바일 단일 세션 철회 결과가 계약한 만료 UX와 
   EVIDENCE: exact source/Preview에서 Cherry screenshot은 private payload 없이 일반 로그인 오분류를 보였고, 영수증은 `MOBILE UX FAIL · CORRECTION REQUIRED`, P5 `10/19`를 고정한다.
 - [x] F2: runtime `401` 부재와 소스 분기의 원인이 증거로 연결된다.
   PROVES: diagnosis
-  CHECK: rg -q 'private session/workspace 요청과 HTTP `401`도 없었다' docs/PHASE2_ACCOUNT_ACCESS_P5_REVOCATION_UI_CORRECTION_BRIEF.md && rg -q '`isSignedIn`이 false이면 private API를 호출하기 전에 상태를 항상 `login`' docs/PHASE2_ACCOUNT_ACCESS_P5_REVOCATION_UI_CORRECTION_BRIEF.md && echo F2_PASS
+  CHECK: rg -q 'private session/workspace 요청이 없었다' docs/PHASE2_ACCOUNT_ACCESS_P5_REVOCATION_UI_CORRECTION_BRIEF.md && rg -q '`isSignedIn`이 false이면 private API를 호출하기 전에 상태를 항상 `login`' docs/PHASE2_ACCOUNT_ACCESS_P5_REVOCATION_UI_CORRECTION_BRIEF.md && echo F2_PASS
   EXPECT: F2_PASS
-  EVIDENCE: exact Preview 최근 로그의 explicit `401` 및 private session/workspace 요청은 `0`; source는 `!isSignedIn`에서 서버 호출 전 `login`을 선택해 실제 관측과 일치한다.
+  EVIDENCE: exact Preview 최근 로그의 private session/workspace 요청은 `0`으로 SDK 선폐기 경계와 일치했다. source는 `!isSignedIn`에서 서버 호출 전 `login`을 선택해 이전 ready tab을 일반 첫 로그인으로 오분류했다.
 - [x] F3: 첫 로그인·명시적 로그아웃·예상 밖 세션 소실을 구분하는 최소 Builder 계약이 준비된다.
   PROVES: implementation
   CHECK: rg -q '처음 방문한 signed-out 사용자는' docs/PHASE2_ACCOUNT_ACCESS_P5_REVOCATION_UI_CORRECTION_BRIEF.md && rg -q '예상 밖 signed-out은 `session_expired`' docs/PHASE2_ACCOUNT_ACCESS_P5_REVOCATION_UI_CORRECTION_BRIEF.md && rg -q '명시적 로그아웃과 `다시 로그인`' docs/PHASE2_ACCOUNT_ACCESS_P5_REVOCATION_UI_CORRECTION_BRIEF.md && echo F3_PASS
