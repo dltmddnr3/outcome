@@ -20,7 +20,7 @@ const validLocator = (value) =>
 const bindingKey = (projectId, role) => `${projectId}:${role}`
 
 export function createProjectRoleBindingRegistry({ projectIds, enabled = true, now = () => new Date().toISOString() } = {}) {
-  if (!Array.isArray(projectIds) || projectIds.length === 0 || projectIds.some((id) => !SAFE_ID.test(id))) {
+  if (!Array.isArray(projectIds) || projectIds.length === 0 || projectIds.some((id) => typeof id !== 'string' || !SAFE_ID.test(id))) {
     throw new TypeError('invalid_project_registry')
   }
   if (new Set(projectIds).size !== projectIds.length) throw new TypeError('duplicate_project')

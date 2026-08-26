@@ -254,3 +254,29 @@ test('invalid constructors fail closed', () => {
   assert.throws(() => createProjectRoleBindingRegistry({ projectIds: ['outcome', 'outcome'] }), /duplicate_project/)
   assert.throws(() => createProjectRoleBindingRegistry({ projectIds: ['Invalid'] }), /invalid_project_registry/)
 })
+
+test('non-string project IDs are rejected before caller coercion', () => {
+  let coercions = 0
+  const methodObject = { toString() { coercions += 1; return 'outcome' } }
+  const proxy = new Proxy({}, { get(target, property) {
+    coercions += 1
+    return Reflect.get(target, property)
+  } })
+  const throwingToString = { toString() { coercions += 1; throw new Error('must_not_run') } }
+  const invalidProjectIds = [
+    new String('outcome'),
+    Symbol('outcome'),
+    { value: 'outcome' },
+    methodObject,
+    proxy,
+    throwingToString,
+  ]
+
+  for (const projectId of invalidProjectIds) {
+    assert.throws(
+      () => createProjectRoleBindingRegistry({ projectIds: [projectId], now: clock() }),
+      /invalid_project_registry/,
+    )
+  }
+  assert.equal(coercions, 0)
+})
