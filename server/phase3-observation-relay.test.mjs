@@ -189,8 +189,12 @@ test('all prohibited raw summary families fail before mutation while ordinary pu
     'prompt 개선 작업 진행 중',
     'docs/summary.md 상대 경로 문서 검토',
     'https://example.invalid/public-status 확인',
+    'Observation is 50% complete',
+    'Ｆｕｌｌｗｉｄｔｈ 공개 요약',
   ].entries()) {
-    assert.equal(relay.ingest(event({ sequence: index + 1, now_summary })).status, 'accepted')
+    const accepted = relay.ingest(event({ sequence: index + 1, now_summary }))
+    assert.equal(accepted.status, 'accepted')
+    assert.equal(accepted.projection.now_summary, now_summary)
   }
 })
 
@@ -233,9 +237,67 @@ test('canonicalized alternate representations reject all 12 fresh re-QA bypasses
     'https://example.invalid/public/status?page=summary',
   ]
   for (const [index, now_summary] of controls.entries()) {
-    assert.equal(relay.ingest(event({ sequence: index + 1, now_summary })).status, 'accepted')
+    const accepted = relay.ingest(event({ sequence: index + 1, now_summary }))
+    assert.equal(accepted.status, 'accepted')
+    assert.equal(accepted.projection.now_summary, now_summary)
   }
   assert.deepEqual(relay.read().evidence.map((item) => item.evidence_id), controls.map((_, index) => index + 1))
+})
+
+test('structural summary policy rejects all exact 17 F5 delimiter escape and scheme cases', () => {
+  const prohibited = [
+    'session/id=synthetic-opaque-123',
+    'thread:id=synthetic-opaque-123',
+    'thread・id=synthetic-opaque-123',
+    'session token | synthetic-opaque-123',
+    'thread/token=synthetic-opaque-123',
+    'provider/locator=synthetic:opaque-123',
+    'api/key=synthetic-not-real',
+    'private/key=synthetic-not-real',
+    'result・raw synthetic response',
+    'session_id%GG=synthetic-opaque-123',
+    'api_key%=synthetic-not-real',
+    'prompt%2=raw synthetic request',
+    'FILE:/opt/synthetic/private.txt',
+    'mailto:synthetic@example.invalid',
+    'urn:synthetic:opaque-123',
+    'ssh:synthetic@example.invalid',
+    'synthetic:opaque-123',
+  ]
+  for (const now_summary of prohibited) {
+    const relay = createPhase3ObservationRelay(config())
+    const before = snapshot(relay)
+    let failure
+    try { relay.ingest(event({ now_summary })) } catch (error) { failure = error }
+    assert.equal(failure?.code, 'summary_prohibited')
+    assert.deepEqual(relay.read(), before)
+    assert.equal(JSON.stringify({ code: failure?.code, state: relay.read() }).includes(now_summary), false)
+    assert.equal(relay.ingest(event()).status, 'accepted')
+    assert.deepEqual(relay.read().evidence.map((item) => item.evidence_id), [1])
+  }
+})
+
+test('canonical expansion enforces exact 320 accepted and 321 rejected boundaries', () => {
+  const ligature = '\uFDFA'
+  const canonical320 = ligature.repeat(17) + 'a'.repeat(14)
+  const canonical321 = ligature.repeat(17) + 'a'.repeat(15)
+  assert.equal(canonical320.normalize('NFKC').length, 320)
+  assert.equal(canonical321.normalize('NFKC').length, 321)
+
+  const relay = createPhase3ObservationRelay(config())
+  assert.equal(relay.ingest(event({ now_summary: canonical320 })).status, 'accepted')
+  assert.equal(relay.read().projections[0].now_summary, canonical320)
+  const accepted = snapshot(relay)
+  assert.throws(() => relay.ingest(event({ sequence: 2, now_summary: canonical321 })), /summary_prohibited/)
+  assert.deepEqual(relay.read(), accepted)
+  assert.equal(relay.ingest(event({ sequence: 2 })).status, 'accepted')
+  assert.deepEqual(relay.read().evidence.map((item) => item.evidence_id), [1, 2])
+
+  const expanded = createPhase3ObservationRelay(config())
+  assert.throws(() => expanded.ingest(event({ now_summary: ligature.repeat(20) })), /summary_prohibited/)
+  assert.deepEqual(expanded.read(), { enabled: true, registry_revision: 7, projections: [], evidence: [] })
+  assert.equal(expanded.ingest(event()).status, 'accepted')
+  assert.deepEqual(expanded.read().evidence.map((item) => item.evidence_id), [1])
 })
 
 test('accessor-bearing mutation envelopes cannot re-enter or consume evidence', () => {

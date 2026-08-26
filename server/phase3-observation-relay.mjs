@@ -3,6 +3,7 @@ const AVAILABILITY = new Set(['available', 'idle', 'offline', 'unknown'])
 const EVENT_KEYS = new Set(['project_id', 'role', 'binding_version', 'source_host', 'sequence', 'observed_at', 'availability', 'now_summary'])
 const CONFIG_KEYS = new Set(['project_ids', 'roles', 'binding_versions', 'source_hosts', 'freshness_ms', 'registry_revision', 'now', 'enabled'])
 const AUTHORIZED_SOURCE_HOSTS = new Set(['source-a', 'source-b'])
+const MAX_CANONICAL_SUMMARY_LENGTH = 320
 const SAFE_ID = /^[a-z][a-z0-9-]{0,63}$/
 const PROHIBITED_SUMMARY = [
   /\b[0-9a-f]{8}(?:-[0-9a-f]{4}){3}-[0-9a-f]{12}\b/i,
@@ -64,18 +65,42 @@ const canonicalIso = (value) => {
 }
 const canonicalSummary = (value) => {
   let canonical = value.normalize('NFKC')
+  if (canonical.length > MAX_CANONICAL_SUMMARY_LENGTH) fail('summary_prohibited')
+  const malformedPercent = () => /%(?![0-9a-f]{2}|(?:\s|$))/i.test(canonical)
+  if (malformedPercent()) fail('summary_prohibited')
   for (let pass = 0; pass < 2 && /%[0-9a-f]{2}/i.test(canonical); pass += 1) {
     try { canonical = decodeURIComponent(canonical).normalize('NFKC') } catch { fail('summary_prohibited') }
-    if (canonical.length > 320) fail('summary_prohibited')
+    if (canonical.length > MAX_CANONICAL_SUMMARY_LENGTH || malformedPercent()) fail('summary_prohibited')
   }
   if (/%[0-9a-f]{2}/i.test(canonical)) fail('summary_prohibited')
   return canonical
+}
+const hasDisallowedScheme = (value) => {
+  const schemes = value.matchAll(/(?:^|\s)([a-z][a-z0-9+.-]*):(?=\S)/gi)
+  for (const match of schemes) {
+    const scheme = match[1].toLowerCase()
+    const schemeStart = match.index + match[0].lastIndexOf(match[1])
+    if (scheme !== 'https' || value.slice(schemeStart, schemeStart + 8).toLowerCase() !== 'https://') return true
+  }
+  return false
+}
+const hasSensitiveStructure = (value) => {
+  const semantic = value.replace(/[\p{P}\s|]+/gu, ' ').trim()
+  return [
+    /\b(?:session|thread) (?:id|token)(?:\s*[=>]\s*|\s+)\S+/i,
+    /\bprovider (?:locator|url|uri)(?:\s*[=>]\s*|\s+)\S+/i,
+    /\b(?:api|private|secret) key(?:\s*[=>]\s*|\s+)\S+/i,
+    /\b(?:credential|password)(?:\s*[=>]\s*|\s+)\S+/i,
+    /\b(?:prompt|result) raw(?:\s*[=>]\s*|\s+)\S+/i,
+    /\b(?:prompt|result)\s*[=>]\s*\S+/i,
+  ].some((pattern) => pattern.test(semantic))
 }
 const safeSummary = (value) => {
   if (value === undefined) return true
   if (typeof value !== 'string' || value.length === 0 || value.length > 160 || value.trim() !== value) return false
   const canonical = canonicalSummary(value)
-  return !/[\u0000-\u001f\u007f]/.test(canonical) && !PROHIBITED_SUMMARY.some((pattern) => pattern.test(canonical))
+  return !/[\u0000-\u001f\u007f]/.test(canonical) && !hasDisallowedScheme(canonical) &&
+    !hasSensitiveStructure(canonical) && !PROHIBITED_SUMMARY.some((pattern) => pattern.test(canonical))
 }
 const materialize = (value) => {
   try { return structuredClone(value) } catch { fail('materialization_failed') }
