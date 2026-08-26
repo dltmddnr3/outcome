@@ -131,6 +131,7 @@ test('allowlists, timestamps and prohibited summary shapes fail atomically', () 
     event({ now_summary: '/Users/example/private/file' }), event({ now_summary: 'C:\\private\\file' }),
     event({ now_summary: '/tmp/private/file' }),
     event({ now_summary: 'prompt: raw request' }), event({ now_summary: 'result: raw response' }),
+    event({ now_summary: '%25252Fopt%25252Fsynthetic%25252Fprivate.txt' }),
   ]
   for (const value of invalid) {
     const before = snapshot(relay)
@@ -191,6 +192,102 @@ test('all prohibited raw summary families fail before mutation while ordinary pu
   ].entries()) {
     assert.equal(relay.ingest(event({ sequence: index + 1, now_summary })).status, 'accepted')
   }
+})
+
+test('canonicalized alternate representations reject all 12 fresh re-QA bypasses and preserve 10 controls', () => {
+  const prohibited = [
+    'SeSsIoN_ID | synthetic-opaque-123',
+    'THREAD.ID=synthetic-opaque-123',
+    'session_id%3Dsynthetic-opaque-123',
+    'provider_locator | synthetic://opaque-123',
+    'SYNTHETIC://opaque-123',
+    'API_KEY | synthetic-not-real',
+    'api_key%3Dsynthetic-not-real',
+    'file:///opt/synthetic/private.txt',
+    'path="/opt/synthetic/private.txt"',
+    '%2Fopt%2Fsynthetic%2Fprivate.txt',
+    'prompt%3Draw synthetic request',
+    'RESULT／raw synthetic response',
+  ]
+  for (const now_summary of prohibited) {
+    const relay = createPhase3ObservationRelay(config())
+    const before = snapshot(relay)
+    let failure
+    try { relay.ingest(event({ now_summary })) } catch (error) { failure = error }
+    assert.equal(failure?.code, 'summary_prohibited')
+    assert.deepEqual(relay.read(), before)
+    assert.equal(JSON.stringify({ error: failure?.code, state: relay.read() }).includes(now_summary), false)
+  }
+
+  const relay = createPhase3ObservationRelay(config())
+  const controls = [
+    '한국어 공개 작업 요약 확인 중',
+    'Public build verification is running',
+    'API integration check complete',
+    'Provider health check complete',
+    'Result verification complete',
+    'Prompt quality review in progress',
+    'docs/public-summary.md review',
+    './docs/public-summary.md review',
+    '../docs/public-summary.md review',
+    'https://example.invalid/public/status?page=summary',
+  ]
+  for (const [index, now_summary] of controls.entries()) {
+    assert.equal(relay.ingest(event({ sequence: index + 1, now_summary })).status, 'accepted')
+  }
+  assert.deepEqual(relay.read().evidence.map((item) => item.evidence_id), controls.map((_, index) => index + 1))
+})
+
+test('accessor-bearing mutation envelopes cannot re-enter or consume evidence', () => {
+  const accessor = (base, key, nested) => {
+    const value = base[key]
+    const input = { ...base }
+    Object.defineProperty(input, key, { enumerable: true, get() { nested(); return value } })
+    return input
+  }
+  const cases = [
+    (relay) => relay.ingest(accessor(event(), 'project_id', () => relay.disable())),
+    (relay) => relay.disconnect(accessor({ source_host: 'source-a' }, 'source_host', () => relay.disable())),
+    (relay) => relay.reconnect(accessor({ source_host: 'source-a', expected_last_sequence: 0, event: event() }, 'source_host', () => relay.disable())),
+    (relay) => relay.reconnect({ source_host: 'source-a', expected_last_sequence: 0, event: accessor(event(), 'project_id', () => relay.disable()) }),
+  ]
+  for (const invoke of cases) {
+    const relay = createPhase3ObservationRelay(config())
+    const before = snapshot(relay)
+    assert.throws(() => invoke(relay), /input_invalid|reentrant_mutation/)
+    assert.deepEqual(relay.read(), before)
+    assert.equal(relay.ingest(event()).status, 'accepted')
+    assert.deepEqual(relay.read().evidence.map((item) => item.evidence_id), [1])
+  }
+
+  for (const trap of ['ownKeys', 'getOwnPropertyDescriptor']) {
+    const relay = createPhase3ObservationRelay(config())
+    const target = event()
+    const proxy = new Proxy(target, {
+      [trap](current, key) {
+        try { relay.disable() } catch { /* the hostile trap swallows the nested failure */ }
+        return trap === 'ownKeys' ? Reflect.ownKeys(current) : Reflect.getOwnPropertyDescriptor(current, key)
+      },
+    })
+    const before = snapshot(relay)
+    assert.throws(() => relay.ingest(proxy), /reentrant_mutation/)
+    assert.deepEqual(relay.read(), before)
+  }
+
+  const restoring = createPhase3ObservationRelay(config())
+  restoring.disable()
+  const disabled = snapshot(restoring)
+  assert.throws(() => restoring.restore(accessor({ registry_revision: 7 }, 'registry_revision', () => restoring.restore({ registry_revision: 7 }))), /input_invalid|reentrant_mutation/)
+  assert.deepEqual(restoring.read(), disabled)
+  assert.equal(restoring.restore({ registry_revision: 7 }).status, 'restored')
+  assert.deepEqual(restoring.read().evidence.map((item) => item.evidence_id), [1, 2])
+
+  const disabling = createPhase3ObservationRelay(config())
+  let getterCalls = 0
+  const unused = accessor({ ignored: true }, 'ignored', () => { getterCalls += 1; disabling.disable() })
+  assert.throws(() => disabling.disable(unused), /input_invalid/)
+  assert.equal(getterCalls, 0)
+  assert.deepEqual(disabling.read(), { enabled: true, registry_revision: 7, projections: [], evidence: [] })
 })
 
 test('disconnect and reconnect use CAS while gap resync opens a new monotonic baseline', () => {
@@ -257,6 +354,14 @@ test('clock failure, re-entry and response materialization failure never partial
   globalThis.structuredClone = () => { throw new Error('clone failure') }
   try { assert.throws(() => cloneFailure.ingest(event()), /materialization_failed/) } finally { globalThis.structuredClone = originalClone }
   assert.deepEqual(cloneFailure.read(), { enabled: true, registry_revision: 7, projections: [], evidence: [] })
+
+  const materializationReentry = createPhase3ObservationRelay(config())
+  globalThis.structuredClone = (value) => {
+    try { materializationReentry.disable() } catch { /* simulate a materializer swallowing nested failure */ }
+    return value
+  }
+  try { assert.throws(() => materializationReentry.ingest(event()), /reentrant_mutation/) } finally { globalThis.structuredClone = originalClone }
+  assert.deepEqual(materializationReentry.read(), { enabled: true, registry_revision: 7, projections: [], evidence: [] })
 })
 
 test('finite clock outside ISO range fails as clock_unavailable without consuming evidence IDs', () => {

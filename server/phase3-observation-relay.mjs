@@ -6,18 +6,18 @@ const AUTHORIZED_SOURCE_HOSTS = new Set(['source-a', 'source-b'])
 const SAFE_ID = /^[a-z][a-z0-9-]{0,63}$/
 const PROHIBITED_SUMMARY = [
   /\b[0-9a-f]{8}(?:-[0-9a-f]{4}){3}-[0-9a-f]{12}\b/i,
-  /\b(?:session|thread)[ _-]*id\b\s*(?:(?:=|:|=>|->)\s*)?[a-z0-9][a-z0-9._:-]{2,}/i,
-  /\b(?:codex|claude|clerk|provider|session|thread):\/\/\S+/i,
-  /\bprovider[ _-]*(?:locator|url|uri)\b\s*(?:=|:|=>|->)\s*\S+/i,
-  /\b(?:api[ _-]*key|access[ _-]*token|secret[ _-]*key|private[ _-]*key|credential|password)\b\s*(?:=|:|=>|->)\s*\S+/i,
+  /\b(?:session|thread)[ ._-]*id\b\s*(?:(?:=|:|=>|->|\|)\s*)?[a-z0-9][a-z0-9._:-]{2,}/i,
+  /\b(?!https:\/\/)[a-z][a-z0-9+.-]*:\/\/\S+/i,
+  /\bprovider[ ._-]*(?:locator|url|uri)\b\s*(?:=|:|=>|->|\|)\s*\S+/i,
+  /\b(?:api[ ._-]*key|access[ ._-]*token|secret[ ._-]*key|private[ ._-]*key|credential|password)\b\s*(?:=|:|=>|->|\|)\s*\S+/i,
   /\b(?:sk-(?:[a-z0-9_-]{8,})|(?:sk|pk)_(?:live|test)_[a-z0-9_-]{4,}|gh[pousr]_[a-z0-9_-]{8,})\b/i,
   /\bbearer\s+\S+/i,
   /\bcookie\b\s*(?:=|:)\s*\S+/i,
-  /(?:^|[\s=(])\/(?!\/)\S+/,
+  /(?:^|[\s=("'])\/(?!\/)\S+/,
   /(?<![:/])\/\/\S+/,
   /(?:^|[^\\])\\\\\S+/,
   /\b[a-z]:[\\/]\S+/i,
-  /\b(?:prompt|result)\b\s*(?:=|:|=>|->|\|)\s*\S+/i,
+  /\b(?:prompt|result)\b\s*(?:=|:|=>|->|\||\/)\s*\S+/i,
 ]
 
 export class Phase3ObservationError extends Error {
@@ -39,15 +39,44 @@ const nonNegativeInteger = (value) => typeof value === 'number' && Number.isSafe
 const exactKeys = (value, allowed) => {
   try { return Object.keys(value).every((key) => allowed.has(key)) } catch { return false }
 }
+const dataRecord = (value, allowed) => {
+  if (!isPlainRecord(value)) fail('input_invalid')
+  try {
+    const keys = Reflect.ownKeys(value)
+    if (keys.some((key) => typeof key !== 'string' || !allowed.has(key))) fail('input_invalid')
+    const descriptors = Object.getOwnPropertyDescriptors(value)
+    const record = {}
+    for (const key of keys) {
+      const descriptor = descriptors[key]
+      if (!descriptor?.enumerable || !Object.hasOwn(descriptor, 'value')) fail('input_invalid')
+      record[key] = descriptor.value
+    }
+    return record
+  } catch (error) {
+    if (error instanceof Phase3ObservationError) throw error
+    fail('input_invalid')
+  }
+}
 const canonicalIso = (value) => {
   if (typeof value !== 'string') return false
   const parsed = Date.parse(value)
   return Number.isFinite(parsed) && new Date(parsed).toISOString() === value
 }
-const safeSummary = (value) => value === undefined || (
-  typeof value === 'string' && value.length > 0 && value.length <= 160 && value.trim() === value &&
-  !/[\u0000-\u001f\u007f]/.test(value) && !PROHIBITED_SUMMARY.some((pattern) => pattern.test(value))
-)
+const canonicalSummary = (value) => {
+  let canonical = value.normalize('NFKC')
+  for (let pass = 0; pass < 2 && /%[0-9a-f]{2}/i.test(canonical); pass += 1) {
+    try { canonical = decodeURIComponent(canonical).normalize('NFKC') } catch { fail('summary_prohibited') }
+    if (canonical.length > 320) fail('summary_prohibited')
+  }
+  if (/%[0-9a-f]{2}/i.test(canonical)) fail('summary_prohibited')
+  return canonical
+}
+const safeSummary = (value) => {
+  if (value === undefined) return true
+  if (typeof value !== 'string' || value.length === 0 || value.length > 160 || value.trim() !== value) return false
+  const canonical = canonicalSummary(value)
+  return !/[\u0000-\u001f\u007f]/.test(canonical) && !PROHIBITED_SUMMARY.some((pattern) => pattern.test(canonical))
+}
 const materialize = (value) => {
   try { return structuredClone(value) } catch { fail('materialization_failed') }
 }
@@ -68,15 +97,12 @@ function validateList(value, itemValidator) {
 }
 
 function validateEvent(input, allowed) {
-  if (!isPlainRecord(input) || !exactKeys(input, EVENT_KEYS)) fail('input_invalid')
-  let value
-  try {
-    value = {
-      project_id: input.project_id, role: input.role, binding_version: input.binding_version,
-      source_host: input.source_host, sequence: input.sequence, observed_at: input.observed_at,
-      availability: input.availability, ...(input.now_summary === undefined ? {} : { now_summary: input.now_summary }),
-    }
-  } catch { fail('input_invalid') }
+  const inputRecord = dataRecord(input, EVENT_KEYS)
+  const value = {
+    project_id: inputRecord.project_id, role: inputRecord.role, binding_version: inputRecord.binding_version,
+    source_host: inputRecord.source_host, sequence: inputRecord.sequence, observed_at: inputRecord.observed_at,
+    availability: inputRecord.availability, ...(inputRecord.now_summary === undefined ? {} : { now_summary: inputRecord.now_summary }),
+  }
   if (!safeString(value.project_id) || !safeString(value.role) || !positiveInteger(value.binding_version) ||
       !safeString(value.source_host, /^source-[a-z0-9]+$/) || !positiveInteger(value.sequence) ||
       typeof value.availability !== 'string' || !AVAILABILITY.has(value.availability)) fail('input_invalid')
@@ -110,6 +136,7 @@ export function createPhase3ObservationRelay(options) {
   }
   let state = { enabled, registryRevision, records: new Map(), evidence: [] }
   let mutating = false
+  let reentryAttempted = false
 
   const safeNow = () => {
     try {
@@ -148,16 +175,19 @@ export function createPhase3ObservationRelay(options) {
     })
   }
   const mutate = (operation) => {
-    if (mutating) fail('reentrant_mutation')
+    if (mutating) { reentryAttempted = true; fail('reentrant_mutation') }
     mutating = true
+    reentryAttempted = false
     try {
       const clock = safeNow()
       const draft = stateClone(state)
       const outcome = operation(draft, clock)
+      if (reentryAttempted) fail('reentrant_mutation')
       const response = materialize(outcome.response)
+      if (reentryAttempted) fail('reentrant_mutation')
       if (outcome.commit) state = draft
       return response
-    } finally { mutating = false }
+    } finally { reentryAttempted = false; mutating = false }
   }
   const validateClockBoundary = (value, clock) => {
     if (Date.parse(value.observed_at) > clock + FUTURE_TOLERANCE_MS) fail('timestamp_invalid')
@@ -170,8 +200,8 @@ export function createPhase3ObservationRelay(options) {
 
   return Object.freeze({
     ingest(input) {
-      const value = validateEvent(input, allowed)
       return mutate((draft, clock) => {
+        const value = validateEvent(input, allowed)
         if (!draft.enabled) fail('relay_disabled')
         validateClockBoundary(value, clock)
         const key = eventKey(value)
@@ -193,12 +223,10 @@ export function createPhase3ObservationRelay(options) {
       })
     },
     disconnect(input) {
-      if (!isPlainRecord(input) || !exactKeys(input, new Set(['source_host']))) fail('input_invalid')
-      let sourceHost
-      try { sourceHost = input.source_host } catch { fail('input_invalid') }
-      if (!safeString(sourceHost, /^source-[a-z0-9]+$/)) fail('input_invalid')
-      if (!allowed.sourceHosts.has(sourceHost)) fail('scope_not_allowed')
       return mutate((draft, clock) => {
+        const { source_host: sourceHost } = dataRecord(input, new Set(['source_host']))
+        if (!safeString(sourceHost, /^source-[a-z0-9]+$/)) fail('input_invalid')
+        if (!allowed.sourceHosts.has(sourceHost)) fail('scope_not_allowed')
         if (!draft.enabled) fail('relay_disabled')
         const matches = [...draft.records.values()].filter(({ event: value }) => value.source_host === sourceHost)
         if (matches.length === 0) fail('source_missing')
@@ -210,13 +238,13 @@ export function createPhase3ObservationRelay(options) {
       })
     },
     reconnect(input) {
-      if (!isPlainRecord(input) || !exactKeys(input, new Set(['source_host', 'expected_last_sequence', 'event']))) fail('input_invalid')
-      let sourceHost, expected, eventInput
-      try { sourceHost = input.source_host; expected = input.expected_last_sequence; eventInput = input.event } catch { fail('input_invalid') }
-      if (!safeString(sourceHost, /^source-[a-z0-9]+$/) || !nonNegativeInteger(expected)) fail('input_invalid')
-      const value = validateEvent(eventInput, allowed)
-      if (value.source_host !== sourceHost) fail('input_invalid')
       return mutate((draft, clock) => {
+        const inputRecord = dataRecord(input, new Set(['source_host', 'expected_last_sequence', 'event']))
+        const sourceHost = inputRecord.source_host
+        const expected = inputRecord.expected_last_sequence
+        if (!safeString(sourceHost, /^source-[a-z0-9]+$/) || !nonNegativeInteger(expected)) fail('input_invalid')
+        const value = validateEvent(inputRecord.event, allowed)
+        if (value.source_host !== sourceHost) fail('input_invalid')
         if (!draft.enabled) fail('relay_disabled')
         validateClockBoundary(value, clock)
         const prior = draft.records.get(eventKey(value))
@@ -236,11 +264,9 @@ export function createPhase3ObservationRelay(options) {
       })
     },
     restore(input) {
-      if (!isPlainRecord(input) || !exactKeys(input, new Set(['registry_revision']))) fail('input_invalid')
-      let revision
-      try { revision = input.registry_revision } catch { fail('input_invalid') }
-      if (!positiveInteger(revision)) fail('input_invalid')
       return mutate((draft, clock) => {
+        const { registry_revision: revision } = dataRecord(input, new Set(['registry_revision']))
+        if (!positiveInteger(revision)) fail('input_invalid')
         if (draft.enabled) fail('relay_enabled')
         if (revision !== draft.registryRevision) fail('cas_mismatch')
         draft.enabled = true
