@@ -32,18 +32,24 @@ try {
     const screenshotDirectory = process.env.OUTCOME_BROWSER_SCREENSHOTS === '1' ? resolve('.outcome-runtime/split-workbench-screenshots') : null
     if (screenshotDirectory) mkdirSync(screenshotDirectory, { recursive: true })
     for (const viewport of [
+      { name: 'desktop-1920x1080', width: 1920, height: 1080 },
       { name: 'desktop-1440x900', width: 1440, height: 900 },
       { name: 'tablet-1024x768', width: 1024, height: 768 },
+      { name: 'mobile-430x932', width: 430, height: 932 },
       { name: 'mobile-390x844', width: 390, height: 844 },
       { name: 'mobile-360x800', width: 360, height: 800 },
       { name: 'phone-375x812', width: 375, height: 812 },
+      { name: 'mobile-320x568', width: 320, height: 568 },
       { name: 'landscape-844x390', width: 844, height: 390 },
     ]) {
       const context = await browser.newContext({ viewport })
       const page = await context.newPage(); await page.goto(`${base}/cherry-note-dashboard`); await verifyAllDashboardStates(page, viewport.name)
       if (screenshotDirectory && ['desktop-1440x900', 'mobile-390x844'].includes(viewport.name)) {
-        if (viewport.name === 'mobile-390x844') { await page.locator('.oc-nav-trigger').click(); await page.locator('.oc-global-nav').waitFor({ state: 'visible' }) }
         await page.screenshot({ path: join(screenshotDirectory, `${viewport.name}.png`), fullPage: true })
+        if (viewport.name === 'mobile-390x844') {
+          await page.locator('.oc-nav-trigger').click(); await page.locator('.oc-global-nav').waitFor({ state: 'visible' })
+          await page.screenshot({ path: join(screenshotDirectory, `${viewport.name}-navigation.png`), fullPage: true })
+        }
       }
       await context.close()
     }

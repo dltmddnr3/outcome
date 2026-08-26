@@ -5,7 +5,7 @@ import { assertDashboardMeasurement, assertMobileHierarchyFlowMeasurement, asser
 
 const passingMeasurement = () => ({
   documentOverflow: 0, clippedDescendants: [], ellipsisTruncation: [], viewportEscape: [], siblingIntersections: [], roleDescendantIntersections: [], roleStatusOverflow: [], undersizedText: [], lowContrastText: [], undersizedControls: [], unexpectedEnglish: [], translationFallback: [], activeAnimationCount: 0, heroHeight: 352,
-  pageHeading: true, sequentialHeadings: true, compactHero: true, roleGeometry: true, heroGeometry: true, mobileMapFirstFold: true, mobileDomOrder: true, mobileHierarchyTruth: true, workspaceSidebarTruth: true, workbenchTruth: true, gateDetailsTruth: true, refinedVisualSystemTruth: true, currentStageActionTruth: true, singleProgressRailTruth: true, phaseNavigationUniqueTruth: true, currentSelectionDistinctionTruth: true, folderHierarchyTruth: true, phaseCurrentMarkerTruth: true, phaseLabelsFull: true, phaseBandTruth: true, phaseOptionTitlesFull: true, desktopPhaseListFirstFold: true, liveSemantics: true, structureTruth: true, phaseCompletionTruth: true, stagePositionTruth: true, snapshotHeroTruth: true, oneMapSurface: true, roving: true, desktopColumns: true, mobileDrill: true, gateCountTruth: true, gaugeTruth: true, explorationTruth: true, groupTruth: true, singleStaleNowSignal: true, snapshotBadgeTextTruth: true, technicalCollapsed: true, technicalEvidence: true, noFabricatedProgress: true, firstFold: true,
+  pageHeading: true, sequentialHeadings: true, compactHero: true, roleGeometry: true, heroGeometry: true, mobileMapFirstFold: true, mobileDomOrder: true, mobileHierarchyTruth: true, workspaceSidebarTruth: true, workbenchTruth: true, wideCanvasTruth: true, gateDetailsTruth: true, refinedVisualSystemTruth: true, currentStageActionTruth: true, singleProgressRailTruth: true, phaseNavigationUniqueTruth: true, currentSelectionDistinctionTruth: true, folderHierarchyTruth: true, phaseCurrentMarkerTruth: true, phaseLabelsFull: true, phaseBandTruth: true, phaseOptionTitlesFull: true, desktopPhaseListFirstFold: true, liveSemantics: true, structureTruth: true, phaseCompletionTruth: true, stagePositionTruth: true, snapshotHeroTruth: true, oneMapSurface: true, roving: true, desktopColumns: true, mobileDrill: true, gateCountTruth: true, gaugeTruth: true, explorationTruth: true, groupTruth: true, singleStaleNowSignal: true, snapshotBadgeTextTruth: true, technicalCollapsed: true, technicalEvidence: true, noFabricatedProgress: true, firstFold: true,
 })
 
 test('all contracted viewport names accept the interactive hierarchy measurement', () => {
@@ -27,6 +27,10 @@ test('responsive assertions fail closed for wrong columns, stacked mobile levels
 test('split workbench fails closed without truthful chat placeholder or full-width Gate details', () => {
   assert.throws(() => assertDashboardMeasurement('desktop/outcome', { ...passingMeasurement(), workbenchTruth: false }), /workbenchTruth=false/)
   assert.throws(() => assertDashboardMeasurement('mobile/outcome', { ...passingMeasurement(), gateDetailsTruth: false }), /gateDetailsTruth=false/)
+})
+
+test('wide canvas fails closed when primary surfaces remain inset or misaligned', () => {
+  assert.throws(() => assertDashboardMeasurement('mobile/outcome', { ...passingMeasurement(), wideCanvasTruth: false, wideCanvasMetrics: { primaryWidth: 358, primaryWidthMinimum: 374, leftDelta: 0, rightDelta: 0, mobileFramesFlat: true } }), /wideCanvasTruth=false.*primaryWidth/)
 })
 
 test('mobile hierarchy clarity fails closed when the three tabs or visible active marker is absent', () => {

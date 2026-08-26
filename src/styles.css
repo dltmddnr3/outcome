@@ -295,9 +295,9 @@ body:has(.account-workspace){min-width:0}
 @media(prefers-reduced-motion:reduce){.account-workspace *{scroll-behavior:auto;transition:none!important;animation:none!important}}
 
 /* OUTCOME workspace sidebar: project switching and truthful future capability boundaries. */
-.oc-dashboard{display:grid;width:min(1600px,100%);grid-template-columns:248px minmax(0,1fr);padding:0;overflow:visible}
+.oc-dashboard{display:grid;width:100%;max-width:none;grid-template-columns:248px minmax(0,1fr);padding:0;overflow:visible;border:0;border-radius:0}
 .cn-standalone-shell:has(.oc-dashboard){padding:0}
-.oc-dashboard-content{min-width:0;padding:0 36px 32px}
+.oc-dashboard-content{min-width:0;padding:0 24px 32px}
 .oc-global-nav{position:sticky;z-index:12;top:0;display:flex;height:100vh;min-width:0;flex-direction:column;gap:12px;padding:16px 12px;border-right:1px solid #303a30;background:#0b110c;color:#f2f6ef}
 .oc-global-nav>header{display:flex;min-height:44px;align-items:center;justify-content:space-between;gap:8px}
 .oc-nav-brand{display:flex;align-items:center;gap:9px;color:#f4f7f1;font-size:12px;letter-spacing:.03em}
@@ -344,8 +344,8 @@ body:has(.account-workspace){min-width:0}
 
 @media(max-width:1407px){
   .oc-dashboard{display:block;width:100%;padding:0}
-  .oc-dashboard-content{padding:0 20px 32px}
-  .oc-topbar{display:flex;margin-right:-20px;margin-left:-20px;padding-right:20px;padding-left:20px;justify-content:space-between}
+  .oc-dashboard-content{padding:0 16px 32px}
+  .oc-topbar{display:flex;margin-right:-16px;margin-left:-16px;padding-right:16px;padding-left:16px;justify-content:space-between}
   .oc-nav-trigger,.oc-nav-close{display:grid;width:44px;min-width:44px;height:44px;place-items:center;padding:0;border:1px solid #465446;border-radius:7px;background:#101710;color:#eef4eb;cursor:pointer}
   .oc-global-nav{position:fixed;z-index:50;top:0;left:0;width:min(320px,calc(100vw - 48px));height:100dvh;padding:16px;overflow-y:auto;visibility:hidden;transform:translateX(-100%);transition:transform .18s ease,visibility 0s linear .18s}
   .oc-global-nav[data-open=true]{visibility:visible;transform:translateX(0);transition-delay:0s}
@@ -354,8 +354,8 @@ body:has(.account-workspace){min-width:0}
 }
 
 @media(max-width:759px){
-  .oc-dashboard-content{padding-right:16px;padding-left:16px}
-  .oc-topbar{margin-right:-16px;margin-left:-16px;padding-right:16px;padding-left:16px;align-items:center}
+  .oc-dashboard-content{padding-right:8px;padding-left:8px}
+  .oc-topbar{margin-right:-8px;margin-left:-8px;padding-right:8px;padding-left:8px;align-items:center}
 }
 
 @media(prefers-reduced-motion:reduce){.oc-global-nav{transition:none}.oc-skip-link{scroll-behavior:auto}}
@@ -468,6 +468,7 @@ body:has(.account-workspace){min-width:0}
 }
 
 @media(max-width:759px){
+  .oc-hero,.oc-workbench{border-right:0;border-left:0;border-radius:0}
   .oc-workbench{margin-bottom:16px;overflow:visible}
   .oc-hierarchy-sticky{position:static;z-index:auto;top:auto}
   .oc-workbench .oc-hierarchy-sticky{position:static;z-index:auto;top:auto}
@@ -480,4 +481,10 @@ body:has(.account-workspace){min-width:0}
   .oc-gate-inspector>summary strong{white-space:normal}
   .oc-gate-inspector>summary>span:last-child{gap:8px}
   .oc-gate-content{padding:12px}
+}
+
+@media(max-width:340px){
+  .oc-map-actions{display:grid;grid-template-columns:minmax(0,1fr);gap:8px}
+  .oc-show-current-button{justify-self:start}
+  .oc-mobile-level{width:100%;justify-content:space-between}
 }
