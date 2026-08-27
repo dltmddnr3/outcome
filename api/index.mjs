@@ -1,4 +1,5 @@
 import snapshot from './deployment-snapshot.mjs'
+import { isProxy } from 'node:util/types'
 import { privateAccessPublicConfig } from '../server/account-access-api.mjs'
 import { handlePrivateAccessRequest } from '../server/account-access-api.mjs'
 import { AccountAccessError } from '../server/account-access.mjs'
@@ -212,10 +213,13 @@ const hostedRequest = createStableHostRequestHandler({ logger: console })
 const MAXIMUM_STABLE_BRIDGE_BODY_BYTES = 1_048_576
 const rawBridgeBody = async (request, pathname) => {
   const target = bridgeRequestTarget(pathname)
-  if (!target.candidate || !target.valid || request.method === 'GET' || typeof request.body === 'string' || Buffer.isBuffer(request.body) || typeof request?.[Symbol.asyncIterator] !== 'function') return request.body
+  const body = request.body
+  if (isProxy(body)) return undefined
+  if (!target.candidate || !target.valid || request.method === 'GET' || typeof body === 'string' || Buffer.isBuffer(body) || typeof request?.[Symbol.asyncIterator] !== 'function') return body
   const chunks = []
   let bytes = 0
   for await (const chunk of request) {
+    if (isProxy(chunk)) return undefined
     const value = Buffer.isBuffer(chunk) ? chunk : Buffer.from(chunk)
     bytes += value.length
     if (bytes > MAXIMUM_STABLE_BRIDGE_BODY_BYTES) return Buffer.alloc(MAXIMUM_STABLE_BRIDGE_BODY_BYTES + 1)

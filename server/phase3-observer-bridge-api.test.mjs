@@ -386,6 +386,53 @@ test('Proxy and accessor request bodies are rejected without trap or getter exec
   assert.equal(hits, 0)
 })
 
+test('QA raw body Proxy blocker rejects before Buffer classification with no trap or bridge call', async () => {
+  let trapHits = 0
+  let bridgeCalls = 0
+  const rawBody = new Proxy(Buffer.from('{}'), { getPrototypeOf() { trapHits += 1; throw new Error('private raw body trap') } })
+  const actual = await call({ maxBodyBytes: 1024, completeEnrollment: () => { bridgeCalls += 1 } }, {
+    method: 'POST', path: '/api/private/bridge/enrollments/complete', headers: { 'content-type': 'application/json' }, rawBody,
+  })
+  assert.deepEqual(actual, { status: 400, body: { error: 'bad_request' } })
+  assert.equal(trapHits, 0)
+  assert.equal(bridgeCalls, 0)
+})
+
+test('raw body hostile matrix rejects Proxy wrappers and revoked values without traps', async () => {
+  let trapHits = 0
+  let bridgeCalls = 0
+  const trap = () => { trapHits += 1; throw new Error('private raw body trap') }
+  const handler = { getPrototypeOf: trap, get: trap, ownKeys: trap, getOwnPropertyDescriptor: trap }
+  const revoked = Proxy.revocable(Buffer.from('{}'), {})
+  revoked.revoke()
+  const values = [
+    new Proxy(Buffer.from('{}'), handler),
+    new Proxy(new String('{}'), { ...handler, get(target, key, receiver) { if (key === Symbol.iterator || key === 'toString' || key === 'valueOf') return trap(); return Reflect.get(target, key, receiver) } }),
+    new Proxy(new Uint8Array(Buffer.from('{}')), handler),
+    revoked.proxy,
+  ]
+  for (const rawBody of values) {
+    const actual = await call({ maxBodyBytes: 1024, completeEnrollment: () => { bridgeCalls += 1 } }, {
+      method: 'POST', path: '/api/private/bridge/enrollments/complete', headers: { 'content-type': 'application/json' }, rawBody,
+    })
+    assert.deepEqual(actual, { status: 400, body: { error: 'bad_request' } })
+  }
+  assert.equal(trapHits, 0)
+  assert.equal(bridgeCalls, 0)
+})
+
+test('genuine raw body byte boundary preserves strings Buffers padding cap and malformed UTF-8', async () => {
+  let bridgeCalls = 0
+  const bridge = { maxBodyBytes: 5, completeEnrollment: () => { bridgeCalls += 1; return { status: 'accepted' } } }
+  for (const rawBody of ['{}', Buffer.from('{}'), ' {} ', Buffer.from(' {} ')]) {
+    assert.equal((await call(bridge, { method: 'POST', path: '/api/private/bridge/enrollments/complete', headers: { 'content-type': 'application/json' }, rawBody })).status, 200)
+  }
+  assert.equal(bridgeCalls, 4)
+  assert.deepEqual(await call(bridge, { method: 'POST', path: '/api/private/bridge/enrollments/complete', headers: { 'content-type': 'application/json' }, rawBody: '  {}  ' }), { status: 400, body: { error: 'body_too_large' } })
+  assert.deepEqual(await call(bridge, { method: 'POST', path: '/api/private/bridge/enrollments/complete', headers: { 'content-type': 'application/json' }, rawBody: Buffer.from([0xff]) }), { status: 400, body: { error: 'bad_request' } })
+  assert.equal(bridgeCalls, 4)
+})
+
 test('private API error mappings preserve parser body and CSRF responses without public constructor authority', async () => {
   const bridge = { maxBodyBytes: 1, read: () => ({ projections: [] }), createEnrollment: () => assert.fail('must fail before bridge call') }
   const badRequest = await call(bridge, { method: 'GET', path: '/api/private/bridge/projection', headers: {}, query: new Proxy({}, {}), authContext: { token: 'owner' } })

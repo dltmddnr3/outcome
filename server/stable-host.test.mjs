@@ -533,6 +533,60 @@ test('private bridge response is no-store at the stable handler boundary', async
   assert.equal(headers.get('cache-control'), 'no-store')
 })
 
+const invokeStableHandler = async (request) => {
+  const headers = new Map()
+  let status
+  let body
+  await stableHandler(request, {
+    setHeader: (name, value) => headers.set(name, value),
+    status(value) { status = value; return this },
+    json(value) { body = value; return value },
+  })
+  return { status, body, headers }
+}
+
+test('stable raw body Proxy boundary rejects body and streamed chunk before native classification', async () => {
+  let trapHits = 0
+  let bridgeCalls = 0
+  const trap = () => { trapHits += 1; throw new Error('private stable body trap') }
+  const handler = { getPrototypeOf: trap, get: trap, ownKeys: trap, getOwnPropertyDescriptor: trap }
+  const direct = await invokeStableHandler({ method: 'POST', url: '/api/private/bridge/events', query: {}, headers: {}, body: new Proxy(Buffer.from('{}'), handler) })
+  let yielded = false
+  const streamed = await invokeStableHandler({
+    method: 'POST', url: '/api/private/bridge/events', query: {}, headers: {}, body: undefined,
+    [Symbol.asyncIterator]() {
+      return { next: () => yielded ? Promise.resolve({ done: true }) : (yielded = true, Promise.resolve({ value: new Proxy(new Uint8Array(Buffer.from('{}')), handler), done: false })) }
+    },
+  })
+  const enabled = await injectedBridgeRequest({ bridge: { ...bridgeStub([]), ingest: () => { bridgeCalls += 1 } } })({
+    method: 'POST', pathname: '/api/private/bridge/events', headers: { 'content-type': 'application/json' }, body: new Proxy(Buffer.from('{}'), handler),
+  })
+  for (const actual of [direct, streamed]) {
+    assert.equal(actual.status, 404)
+    assert.deepEqual(actual.body, { error: 'bridge_unavailable' })
+    assert.equal(actual.headers.get('cache-control'), 'no-store')
+    assert.doesNotMatch(JSON.stringify(actual.body), /private|trap|stack|buffer|proxy/i)
+  }
+  assert.deepEqual(enabled, { status: 400, body: { error: 'bad_request' } })
+  assert.equal(trapHits, 0)
+  assert.equal(bridgeCalls, 0)
+})
+
+test('raw body hostile matrix stays finite at the stable handler boundary', async () => {
+  let trapHits = 0
+  const trap = () => { trapHits += 1; throw new Error('private stable body trap') }
+  const handler = { getPrototypeOf: trap, get: trap, ownKeys: trap, getOwnPropertyDescriptor: trap }
+  const revoked = Proxy.revocable(Buffer.from('{}'), {})
+  revoked.revoke()
+  const values = [new Proxy(Buffer.from('{}'), handler), new Proxy(new String('{}'), handler), new Proxy(new Uint8Array(Buffer.from('{}')), handler), revoked.proxy]
+  for (const body of values) {
+    const actual = await invokeStableHandler({ method: 'POST', url: '/api/private/bridge/events', query: {}, headers: {}, body })
+    assert.equal(actual.status, 404)
+    assert.deepEqual(actual.body, { error: 'bridge_unavailable' })
+  }
+  assert.equal(trapHits, 0)
+})
+
 test('stable snapshot has no prohibited disclosure or Gate evidence fields', () => {
   const text = JSON.stringify(snapshot)
   for (const pattern of [/\/Users\//, /\/tmp\//, /(?:session|thread|turn|task)[_-]?id/i, /\b[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}\b/i, /\b[0-9a-f]{40}\b/i, /\b[0-9a-f]{64}\b/i, /(?:token|secret|password|authorization)\s*[:=]/i]) assert.doesNotMatch(text, pattern)

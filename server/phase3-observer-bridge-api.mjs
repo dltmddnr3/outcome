@@ -74,6 +74,7 @@ function materializeJson(value, depth = 0) {
 }
 
 function parseRawJson(rawBody, maximumBytes) {
+  if (isProxy(rawBody)) apiFail('bad_request')
   let text
   let bytes
   if (typeof rawBody === 'string') {
