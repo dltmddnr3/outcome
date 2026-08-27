@@ -26,10 +26,10 @@ Outcome: only genuinely constructed, exact-shape `HostedObserverBridgeError` ins
   CHECK: node --test server/phase3-observer-bridge-api.test.mjs server/phase3-observer-bridge-hosted.test.mjs server/stable-host.test.mjs server/phase3-observer-bridge.test.mjs server/phase3-observer-bridge-postgres.test.mjs server/phase3-observer-bridge-operations.test.mjs server/account-access-api.test.mjs server/account-access-hosted.test.mjs server/account-access-identity-runtime.test.mjs
   EXPECT: targeted regression matrix passes.
   EVIDENCE: hosted/API/stable 65/65, bridge/hosted/account targeted 128/128, and full Node 249/249 pass; raw path, parser, auth, cache, Postgres, operations, account, and default-disabled boundaries remain covered.
-- [ ] B7: full Node/frontend/build/security/public/mutation/scope/runbook/boundary/diff and immutable receipt checks pass.
+- [x] B7: full Node/frontend/build/security/public/mutation/scope/runbook/boundary/diff and immutable receipt checks pass.
   CHECK: test -f docs/PHASE3_OBSERVER_BRIDGE_ASYNC_ERROR_BRAND_CORRECTION_BUILDER_RECEIPT.md && rg -q 'full Node: PASS' docs/PHASE3_OBSERVER_BRIDGE_ASYNC_ERROR_BRAND_CORRECTION_BUILDER_RECEIPT.md && rg -q 'full frontend: PASS' docs/PHASE3_OBSERVER_BRIDGE_ASYNC_ERROR_BRAND_CORRECTION_BUILDER_RECEIPT.md && rg -q 'build: PASS' docs/PHASE3_OBSERVER_BRIDGE_ASYNC_ERROR_BRAND_CORRECTION_BUILDER_RECEIPT.md && rg -q 'security/public/mutation/scope/runbook/boundary/diff: PASS' docs/PHASE3_OBSERVER_BRIDGE_ASYNC_ERROR_BRAND_CORRECTION_BUILDER_RECEIPT.md && rg -q 'external mutations: 0' docs/PHASE3_OBSERVER_BRIDGE_ASYNC_ERROR_BRAND_CORRECTION_BUILDER_RECEIPT.md && rg -q 'O2: OPEN/LOCKED' docs/PHASE3_OBSERVER_BRIDGE_ASYNC_ERROR_BRAND_CORRECTION_BUILDER_RECEIPT.md && rg -q 'Phase 3: 17/43' docs/PHASE3_OBSERVER_BRIDGE_ASYNC_ERROR_BRAND_CORRECTION_BUILDER_RECEIPT.md && rg -q 'EXTERNAL_OUTCOME_COMPLETE=false' docs/PHASE3_OBSERVER_BRIDGE_ASYNC_ERROR_BRAND_CORRECTION_BUILDER_RECEIPT.md && echo B7_PASS
   EXPECT: measured evidence, rollback, false completions, residual risk, and learning are fixed without promotion.
-  EVIDENCE: pending.
+  EVIDENCE: receipt records targeted 128/128, Node 249/249, frontend 89/89, build 1,652, security 44/44, public 4/4, mutation 32/32 and 28/28 API, scope 47, runbook, boundary 0, diff PASS, external 0, rollback, nine false-completion controls, residual risk, and learning.
 
 ## ABANDON
 
