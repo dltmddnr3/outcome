@@ -1,6 +1,6 @@
 # OUTCOME Package · Session Binding Control Plane
 
-Status: **CHERRY-APPROVED PRODUCT DIRECTION / IMPLEMENTATION OPEN**
+Status: **LOCAL IMPLEMENTATION AUDITED / LIVE OPERATIONS AND RELEASE OPEN**
 
 Observed: 2026-08-27 KST
 
@@ -16,10 +16,10 @@ Observed: 2026-08-27 KST
 
 ## Source-grounded baseline
 
-- 현재 synthetic `server/phase3-private-session-registry.mjs`가 증명한 mutation은 `bind`, `rebind`, `revoke`, `disable`이다. project+role active uniqueness, versioned replacement/revocation, append-only audit와 public-safe projection은 local synthetic 범위에서만 검증됐다.
-- 이 계약의 `doctor`, `assign`, `replace`, `observe`, `checkpoint`와 persistent migration/CLI/UI는 아직 구현되지 않았다. 기존 `bind/rebind`를 새 이름의 live control plane으로 간주하지 않는다.
-- 현재 `.outcome-runtime/bindings.json`은 `schema_version`이 없는 `bindings` object이며 네 role row와 stale observation, raw locator-shaped private field를 가진 historical input이다. 값은 Package/Git/public projection으로 복사하지 않고 migration 전 검증 대상으로만 취급한다.
-- 현재 loader는 runtime file을 읽어 배열로 투영할 뿐 atomic persistence, history, migration receipt 또는 role completeness를 제공하지 않는다.
+- local control plane은 권한 제한 exact-`0600` persistent schema-v2 private registry, project+role one-active invariant, CAS mutation, append-only binding/event history, atomic publication, restart validation/recovery와 versionless legacy migration을 구현한다.
+- local CLI는 `doctor`, `assign`, `replace`, `revoke`, `observe`, `checkpoint` 여섯 control과 identity-bound orphan lock용 `recover-lock`을 제공한다. Planner 교체는 routing freeze, verified handoff, `STARTED`, `CONTINUITY_READY`, valid handoff digest와 archive eligibility를 통과해야 한다.
+- Package parser와 template은 optional `OUTCOME_SESSIONS.md`의 네 role slot과 public-safe binding reference를 검증·생성하며, dashboard는 manifest와 private registry를 fail-closed로 reconcile해 role state/version/stage/history를 raw identifier 없이 투영한다.
+- fresh independent UX & Product QA와 Release Audit은 동일한 exact V6 candidate에서 PASS했다. 이는 local audited implementation candidate이며 live assignment, legacy migration, provider discovery, routing, archive, deploy와 release는 실행되지 않았고 계속 open이다.
 
 ## Package 구성
 
