@@ -113,7 +113,7 @@ const gateCopy: Record<string, string> = {
 }
 
 const stateCopy: Record<string, string> = {
-  active: '진행 중', idle: '대기 중', terminal: '종료됨', unbound: '연결 없음', connected: '연결됨', missing: '채택 안 됨', not_published: '게시 안 됨', replaced: '교체됨', blocked: '차단됨', pending: '증거 대기', complete: '완료 조건 충족', gates_closed_evidence_pending: '체크 항목 닫힘 · 증거 대기', queued: '진입 대기', locked: '선행 완료 조건 대기', unknown: '근거 없음', stale: '관측 오래됨', available: '로컬에 있음', ahead: '로컬 앞섬', behind: '로컬 뒤처짐', diverged: '분기됨', synced: '동기화됨', evidence_closed: '증거 확정', partially_evidenced: '일부 증거 있음', not_sourced: '해당 축 근거 없음', not_started: '시작 전', present: '원본 있음', conflict: '충돌', valid: '정상',
+  active: '진행 중', idle: '대기 중', terminal: '종료됨', unbound: '연결 없음', setup_required: '연결 설정 필요', rotating: '교체 중', registry_unavailable: '연결 원본 사용 불가', registry_conflict: '연결 원본 충돌', connected: '연결됨', missing: '채택 안 됨', not_published: '게시 안 됨', replaced: '교체됨', blocked: '차단됨', pending: '증거 대기', complete: '완료 조건 충족', gates_closed_evidence_pending: '체크 항목 닫힘 · 증거 대기', queued: '진입 대기', locked: '선행 완료 조건 대기', unknown: '근거 없음', stale: '관측 오래됨', available: '로컬에 있음', ahead: '로컬 앞섬', behind: '로컬 뒤처짐', diverged: '분기됨', synced: '동기화됨', evidence_closed: '증거 확정', partially_evidenced: '일부 증거 있음', not_sourced: '해당 축 근거 없음', not_started: '시작 전', present: '원본 있음', conflict: '충돌', valid: '정상',
 }
 
 const axisCopy: Record<string, string> = {

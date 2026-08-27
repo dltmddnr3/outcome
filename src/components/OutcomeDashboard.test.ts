@@ -122,6 +122,11 @@ describe('OUTCOME Package dashboard', () => {
     expect(bindingHeroLabel(binding('unknown', 'stale'))).toBe('근거 없음 · 오래됨')
     expect(bindingHeroLabel(binding('replaced', 'replaced'))).toBe('교체됨')
   })
+  it('역할 행은 version, history, Stage와 식별자 없는 append-only history detail을 표시한다', () => {
+    const source = OutcomeDashboard.toString()
+    for (const token of ['bindingVersion', 'historyCount', 'stageId', 'binding.history', 'oc-role-history']) expect(source).toContain(token)
+    for (const privateToken of ['locator_ref', 'binding_ref', 'event_ref', 'session_id', 'thread_id', 'task_id', 'turn_id']) expect(source).not.toContain(privateToken)
+  })
   it('정보 구조 리뉴얼은 핵심 source-grounded 기능을 보존한다', () => {
     const source = OutcomeDashboard.toString()
     for (const token of ['oc-structure-band', 'oc-gate-gauge', 'oc-now-summary', 'oc-outcome-map', 'oc-gate-inspector', 'oc-technical']) expect(source).toContain(token)

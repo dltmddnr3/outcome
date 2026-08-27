@@ -1,9 +1,10 @@
-import { existsSync, readFileSync, statSync } from 'node:fs'
+import { existsSync, readFileSync, statSync, writeFileSync } from 'node:fs'
 import { execFileSync } from 'node:child_process'
 import { basename, dirname, isAbsolute, join, resolve } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import YAML from 'yaml'
 import { sanitizeEvidenceText, sanitizeRemotePayload } from './cherry-note-dashboard.mjs'
+import { loadRegistry, publicRegistryProjection } from './outcome-session-registry-persistence.mjs'
 
 const ROLES = ['planner', 'builder', 'ux_product_qa', 'release_audit']
 const STABLE_ID = /^[a-z0-9]+(?:-[a-z0-9]+)*$/
@@ -163,19 +164,36 @@ const stageState = (stage, gate) => {
   return gate.total > 0 ? 'queued' : 'unknown'
 }
 
-function bindingViews(projectId, registry, now, staleAfterSeconds) {
+function parseSessionsManifest(markdown, projectId) {
+  if (!markdown) return { setupRequired: true, errors: [] }
+  const source = fencedYaml(markdown)
+  if (!source) return { setupRequired: false, errors: ['sessions_yaml_missing'] }
+  try {
+    const value = YAML.parse(source)
+    const roles = value?.roles
+    if (value?.schema_version !== 2 || value?.project_id !== projectId || !roles || typeof roles !== 'object' || Array.isArray(roles) || Object.keys(roles).length !== ROLES.length || ROLES.some((role) => !roles[role] || roles[role].state !== 'unbound' && !['active', 'idle', 'stale', 'rotating', 'blocked'].includes(roles[role].state) || !Number.isInteger(roles[role].binding_version) || roles[role].binding_version < 0 || roles[role].state === 'unbound' && roles[role].active_binding_ref != null)) return { setupRequired: false, errors: ['sessions_manifest_invalid'] }
+    return { setupRequired: false, errors: [] }
+  } catch { return { setupRequired: false, errors: ['sessions_yaml_invalid'] } }
+}
+
+function bindingViews(projectId, registry, now, staleAfterSeconds, setupRequired = false) {
+  const runtimeError = !Array.isArray(registry) && ['registry_unavailable', 'registry_conflict'].includes(registry?.error) ? registry.error : null
+  const rows = Array.isArray(registry) ? registry : Array.isArray(registry?.bindings) ? registry.bindings : []
   return ROLES.map((role) => {
-    const history = registry.filter((item) => item.project_id === projectId && item.role === role).sort((a, b) => Date.parse(b.bound_at) - Date.parse(a.bound_at))
-    const current = history.find((item) => !item.replaced_at) ?? null
-    if (!current) return { role, status: 'unbound', activity: null, boundAt: null, observedAt: null, freshness: 'unknown', historyCount: history.length, stageId: null }
+    if (setupRequired) return { role, status: 'setup_required', activity: null, boundAt: null, observedAt: null, freshness: 'unknown', bindingVersion: 0, historyCount: 0, phaseId: null, scopeId: null, stageId: null, rotating: false, hasPredecessor: false, history: [] }
+    if (runtimeError) return { role, status: runtimeError, activity: null, boundAt: null, observedAt: null, freshness: 'unknown', bindingVersion: 0, historyCount: 0, phaseId: null, scopeId: null, stageId: null, rotating: false, hasPredecessor: false, history: [] }
+    const history = rows.filter((item) => item.project_id === projectId && item.role === role).sort((a, b) => Date.parse(b.bound_at) - Date.parse(a.bound_at))
+    const projected = history.find((item) => Number.isInteger(item.history_count)) ?? null
+    const current = projected ?? history.find((item) => !['replaced', 'revoked'].includes(item.status) && !item.replaced_at) ?? null
+    if (!current || current.status === 'unbound') return { role, status: 'unbound', activity: null, boundAt: null, observedAt: null, freshness: 'unknown', bindingVersion: current?.binding_version ?? 0, historyCount: current?.history_count ?? history.length, phaseId: null, scopeId: null, stageId: null, rotating: false, hasPredecessor: false, history: current?.history ?? [] }
     const boundAt = Number.isFinite(Date.parse(current.bound_at)) ? current.bound_at : null
-    const observedAt = current.observed_at ?? current.bound_at
+    const observedAt = current.observed_at ?? null
     const stale = !observedAt || now.getTime() - Date.parse(observedAt) > staleAfterSeconds * 1000
-    return { role, status: stale ? 'stale' : current.status, activity: current.activity == null ? null : sanitizeEvidenceText(current.activity), boundAt, observedAt, freshness: stale ? 'stale' : 'fresh', historyCount: history.length, stageId: current.stage_id ?? null }
+    return { role, status: ['rotating', 'blocked', 'stale'].includes(current.status) ? current.status : stale ? 'stale' : current.status, activity: current.activity == null ? null : sanitizeEvidenceText(current.activity), boundAt, observedAt, freshness: stale ? 'stale' : 'fresh', bindingVersion: current.binding_version ?? 0, historyCount: current.history_count ?? history.length, phaseId: current.phase_id ?? null, scopeId: current.scope_id ?? null, stageId: current.stage_id ?? null, rotating: current.rotating === true || current.status === 'rotating', hasPredecessor: current.has_predecessor === true, history: Array.isArray(current.history) ? current.history : [] }
   })
 }
 
-export function buildPackageModel({ root, contractFile, mapFile, bindingRegistry = [], gitEvidence, now = new Date(), staleAfterSeconds = 900 }) {
+export function buildPackageModel({ root, contractFile, mapFile, sessionsFile = null, bindingRegistry = [], gitEvidence, now = new Date(), staleAfterSeconds = 900 }) {
   const contractPath = resolve(root, contractFile)
   const mapPath = resolve(root, mapFile)
   const contractText = safeRead(contractPath)
@@ -187,7 +205,10 @@ export function buildPackageModel({ root, contractFile, mapFile, bindingRegistry
   errors.push(...contract.missing.map((name) => `contract_${name}_missing`))
   const parsedMap = parseOutcomeMap(mapText); errors.push(...parsedMap.errors)
   const map = parsedMap.value
-  if (!map) return { status: 'unknown', errors: [...new Set(errors)], project: { id: contract.projectId ?? 'unknown', name: contract.projectName ?? 'Unknown project', outcome: contract.outcome }, phases: [], bindings: bindingViews(contract.projectId, bindingRegistry, now, staleAfterSeconds), now: { status: 'unbound', activity: null }, progress: { available: false } }
+  const sessionsText = sessionsFile ? safeRead(resolve(root, sessionsFile)) : ''
+  if (sessionsFile && !sessionsText) errors.push('sessions_manifest_missing')
+  const sessions = parseSessionsManifest(sessionsText, contract.projectId); errors.push(...sessions.errors)
+  if (!map) return { status: 'unknown', errors: [...new Set(errors)], project: { id: contract.projectId ?? 'unknown', name: contract.projectName ?? 'Unknown project', outcome: contract.outcome }, phases: [], bindings: bindingViews(contract.projectId, bindingRegistry, now, staleAfterSeconds, sessions.setupRequired), now: { status: 'unbound', activity: null }, progress: { available: false } }
   if (contract.projectId !== map.project_id) errors.push('project_reference_mismatch')
   const github = parseGithubConnector(map.source_connectors?.github, gitEvidence ?? readLocalGitEvidence(root, map.source_connectors?.github))
   const allIds = [map.project_id]
@@ -233,7 +254,7 @@ export function buildPackageModel({ root, contractFile, mapFile, bindingRegistry
     if (item.stage.state === 'complete' || item.stage.state === 'blocked') continue
     item.stage.state = item.stage.dependsOn.every((id) => stages.find((candidate) => candidate.stage.id === id)?.stage.state === 'complete') ? 'queued' : 'locked'
   }
-  const bindings = bindingViews(map.project_id, bindingRegistry, now, staleAfterSeconds)
+  const bindings = bindingViews(map.project_id, bindingRegistry, now, staleAfterSeconds, sessions.setupRequired)
   const builder = bindings.find((item) => item.role === 'builder')
   const evidenceTimes = stages.map((item) => item.stage.gate.observedAt).filter(Boolean).map(Date.parse).filter(Number.isFinite)
   const evidenceObservedAt = evidenceTimes.length ? new Date(Math.max(...evidenceTimes)).toISOString() : null
@@ -243,7 +264,7 @@ export function buildPackageModel({ root, contractFile, mapFile, bindingRegistry
     project: { id: map.project_id, name: map.project_title ?? map.title ?? contract.projectName, outcome: map.project_purpose ?? contract.outcome, acceptanceAuthority: contract.acceptanceAuthority }, phases, connectors: { github },
     current: current ? { phaseId: current.phase.id, scopeId: current.scope.id, stageId: current.stage.id } : null,
     next: next ? { phaseId: next.phase.id, scopeId: next.scope.id, stageId: next.stage.id } : null,
-    bindings, now: builder && builder.status !== 'unbound' ? { status: builder.status, activity: builder.activity, observedAt: builder.observedAt, source: 'builder_binding' } : { status: 'unbound', activity: null, observedAt: null, source: 'runtime_registry' },
+    bindings, now: builder && !['unbound', 'setup_required', 'registry_unavailable', 'registry_conflict'].includes(builder.status) ? { status: builder.status, activity: builder.activity, observedAt: builder.observedAt, source: 'builder_binding' } : { status: builder?.status ?? 'unbound', activity: null, observedAt: null, source: 'runtime_registry' },
     progress: { available: false, reason: 'no_cross_stage_aggregate' },
   }
 }
@@ -262,11 +283,13 @@ export function loadProjectRegistry({ environment = process.env, repositoryRoot 
   return value.projects.map((entry) => {
     if (!entry || typeof entry !== 'object' || Array.isArray(entry) || !['root', 'contract_file', 'map_file'].every((key) => typeof entry[key] === 'string' && entry[key].trim())) registryError('project_registry_entry_invalid')
     const root = resolve(repositoryRoot, entry.root)
-    const documents = [entry.contract_file, entry.map_file]
+    if (entry.sessions_file != null && (typeof entry.sessions_file !== 'string' || !entry.sessions_file.trim())) registryError('project_registry_entry_invalid')
+    const documents = [entry.contract_file, entry.map_file, ...(entry.sessions_file ? [entry.sessions_file] : [])]
     if (documents.some(isAbsolute)) registryError('project_registry_document_absolute')
-    const [contractPath, mapPath] = documents.map((document) => resolve(root, document))
-    if (!insideRoot(root, contractPath) || !insideRoot(root, mapPath)) registryError('project_registry_document_traversal')
-    const definition = { root, contractFile: entry.contract_file, mapFile: entry.map_file }
+    const documentPaths = documents.map((document) => resolve(root, document))
+    if (documentPaths.some((documentPath) => !insideRoot(root, documentPath))) registryError('project_registry_document_traversal')
+    const [contractPath, mapPath] = documentPaths
+    const definition = { root, contractFile: entry.contract_file, mapFile: entry.map_file, sessionsFile: entry.sessions_file ?? null }
     const fingerprint = JSON.stringify([root, contractPath, mapPath])
     if (fingerprints.has(fingerprint)) registryError('project_registry_duplicate_entry')
     fingerprints.add(fingerprint)
@@ -292,7 +315,16 @@ export function projectPublicPackages(value) {
 
 export function loadBindingRegistry(path = process.env.OUTCOME_BINDING_REGISTRY ?? join(process.cwd(), '.outcome-runtime', 'bindings.json')) {
   try {
-    const value = JSON.parse(readFileSync(path, 'utf8'))
-    return Array.isArray(value.bindings) ? value.bindings.filter((item) => item && typeof item.project_id === 'string' && ROLES.includes(item.role)) : []
-  } catch { return [] }
+    const value = loadRegistry(path)
+    return { bindings: value.project_ids.flatMap((projectId) => publicRegistryProjection(value, projectId)), error: null }
+  } catch (error) { return { bindings: [], error: error instanceof Error && error.message === 'registry_conflict' ? 'registry_conflict' : 'registry_unavailable' } }
+}
+
+export function installOutcomeSessions({ root, projectId, templatePath = join(OUTCOME_ROOT, 'templates', 'OUTCOME_SESSIONS.md') }) {
+  if (typeof projectId !== 'string' || !STABLE_ID.test(projectId)) registryError('invalid_stable_id')
+  const target = resolve(root, 'OUTCOME_SESSIONS.md')
+  if (!insideRoot(resolve(root), target)) registryError('sessions_manifest_traversal')
+  const template = readFileSync(templatePath, 'utf8')
+  writeFileSync(target, template.replaceAll('<stable-project-id>', projectId).replace('<non-secret registry alias>', `${projectId}-local-private`), { encoding: 'utf8', flag: 'wx', mode: 0o644 })
+  return { created: true, projectId, roles: [...ROLES] }
 }

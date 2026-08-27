@@ -8,6 +8,8 @@ registry_ref: <non-secret registry alias>
 ## Role slots
 
 ```yaml
+schema_version: 2
+project_id: <stable-project-id>
 roles:
   planner:
     required: true

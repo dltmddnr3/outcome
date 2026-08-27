@@ -9,7 +9,8 @@
     {
       "root": ".",
       "contract_file": "docs/OUTCOME_CONTRACT.md",
-      "map_file": "docs/OUTCOME_MAP.md"
+      "map_file": "docs/OUTCOME_MAP.md",
+      "sessions_file": "docs/OUTCOME_SESSIONS.md"
     }
   ]
 }

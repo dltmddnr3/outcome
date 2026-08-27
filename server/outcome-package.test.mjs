@@ -3,15 +3,17 @@ import test from 'node:test'
 import { mkdtempSync, mkdirSync, readFileSync, utimesSync, writeFileSync } from 'node:fs'
 import { isAbsolute, join, resolve } from 'node:path'
 import { tmpdir } from 'node:os'
-import { buildPackageModel, collectOutcomePackages, loadProjectRegistry, parseGateLedger, parseGithubConnector, projectPublicPackages } from './outcome-package.mjs'
+import { buildPackageModel, collectOutcomePackages, installOutcomeSessions, loadBindingRegistry, loadProjectRegistry, parseGateLedger, parseGithubConnector, projectPublicPackages } from './outcome-package.mjs'
 
 const map = (overrides = '') => `# Map\n\`\`\`yaml\nschema_version: 1\nproject_id: demo\ntitle: Demo\nphases:\n  - id: phase-one\n    title: Phase\n    purpose: Phase purpose\n    scopes:\n      - id: scope-one\n        title: Scope\n        purpose: Scope purpose\n        stages:\n          - id: stage-one\n            title: Stage\n            purpose: Stage purpose\n            depends_on: []\n            gates_file: GATES_STAGE.md\n            implementation_state: work_in_progress\n            evidence_closure_state: pending\n${overrides}\n\`\`\`\n`
 const contract = '- Project ID: `demo`\n- Project name: `Demo`\n- Outcome: Measured outcome\n- Acceptance authority: `Cherry`\n'
-function fixture({ contractText = contract, mapText = map(), gateText = '- [x] G1: first\n- [ ] G2: second', registry = [], fileTime, now = new Date() } = {}) {
+const sessions = '# Sessions\n```yaml\nschema_version: 2\nproject_id: demo\nroles:\n  planner: { state: unbound, binding_version: 0 }\n  builder: { state: unbound, binding_version: 0 }\n  ux_product_qa: { state: unbound, binding_version: 0 }\n  release_audit: { state: unbound, binding_version: 0 }\n```\n'
+function fixture({ contractText = contract, mapText = map(), gateText = '- [x] G1: first\n- [ ] G2: second', sessionsText = sessions, registry = [], fileTime, now = new Date() } = {}) {
   const root = mkdtempSync(join(tmpdir(), 'outcome-package-')); mkdirSync(join(root, 'docs'))
   writeFileSync(join(root, 'docs/OUTCOME_CONTRACT.md'), contractText); writeFileSync(join(root, 'docs/OUTCOME_MAP.md'), mapText); if (gateText !== null) writeFileSync(join(root, 'docs/GATES_STAGE.md'), gateText)
+  if (sessionsText !== null) writeFileSync(join(root, 'docs/OUTCOME_SESSIONS.md'), sessionsText)
   if (fileTime) for (const name of ['OUTCOME_CONTRACT.md', 'OUTCOME_MAP.md', ...(gateText === null ? [] : ['GATES_STAGE.md'])]) utimesSync(join(root, 'docs', name), fileTime, fileTime)
-  return buildPackageModel({ root, contractFile: 'docs/OUTCOME_CONTRACT.md', mapFile: 'docs/OUTCOME_MAP.md', bindingRegistry: registry, now, staleAfterSeconds: 3600 })
+  return buildPackageModel({ root, contractFile: 'docs/OUTCOME_CONTRACT.md', mapFile: 'docs/OUTCOME_MAP.md', sessionsFile: sessionsText === null ? null : 'docs/OUTCOME_SESSIONS.md', bindingRegistry: registry, now, staleAfterSeconds: 3600 })
 }
 
 function registryFixture(ids = ['alpha', 'beta', 'gamma']) {
@@ -50,6 +52,7 @@ test('registry rejects empty malformed schema duplicate entries project IDs abso
     [{ schema_version: 1, projects: [...valid.projects, valid.projects[0]] }, /project_registry_duplicate_entry/],
     [{ schema_version: 1, projects: [{ ...valid.projects[0], contract_file: '/tmp/CONTRACT.md' }] }, /project_registry_document_absolute/],
     [{ schema_version: 1, projects: [{ ...valid.projects[0], map_file: '../MAP.md' }] }, /project_registry_document_traversal/],
+    [{ schema_version: 1, projects: [{ ...valid.projects[0], sessions_file: '../SESSIONS.md' }] }, /project_registry_document_traversal/],
   ]
   for (const [index, [body, expected]] of cases.entries()) { const path = join(value.repositoryRoot, `invalid-${index}.json`); writeFileSync(path, JSON.stringify(body)); assert.throws(() => loadProjectRegistry({ environment: { OUTCOME_PROJECT_REGISTRY: path }, repositoryRoot: value.repositoryRoot }), expected) }
   writeFileSync(value.registryPath, ''); assert.throws(() => loadProjectRegistry({ environment: { OUTCOME_PROJECT_REGISTRY: value.registryPath }, repositoryRoot: value.repositoryRoot }), /project_registry_json_invalid/)
@@ -75,6 +78,41 @@ test('tracked portfolio browser registry is worktree-contained and yields three 
 })
 
 test('valid package parses contract map and referenced gates', () => { const model = fixture(); assert.equal(model.errors.length, 0); assert.equal(model.phases[0].scopes[0].stages[0].gate.total, 2) })
+test('missing optional sessions companion keeps Package valid and projects four setup-required roles', () => {
+  const model = fixture({ sessionsText: null })
+  assert.equal(model.status, 'valid')
+  assert.deepEqual(model.bindings.map(({ role, status, bindingVersion }) => [role, status, bindingVersion]), [
+    ['planner', 'setup_required', 0], ['builder', 'setup_required', 0], ['ux_product_qa', 'setup_required', 0], ['release_audit', 'setup_required', 0],
+  ])
+})
+
+test('project registry accepts a bounded sessions_file and uses its unassigned role slots', () => {
+  const value = registryFixture(['demo'])
+  const registry = JSON.parse(readFileSync(value.registryPath, 'utf8'))
+  registry.projects[0].sessions_file = 'SESSIONS.md'
+  writeFileSync(value.registryPath, JSON.stringify(registry))
+  writeFileSync(join(value.repositoryRoot, 'demo', 'SESSIONS.md'), '# Sessions\n```yaml\nschema_version: 2\nproject_id: demo\nroles:\n  planner: { state: unbound, binding_version: 0 }\n  builder: { state: unbound, binding_version: 0 }\n  ux_product_qa: { state: unbound, binding_version: 0 }\n  release_audit: { state: unbound, binding_version: 0 }\n```\n')
+  const [model] = collectOutcomePackages({ environment: { OUTCOME_PROJECT_REGISTRY: value.registryPath }, repositoryRoot: value.repositoryRoot }).projects
+  assert.equal(model.status, 'valid')
+  assert.equal(model.bindings.every(({ status }) => status === 'unbound'), true)
+})
+
+test('Package installer creates the four-slot sessions companion without assignment', () => {
+  const root = mkdtempSync(join(tmpdir(), 'outcome-session-install-'))
+  assert.deepEqual(installOutcomeSessions({ root, projectId: 'new-project' }), { created: true, projectId: 'new-project', roles: ['planner', 'builder', 'ux_product_qa', 'release_audit'] })
+  const text = readFileSync(join(root, 'OUTCOME_SESSIONS.md'), 'utf8')
+  for (const role of ['planner', 'builder', 'ux_product_qa', 'release_audit']) assert.match(text, new RegExp(`^  ${role}:`, 'm'))
+  assert.equal((text.match(/active_binding_ref: null/g) ?? []).length, 4)
+  assert.throws(() => installOutcomeSessions({ root, projectId: 'new-project' }), /EEXIST/)
+})
+
+test('runtime collector projects corrupt v2 state as unavailable instead of unbound', () => {
+  const path = join(mkdtempSync(join(tmpdir(), 'outcome-corrupt-registry-')), 'registry.json')
+  writeFileSync(path, '{')
+  const model = fixture({ registry: loadBindingRegistry(path) })
+  assert.equal(model.bindings.every(({ status }) => status === 'registry_unavailable'), true)
+  assert.equal(model.now.status, 'registry_unavailable')
+})
 test('missing package documents fail closed unknown', () => { const model = buildPackageModel({ root: '/missing', contractFile: 'none', mapFile: 'none' }); assert.equal(model.status, 'unknown'); assert.ok(model.errors.includes('contract_missing')) })
 test('reference mismatch fails closed conflict', () => { const model = fixture({ mapText: map().replace('project_id: demo', 'project_id: other') }); assert.equal(model.status, 'conflict'); assert.ok(model.errors.includes('project_reference_mismatch')) })
 test('missing Gate reference fails closed unknown', () => { const model = fixture({ gateText: null }); assert.equal(model.status, 'unknown'); assert.ok(model.errors.includes('gate_reference_missing:stage-one')) })
@@ -86,6 +124,7 @@ test('gate acceptance child preserves closed and total without aggregate inferen
 test('gate reference anchor selects only the owning Stage range', () => { const ledger = parseGateLedger('- [x] M5: parser\n- [x] M6: ids\n- [ ] M10: ui', 'stage-four', 'M5-M9'); assert.deepEqual(ledger.gates.map((gate) => gate.id), ['M5', 'M6']) })
 test('role bindings are project scoped with replaced history', () => { const now = new Date().toISOString(); const model = fixture({ registry: [{ project_id: 'demo', role: 'builder', status: 'replaced', bound_at: '2026-01-01T00:00:00Z', replaced_at: '2026-02-01T00:00:00Z' }, { project_id: 'demo', role: 'builder', status: 'active', bound_at: now, observed_at: now, activity: 'current work' }, { project_id: 'other', role: 'builder', status: 'active', bound_at: now }] }); const builder = model.bindings.find((item) => item.role === 'builder'); assert.equal(builder.status, 'active'); assert.equal(builder.historyCount, 2) })
 test('role bindings preserve observed idle status without synthesizing activity', () => { const now = new Date().toISOString(); const model = fixture({ registry: [{ project_id: 'demo', role: 'ux_product_qa', status: 'idle', bound_at: now, observed_at: now, activity: null }] }); const qa = model.bindings.find((item) => item.role === 'ux_product_qa'); assert.equal(qa.status, 'idle'); assert.equal(qa.activity, null); assert.equal(qa.freshness, 'fresh') })
+test('blocked and rotating registry states are not weakened to stale when observation is absent', () => { for (const status of ['blocked', 'rotating']) { const model = fixture({ registry: [{ project_id: 'demo', role: 'planner', status, bound_at: new Date().toISOString(), observed_at: null }] }); assert.equal(model.bindings.find(({ role }) => role === 'planner').status, status) } })
 test('role binding public model preserves bound_at separately from observed_at', () => { const model = fixture({ now: new Date('2026-08-24T01:00:00Z'), registry: [{ project_id: 'demo', role: 'builder', status: 'active', stage_id: 'stage-one', bound_at: '2026-08-24T00:00:00Z', observed_at: '2026-08-24T00:59:00Z' }] }); const builder = model.bindings.find((item) => item.role === 'builder'); assert.equal(builder.boundAt, '2026-08-24T00:00:00Z'); assert.equal(builder.observedAt, '2026-08-24T00:59:00Z') })
 test('optional expected duration is source-grounded and missing remains unavailable', () => { const absent = fixture(); const present = fixture({ mapText: map().replace('            gates_file: GATES_STAGE.md', '            gates_file: GATES_STAGE.md\n            expected_duration_minutes: 120') }); assert.equal(absent.phases[0].scopes[0].stages[0].expectedDurationMinutes, null); assert.equal(present.phases[0].scopes[0].stages[0].expectedDurationMinutes, 120) })
 test('invalid expected duration fails closed unknown', () => { const model = fixture({ mapText: map().replace('            gates_file: GATES_STAGE.md', '            gates_file: GATES_STAGE.md\n            expected_duration_minutes: estimated') }); assert.equal(model.status, 'unknown'); assert.equal(model.phases[0].scopes[0].stages[0].expectedDurationMinutes, null); assert.ok(model.errors.includes('invalid_expected_duration_minutes:stage-one')) })
