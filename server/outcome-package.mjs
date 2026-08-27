@@ -4,7 +4,7 @@ import { basename, dirname, isAbsolute, join, resolve } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import YAML from 'yaml'
 import { sanitizeEvidenceText, sanitizeRemotePayload } from './cherry-note-dashboard.mjs'
-import { loadRegistry, publicRegistryProjection } from './outcome-session-registry-persistence.mjs'
+import { isPublicSessionAlias, loadRegistry, publicRegistryProjection } from './outcome-session-registry-persistence.mjs'
 
 const ROLES = ['planner', 'builder', 'ux_product_qa', 'release_audit']
 const STABLE_ID = /^[a-z0-9]+(?:-[a-z0-9]+)*$/
@@ -12,12 +12,6 @@ const UUID = /^[a-f0-9]{8}-[a-f0-9]{4}-[1-8][a-f0-9]{3}-[89ab][a-f0-9]{3}-[a-f0-
 const PRIVATE_MANIFEST_VALUE = /(?:\b[a-z][a-z0-9+.-]*:\/\/|\b(?:session|thread|task|turn)_id(?:[:=]|%[0-9a-f]{2})|\b(?:sess|thread|task|turn)_[a-z0-9]|\b(?:sk|ghp|github_pat|xox[baprs])[-_][A-Za-z0-9_-]{8,}|(?:token|secret|password|authorization|api[_-]?key|locator)(?:[_-][a-z0-9]+)*\s*[:=]\s*[^\s,;}]+|:\s*["']?\/(?:Users|home|tmp|var|opt|etc|Volumes|Library|Applications|System|usr|bin|sbin|dev|private)\/|\b[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}\b)/i
 const SESSION_MANIFEST_KEYS = new Set(['schema_version', 'project_id', 'roles'])
 const SESSION_ROLE_KEYS = new Set(['required', 'active_binding_ref', 'binding_version', 'state'])
-const PRIVATE_ALIAS_SEGMENTS = new Set(['codex', 'openai', 'chatgpt', 'provider', 'anthropic', 'claude', 'google', 'gemini', 'session', 'sess', 'thread', 'task', 'turn', 'conversation', 'chat', 'run', 'message', 'msg', 'assistant', 'asst'])
-const publicSessionAlias = (value) => {
-  if (typeof value !== 'string' || value.length > 64) return false
-  const segments = value.split('-')
-  return segments.length >= 2 && segments.length <= 5 && segments.every((segment) => /^[a-z][a-z0-9]{0,23}$/.test(segment) && !PRIVATE_ALIAS_SEGMENTS.has(segment))
-}
 const GIT_REMOTE = /^[A-Za-z0-9][A-Za-z0-9._-]*$/
 const GIT_BRANCH = /^[A-Za-z0-9][A-Za-z0-9._/-]*$/
 const safeRead = (path) => { try { return readFileSync(path, 'utf8') } catch { return '' } }
@@ -175,10 +169,10 @@ const stageState = (stage, gate) => {
 }
 
 function parseSessionsManifest(markdown, projectId) {
-  if (!markdown) return { setupRequired: true, errors: [] }
-  if (PRIVATE_MANIFEST_VALUE.test(markdown)) return { setupRequired: false, errors: ['sessions_manifest_invalid'] }
+  if (!markdown) return { setupRequired: true, errors: [], roles: null }
+  if (PRIVATE_MANIFEST_VALUE.test(markdown)) return { setupRequired: false, errors: ['sessions_manifest_invalid'], roles: null }
   const source = fencedYaml(markdown)
-  if (!source) return { setupRequired: false, errors: ['sessions_yaml_missing'] }
+  if (!source) return { setupRequired: false, errors: ['sessions_yaml_missing'], roles: null }
   try {
     const value = YAML.parse(source)
     const roles = value?.roles
@@ -186,11 +180,25 @@ function parseSessionsManifest(markdown, projectId) {
     const validRole = (row) => {
       if (!exact(row, SESSION_ROLE_KEYS) || row.required !== true || !Number.isInteger(row.binding_version)) return false
       if (row.state === 'unbound') return row.binding_version === 0 && row.active_binding_ref === null
-      return ['active', 'idle', 'stale', 'rotating', 'blocked'].includes(row.state) && row.binding_version >= 1 && publicSessionAlias(row.active_binding_ref) && !UUID.test(row.active_binding_ref) && !PRIVATE_MANIFEST_VALUE.test(row.active_binding_ref)
+      return ['active', 'idle', 'stale', 'rotating', 'blocked'].includes(row.state) && row.binding_version >= 1 && isPublicSessionAlias(row.active_binding_ref) && !UUID.test(row.active_binding_ref) && !PRIVATE_MANIFEST_VALUE.test(row.active_binding_ref)
     }
-    if (!exact(value, SESSION_MANIFEST_KEYS) || value.schema_version !== 2 || value.project_id !== projectId || !exact(roles, new Set(ROLES)) || ROLES.some((role) => !validRole(roles[role]))) return { setupRequired: false, errors: ['sessions_manifest_invalid'] }
-    return { setupRequired: false, errors: [] }
-  } catch { return { setupRequired: false, errors: ['sessions_yaml_invalid'] } }
+    if (!exact(value, SESSION_MANIFEST_KEYS) || value.schema_version !== 2 || value.project_id !== projectId || !exact(roles, new Set(ROLES)) || ROLES.some((role) => !validRole(roles[role]))) return { setupRequired: false, errors: ['sessions_manifest_invalid'], roles: null }
+    return { setupRequired: false, errors: [], roles }
+  } catch { return { setupRequired: false, errors: ['sessions_yaml_invalid'], roles: null } }
+}
+
+function reconcileSessions(projectId, registry, sessions) {
+  if (sessions.setupRequired || !sessions.roles || !Array.isArray(registry) && !Array.isArray(registry?.bindings)) return []
+  const rows = Array.isArray(registry) ? registry : registry.bindings
+  return ROLES.flatMap((role) => {
+    const history = rows.filter((row) => row.project_id === projectId && row.role === role)
+    const projected = history.find((row) => Number.isInteger(row.history_count))
+    const current = projected ?? history.find((row) => !['replaced', 'revoked'].includes(row.status) && !row.replaced_at) ?? null
+    const declared = sessions.roles[role]
+    if (declared.state === 'unbound') return current && current.status !== 'unbound' ? [`sessions_registry_conflict:${role}`] : []
+    if (!current || current.status === 'unbound' || current.public_alias !== declared.active_binding_ref || current.binding_version !== declared.binding_version || current.status !== declared.state) return [`sessions_registry_conflict:${role}`]
+    return []
+  })
 }
 
 function bindingViews(projectId, registry, now, staleAfterSeconds, setupRequired = false) {
@@ -225,7 +233,9 @@ export function buildPackageModel({ root, contractFile, mapFile, sessionsFile = 
   const sessionsText = sessionsFile ? safeRead(resolve(root, sessionsFile)) : ''
   if (sessionsFile && !sessionsText) errors.push('sessions_manifest_missing')
   const sessions = parseSessionsManifest(sessionsText, contract.projectId); errors.push(...sessions.errors)
-  if (!map) return { status: 'unknown', errors: [...new Set(errors)], project: { id: contract.projectId ?? 'unknown', name: contract.projectName ?? 'Unknown project', outcome: contract.outcome }, phases: [], bindings: bindingViews(contract.projectId, bindingRegistry, now, staleAfterSeconds, sessions.setupRequired), now: { status: 'unbound', activity: null }, progress: { available: false } }
+  const reconciliationErrors = reconcileSessions(contract.projectId, bindingRegistry, sessions); errors.push(...reconciliationErrors)
+  const reconciledRegistry = reconciliationErrors.length ? { bindings: [], error: 'registry_conflict' } : bindingRegistry
+  if (!map) return { status: 'unknown', errors: [...new Set(errors)], project: { id: contract.projectId ?? 'unknown', name: contract.projectName ?? 'Unknown project', outcome: contract.outcome }, phases: [], bindings: bindingViews(contract.projectId, reconciledRegistry, now, staleAfterSeconds, sessions.setupRequired), now: { status: 'unbound', activity: null }, progress: { available: false } }
   if (contract.projectId !== map.project_id) errors.push('project_reference_mismatch')
   const github = parseGithubConnector(map.source_connectors?.github, gitEvidence ?? readLocalGitEvidence(root, map.source_connectors?.github))
   const allIds = [map.project_id]
@@ -271,7 +281,7 @@ export function buildPackageModel({ root, contractFile, mapFile, sessionsFile = 
     if (item.stage.state === 'complete' || item.stage.state === 'blocked') continue
     item.stage.state = item.stage.dependsOn.every((id) => stages.find((candidate) => candidate.stage.id === id)?.stage.state === 'complete') ? 'queued' : 'locked'
   }
-  const bindings = bindingViews(map.project_id, bindingRegistry, now, staleAfterSeconds, sessions.setupRequired)
+  const bindings = bindingViews(map.project_id, reconciledRegistry, now, staleAfterSeconds, sessions.setupRequired)
   const builder = bindings.find((item) => item.role === 'builder')
   const evidenceTimes = stages.map((item) => item.stage.gate.observedAt).filter(Boolean).map(Date.parse).filter(Number.isFinite)
   const evidenceObservedAt = evidenceTimes.length ? new Date(Math.max(...evidenceTimes)).toISOString() : null

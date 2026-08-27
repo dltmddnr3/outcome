@@ -15,8 +15,8 @@ const SAFE_CLASS = /^[a-z][a-z0-9_-]{0,63}$/
 const SAFE_REASON = /^[a-z0-9_:-]{1,96}$/
 const PUBLIC_IDENTIFIER = /(?:\b[a-z][a-z0-9+.-]*:\/\/|\b(?:session|thread|task|turn)_id(?:[:=]|%[0-9a-f]{2})|\b(?:sess|thread|task|turn)_[a-z0-9])/i
 const REGISTRY_KEYS = new Set(['schema_version', 'revision', 'next_event_sequence', 'project_ids', 'bindings', 'events'])
-const BINDING_KEYS = new Set(['binding_ref', 'project_id', 'role', 'provider_class', 'locator_ref', 'binding_version', 'status', 'phase_id', 'scope_id', 'stage_id', 'bound_at', 'observed_at', 'predecessor_binding_ref', 'successor_binding_ref', 'continuity_handoff_sha256', 'last_checkpoint_ref', 'replaced_at', 'revoked_at', 'activity', 'predecessor_archive_eligible'])
-const BINDING_REQUIRED_KEYS = ['binding_ref', 'project_id', 'role', 'provider_class', 'locator_ref', 'binding_version', 'status', 'phase_id', 'scope_id', 'stage_id', 'bound_at', 'observed_at', 'predecessor_binding_ref', 'successor_binding_ref', 'continuity_handoff_sha256', 'last_checkpoint_ref']
+const BINDING_KEYS = new Set(['binding_ref', 'public_alias', 'project_id', 'role', 'provider_class', 'locator_ref', 'binding_version', 'status', 'phase_id', 'scope_id', 'stage_id', 'bound_at', 'observed_at', 'predecessor_binding_ref', 'successor_binding_ref', 'continuity_handoff_sha256', 'last_checkpoint_ref', 'replaced_at', 'revoked_at', 'activity', 'predecessor_archive_eligible'])
+const BINDING_REQUIRED_KEYS = ['binding_ref', 'public_alias', 'project_id', 'role', 'provider_class', 'locator_ref', 'binding_version', 'status', 'phase_id', 'scope_id', 'stage_id', 'bound_at', 'observed_at', 'predecessor_binding_ref', 'successor_binding_ref', 'continuity_handoff_sha256', 'last_checkpoint_ref']
 const EVENT_KEYS = new Set(['event_ref', 'sequence', 'project_id', 'role', 'action', 'before_version', 'after_version', 'actor_class', 'reason_class', 'occurred_at', 'stage_id', 'handoff_sha256', 'evidence_receipt_ref', 'observation_status'])
 const EVENT_REQUIRED_KEYS = ['event_ref', 'sequence', 'project_id', 'role', 'action', 'before_version', 'after_version', 'actor_class', 'reason_class', 'occurred_at', 'stage_id']
 const LOCK_KEYS = new Set(['schema_version', 'owner_pid', 'owner_uid', 'process_start_identity', 'created_at', 'owner_nonce'])
@@ -34,6 +34,12 @@ const safePublicId = (value) => publicStableId(value) ? value : null
 const safePublicReason = (value) => typeof value === 'string' && SAFE_REASON.test(value) && !UUID.test(value) && !PUBLIC_IDENTIFIER.test(value) ? value : 'invalid_reason'
 const sanitizedPublicText = (value) => value == null ? null : safePublicText(value) ? value : null
 const safePublicTime = (value) => isoTime(value) ? value : null
+const PRIVATE_ALIAS_SEGMENTS = new Set(['codex', 'openai', 'chatgpt', 'provider', 'anthropic', 'claude', 'google', 'gemini', 'session', 'sess', 'thread', 'task', 'turn', 'conversation', 'chat', 'run', 'message', 'msg', 'assistant', 'asst'])
+export const isPublicSessionAlias = (value) => {
+  if (typeof value !== 'string' || value.length > 64) return false
+  const segments = value.split('-')
+  return segments.length >= 2 && segments.length <= 5 && segments.every((segment) => /^[a-z][a-z0-9]{0,23}$/.test(segment) && !PRIVATE_ALIAS_SEGMENTS.has(segment))
+}
 const exactPrivateMode = (metadata) => process.platform !== 'win32' && (metadata.mode & 0o777) === 0o600
 const sameFile = (left, right) => left.dev === right.dev && left.ino === right.ino
 
@@ -109,7 +115,7 @@ function validateRegistry(value) {
   if (new Set(value.project_ids).size !== value.project_ids.length || value.project_ids.some((id) => !publicStableId(id))) fail('registry_conflict')
   const active = new Set(); const versions = new Map(); const bindingRefs = new Set(); const eventRefs = new Set(); let expectedSequence = 1; const eventVersions = new Map()
   for (const binding of value.bindings) {
-    if (!binding || typeof binding !== 'object' || Array.isArray(binding) || !hasExactKeys(binding, BINDING_KEYS, BINDING_REQUIRED_KEYS) || !value.project_ids.includes(binding.project_id) || !SESSION_ROLES.includes(binding.role) || !ALL_STATUSES.has(binding.status) || !Number.isInteger(binding.binding_version) || binding.binding_version < 1 || typeof binding.binding_ref !== 'string' || !UUID.test(binding.binding_ref) || bindingRefs.has(binding.binding_ref) || typeof binding.locator_ref !== 'string' || !binding.locator_ref || typeof binding.provider_class !== 'string' || !/^[a-z][a-z0-9_-]{0,31}$/.test(binding.provider_class) || UUID.test(binding.provider_class) || PUBLIC_IDENTIFIER.test(binding.provider_class) || !isoTime(binding.bound_at) || !nullableIsoTime(binding.observed_at) || !nullableStableId(binding.phase_id) || !nullableStableId(binding.scope_id) || !nullableStableId(binding.stage_id) || !nullablePrivateRef(binding.predecessor_binding_ref) || !nullablePrivateRef(binding.successor_binding_ref) || !(binding.continuity_handoff_sha256 === null || SHA256.test(binding.continuity_handoff_sha256)) || !(binding.last_checkpoint_ref === null || typeof binding.last_checkpoint_ref === 'string' && binding.last_checkpoint_ref.length > 0) || !(binding.replaced_at === undefined || isoTime(binding.replaced_at)) || !(binding.revoked_at === undefined || isoTime(binding.revoked_at)) || !(binding.activity === undefined || binding.activity === null || safePublicText(binding.activity)) || !(binding.predecessor_archive_eligible === undefined || typeof binding.predecessor_archive_eligible === 'boolean')) fail('registry_conflict')
+    if (!binding || typeof binding !== 'object' || Array.isArray(binding) || !hasExactKeys(binding, BINDING_KEYS, BINDING_REQUIRED_KEYS) || !value.project_ids.includes(binding.project_id) || !SESSION_ROLES.includes(binding.role) || !ALL_STATUSES.has(binding.status) || !Number.isInteger(binding.binding_version) || binding.binding_version < 1 || typeof binding.binding_ref !== 'string' || !UUID.test(binding.binding_ref) || bindingRefs.has(binding.binding_ref) || !(binding.public_alias === null || isPublicSessionAlias(binding.public_alias)) || typeof binding.locator_ref !== 'string' || !binding.locator_ref || typeof binding.provider_class !== 'string' || !/^[a-z][a-z0-9_-]{0,31}$/.test(binding.provider_class) || UUID.test(binding.provider_class) || PUBLIC_IDENTIFIER.test(binding.provider_class) || !isoTime(binding.bound_at) || !nullableIsoTime(binding.observed_at) || !nullableStableId(binding.phase_id) || !nullableStableId(binding.scope_id) || !nullableStableId(binding.stage_id) || !nullablePrivateRef(binding.predecessor_binding_ref) || !nullablePrivateRef(binding.successor_binding_ref) || !(binding.continuity_handoff_sha256 === null || SHA256.test(binding.continuity_handoff_sha256)) || !(binding.last_checkpoint_ref === null || typeof binding.last_checkpoint_ref === 'string' && binding.last_checkpoint_ref.length > 0) || !(binding.replaced_at === undefined || isoTime(binding.replaced_at)) || !(binding.revoked_at === undefined || isoTime(binding.revoked_at)) || !(binding.activity === undefined || binding.activity === null || safePublicText(binding.activity)) || !(binding.predecessor_archive_eligible === undefined || typeof binding.predecessor_archive_eligible === 'boolean')) fail('registry_conflict')
     bindingRefs.add(binding.binding_ref)
     const key = `${binding.project_id}:${binding.role}`; const prior = versions.get(key) ?? 0
     if (binding.binding_version !== prior + 1) fail('registry_conflict')
@@ -145,6 +151,19 @@ function atomicWrite(path, value) {
   renameSync(temp, path)
   const directory = openSync(dirname(path), 'r')
   try { fsyncSync(directory) } finally { closeSync(directory) }
+}
+
+function atomicCreate(path, value) {
+  if (process.platform === 'win32' || !Number.isInteger(constants.O_NOFOLLOW)) fail('registry_unavailable')
+  mkdirSync(dirname(path), { recursive: true, mode: 0o700 })
+  const temp = `${path}.tmp-${process.pid}-${randomUUID()}`
+  const descriptor = openSync(temp, 'wx', 0o600)
+  try {
+    fchmodSync(descriptor, 0o600); writeFileSync(descriptor, `${JSON.stringify(value, null, 2)}\n`, 'utf8'); fsyncSync(descriptor)
+  } finally { closeSync(descriptor) }
+  try { linkSync(temp, path) } catch (error) { rmSync(temp, { force: true }); if (error && typeof error === 'object' && error.code === 'EEXIST') fail('registry_exists'); fail('registry_unavailable') }
+  rmSync(temp, { force: true })
+  const directory = openSync(dirname(path), 'r'); try { fsyncSync(directory) } finally { closeSync(directory) }
 }
 
 const processIdentity = (pid) => {
@@ -194,9 +213,8 @@ function withLock(path, operation) {
 
 export function createEmptyRegistry(path, projectIds) {
   if (!Array.isArray(projectIds) || !projectIds.length || new Set(projectIds).size !== projectIds.length || projectIds.some((id) => !publicStableId(id))) fail('invalid_project_registry')
-  if (directoryEntryExists(path)) fail('registry_exists')
   const registry = { schema_version: 2, revision: 0, next_event_sequence: 1, project_ids: [...projectIds], bindings: [], events: [] }
-  atomicWrite(path, registry)
+  atomicCreate(path, registry)
   return clone(registry)
 }
 
@@ -221,6 +239,8 @@ function validateInput(registry, input) {
   if (typeof input.occurredAt !== 'string' || !Number.isFinite(Date.parse(input.occurredAt))) fail('occurred_at_required')
   for (const value of [input.phaseId, input.scopeId, input.stageId]) if (value != null && !publicStableId(value)) fail('invalid_stage_placement')
   if (input.providerClass != null && (typeof input.providerClass !== 'string' || !/^[a-z][a-z0-9_-]{0,31}$/.test(input.providerClass) || UUID.test(input.providerClass) || PUBLIC_IDENTIFIER.test(input.providerClass))) fail('unsupported_provider')
+  if (['assign', 'replace'].includes(input.action) && !isPublicSessionAlias(input.publicAlias)) fail('public_alias_required')
+  if (input.action === 'replace' && input.role === 'planner' && !(input.routingFreeze === true && input.handoffVerified === true && input.started === true && input.continuityReady === true && SHA256.test(input.handoffSha256 ?? ''))) fail('planner_rotation_unsafe')
 }
 
 function appendEvent(registry, input, beforeVersion, afterVersion, extras = {}) {
@@ -244,13 +264,14 @@ export function mutateRegistry(path, input) {
       if (current) fail('duplicate_active_binding')
       if (typeof input.locator !== 'string' || !input.locator) fail('locator_private_input_required')
       const version = currentVersion + 1
-      result = { binding_ref: randomUUID(), project_id: input.projectId, role: input.role, provider_class: input.providerClass ?? 'codex', locator_ref: input.locator, binding_version: version, status: 'active', phase_id: input.phaseId ?? null, scope_id: input.scopeId ?? null, stage_id: input.stageId ?? null, bound_at: input.occurredAt, observed_at: null, predecessor_binding_ref: history.at(-1)?.binding_ref ?? null, successor_binding_ref: null, continuity_handoff_sha256: null, last_checkpoint_ref: null }
+      result = { binding_ref: randomUUID(), public_alias: input.publicAlias, project_id: input.projectId, role: input.role, provider_class: input.providerClass ?? 'codex', locator_ref: input.locator, binding_version: version, status: 'active', phase_id: input.phaseId ?? null, scope_id: input.scopeId ?? null, stage_id: input.stageId ?? null, bound_at: input.occurredAt, observed_at: null, predecessor_binding_ref: history.at(-1)?.binding_ref ?? null, successor_binding_ref: null, continuity_handoff_sha256: null, last_checkpoint_ref: null }
       registry.bindings.push(result); appendEvent(registry, input, currentVersion, version)
     } else if (input.action === 'replace') {
       if (!current) fail('binding_not_active')
       if (typeof input.locator !== 'string' || !input.locator) fail('locator_private_input_required')
+      if (input.publicAlias === current.public_alias) fail('public_alias_conflict')
       const version = currentVersion + 1
-      result = { ...current, binding_ref: randomUUID(), locator_ref: input.locator, binding_version: version, status: 'active', phase_id: input.phaseId ?? current.phase_id, scope_id: input.scopeId ?? current.scope_id, stage_id: input.stageId ?? current.stage_id, bound_at: input.occurredAt, observed_at: null, predecessor_binding_ref: current.binding_ref, successor_binding_ref: null, continuity_handoff_sha256: input.handoffSha256 ?? null, last_checkpoint_ref: null, predecessor_archive_eligible: input.role === 'planner' }
+      result = { binding_ref: randomUUID(), public_alias: input.publicAlias, project_id: current.project_id, role: current.role, provider_class: input.providerClass ?? current.provider_class, locator_ref: input.locator, binding_version: version, status: 'active', phase_id: input.phaseId ?? current.phase_id, scope_id: input.scopeId ?? current.scope_id, stage_id: input.stageId ?? current.stage_id, bound_at: input.occurredAt, observed_at: null, predecessor_binding_ref: current.binding_ref, successor_binding_ref: null, continuity_handoff_sha256: input.handoffSha256 ?? null, last_checkpoint_ref: null, predecessor_archive_eligible: false }
       current.status = 'replaced'; current.replaced_at = input.occurredAt; current.successor_binding_ref = result.binding_ref
       registry.bindings.push(result); appendEvent(registry, input, currentVersion, version, { handoff_sha256: input.handoffSha256 ?? null })
     } else if (input.action === 'revoke') {
@@ -280,7 +301,7 @@ export function publicRegistryProjection(registry, projectId) {
     const bindings = historyFor(registry, projectId, role); const current = bindings.find((binding) => CURRENT_STATUSES.has(binding.status)) ?? null
     const events = registry.events.filter((event) => event.project_id === projectId && event.role === role)
     return {
-      project_id: safePublicId(projectId), role, status: current?.status ?? 'unbound', binding_version: current?.binding_version ?? bindings.at(-1)?.binding_version ?? 0,
+      project_id: safePublicId(projectId), role, public_alias: current?.public_alias && isPublicSessionAlias(current.public_alias) ? current.public_alias : null, status: current?.status ?? 'unbound', binding_version: current?.binding_version ?? bindings.at(-1)?.binding_version ?? 0,
       history_count: bindings.length, bound_at: safePublicTime(current?.bound_at), observed_at: safePublicTime(current?.observed_at), activity: sanitizedPublicText(current?.activity),
       phase_id: safePublicId(current?.phase_id), scope_id: safePublicId(current?.scope_id), stage_id: safePublicId(current?.stage_id),
       rotating: current?.status === 'rotating', has_predecessor: Boolean(current?.predecessor_binding_ref),
@@ -333,7 +354,7 @@ export function migrateLegacyRegistry({ legacyPath, registryPath, projectIds, oc
   for (const row of legacy.bindings) {
     if (!row || !projectIds.includes(row.project_id) || !SESSION_ROLES.includes(row.role)) fail('legacy_schema_invalid')
     const key = `${row.project_id}:${row.role}`; if (seen.has(key)) fail('registry_conflict'); seen.add(key)
-    const binding = { binding_ref: randomUUID(), project_id: row.project_id, role: row.role, provider_class: typeof row.provider_class === 'string' ? row.provider_class : 'codex', locator_ref: typeof row.locator_ref === 'string' ? row.locator_ref : 'legacy-unresolved', binding_version: 1, status: 'stale', phase_id: row.phase_id ?? null, scope_id: row.scope_id ?? null, stage_id: row.stage_id ?? null, bound_at: typeof row.bound_at === 'string' ? row.bound_at : occurredAt, observed_at: null, predecessor_binding_ref: null, successor_binding_ref: null, continuity_handoff_sha256: null, last_checkpoint_ref: null }
+    const binding = { binding_ref: randomUUID(), public_alias: null, project_id: row.project_id, role: row.role, provider_class: typeof row.provider_class === 'string' ? row.provider_class : 'codex', locator_ref: typeof row.locator_ref === 'string' ? row.locator_ref : 'legacy-unresolved', binding_version: 1, status: 'stale', phase_id: row.phase_id ?? null, scope_id: row.scope_id ?? null, stage_id: row.stage_id ?? null, bound_at: typeof row.bound_at === 'string' ? row.bound_at : occurredAt, observed_at: null, predecessor_binding_ref: null, successor_binding_ref: null, continuity_handoff_sha256: null, last_checkpoint_ref: null }
     registry.bindings.push(binding)
     const migrationInput = { projectId: row.project_id, role: row.role, action: 'assign', actorClass: 'migration', reasonClass: 'legacy_stale_migration', occurredAt, stageId: binding.stage_id }
     appendEvent(registry, migrationInput, 0, 1)

@@ -1,13 +1,53 @@
 import assert from 'node:assert/strict'
 import test from 'node:test'
-import { execFileSync } from 'node:child_process'
+import { execFileSync, spawn } from 'node:child_process'
 import { chmodSync, existsSync, lstatSync, mkdirSync, mkdtempSync, readFileSync, statSync, symlinkSync, writeFileSync } from 'node:fs'
 import { join } from 'node:path'
 import { tmpdir } from 'node:os'
 import { createEmptyRegistry, doctorRegistry, loadRegistry, migrateLegacyRegistry, mutateRegistry, publicRegistryProjection, recoverRegistryLock } from './outcome-session-registry-persistence.mjs'
 
 const tempPath = () => join(mkdtempSync(join(tmpdir(), 'outcome-session-v2-')), 'registry.json')
-const meta = { actorClass: 'builder', reasonClass: 'approved_local_test', occurredAt: '2026-08-27T00:00:00.000Z' }
+const meta = { actorClass: 'builder', reasonClass: 'approved_local_test', occurredAt: '2026-08-27T00:00:00.000Z', publicAlias: 'builder-primary' }
+
+test('synchronized initial creators publish exactly one complete private registry', async () => {
+  const path = tempPath(); const moduleUrl = new URL('./outcome-session-registry-persistence.mjs', import.meta.url).href
+  const attempts = Array.from({ length: 12 }, (_, index) => {
+    const child = spawn(process.execPath, ['--input-type=module', '--eval', `import { createEmptyRegistry } from ${JSON.stringify(moduleUrl)}; process.stdout.write('ready\\n'); process.stdin.once('data', () => { try { createEmptyRegistry(${JSON.stringify(path)}, [${JSON.stringify(`project-${index}`)}]); process.stdout.write('success') } catch (error) { process.stdout.write(error.message) } })`])
+    let output = ''; let markReady
+    const ready = new Promise((resolve) => { markReady = resolve })
+    child.stdout.on('data', (chunk) => { output += chunk; if (output.includes('ready\n')) markReady() })
+    const done = new Promise((resolve) => child.on('close', () => resolve({ index, output: output.replace('ready\n', '') })))
+    return { child, ready, done }
+  })
+  await Promise.all(attempts.map(({ ready }) => ready)); for (const { child } of attempts) child.stdin.end('create')
+  const results = await Promise.all(attempts.map(({ done }) => done)); const winners = results.filter(({ output }) => output === 'success')
+  assert.equal(winners.length, 1)
+  assert.equal(results.filter(({ output }) => output === 'registry_exists').length, 11)
+  assert.deepEqual(loadRegistry(path).project_ids, [`project-${winners[0].index}`])
+  assert.equal(statSync(path).mode & 0o777, 0o600)
+})
+
+test('direct Planner replace cannot bypass continuity guards and archive eligibility requires the control read-back', () => {
+  const path = tempPath(); createEmptyRegistry(path, ['outcome'])
+  mutateRegistry(path, { action: 'assign', projectId: 'outcome', role: 'planner', expectedVersion: 0, locator: 'one', ...meta, publicAlias: 'planner-primary' })
+  const base = { action: 'replace', projectId: 'outcome', role: 'planner', expectedVersion: 1, locator: 'two', handoffSha256: 'a'.repeat(64), routingFreeze: true, handoffVerified: true, started: true, continuityReady: true, ...meta, publicAlias: 'planner-successor' }
+  for (const [prerequisite, value] of [['routingFreeze', false], ['handoffVerified', false], ['started', false], ['continuityReady', false], ['handoffSha256', 'invalid']]) {
+    const before = readFileSync(path); assert.throws(() => mutateRegistry(path, { ...base, [prerequisite]: value }), /planner_rotation_unsafe/); assert.deepEqual(readFileSync(path), before)
+  }
+  const successor = mutateRegistry(path, base)
+  assert.equal(successor.predecessor_archive_eligible, false)
+})
+
+test('replacement successor starts unobserved without predecessor volatile activity', () => {
+  const path = tempPath(); createEmptyRegistry(path, ['outcome'])
+  mutateRegistry(path, { action: 'assign', projectId: 'outcome', role: 'builder', expectedVersion: 0, locator: 'one', publicAlias: 'builder-primary', ...meta })
+  mutateRegistry(path, { action: 'observe', projectId: 'outcome', role: 'builder', expectedVersion: 1, status: 'active', observedAt: '2026-08-27T00:01:00.000Z', activity: 'predecessor NOW', ...meta })
+  mutateRegistry(path, { action: 'replace', projectId: 'outcome', role: 'builder', expectedVersion: 1, locator: 'two', ...meta, publicAlias: 'builder-successor' })
+  const successor = loadRegistry(path).bindings[1]
+  assert.equal(successor.observed_at, null)
+  assert.equal(Object.hasOwn(successor, 'activity'), false)
+  assert.equal(publicRegistryProjection(loadRegistry(path), 'outcome').find(({ role }) => role === 'builder').activity, null)
+})
 
 test('atomic registry persists assign, observation and checkpoint across restart with append-only events', () => {
   const path = tempPath(); createEmptyRegistry(path, ['outcome'])
@@ -27,9 +67,9 @@ test('one-active, stale CAS and concurrent replace loser fail with zero partial 
   const beforeDuplicate = readFileSync(path)
   assert.throws(() => mutateRegistry(path, { action: 'assign', projectId: 'outcome', role: 'builder', expectedVersion: 1, locator: 'two', ...meta }), /duplicate_active_binding/)
   assert.deepEqual(readFileSync(path), beforeDuplicate)
-  mutateRegistry(path, { action: 'replace', projectId: 'outcome', role: 'builder', expectedVersion: 1, locator: 'two', ...meta })
+  mutateRegistry(path, { action: 'replace', projectId: 'outcome', role: 'builder', expectedVersion: 1, locator: 'two', ...meta, publicAlias: 'builder-successor' })
   const afterWinner = readFileSync(path)
-  assert.throws(() => mutateRegistry(path, { action: 'replace', projectId: 'outcome', role: 'builder', expectedVersion: 1, locator: 'three', ...meta }), /stale_version/)
+  assert.throws(() => mutateRegistry(path, { action: 'replace', projectId: 'outcome', role: 'builder', expectedVersion: 1, locator: 'three', ...meta, publicAlias: 'builder-loser' }), /stale_version/)
   assert.deepEqual(readFileSync(path), afterWinner)
 })
 
@@ -159,7 +199,7 @@ test('dangling and non-regular lock entries are invalid, stay protected, and blo
 test('replacement followed by checkpoint remains a causally valid restart history', () => {
   const path = tempPath(); createEmptyRegistry(path, ['outcome'])
   mutateRegistry(path, { action: 'assign', projectId: 'outcome', role: 'builder', expectedVersion: 0, locator: 'one', stageId: 'stage-one', ...meta })
-  mutateRegistry(path, { action: 'replace', projectId: 'outcome', role: 'builder', expectedVersion: 1, locator: 'two', stageId: 'stage-two', handoffSha256: 'a'.repeat(64), ...meta })
+  mutateRegistry(path, { action: 'replace', projectId: 'outcome', role: 'builder', expectedVersion: 1, locator: 'two', stageId: 'stage-two', handoffSha256: 'a'.repeat(64), ...meta, publicAlias: 'builder-successor' })
   mutateRegistry(path, { action: 'checkpoint', projectId: 'outcome', role: 'builder', expectedVersion: 2, handoffSha256: 'b'.repeat(64), checkpointRef: 'checkpoint-two', ...meta })
   const restarted = loadRegistry(path)
   assert.equal(restarted.bindings[1].stage_id, 'stage-two')

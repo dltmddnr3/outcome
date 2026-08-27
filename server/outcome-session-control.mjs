@@ -9,10 +9,13 @@ export function runSessionControl(input) {
   if (input.action === 'recover-lock') return { ...recoverRegistryLock(input.registryPath, { recoveryRef: input.recoveryRef }), action: 'recover-lock' }
   if (Object.hasOwn(input, 'locator')) throw new Error('locator_private_input_required')
   if (['assign', 'replace'].includes(input.action) && (typeof input.privateInput?.locator !== 'string' || !input.privateInput.locator)) throw new Error('locator_private_input_required')
+  if (['assign', 'replace'].includes(input.action) && typeof input.publicAlias !== 'string') throw new Error('public_alias_required')
   if (input.action === 'replace' && input.role === 'planner' && !(input.routingFreeze && input.handoffVerified && input.started && input.continuityReady && /^[a-f0-9]{64}$/.test(input.handoffSha256 ?? ''))) throw new Error('planner_rotation_unsafe')
   const binding = mutateRegistry(input.registryPath, { ...input, locator: input.privateInput?.locator, occurredAt: input.occurredAt ?? defaultTime() })
   const row = publicRegistryProjection(loadRegistry(input.registryPath), input.projectId).find(({ role }) => role === input.role)
-  return { ok: true, action: input.action, binding: { ...row, predecessor_archive_eligible: Boolean(binding.predecessor_archive_eligible) } }
+  if (!row || row.binding_version !== binding.binding_version) throw new Error('registry_readback_conflict')
+  const predecessorArchiveEligible = input.action === 'replace' && input.role === 'planner' && row.status !== 'unbound' && row.public_alias === input.publicAlias
+  return { ok: true, action: input.action, binding: { ...row, predecessor_archive_eligible: predecessorArchiveEligible } }
 }
 
 function parseArgs(argv) {

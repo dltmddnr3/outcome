@@ -51,6 +51,7 @@ Private registry는 source control 밖의 권한 제한 파일 또는 향후 acc
 ### Binding
 
 - `binding_ref`: OUTCOME이 발급한 non-secret opaque identity
+- `public_alias`: manifest의 `active_binding_ref`와 비교하는 semantic non-secret alias. explicit assign/replace input이며 private locator에서 파생하지 않는다. legacy migration만 `null`을 유지한다.
 - `project_id`, `role`, `provider_class`
 - `binding_version`: project+role 안에서 1부터 증가
 - `status`: `active | idle | stale | rotating | blocked | replaced | revoked`
@@ -104,6 +105,8 @@ Planner는 다른 역할과 달리 project routing의 root owner다. Planner rep
 5. 새 version으로 routing owner가 바뀐 것을 read-after-write 검증한다.
 6. 그 뒤에만 predecessor를 recoverable archive로 이동한다.
 
+Planner replace의 routing freeze, verified handoff, `STARTED`, `CONTINUITY_READY`, valid handoff digest 검증은 CLI facade뿐 아니라 exported persistence mutation boundary에서도 동일하게 강제한다. persistence 결과만으로 archive 가능하다고 판단하지 않으며 control의 exact version/public alias read-after-write가 성공한 뒤에만 archive eligibility를 반환한다. successor record는 explicit allowlist로 새로 만들고 predecessor의 `activity`, `observed_at` 및 다른 volatile NOW field를 승계하지 않는다.
+
 어느 단계든 timeout, `delivery_unknown`, hash drift 또는 successor `SAFE_HOLD`면 `rotation_failed`다. 기존 Planner는 active/recoverable 상태를 유지하고 queued work는 새 binding에 자동 승계하지 않는다. 이 규칙으로 루트 역할이 둘이 되거나 아무도 없는 상태를 방지한다.
 
 ## Persistence와 migration
@@ -113,6 +116,7 @@ Planner는 다른 역할과 달리 project routing의 root owner다. Planner rep
 - migration 전 원본 byte SHA-256과 file mode를 receipt에 기록
 - active라고 쓰였더라도 최신 observation 근거가 없으면 `stale`, 자동 활성화하지 않음
 - v2 registry를 temp file에 완전히 쓰고 fsync/rename으로 원자 교체
+- 최초 registry 생성은 완전한 exact-`0600` temp inode를 exclusive hard-link publication으로 공개한다. 동시에 시작한 creator 중 하나만 성공하며 기존 path를 rename으로 덮어쓰지 않는다.
 - migration event와 각 role의 version/history를 생성
 - validation 실패 시 원본을 보존하고 `registry_unavailable` 또는 `registry_conflict`
 - migration 과정에서 Git, Package 문서, raw locator 또는 progress를 변경하지 않음
@@ -144,6 +148,8 @@ Public alias는 2-5개의 lower-case semantic segment와 최대 64자로 제한�
 
 - Package manifest는 role slot을 선언한다.
 - private registry는 current binding과 history의 runtime authority다.
+- bound role은 manifest `active_binding_ref`와 private current binding의 `public_alias`, `binding_version`, state가 모두 일치해야 한다. runtime-only active, manifest-only bound, ref/version/state mismatch는 `sessions_registry_conflict:<role>`로 fail closed하고 role row를 `registry_conflict`로 projection한다. revoke 뒤 current가 없으면 manifest는 다시 `unbound`여야 한다.
+- assign/replace operator flow는 private mutation과 별도의 reviewed Git manifest 변경을 같은 alias/version/state로 준비하고, 둘이 일치하기 전에는 Package conflict를 정상적인 routing freeze 상태로 취급한다. control plane은 Git 파일을 자동 수정하지 않는다.
 - provider observation은 availability와 NOW만 갱신한다.
 - `GATES*.md`와 immutable evidence만 progress/transition을 판정한다.
 
