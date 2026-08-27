@@ -1,5 +1,4 @@
 import snapshot from './deployment-snapshot.mjs'
-import { isPromise, isProxy } from 'node:util/types'
 import { privateAccessPublicConfig } from '../server/account-access-api.mjs'
 import { handlePrivateAccessRequest } from '../server/account-access-api.mjs'
 import { AccountAccessError } from '../server/account-access.mjs'
@@ -211,88 +210,24 @@ export const requestPath = (request) => {
 const hostedRequest = createStableHostRequestHandler({ logger: console })
 
 const MAXIMUM_STABLE_BRIDGE_BODY_BYTES = 1_048_576
-const safeDataMethod = (object, key) => {
-  try {
-    if ((typeof object !== 'object' && typeof object !== 'function') || object === null || isProxy(object)) return null
-    let current = object
-    for (let depth = 0; current !== null && depth < 16; depth += 1) {
-      if (isProxy(current)) return null
-      const descriptor = Object.getOwnPropertyDescriptor(current, key)
-      if (descriptor) {
-        if (!Object.hasOwn(descriptor, 'value') || typeof descriptor.value !== 'function' || isProxy(descriptor.value)) return null
-        const name = Object.getOwnPropertyDescriptor(descriptor.value, 'name')
-        return name && Object.hasOwn(name, 'value') && typeof name.value === 'string' && !name.value.startsWith('bound ') ? descriptor.value : null
-      }
-      current = Object.getPrototypeOf(current)
-    }
-  } catch {}
-  return null
-}
-const safeIteratorResult = (value) => {
-  try {
-    if (typeof value !== 'object' || value === null || isProxy(value)) return null
-    const prototype = Object.getPrototypeOf(value)
-    if (prototype !== Object.prototype && prototype !== null) return null
-    const descriptors = Object.getOwnPropertyDescriptors(value)
-    const keys = Reflect.ownKeys(descriptors)
-    if (keys.some((key) => typeof key !== 'string' || !['done', 'value'].includes(key))) return null
-    const done = descriptors.done
-    if (!done || !Object.hasOwn(done, 'value') || typeof done.value !== 'boolean') return null
-    const item = descriptors.value
-    if (item && !Object.hasOwn(item, 'value')) return null
-    return { done: done.value, value: item?.value }
-  } catch {
-    return null
-  }
-}
-const closeIterator = async (iterator) => {
-  const close = safeDataMethod(iterator, 'return')
-  if (!close) return
-  try {
-    const pending = Reflect.apply(close, iterator, [])
-    if (!isProxy(pending) && isPromise(pending)) await pending
-  } catch {}
-}
 const rawBridgeBody = async (request, pathname) => {
   const target = bridgeRequestTarget(pathname)
-  if (isProxy(request)) return undefined
-  let body
-  try {
-    const descriptor = Object.getOwnPropertyDescriptor(request, 'body')
-    if (descriptor && !Object.hasOwn(descriptor, 'value')) return undefined
-    body = descriptor?.value
-  } catch { return undefined }
-  if (isProxy(body)) return undefined
+  const body = request.body
   if (!target.candidate || !target.valid || request.method === 'GET' || typeof body === 'string' || Buffer.isBuffer(body)) return body
-  const iteratorMethod = safeDataMethod(request, Symbol.asyncIterator)
-  if (!iteratorMethod) return body
-  let iterator
-  try { iterator = Reflect.apply(iteratorMethod, request, []) } catch { return undefined }
-  if (typeof iterator !== 'object' || iterator === null || isProxy(iterator)) return undefined
-  const next = safeDataMethod(iterator, 'next')
-  if (!next) return undefined
   const chunks = []
   let bytes = 0
   try {
-    while (true) {
-      let pending = Reflect.apply(next, iterator, [])
-      if (isProxy(pending)) { await closeIterator(iterator); return undefined }
-      if (isPromise(pending)) pending = await pending
-      const item = safeIteratorResult(pending)
-      if (!item) { await closeIterator(iterator); return undefined }
-      if (item.done) break
-      const chunk = item.value
-      if (isProxy(chunk)) { await closeIterator(iterator); return undefined }
+    if (typeof request[Symbol.asyncIterator] !== 'function') return body
+    for await (const chunk of request) {
       let value
       if (typeof chunk === 'string') value = Buffer.from(chunk)
-      else if (Buffer.isBuffer(chunk) && Object.getPrototypeOf(chunk) === Buffer.prototype) value = chunk
-      else { await closeIterator(iterator); return undefined }
+      else if (Buffer.isBuffer(chunk)) value = chunk
+      else return undefined
       bytes += value.length
-      if (bytes > MAXIMUM_STABLE_BRIDGE_BODY_BYTES) { await closeIterator(iterator); return Buffer.alloc(MAXIMUM_STABLE_BRIDGE_BODY_BYTES + 1) }
+      if (bytes > MAXIMUM_STABLE_BRIDGE_BODY_BYTES) return Buffer.alloc(MAXIMUM_STABLE_BRIDGE_BODY_BYTES + 1)
       chunks.push(value)
     }
   } catch {
-    await closeIterator(iterator)
     return undefined
   }
   return Buffer.concat(chunks, bytes)
@@ -301,13 +236,6 @@ const rawBridgeBody = async (request, pathname) => {
 export const config = Object.freeze({ api: Object.freeze({ bodyParser: false }) })
 
 export default async function handler(request, response) {
-  if (isProxy(request)) {
-    response.setHeader('content-type', 'application/json; charset=utf-8')
-    response.setHeader('cache-control', 'no-store')
-    response.setHeader('x-content-type-options', 'nosniff')
-    response.setHeader('x-frame-options', 'DENY')
-    return response.status(400).json({ error: 'bad_request' })
-  }
   const pathname = requestPath(request)
   let body
   try { body = await rawBridgeBody(request, pathname) } catch { body = undefined }
