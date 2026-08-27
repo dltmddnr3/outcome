@@ -2,7 +2,7 @@ import { isProxy } from 'node:util/types'
 import { createHash, randomBytes } from 'node:crypto'
 
 const ROLES = new Set(['planner', 'builder', 'ux_product_qa', 'release_audit'])
-const STATUS_CODES = new Set(['기획 진행 중', '구현 진행 중', '테스트 실행 중', '사용성·제품 검수 중', '출시 감사 중', '결정 대기 중'])
+const STATUS_CODES = new Set(['작업 준비 중', '구현 진행 중', '테스트 실행 중', '검수 진행 중', '결과 정리 중', '응답 대기 중'])
 const SAFE_ID = /^[a-z][a-z0-9_-]{0,63}$/
 const PRIVATE_REF = /^[a-z][A-Za-z0-9_-]{7,95}$/
 const DIGEST = /^[0-9a-f]{64}$/
@@ -11,9 +11,9 @@ const EVENT_FIELDS = new Set(['workspace_id', 'project_id', 'role', 'binding_ver
 const ACTIVATE_FIELDS = new Set(['workspace_id', 'project_id', 'role', 'binding_version', 'source_ref', 'source_version', 'key_version', 'challenge_digest', 'expected_challenge_revision', 'certificate_digest', 'public_key_spki', 'public_key_digest', 'activated_at'])
 const ROTATE_FIELDS = new Set(['workspace_id', 'project_id', 'role', 'binding_version', 'source_ref', 'source_version', 'expected_source_revision', 'expected_key_version', 'new_key_version', 'public_key_spki', 'public_key_digest', 'rotated_at'])
 const REVOKE_FIELDS = new Set(['workspace_id', 'project_id', 'role', 'binding_version', 'source_ref', 'source_version', 'expected_source_revision', 'revoked_at'])
-const TOMBSTONE_FIELDS = new Set(['workspace_id', 'project_id', 'role', 'binding_version', 'deletion_revision', 'deletion_receipt_digest', 'purge_before', 'tombstoned_at', 'expected_durable_revision'])
-const MANIFEST_FIELDS = new Set(['manifest_ref', 'workspace_id', 'manifest_schema_version', 'bridge_schema_version', 'durable_revision', 'tombstone_count', 'tombstone_coverage_digest', 'stored_at'])
-const RESTORE_FIELDS = new Set(['restore_receipt_ref', 'manifest_ref', 'manifest_digest', 'workspace_id', 'project_id', 'role', 'binding_version', 'expected_schema_version', 'expected_durable_revision', 'restored_at'])
+const TOMBSTONE_FIELDS = new Set(['workspace_id', 'project_id', 'role', 'binding_version', 'source_ref', 'source_version', 'deletion_revision', 'deletion_receipt_digest', 'purge_before', 'tombstoned_at', 'expected_durable_revision'])
+const MANIFEST_FIELDS = new Set(['manifest_ref', 'workspace_id', 'project_id', 'role', 'binding_version', 'source_ref', 'source_version', 'deletion_revision', 'manifest_schema_version', 'bridge_schema_version', 'durable_revision', 'tombstone_count', 'tombstone_coverage_digest', 'stored_at'])
+const RESTORE_FIELDS = new Set(['restore_receipt_ref', 'manifest_ref', 'manifest_digest', 'workspace_id', 'project_id', 'role', 'binding_version', 'source_ref', 'source_version', 'deletion_revision', 'expected_schema_version', 'expected_durable_revision', 'restored_at'])
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-7[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/
 export const OBSERVER_BRIDGE_POSTGRES_FUTURE_SKEW_MS = 5_000
 export const OBSERVER_BRIDGE_EFFECTIVE_ROLE = 'outcome_bridge_backend'
@@ -49,13 +49,13 @@ export function createOpaqueLedgerId(now = Date.now()) {
 export function computeTombstoneCoverageDigest(rows) {
   if (!Array.isArray(rows)) fail('restore_denied')
   const canonical = rows.map((row) => {
-    if (!safeId(row.workspace_id) || !safeId(row.project_id) || !ROLES.has(row.role) || !positive(Number(row.binding_version)) || !positive(Number(row.deletion_revision)) || !digest(row.deletion_receipt_digest)) fail('restore_denied')
-    return `${row.workspace_id}\u001f${row.project_id}\u001f${row.role}\u001f${Number(row.binding_version)}\u001f${Number(row.deletion_revision)}\u001f${row.deletion_receipt_digest}`
+    if (!safeId(row.workspace_id) || !safeId(row.project_id) || !ROLES.has(row.role) || !positive(Number(row.binding_version)) || !privateRef(row.source_ref) || !positive(Number(row.source_version)) || !positive(Number(row.deletion_revision)) || !digest(row.deletion_receipt_digest)) fail('restore_denied')
+    return `${row.workspace_id}\u001f${row.project_id}\u001f${row.role}\u001f${Number(row.binding_version)}\u001f${row.source_ref}\u001f${Number(row.source_version)}\u001f${Number(row.deletion_revision)}\u001f${row.deletion_receipt_digest}`
   }).sort()
   return sha256(canonical.join('\n'))
 }
 
-const manifestDigest = (value) => sha256([value.manifest_ref, value.workspace_id, value.manifest_schema_version, value.bridge_schema_version, value.durable_revision, value.tombstone_count, value.tombstone_coverage_digest, value.stored_at].join('\u001f'))
+const manifestDigest = (value) => sha256([value.manifest_ref, value.workspace_id, value.project_id, value.role, value.binding_version, value.source_ref, value.source_version, value.deletion_revision, value.manifest_schema_version, value.bridge_schema_version, value.durable_revision, value.tombstone_count, value.tombstone_coverage_digest, value.stored_at].join('\u001f'))
 
 function ownRecord(value, allowed, required = allowed, code = 'input_invalid') {
   if (typeof value !== 'object' || value === null || Array.isArray(value) || isProxy(value)) fail(code)
@@ -167,6 +167,7 @@ export function createObserverBridgePostgresAdapter(options = {}) {
         if (!challenge || challenge.state !== 'pending' || Number(challenge.revision) !== value.expected_challenge_revision || Date.parse(challenge.expires_at) <= Date.parse(value.activated_at) || challenge.project_id !== value.project_id || challenge.role !== value.role || Number(challenge.binding_version) !== value.binding_version || challenge.source_ref !== value.source_ref || Number(challenge.source_version) !== value.source_version || Number(challenge.key_version) !== value.key_version) fail('enrollment_invalid')
         const consumed = await client.query("update outcome_private.bridge_enrollment_challenges set state='consumed',consumed_at=$3,revision=revision+1 where workspace_id=$1 and challenge_digest=$2 and state='pending' and revision=$4 returning revision", [value.workspace_id, value.challenge_digest, value.activated_at, value.expected_challenge_revision])
         if (consumed?.rows?.length !== 1) fail('revision_conflict')
+        await client.query('insert into outcome_private.bridge_source_scopes(workspace_id,project_id,role,binding_version,source_ref,source_version,created_at) values($1,$2,$3,$4,$5,$6,$7)', [value.workspace_id, value.project_id, value.role, value.binding_version, value.source_ref, value.source_version, value.activated_at])
         await client.query('insert into outcome_private.bridge_sources(workspace_id,project_id,role,binding_version,source_ref,source_version,active_key_version,certificate_digest,state,revision,created_at,updated_at) values($1,$2,$3,$4,$5,$6,$7,$8,$9,1,$10,$10)', [value.workspace_id, value.project_id, value.role, value.binding_version, value.source_ref, value.source_version, value.key_version, value.certificate_digest, 'active', value.activated_at])
         await client.query('insert into outcome_private.bridge_source_keys(workspace_id,project_id,role,binding_version,source_ref,source_version,key_version,public_key_spki,public_key_digest,state,created_at) values($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11)', [value.workspace_id, value.project_id, value.role, value.binding_version, value.source_ref, value.source_version, value.key_version, value.public_key_spki, value.public_key_digest, 'active', value.activated_at])
         await client.query('insert into outcome_private.bridge_audit(audit_id,workspace_id,project_id,role,binding_version,action_code,reason_code,revision,occurred_at) values($1,$2,$3,$4,$5,$6,$7,1,$8)', [auditId, value.workspace_id, value.project_id, value.role, value.binding_version, 'source_activated', 'ok', value.activated_at])
@@ -237,56 +238,62 @@ export function createObserverBridgePostgresAdapter(options = {}) {
 
     async tombstone(input) {
       const value = ownRecord(input, TOMBSTONE_FIELDS)
-      if (!safeId(value.workspace_id) || !safeId(value.project_id) || !ROLES.has(value.role) || !positive(value.binding_version) || !positive(value.deletion_revision) || !digest(value.deletion_receipt_digest) || !iso(value.purge_before) || !iso(value.tombstoned_at) || Date.parse(value.tombstoned_at) < Date.parse(value.purge_before) || !nonNegative(value.expected_durable_revision)) fail('input_invalid')
+      if (!safeId(value.workspace_id) || !safeId(value.project_id) || !ROLES.has(value.role) || !positive(value.binding_version) || !privateRef(value.source_ref) || !positive(value.source_version) || !positive(value.deletion_revision) || !digest(value.deletion_receipt_digest) || !iso(value.purge_before) || !iso(value.tombstoned_at) || Date.parse(value.tombstoned_at) < Date.parse(value.purge_before) || !nonNegative(value.expected_durable_revision)) fail('input_invalid')
       const [auditId] = rowIds(1)
       return transaction(async (client) => {
         const schema = await ensureSchema(client, value.workspace_id)
         if (schema.durableRevision !== value.expected_durable_revision || value.deletion_revision !== schema.durableRevision + 1) fail('revision_conflict')
-        await client.query('insert into outcome_private.bridge_tombstones(workspace_id,project_id,role,binding_version,deletion_revision,deletion_receipt_digest,purge_before,tombstoned_at,restore_redelete_required) values($1,$2,$3,$4,$5,$6,$7,$8,true)', [value.workspace_id, value.project_id, value.role, value.binding_version, value.deletion_revision, value.deletion_receipt_digest, value.purge_before, value.tombstoned_at])
+        const scope = [value.workspace_id, value.project_id, value.role, value.binding_version, value.source_ref, value.source_version]
+        const target = (await client.query("select state from outcome_private.bridge_sources where workspace_id=$1 and project_id=$2 and role=$3 and binding_version=$4 and source_ref=$5 and source_version=$6 and state<>'deleted' for update", scope)).rows?.[0]
+        if (!target) fail('access_denied')
+        await client.query('insert into outcome_private.bridge_tombstones(workspace_id,project_id,role,binding_version,source_ref,source_version,deletion_revision,deletion_receipt_digest,purge_before,tombstoned_at,restore_redelete_required) values($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,true)', [...scope, value.deletion_revision, value.deletion_receipt_digest, value.purge_before, value.tombstoned_at])
         for (const table of ['bridge_request_replay', 'bridge_events', 'bridge_source_keys', 'bridge_enrollment_challenges', 'bridge_projections']) {
-          await client.query(`delete from outcome_private.${table} where workspace_id=$1 and project_id=$2 and role=$3 and binding_version=$4`, [value.workspace_id, value.project_id, value.role, value.binding_version])
+          await client.query(`delete from outcome_private.${table} where workspace_id=$1 and project_id=$2 and role=$3 and binding_version=$4 and source_ref=$5 and source_version=$6`, scope)
         }
-        await client.query('delete from outcome_private.bridge_sources where workspace_id=$1 and project_id=$2 and role=$3 and binding_version=$4', [value.workspace_id, value.project_id, value.role, value.binding_version])
+        const purged = await client.query('delete from outcome_private.bridge_sources where workspace_id=$1 and project_id=$2 and role=$3 and binding_version=$4 and source_ref=$5 and source_version=$6 returning source_ref', scope)
+        if (purged?.rows?.length !== 1) fail('access_denied')
         const durable = await client.query('update outcome_private.bridge_schema_versions set durable_revision=$2,updated_at=$3 where workspace_id=$1 and durable_revision=$4 returning durable_revision', [value.workspace_id, value.deletion_revision, value.tombstoned_at, value.expected_durable_revision])
         if (durable?.rows?.length !== 1) fail('revision_conflict')
-        await client.query('insert into outcome_private.bridge_audit(audit_id,workspace_id,project_id,role,binding_version,action_code,reason_code,revision,occurred_at) values($1,$2,$3,$4,$5,$6,$7,$8,$9)', [auditId, value.workspace_id, value.project_id, value.role, value.binding_version, 'tombstone_written', 'retention', value.deletion_revision, value.tombstoned_at])
+        await client.query('insert into outcome_private.bridge_audit(audit_id,workspace_id,project_id,role,binding_version,source_ref,source_version,action_code,reason_code,revision,occurred_at) values($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11)', [auditId, ...scope, 'tombstone_written', 'retention', value.deletion_revision, value.tombstoned_at])
         return { status: 'tombstoned', durable_revision: value.deletion_revision }
       })
     },
 
     async storeManifest(input) {
       const value = ownRecord(input, MANIFEST_FIELDS)
-      if (!UUID.test(value.manifest_ref) || !safeId(value.workspace_id) || value.manifest_schema_version !== 1 || value.bridge_schema_version !== expectedSchemaVersion || !nonNegative(value.durable_revision) || !nonNegative(value.tombstone_count) || !digest(value.tombstone_coverage_digest) || !iso(value.stored_at)) fail('input_invalid')
+      if (!UUID.test(value.manifest_ref) || !safeId(value.workspace_id) || !safeId(value.project_id) || !ROLES.has(value.role) || !positive(value.binding_version) || !privateRef(value.source_ref) || !positive(value.source_version) || !positive(value.deletion_revision) || value.manifest_schema_version !== 1 || value.bridge_schema_version !== expectedSchemaVersion || !nonNegative(value.durable_revision) || value.tombstone_count !== 1 || !digest(value.tombstone_coverage_digest) || !iso(value.stored_at)) fail('input_invalid')
       const computedManifestDigest = manifestDigest(value)
       return transaction(async (client) => {
         const schema = await ensureSchema(client, value.workspace_id)
         if (schema.durableRevision !== value.durable_revision) fail('revision_conflict')
-        const tombstones = (await client.query('select workspace_id,project_id,role,binding_version,deletion_revision,deletion_receipt_digest from outcome_private.bridge_tombstones where workspace_id=$1 and deletion_revision<=$2 order by project_id,role,binding_version,deletion_revision', [value.workspace_id, value.durable_revision])).rows ?? []
+        const scope = [value.workspace_id, value.project_id, value.role, value.binding_version, value.source_ref, value.source_version, value.deletion_revision]
+        const tombstones = (await client.query('select workspace_id,project_id,role,binding_version,source_ref,source_version,deletion_revision,deletion_receipt_digest from outcome_private.bridge_tombstones where workspace_id=$1 and project_id=$2 and role=$3 and binding_version=$4 and source_ref=$5 and source_version=$6 and deletion_revision=$7', scope)).rows ?? []
         if (tombstones.length !== value.tombstone_count || computeTombstoneCoverageDigest(tombstones) !== value.tombstone_coverage_digest) fail('manifest_invalid')
-        await client.query('insert into outcome_private.bridge_backup_manifests(manifest_ref,workspace_id,manifest_schema_version,bridge_schema_version,durable_revision,tombstone_count,tombstone_coverage_digest,manifest_digest,stored_at) values($1,$2,$3,$4,$5,$6,$7,$8,$9)', [value.manifest_ref, value.workspace_id, value.manifest_schema_version, value.bridge_schema_version, value.durable_revision, value.tombstone_count, value.tombstone_coverage_digest, computedManifestDigest, value.stored_at])
+        await client.query('insert into outcome_private.bridge_backup_manifests(manifest_ref,workspace_id,project_id,role,binding_version,source_ref,source_version,deletion_revision,manifest_schema_version,bridge_schema_version,durable_revision,tombstone_count,tombstone_coverage_digest,manifest_digest,stored_at) values($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15)', [value.manifest_ref, ...scope, value.manifest_schema_version, value.bridge_schema_version, value.durable_revision, value.tombstone_count, value.tombstone_coverage_digest, computedManifestDigest, value.stored_at])
         return { status: 'manifest_stored', schema_version: value.bridge_schema_version, durable_revision: value.durable_revision, tombstone_count: value.tombstone_count, manifest_digest: computedManifestDigest }
       })
     },
 
     async verifyRestore(input) {
       const value = ownRecord(input, RESTORE_FIELDS)
-      if (!UUID.test(value.restore_receipt_ref) || !UUID.test(value.manifest_ref) || !digest(value.manifest_digest) || !safeId(value.workspace_id) || !safeId(value.project_id) || !ROLES.has(value.role) || !positive(value.binding_version) || value.expected_schema_version !== expectedSchemaVersion || !nonNegative(value.expected_durable_revision) || !iso(value.restored_at)) fail('input_invalid')
+      if (!UUID.test(value.restore_receipt_ref) || !UUID.test(value.manifest_ref) || !digest(value.manifest_digest) || !safeId(value.workspace_id) || !safeId(value.project_id) || !ROLES.has(value.role) || !positive(value.binding_version) || !privateRef(value.source_ref) || !positive(value.source_version) || !positive(value.deletion_revision) || value.expected_schema_version !== expectedSchemaVersion || !nonNegative(value.expected_durable_revision) || !iso(value.restored_at)) fail('input_invalid')
       const [auditId] = rowIds(1)
       return transaction(async (client) => {
         const schema = await ensureSchema(client, value.workspace_id)
         if (schema.durableRevision !== value.expected_durable_revision) fail('restore_denied')
-        const manifest = (await client.query('select manifest_ref,workspace_id,manifest_schema_version,bridge_schema_version,durable_revision,tombstone_count,tombstone_coverage_digest,manifest_digest,stored_at from outcome_private.bridge_backup_manifests where workspace_id=$1 and manifest_ref=$2', [value.workspace_id, value.manifest_ref])).rows?.[0]
+        const scope = [value.workspace_id, value.project_id, value.role, value.binding_version, value.source_ref, value.source_version, value.deletion_revision]
+        const manifest = (await client.query('select manifest_ref,workspace_id,project_id,role,binding_version,source_ref,source_version,deletion_revision,manifest_schema_version,bridge_schema_version,durable_revision,tombstone_count,tombstone_coverage_digest,manifest_digest,stored_at from outcome_private.bridge_backup_manifests where manifest_ref=$1 and workspace_id=$2 and project_id=$3 and role=$4 and binding_version=$5 and source_ref=$6 and source_version=$7 and deletion_revision=$8', [value.manifest_ref, ...scope])).rows?.[0]
         if (!manifest || Number(manifest.manifest_schema_version) !== 1 || Number(manifest.bridge_schema_version) !== schema.schemaVersion || Number(manifest.durable_revision) !== schema.durableRevision || manifest.manifest_digest !== value.manifest_digest) fail('restore_denied')
-        const tombstones = (await client.query('select workspace_id,project_id,role,binding_version,deletion_revision,deletion_receipt_digest from outcome_private.bridge_tombstones where workspace_id=$1 and deletion_revision<=$2 order by project_id,role,binding_version,deletion_revision', [value.workspace_id, schema.durableRevision])).rows ?? []
+        const tombstones = (await client.query('select workspace_id,project_id,role,binding_version,source_ref,source_version,deletion_revision,deletion_receipt_digest from outcome_private.bridge_tombstones where workspace_id=$1 and project_id=$2 and role=$3 and binding_version=$4 and source_ref=$5 and source_version=$6 and deletion_revision=$7', scope)).rows ?? []
         const coverageDigest = computeTombstoneCoverageDigest(tombstones)
         if (tombstones.length !== Number(manifest.tombstone_count) || coverageDigest !== manifest.tombstone_coverage_digest) fail('restore_denied')
         for (const tombstone of tombstones) {
-          const params = [tombstone.workspace_id, tombstone.project_id, tombstone.role, Number(tombstone.binding_version)]
-          for (const table of ['bridge_request_replay', 'bridge_events', 'bridge_source_keys', 'bridge_enrollment_challenges', 'bridge_projections']) await client.query(`delete from outcome_private.${table} where workspace_id=$1 and project_id=$2 and role=$3 and binding_version=$4`, params)
-          await client.query('delete from outcome_private.bridge_sources where workspace_id=$1 and project_id=$2 and role=$3 and binding_version=$4', params)
+          const params = [tombstone.workspace_id, tombstone.project_id, tombstone.role, Number(tombstone.binding_version), tombstone.source_ref, Number(tombstone.source_version)]
+          for (const table of ['bridge_request_replay', 'bridge_events', 'bridge_source_keys', 'bridge_enrollment_challenges', 'bridge_projections']) await client.query(`delete from outcome_private.${table} where workspace_id=$1 and project_id=$2 and role=$3 and binding_version=$4 and source_ref=$5 and source_version=$6`, params)
+          await client.query('delete from outcome_private.bridge_sources where workspace_id=$1 and project_id=$2 and role=$3 and binding_version=$4 and source_ref=$5 and source_version=$6', params)
         }
-        await client.query('insert into outcome_private.bridge_restore_receipts(restore_receipt_ref,manifest_ref,workspace_id,bridge_schema_version,durable_revision,tombstone_count,tombstone_coverage_digest,manifest_digest,restored_at) values($1,$2,$3,$4,$5,$6,$7,$8,$9)', [value.restore_receipt_ref, value.manifest_ref, value.workspace_id, schema.schemaVersion, schema.durableRevision, tombstones.length, coverageDigest, value.manifest_digest, value.restored_at])
-        await client.query('insert into outcome_private.bridge_audit(audit_id,workspace_id,project_id,role,binding_version,action_code,reason_code,revision,occurred_at) values($1,$2,$3,$4,$5,$6,$7,$8,$9)', [auditId, value.workspace_id, value.project_id, value.role, value.binding_version, 'restore_verified', 'ok', schema.durableRevision, value.restored_at])
+        await client.query('insert into outcome_private.bridge_restore_receipts(restore_receipt_ref,manifest_ref,workspace_id,project_id,role,binding_version,source_ref,source_version,deletion_revision,bridge_schema_version,durable_revision,tombstone_count,tombstone_coverage_digest,manifest_digest,restored_at) values($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15)', [value.restore_receipt_ref, value.manifest_ref, ...scope, schema.schemaVersion, schema.durableRevision, tombstones.length, coverageDigest, value.manifest_digest, value.restored_at])
+        await client.query('insert into outcome_private.bridge_audit(audit_id,workspace_id,project_id,role,binding_version,source_ref,source_version,action_code,reason_code,revision,occurred_at) values($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11)', [auditId, value.workspace_id, value.project_id, value.role, value.binding_version, value.source_ref, value.source_version, 'restore_verified', 'ok', schema.durableRevision, value.restored_at])
         return { status: 'restore_verified', durable_revision: schema.durableRevision, schema_version: schema.schemaVersion, tombstone_count: tombstones.length, raw_resurrection_count: 0 }
       })
     },

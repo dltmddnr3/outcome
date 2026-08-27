@@ -4,16 +4,19 @@ const CONFIG_FIELDS = new Set(['feature_enabled', 'ingest_enabled', 'read_only',
 const ADMIT_FIELDS = new Set(['body_bytes', 'cost_units'])
 const PROJECTION_FIELDS = new Set(['status_code', 'observed_at', 'expires_at', 'durable_revision', 'cache_revision'])
 const DISABLE_FIELDS = new Set(['expected_revision', 'reason_code'])
-const RESTORE_FIELDS = new Set(['expected_revision', 'manifest_ref', 'manifest_digest', 'restore_receipt_ref'])
+const RESTORE_FIELDS = new Set(['expected_revision', 'manifest_ref', 'manifest_digest', 'restore_receipt_ref', 'workspace_id', 'project_id', 'role', 'binding_version', 'source_ref', 'source_version', 'deletion_revision'])
 const RETENTION_FIELDS = new Set(['expected_revision', 'expired_challenges', 'expired_replays', 'expired_events', 'tombstone_written'])
 const EXPORT_FIELDS = new Set(['expected_revision'])
-const STATUS_CODES = new Set(['기획 진행 중', '구현 진행 중', '테스트 실행 중', '사용성·제품 검수 중', '출시 감사 중', '결정 대기 중'])
+const STATUS_CODES = new Set(['작업 준비 중', '구현 진행 중', '테스트 실행 중', '검수 진행 중', '결과 정리 중', '응답 대기 중'])
+const ROLES = new Set(['planner', 'builder', 'ux_product_qa', 'release_audit'])
+const SAFE_ID = /^[a-z][a-z0-9_-]{0,63}$/
+const PRIVATE_REF = /^[a-z][A-Za-z0-9_-]{7,95}$/
 const REASONS = new Set(['operator_action', 'schema_mismatch', 'cost_stop', 'rate_limited', 'source_compromise'])
 const DIGEST = /^[0-9a-f]{64}$/
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-7[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/
 const RESTORE_EVIDENCE_FIELDS = new Set(['manifest', 'receipt'])
-const MANIFEST_FIELDS = new Set(['manifest_ref', 'manifest_digest', 'schema_version', 'durable_revision', 'tombstone_count', 'tombstone_coverage_digest'])
-const RECEIPT_FIELDS = new Set(['restore_receipt_ref', 'manifest_ref', 'manifest_digest', 'schema_version', 'durable_revision', 'tombstone_count', 'tombstone_coverage_digest', 'state'])
+const MANIFEST_FIELDS = new Set(['manifest_ref', 'manifest_digest', 'workspace_id', 'project_id', 'role', 'binding_version', 'source_ref', 'source_version', 'deletion_revision', 'schema_version', 'durable_revision', 'tombstone_count', 'tombstone_coverage_digest'])
+const RECEIPT_FIELDS = new Set(['restore_receipt_ref', 'manifest_ref', 'manifest_digest', 'workspace_id', 'project_id', 'role', 'binding_version', 'source_ref', 'source_version', 'deletion_revision', 'schema_version', 'durable_revision', 'tombstone_count', 'tombstone_coverage_digest', 'state'])
 export const OBSERVER_BRIDGE_FUTURE_SKEW_MS = 5_000
 
 export class ObserverBridgeOperationsError extends Error {
@@ -28,6 +31,8 @@ const fail = (code) => { throw new ObserverBridgeOperationsError(code) }
 const positive = (value) => typeof value === 'number' && Number.isSafeInteger(value) && value > 0
 const nonNegative = (value) => typeof value === 'number' && Number.isSafeInteger(value) && value >= 0
 const iso = (value) => typeof value === 'string' && new Date(value).toISOString() === value
+const exactScope = (value) => typeof value.workspace_id === 'string' && SAFE_ID.test(value.workspace_id) && typeof value.project_id === 'string' && SAFE_ID.test(value.project_id) && ROLES.has(value.role) && positive(value.binding_version) && typeof value.source_ref === 'string' && PRIVATE_REF.test(value.source_ref) && positive(value.source_version) && positive(value.deletion_revision)
+const sameScope = (left, right) => ['workspace_id', 'project_id', 'role', 'binding_version', 'source_ref', 'source_version', 'deletion_revision'].every((key) => left[key] === right[key])
 
 function ownRecord(value, allowed, required = allowed, code = 'input_invalid') {
   if (typeof value !== 'object' || value === null || Array.isArray(value) || isProxy(value)) fail(code)
@@ -169,14 +174,14 @@ export function createObserverBridgeOperations(options = {}) {
     restore(input) {
       return mutate((draft) => {
         const value = ownRecord(input, RESTORE_FIELDS)
-        if (!nonNegative(value.expected_revision) || !UUID.test(value.manifest_ref) || !DIGEST.test(value.manifest_digest) || !UUID.test(value.restore_receipt_ref)) fail('input_invalid')
+        if (!nonNegative(value.expected_revision) || !UUID.test(value.manifest_ref) || !DIGEST.test(value.manifest_digest) || !UUID.test(value.restore_receipt_ref) || !exactScope(value)) fail('input_invalid')
         if (value.expected_revision !== draft.revision || draft.feature !== 'off' || typeof loadRestoreEvidence !== 'function') fail('restore_denied')
         let evidence
-        try { evidence = ownRecord(loadRestoreEvidence({ manifest_ref: value.manifest_ref, restore_receipt_ref: value.restore_receipt_ref }), RESTORE_EVIDENCE_FIELDS, RESTORE_EVIDENCE_FIELDS, 'restore_denied') } catch { fail('restore_denied') }
+        try { evidence = ownRecord(loadRestoreEvidence({ manifest_ref: value.manifest_ref, restore_receipt_ref: value.restore_receipt_ref, workspace_id: value.workspace_id, project_id: value.project_id, role: value.role, binding_version: value.binding_version, source_ref: value.source_ref, source_version: value.source_version, deletion_revision: value.deletion_revision }), RESTORE_EVIDENCE_FIELDS, RESTORE_EVIDENCE_FIELDS, 'restore_denied') } catch { fail('restore_denied') }
         const manifest = ownRecord(evidence.manifest, MANIFEST_FIELDS, MANIFEST_FIELDS, 'restore_denied')
         const receipt = ownRecord(evidence.receipt, RECEIPT_FIELDS, RECEIPT_FIELDS, 'restore_denied')
-        const manifestValid = manifest.manifest_ref === value.manifest_ref && manifest.manifest_digest === value.manifest_digest && manifest.schema_version === draft.schema_version && manifest.durable_revision === draft.durable_revision && nonNegative(manifest.tombstone_count) && DIGEST.test(manifest.tombstone_coverage_digest)
-        const receiptValid = receipt.restore_receipt_ref === value.restore_receipt_ref && receipt.manifest_ref === manifest.manifest_ref && receipt.manifest_digest === manifest.manifest_digest && receipt.schema_version === manifest.schema_version && receipt.durable_revision === manifest.durable_revision && receipt.tombstone_count === manifest.tombstone_count && receipt.tombstone_coverage_digest === manifest.tombstone_coverage_digest && receipt.state === 'applied'
+        const manifestValid = manifest.manifest_ref === value.manifest_ref && manifest.manifest_digest === value.manifest_digest && sameScope(manifest, value) && manifest.schema_version === draft.schema_version && manifest.durable_revision === draft.durable_revision && manifest.tombstone_count === 1 && DIGEST.test(manifest.tombstone_coverage_digest)
+        const receiptValid = receipt.restore_receipt_ref === value.restore_receipt_ref && receipt.manifest_ref === manifest.manifest_ref && receipt.manifest_digest === manifest.manifest_digest && sameScope(receipt, manifest) && receipt.schema_version === manifest.schema_version && receipt.durable_revision === manifest.durable_revision && receipt.tombstone_count === manifest.tombstone_count && receipt.tombstone_coverage_digest === manifest.tombstone_coverage_digest && receipt.state === 'applied'
         if (!manifestValid || !receiptValid) fail('restore_denied')
         draft.cache_revision = manifest.durable_revision
         draft.ingest = 'disabled'
