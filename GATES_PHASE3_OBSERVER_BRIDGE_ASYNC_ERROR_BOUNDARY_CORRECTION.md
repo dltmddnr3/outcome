@@ -26,10 +26,10 @@ Outcome: arbitrary hostile bridge rejection reasons are classified without obser
   CHECK: node --test server/phase3-observer-bridge-api.test.mjs server/stable-host.test.mjs server/phase3-observer-bridge.test.mjs server/phase3-observer-bridge-hosted.test.mjs server/phase3-observer-bridge-postgres.test.mjs server/phase3-observer-bridge-operations.test.mjs server/account-access-api.test.mjs server/account-access-hosted.test.mjs server/account-access-identity-runtime.test.mjs
   EXPECT: targeted regression matrix passes with default bridge disabled.
   EVIDENCE: API/stable 38/38 and bridge/account targeted 120/120 pass; full Node 241/241 confirms default-disabled, path, parser, auth, cache, Postgres, operations, and account boundaries.
-- [ ] E7: full Node/frontend/build/security/public/mutation/scope/runbook/boundary/diff and immutable receipt checks pass.
+- [x] E7: full Node/frontend/build/security/public/mutation/scope/runbook/boundary/diff and immutable receipt checks pass.
   CHECK: test -f docs/PHASE3_OBSERVER_BRIDGE_ASYNC_ERROR_BOUNDARY_CORRECTION_BUILDER_RECEIPT.md && rg -q 'full Node: PASS' docs/PHASE3_OBSERVER_BRIDGE_ASYNC_ERROR_BOUNDARY_CORRECTION_BUILDER_RECEIPT.md && rg -q 'full frontend: PASS' docs/PHASE3_OBSERVER_BRIDGE_ASYNC_ERROR_BOUNDARY_CORRECTION_BUILDER_RECEIPT.md && rg -q 'build: PASS' docs/PHASE3_OBSERVER_BRIDGE_ASYNC_ERROR_BOUNDARY_CORRECTION_BUILDER_RECEIPT.md && rg -q 'security/public/mutation/scope/runbook/boundary/diff: PASS' docs/PHASE3_OBSERVER_BRIDGE_ASYNC_ERROR_BOUNDARY_CORRECTION_BUILDER_RECEIPT.md && rg -q 'external mutations: 0' docs/PHASE3_OBSERVER_BRIDGE_ASYNC_ERROR_BOUNDARY_CORRECTION_BUILDER_RECEIPT.md && rg -q 'O2: OPEN/LOCKED' docs/PHASE3_OBSERVER_BRIDGE_ASYNC_ERROR_BOUNDARY_CORRECTION_BUILDER_RECEIPT.md && rg -q 'Phase 3: 17/43' docs/PHASE3_OBSERVER_BRIDGE_ASYNC_ERROR_BOUNDARY_CORRECTION_BUILDER_RECEIPT.md && rg -q 'EXTERNAL_OUTCOME_COMPLETE=false' docs/PHASE3_OBSERVER_BRIDGE_ASYNC_ERROR_BOUNDARY_CORRECTION_BUILDER_RECEIPT.md && echo E7_PASS
   EXPECT: measured regressions and locked boundaries are fixed in the receipt; Builder correction only.
-  EVIDENCE: pending.
+  EVIDENCE: receipt records targeted 120/120, Node 241/241, frontend 89/89, build 1,652, security 41/41, public 4/4, mutation 32/32 and 28/28 API, scope 47, runbook, boundary 0, diff PASS, external 0, rollback, eight false-completion controls, residual risk, and learning.
 
 ## ABANDON
 
