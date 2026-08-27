@@ -8,7 +8,7 @@ import { createEmptyRegistry, mutateRegistry } from './outcome-session-registry-
 
 const map = (overrides = '') => `# Map\n\`\`\`yaml\nschema_version: 1\nproject_id: demo\ntitle: Demo\nphases:\n  - id: phase-one\n    title: Phase\n    purpose: Phase purpose\n    scopes:\n      - id: scope-one\n        title: Scope\n        purpose: Scope purpose\n        stages:\n          - id: stage-one\n            title: Stage\n            purpose: Stage purpose\n            depends_on: []\n            gates_file: GATES_STAGE.md\n            implementation_state: work_in_progress\n            evidence_closure_state: pending\n${overrides}\n\`\`\`\n`
 const contract = '- Project ID: `demo`\n- Project name: `Demo`\n- Outcome: Measured outcome\n- Acceptance authority: `Cherry`\n'
-const sessions = '# Sessions\n```yaml\nschema_version: 2\nproject_id: demo\nroles:\n  planner: { state: unbound, binding_version: 0 }\n  builder: { state: unbound, binding_version: 0 }\n  ux_product_qa: { state: unbound, binding_version: 0 }\n  release_audit: { state: unbound, binding_version: 0 }\n```\n'
+const sessions = '# Sessions\n```yaml\nschema_version: 2\nproject_id: demo\nroles:\n  planner: { required: true, active_binding_ref: null, binding_version: 0, state: unbound }\n  builder: { required: true, active_binding_ref: null, binding_version: 0, state: unbound }\n  ux_product_qa: { required: true, active_binding_ref: null, binding_version: 0, state: unbound }\n  release_audit: { required: true, active_binding_ref: null, binding_version: 0, state: unbound }\n```\n'
 function fixture({ contractText = contract, mapText = map(), gateText = '- [x] G1: first\n- [ ] G2: second', sessionsText = sessions, registry = [], fileTime, now = new Date() } = {}) {
   const root = mkdtempSync(join(tmpdir(), 'outcome-package-')); mkdirSync(join(root, 'docs'))
   writeFileSync(join(root, 'docs/OUTCOME_CONTRACT.md'), contractText); writeFileSync(join(root, 'docs/OUTCOME_MAP.md'), mapText); if (gateText !== null) writeFileSync(join(root, 'docs/GATES_STAGE.md'), gateText)
@@ -92,7 +92,7 @@ test('project registry accepts a bounded sessions_file and uses its unassigned r
   const registry = JSON.parse(readFileSync(value.registryPath, 'utf8'))
   registry.projects[0].sessions_file = 'SESSIONS.md'
   writeFileSync(value.registryPath, JSON.stringify(registry))
-  writeFileSync(join(value.repositoryRoot, 'demo', 'SESSIONS.md'), '# Sessions\n```yaml\nschema_version: 2\nproject_id: demo\nroles:\n  planner: { state: unbound, binding_version: 0 }\n  builder: { state: unbound, binding_version: 0 }\n  ux_product_qa: { state: unbound, binding_version: 0 }\n  release_audit: { state: unbound, binding_version: 0 }\n```\n')
+  writeFileSync(join(value.repositoryRoot, 'demo', 'SESSIONS.md'), sessions)
   const [model] = collectOutcomePackages({ environment: { OUTCOME_PROJECT_REGISTRY: value.registryPath }, repositoryRoot: value.repositoryRoot }).projects
   assert.equal(model.status, 'valid')
   assert.equal(model.bindings.every(({ status }) => status === 'unbound'), true)
@@ -105,6 +105,33 @@ test('Package installer creates the four-slot sessions companion without assignm
   for (const role of ['planner', 'builder', 'ux_product_qa', 'release_audit']) assert.match(text, new RegExp(`^  ${role}:`, 'm'))
   assert.equal((text.match(/active_binding_ref: null/g) ?? []).length, 4)
   assert.throws(() => installOutcomeSessions({ root, projectId: 'new-project' }), /EEXIST/)
+})
+
+test('sessions manifest accepts a stable public alias and rejects private or secret-bearing shapes', () => {
+  const active = sessions.replace('active_binding_ref: null, binding_version: 0, state: unbound', 'active_binding_ref: planner-primary, binding_version: 1, state: active')
+  assert.equal(fixture({ sessionsText: active }).errors.length, 0)
+  const hostile = [
+    'codex://tenant-alpha/private-conversation/short',
+    'session_id=private-value',
+    'thread_private_value',
+    'task_private_value',
+    'turn_private_value',
+    '123e4567-e89b-12d3-a456-426614174000',
+    '/Users/cherry/private-registry',
+    'token=private-value',
+    'sk-privatevalue123456',
+    'ghp_privatevalue123456',
+  ]
+  for (const marker of hostile) {
+    const text = active.replace('planner-primary', JSON.stringify(marker))
+    assert.ok(fixture({ sessionsText: text }).errors.includes('sessions_manifest_invalid'), marker)
+  }
+  for (const injected of [
+    active.replace('required: true,', 'required: true, provider_locator: private,') ,
+    active.replace('roles:', 'api_token: private\nroles:'),
+    active.replace('state: active', 'state: active, unexpected_secret: private'),
+    `${active}\nsecret_note: private\n`,
+  ]) assert.ok(fixture({ sessionsText: injected }).errors.includes('sessions_manifest_invalid'))
 })
 
 test('runtime collector projects corrupt v2 state as unavailable instead of unbound', () => {

@@ -119,6 +119,13 @@ Planner는 다른 역할과 달리 project routing의 root owner다. Planner rep
 
 Persistence는 restart/crash 뒤 binding version, active uniqueness, event history와 checkpoint ref를 그대로 복구해야 한다. partial JSON, truncated event, temp file 잔존과 concurrent writer를 테스트한다.
 
+### Private file 및 writer-lock 복구
+
+- v2 registry의 모든 load는 regular file과 owner-only `0600` mode를 먼저 확인한다. group/other bit가 하나라도 있으면 `registry_unavailable`이며 `doctor`는 `registry_permissions_too_open`을 반환한다. mode 수리는 operator가 원본 hash와 소유권을 확인한 뒤 별도 승인으로 수행하며 loader가 자동 chmod하지 않는다.
+- writer lock은 `0600` regular file에 owner PID, OS uid, process start identity, 생성 시각, nonce를 기록한다. `doctor`는 lock을 `live`, `unconfirmed`, `orphaned`, `invalid`로 구분한다. PID만 같고 process start identity가 다르면 live owner로 보지 않는다.
+- live lock과 생성 후 30초 미만인 unconfirmed lock은 제거하지 않는다. `recover-lock`은 routing/mutation을 중지한 operator가 `doctor`에서 받은 exact recovery ref를 다시 제출한 경우에만 30초 이상 된 orphan lock을 격리 rename 후 제거한다. recovery 과정은 어떤 PID에도 signal을 보내거나 종료하지 않는다.
+- operator flow: (1) mutation/routing freeze, (2) `doctor --registry-path <private-path>` 실행, (3) `registry_lock_orphaned`와 recovery ref 확인, (4) `recover-lock --registry-path <private-path> --recovery-ref <exact-ref>` 실행, (5) `doctor` 재실행, (6) 별도 synthetic/read-after-write 검사. `live`, `unconfirmed`, `invalid`, ref drift면 중단하고 파일/owner evidence를 보존한다.
+
 ## Package와 dashboard projection
 
 대시보드는 선택 프로젝트에서 네 역할을 항상 같은 순서로 보여준다.

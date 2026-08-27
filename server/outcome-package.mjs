@@ -8,6 +8,10 @@ import { loadRegistry, publicRegistryProjection } from './outcome-session-regist
 
 const ROLES = ['planner', 'builder', 'ux_product_qa', 'release_audit']
 const STABLE_ID = /^[a-z0-9]+(?:-[a-z0-9]+)*$/
+const UUID = /^[a-f0-9]{8}-[a-f0-9]{4}-[1-8][a-f0-9]{3}-[89ab][a-f0-9]{3}-[a-f0-9]{12}$/i
+const PRIVATE_MANIFEST_VALUE = /(?:\b[a-z][a-z0-9+.-]*:\/\/|\b(?:session|thread|task|turn)_id(?:[:=]|%[0-9a-f]{2})|\b(?:sess|thread|task|turn)_[a-z0-9]|\b(?:sk|ghp|github_pat|xox[baprs])[-_][A-Za-z0-9_-]{8,}|(?:token|secret|password|authorization|api[_-]?key|locator)(?:[_-][a-z0-9]+)*\s*[:=]\s*[^\s,;}]+|:\s*["']?\/(?:Users|home|tmp|var|opt|etc|Volumes|Library|Applications|System|usr|bin|sbin|dev|private)\/|\b[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}\b)/i
+const SESSION_MANIFEST_KEYS = new Set(['schema_version', 'project_id', 'roles'])
+const SESSION_ROLE_KEYS = new Set(['required', 'active_binding_ref', 'binding_version', 'state'])
 const GIT_REMOTE = /^[A-Za-z0-9][A-Za-z0-9._-]*$/
 const GIT_BRANCH = /^[A-Za-z0-9][A-Za-z0-9._/-]*$/
 const safeRead = (path) => { try { return readFileSync(path, 'utf8') } catch { return '' } }
@@ -166,12 +170,19 @@ const stageState = (stage, gate) => {
 
 function parseSessionsManifest(markdown, projectId) {
   if (!markdown) return { setupRequired: true, errors: [] }
+  if (PRIVATE_MANIFEST_VALUE.test(markdown)) return { setupRequired: false, errors: ['sessions_manifest_invalid'] }
   const source = fencedYaml(markdown)
   if (!source) return { setupRequired: false, errors: ['sessions_yaml_missing'] }
   try {
     const value = YAML.parse(source)
     const roles = value?.roles
-    if (value?.schema_version !== 2 || value?.project_id !== projectId || !roles || typeof roles !== 'object' || Array.isArray(roles) || Object.keys(roles).length !== ROLES.length || ROLES.some((role) => !roles[role] || roles[role].state !== 'unbound' && !['active', 'idle', 'stale', 'rotating', 'blocked'].includes(roles[role].state) || !Number.isInteger(roles[role].binding_version) || roles[role].binding_version < 0 || roles[role].state === 'unbound' && roles[role].active_binding_ref != null)) return { setupRequired: false, errors: ['sessions_manifest_invalid'] }
+    const exact = (item, keys) => item && typeof item === 'object' && !Array.isArray(item) && Object.keys(item).length === keys.size && Object.keys(item).every((key) => keys.has(key))
+    const validRole = (row) => {
+      if (!exact(row, SESSION_ROLE_KEYS) || row.required !== true || !Number.isInteger(row.binding_version)) return false
+      if (row.state === 'unbound') return row.binding_version === 0 && row.active_binding_ref === null
+      return ['active', 'idle', 'stale', 'rotating', 'blocked'].includes(row.state) && row.binding_version >= 1 && typeof row.active_binding_ref === 'string' && row.active_binding_ref.length <= 64 && STABLE_ID.test(row.active_binding_ref) && !UUID.test(row.active_binding_ref) && !PRIVATE_MANIFEST_VALUE.test(row.active_binding_ref)
+    }
+    if (!exact(value, SESSION_MANIFEST_KEYS) || value.schema_version !== 2 || value.project_id !== projectId || !exact(roles, new Set(ROLES)) || ROLES.some((role) => !validRole(roles[role]))) return { setupRequired: false, errors: ['sessions_manifest_invalid'] }
     return { setupRequired: false, errors: [] }
   } catch { return { setupRequired: false, errors: ['sessions_yaml_invalid'] } }
 }

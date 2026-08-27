@@ -1,4 +1,5 @@
-import { closeSync, existsSync, fsyncSync, mkdirSync, openSync, readFileSync, renameSync, rmSync, statSync, writeFileSync } from 'node:fs'
+import { closeSync, existsSync, fsyncSync, linkSync, lstatSync, mkdirSync, openSync, readFileSync, renameSync, rmSync, statSync, writeFileSync } from 'node:fs'
+import { execFileSync } from 'node:child_process'
 import { createHash, randomUUID } from 'node:crypto'
 import { dirname } from 'node:path'
 import { sanitizeEvidenceText } from './cherry-note-dashboard.mjs'
@@ -18,6 +19,8 @@ const BINDING_KEYS = new Set(['binding_ref', 'project_id', 'role', 'provider_cla
 const BINDING_REQUIRED_KEYS = ['binding_ref', 'project_id', 'role', 'provider_class', 'locator_ref', 'binding_version', 'status', 'phase_id', 'scope_id', 'stage_id', 'bound_at', 'observed_at', 'predecessor_binding_ref', 'successor_binding_ref', 'continuity_handoff_sha256', 'last_checkpoint_ref']
 const EVENT_KEYS = new Set(['event_ref', 'sequence', 'project_id', 'role', 'action', 'before_version', 'after_version', 'actor_class', 'reason_class', 'occurred_at', 'stage_id', 'handoff_sha256', 'evidence_receipt_ref', 'observation_status'])
 const EVENT_REQUIRED_KEYS = ['event_ref', 'sequence', 'project_id', 'role', 'action', 'before_version', 'after_version', 'actor_class', 'reason_class', 'occurred_at', 'stage_id']
+const LOCK_KEYS = new Set(['schema_version', 'owner_pid', 'owner_uid', 'process_start_identity', 'created_at', 'owner_nonce'])
+const LOCK_STALE_MILLISECONDS = 30_000
 const clone = (value) => structuredClone(value)
 const fail = (code) => { throw new Error(code) }
 const hasExactKeys = (value, allowed, required) => Object.keys(value).every((key) => allowed.has(key)) && required.every((key) => Object.hasOwn(value, key))
@@ -32,6 +35,58 @@ const safePublicReason = (value) => typeof value === 'string' && SAFE_REASON.tes
 const sanitizedPublicText = (value) => value == null ? null : safePublicText(value) ? value : null
 const safePublicTime = (value) => isoTime(value) ? value : null
 
+function validateLifecycle(value) {
+  const histories = new Map()
+  for (const binding of value.bindings) {
+    const key = `${binding.project_id}:${binding.role}`
+    if (!histories.has(key)) histories.set(key, [])
+    histories.get(key).push(binding)
+  }
+  const folded = new Map()
+  for (const event of value.events) {
+    const key = `${event.project_id}:${event.role}`; const bindings = histories.get(key) ?? []
+    const state = folded.get(key) ?? { version: 0, current: null, records: new Map() }
+    const record = state.current == null ? null : state.records.get(state.current)
+    const hasHandoff = Object.hasOwn(event, 'handoff_sha256'); const hasEvidence = Object.hasOwn(event, 'evidence_receipt_ref'); const hasObservation = Object.hasOwn(event, 'observation_status')
+    if (event.action === 'assign') {
+      const binding = bindings.find(({ binding_version }) => binding_version === event.after_version)
+      const previous = bindings.find(({ binding_version }) => binding_version === event.before_version)
+      if (state.current !== null || event.after_version !== state.version + 1 || !binding || hasHandoff || hasEvidence || hasObservation || binding.bound_at !== event.occurred_at || (state.version === 0 ? binding.predecessor_binding_ref !== null : !previous || previous.status !== 'revoked' || binding.predecessor_binding_ref !== previous.binding_ref)) fail('registry_conflict')
+      state.version = event.after_version; state.current = binding.binding_version
+      state.records.set(binding.binding_version, { status: 'active', stageId: event.stage_id, handoff: null, checkpoint: null })
+    } else if (event.action === 'replace') {
+      const binding = bindings.find(({ binding_version }) => binding_version === event.after_version)
+      const previous = bindings.find(({ binding_version }) => binding_version === event.before_version)
+      if (!record || !binding || !previous || event.after_version !== state.version + 1 || !hasHandoff || hasEvidence || hasObservation || binding.bound_at !== event.occurred_at || previous.replaced_at !== event.occurred_at || previous.successor_binding_ref !== binding.binding_ref || binding.predecessor_binding_ref !== previous.binding_ref) fail('registry_conflict')
+      record.status = 'replaced'; state.version = event.after_version; state.current = binding.binding_version
+      state.records.set(binding.binding_version, { status: 'active', stageId: event.stage_id ?? record.stageId, handoff: event.handoff_sha256, checkpoint: null })
+    } else if (event.action === 'revoke') {
+      if (!record || event.after_version !== state.version || hasHandoff || hasEvidence || hasObservation) fail('registry_conflict')
+      record.status = 'revoked'; record.terminalAt = event.occurred_at; state.current = null
+    } else if (event.action === 'observe') {
+      if (!record || event.after_version !== state.version || hasHandoff || hasEvidence || !hasObservation) fail('registry_conflict')
+      record.status = event.observation_status; if (event.stage_id !== null) record.stageId = event.stage_id
+    } else {
+      if (!record || event.after_version !== state.version || !hasHandoff || !hasEvidence || hasObservation) fail('registry_conflict')
+      record.handoff = event.handoff_sha256; record.checkpoint = event.evidence_receipt_ref
+    }
+    folded.set(key, state)
+  }
+  for (const [key, bindings] of histories) {
+    const state = folded.get(key)
+    if (!state || state.records.size !== bindings.length) fail('registry_conflict')
+    for (const binding of bindings) {
+      const record = state.records.get(binding.binding_version)
+      if (!record || binding.status !== record.status || binding.stage_id !== record.stageId || binding.continuity_handoff_sha256 !== record.handoff || binding.last_checkpoint_ref !== record.checkpoint) fail('registry_conflict')
+      if (binding.status === 'replaced') {
+        if (!isoTime(binding.replaced_at) || binding.revoked_at !== undefined || !UUID.test(binding.successor_binding_ref ?? '')) fail('registry_conflict')
+      } else if (binding.status === 'revoked') {
+        if (binding.revoked_at !== record.terminalAt || binding.replaced_at !== undefined || binding.successor_binding_ref !== null) fail('registry_conflict')
+      } else if (binding.replaced_at !== undefined || binding.revoked_at !== undefined || binding.successor_binding_ref !== null) fail('registry_conflict')
+    }
+  }
+}
+
 function validateRegistry(value) {
   if (!value || typeof value !== 'object' || Array.isArray(value) || value.schema_version !== 2) fail('registry_unavailable')
   if (!hasExactKeys(value, REGISTRY_KEYS, [...REGISTRY_KEYS]) || !Number.isInteger(value.revision) || value.revision < 0 || !Array.isArray(value.project_ids) || !Array.isArray(value.bindings) || !Array.isArray(value.events)) fail('registry_conflict')
@@ -41,7 +96,7 @@ function validateRegistry(value) {
     if (!binding || typeof binding !== 'object' || Array.isArray(binding) || !hasExactKeys(binding, BINDING_KEYS, BINDING_REQUIRED_KEYS) || !value.project_ids.includes(binding.project_id) || !SESSION_ROLES.includes(binding.role) || !ALL_STATUSES.has(binding.status) || !Number.isInteger(binding.binding_version) || binding.binding_version < 1 || typeof binding.binding_ref !== 'string' || !UUID.test(binding.binding_ref) || bindingRefs.has(binding.binding_ref) || typeof binding.locator_ref !== 'string' || !binding.locator_ref || typeof binding.provider_class !== 'string' || !/^[a-z][a-z0-9_-]{0,31}$/.test(binding.provider_class) || UUID.test(binding.provider_class) || PUBLIC_IDENTIFIER.test(binding.provider_class) || !isoTime(binding.bound_at) || !nullableIsoTime(binding.observed_at) || !nullableStableId(binding.phase_id) || !nullableStableId(binding.scope_id) || !nullableStableId(binding.stage_id) || !nullablePrivateRef(binding.predecessor_binding_ref) || !nullablePrivateRef(binding.successor_binding_ref) || !(binding.continuity_handoff_sha256 === null || SHA256.test(binding.continuity_handoff_sha256)) || !(binding.last_checkpoint_ref === null || typeof binding.last_checkpoint_ref === 'string' && binding.last_checkpoint_ref.length > 0) || !(binding.replaced_at === undefined || isoTime(binding.replaced_at)) || !(binding.revoked_at === undefined || isoTime(binding.revoked_at)) || !(binding.activity === undefined || binding.activity === null || safePublicText(binding.activity)) || !(binding.predecessor_archive_eligible === undefined || typeof binding.predecessor_archive_eligible === 'boolean')) fail('registry_conflict')
     bindingRefs.add(binding.binding_ref)
     const key = `${binding.project_id}:${binding.role}`; const prior = versions.get(key) ?? 0
-    if (binding.binding_version <= prior) fail('registry_conflict')
+    if (binding.binding_version !== prior + 1) fail('registry_conflict')
     versions.set(key, binding.binding_version)
     if (CURRENT_STATUSES.has(binding.status)) { if (active.has(key)) fail('registry_conflict'); active.add(key) }
   }
@@ -57,6 +112,7 @@ function validateRegistry(value) {
   }
   if (value.next_event_sequence !== expectedSequence || value.revision !== value.events.length) fail('registry_conflict')
   for (const [key, version] of versions) if (eventVersions.get(key) !== version) fail('registry_conflict')
+  validateLifecycle(value)
   return value
 }
 
@@ -73,10 +129,43 @@ function atomicWrite(path, value) {
   try { fsyncSync(directory) } finally { closeSync(directory) }
 }
 
+const processIdentity = (pid) => {
+  try {
+    const value = execFileSync('ps', ['-p', String(pid), '-o', 'uid=', '-o', 'lstart='], { encoding: 'utf8', stdio: ['ignore', 'pipe', 'ignore'], timeout: 1000 }).trim()
+    return value ? value.replace(/\s+/g, ' ') : null
+  } catch { return null }
+}
+const lockRef = (bytes) => createHash('sha256').update(bytes).digest('hex')
+const lockNow = (value = new Date()) => value instanceof Date ? value : new Date(value)
+
+function inspectRegistryLock(path, options = {}) {
+  const lockPath = `${path}.lock`
+  if (!existsSync(lockPath)) return { state: 'clear', recoveryRef: null, ageSeconds: null }
+  let metadata; let bytes; let value
+  try {
+    metadata = lstatSync(lockPath); bytes = readFileSync(lockPath)
+    value = JSON.parse(bytes.toString('utf8'))
+  } catch { return { state: 'invalid', recoveryRef: null, ageSeconds: null } }
+  const currentUid = typeof process.getuid === 'function' ? process.getuid() : null
+  const recoveryRef = lockRef(bytes); const age = lockNow(options.now).getTime() - Date.parse(value?.created_at)
+  if (!metadata.isFile() || metadata.isSymbolicLink() || (metadata.mode & 0o077) !== 0 || currentUid !== null && metadata.uid !== currentUid || !value || typeof value !== 'object' || Array.isArray(value) || !hasExactKeys(value, LOCK_KEYS, [...LOCK_KEYS]) || value.schema_version !== 1 || !Number.isInteger(value.owner_pid) || value.owner_pid < 1 || value.owner_uid !== currentUid || typeof value.process_start_identity !== 'string' || !value.process_start_identity || !isoTime(value.created_at) || !UUID.test(value.owner_nonce) || !Number.isFinite(age) || age < 0) return { state: 'invalid', recoveryRef, ageSeconds: null }
+  const ageSeconds = Math.floor(age / 1000)
+  if (processIdentity(value.owner_pid) === value.process_start_identity) return { state: 'live', recoveryRef, ageSeconds }
+  if (age < LOCK_STALE_MILLISECONDS) return { state: 'unconfirmed', recoveryRef, ageSeconds }
+  return { state: 'orphaned', recoveryRef, ageSeconds }
+}
+
 function withLock(path, operation) {
-  const lockPath = `${path}.lock`; let descriptor
-  try { descriptor = openSync(lockPath, 'wx', 0o600) } catch { fail('registry_busy') }
-  try { return operation() } finally { closeSync(descriptor); rmSync(lockPath, { force: true }) }
+  const lockPath = `${path}.lock`; const identity = processIdentity(process.pid)
+  if (!identity) fail('registry_lock_identity_unavailable')
+  const candidatePath = `${lockPath}.candidate-${process.pid}-${randomUUID()}`
+  const descriptor = openSync(candidatePath, 'wx', 0o600)
+  try {
+    writeFileSync(descriptor, `${JSON.stringify({ schema_version: 1, owner_pid: process.pid, owner_uid: typeof process.getuid === 'function' ? process.getuid() : null, process_start_identity: identity, created_at: new Date().toISOString(), owner_nonce: randomUUID() })}\n`, 'utf8'); fsyncSync(descriptor)
+  } finally { closeSync(descriptor) }
+  try { linkSync(candidatePath, lockPath) } catch (error) { rmSync(candidatePath, { force: true }); if (error && typeof error === 'object' && error.code === 'EEXIST') fail('registry_busy'); fail('registry_lock_unavailable') }
+  rmSync(candidatePath, { force: true })
+  try { return operation() } finally { rmSync(lockPath, { force: true }) }
 }
 
 export function createEmptyRegistry(path, projectIds) {
@@ -88,7 +177,11 @@ export function createEmptyRegistry(path, projectIds) {
 }
 
 export function loadRegistry(path) {
-  try { return clone(validateRegistry(JSON.parse(readFileSync(path, 'utf8')))) } catch (error) {
+  try {
+    const metadata = lstatSync(path)
+    if (!metadata.isFile() || metadata.isSymbolicLink() || (metadata.mode & 0o077) !== 0) fail('registry_unavailable')
+    return clone(validateRegistry(JSON.parse(readFileSync(path, 'utf8'))))
+  } catch (error) {
     if (error instanceof Error && ['registry_conflict', 'registry_unavailable'].includes(error.message)) throw error
     fail('registry_unavailable')
   }
@@ -135,7 +228,7 @@ export function mutateRegistry(path, input) {
       if (!current) fail('binding_not_active')
       if (typeof input.locator !== 'string' || !input.locator) fail('locator_private_input_required')
       const version = currentVersion + 1
-      result = { ...current, binding_ref: randomUUID(), locator_ref: input.locator, binding_version: version, status: 'active', bound_at: input.occurredAt, observed_at: null, predecessor_binding_ref: current.binding_ref, successor_binding_ref: null, continuity_handoff_sha256: input.handoffSha256 ?? null, last_checkpoint_ref: null, predecessor_archive_eligible: input.role === 'planner' }
+      result = { ...current, binding_ref: randomUUID(), locator_ref: input.locator, binding_version: version, status: 'active', phase_id: input.phaseId ?? current.phase_id, scope_id: input.scopeId ?? current.scope_id, stage_id: input.stageId ?? current.stage_id, bound_at: input.occurredAt, observed_at: null, predecessor_binding_ref: current.binding_ref, successor_binding_ref: null, continuity_handoff_sha256: input.handoffSha256 ?? null, last_checkpoint_ref: null, predecessor_archive_eligible: input.role === 'planner' }
       current.status = 'replaced'; current.replaced_at = input.occurredAt; current.successor_binding_ref = result.binding_ref
       registry.bindings.push(result); appendEvent(registry, input, currentVersion, version, { handoff_sha256: input.handoffSha256 ?? null })
     } else if (input.action === 'revoke') {
@@ -174,12 +267,39 @@ export function publicRegistryProjection(registry, projectId) {
   })
 }
 
-export function doctorRegistry(path, projectIds) {
-  const registry = loadRegistry(path); const issues = []
-  if ((statSync(path).mode & 0o077) !== 0) issues.push('registry_permissions_too_open')
+export function doctorRegistry(path, projectIds, options = {}) {
+  let metadata
+  try { metadata = lstatSync(path) } catch { return { ok: false, schemaVersion: null, revision: null, projects: 0, roleSlots: 0, issues: ['registry_unavailable'], lock: inspectRegistryLock(path, options) } }
+  if (!metadata.isFile() || metadata.isSymbolicLink()) return { ok: false, schemaVersion: null, revision: null, projects: 0, roleSlots: 0, issues: ['registry_unavailable'], lock: inspectRegistryLock(path, options) }
+  if ((metadata.mode & 0o077) !== 0) return { ok: false, schemaVersion: null, revision: null, projects: 0, roleSlots: 0, issues: ['registry_permissions_too_open'], lock: inspectRegistryLock(path, options) }
+  let registry
+  try { registry = loadRegistry(path) } catch (error) { return { ok: false, schemaVersion: null, revision: null, projects: 0, roleSlots: 0, issues: [error instanceof Error && error.message === 'registry_conflict' ? 'registry_conflict' : 'registry_unavailable'], lock: inspectRegistryLock(path, options) } }
+  const issues = []; const lock = inspectRegistryLock(path, options)
+  if (lock.state !== 'clear') issues.push(`registry_lock_${lock.state}`)
   if (Array.isArray(projectIds) && projectIds.some((id) => !registry.project_ids.includes(id))) issues.push('project_missing')
   for (const projectId of registry.project_ids) for (const role of SESSION_ROLES) if (!publicRegistryProjection(registry, projectId).find((row) => row.role === role)) issues.push(`role_missing:${projectId}:${role}`)
-  return { ok: issues.length === 0, schemaVersion: 2, revision: registry.revision, projects: registry.project_ids.length, roleSlots: registry.project_ids.length * SESSION_ROLES.length, issues }
+  return { ok: issues.length === 0, schemaVersion: 2, revision: registry.revision, projects: registry.project_ids.length, roleSlots: registry.project_ids.length * SESSION_ROLES.length, issues, lock }
+}
+
+export function recoverRegistryLock(path, { recoveryRef, now = new Date() } = {}) {
+  const diagnosis = inspectRegistryLock(path, { now })
+  if (diagnosis.state === 'clear') fail('registry_lock_missing')
+  if (diagnosis.state === 'live') fail('registry_lock_live')
+  if (diagnosis.state !== 'orphaned') fail(`registry_lock_${diagnosis.state}`)
+  if (typeof recoveryRef !== 'string' || recoveryRef !== diagnosis.recoveryRef) fail('registry_lock_changed')
+  const lockPath = `${path}.lock`; const quarantine = `${lockPath}.recovery-${randomUUID()}`
+  try {
+    renameSync(lockPath, quarantine)
+    if (lockRef(readFileSync(quarantine)) !== recoveryRef) {
+      if (!existsSync(lockPath)) renameSync(quarantine, lockPath)
+      fail('registry_lock_changed')
+    }
+    rmSync(quarantine)
+  } catch (error) {
+    if (error instanceof Error && error.message === 'registry_lock_changed') throw error
+    fail('registry_lock_changed')
+  }
+  return { ok: true, recovered: true }
 }
 
 export function migrateLegacyRegistry({ legacyPath, registryPath, projectIds, occurredAt }) {
@@ -193,7 +313,9 @@ export function migrateLegacyRegistry({ legacyPath, registryPath, projectIds, oc
     const key = `${row.project_id}:${row.role}`; if (seen.has(key)) fail('registry_conflict'); seen.add(key)
     const binding = { binding_ref: randomUUID(), project_id: row.project_id, role: row.role, provider_class: typeof row.provider_class === 'string' ? row.provider_class : 'codex', locator_ref: typeof row.locator_ref === 'string' ? row.locator_ref : 'legacy-unresolved', binding_version: 1, status: 'stale', phase_id: row.phase_id ?? null, scope_id: row.scope_id ?? null, stage_id: row.stage_id ?? null, bound_at: typeof row.bound_at === 'string' ? row.bound_at : occurredAt, observed_at: null, predecessor_binding_ref: null, successor_binding_ref: null, continuity_handoff_sha256: null, last_checkpoint_ref: null }
     registry.bindings.push(binding)
-    appendEvent(registry, { projectId: row.project_id, role: row.role, action: 'assign', actorClass: 'migration', reasonClass: 'legacy_stale_migration', occurredAt }, 0, 1)
+    const migrationInput = { projectId: row.project_id, role: row.role, action: 'assign', actorClass: 'migration', reasonClass: 'legacy_stale_migration', occurredAt, stageId: binding.stage_id }
+    appendEvent(registry, migrationInput, 0, 1)
+    appendEvent(registry, { ...migrationInput, action: 'observe' }, 1, 1, { observation_status: 'stale' })
   }
   validateRegistry(registry); atomicWrite(registryPath, registry)
   return { source_sha256: createHash('sha256').update(bytes).digest('hex'), source_mode: (statSync(legacyPath).mode & 0o777).toString(8).padStart(4, '0'), migrated_bindings: registry.bindings.length, stale_by_default: true }

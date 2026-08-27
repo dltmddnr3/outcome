@@ -1,9 +1,10 @@
 import assert from 'node:assert/strict'
 import test from 'node:test'
-import { chmodSync, mkdtempSync, readFileSync, writeFileSync } from 'node:fs'
+import { execFileSync } from 'node:child_process'
+import { chmodSync, existsSync, mkdtempSync, readFileSync, statSync, writeFileSync } from 'node:fs'
 import { join } from 'node:path'
 import { tmpdir } from 'node:os'
-import { createEmptyRegistry, loadRegistry, migrateLegacyRegistry, mutateRegistry, publicRegistryProjection } from './outcome-session-registry-persistence.mjs'
+import { createEmptyRegistry, doctorRegistry, loadRegistry, migrateLegacyRegistry, mutateRegistry, publicRegistryProjection, recoverRegistryLock } from './outcome-session-registry-persistence.mjs'
 
 const tempPath = () => join(mkdtempSync(join(tmpdir(), 'outcome-session-v2-')), 'registry.json')
 const meta = { actorClass: 'builder', reasonClass: 'approved_local_test', occurredAt: '2026-08-27T00:00:00.000Z' }
@@ -50,6 +51,83 @@ test('duplicate active and event history gaps fail closed on restart', () => {
     const value = JSON.parse(readFileSync(path, 'utf8')); corrupt(value); writeFileSync(path, JSON.stringify(value))
     assert.throws(() => loadRegistry(path), /registry_conflict/)
   }
+})
+
+test('restart rejects causal binding and event lifecycle mismatches', () => {
+  const cases = [
+    (value) => { value.events[0].action = 'replace' },
+    (value) => { value.bindings[0].status = 'revoked'; value.bindings[0].revoked_at = meta.occurredAt },
+    (value) => { value.bindings[0].status = 'replaced'; value.bindings[0].replaced_at = meta.occurredAt },
+    (value) => { value.bindings[0].predecessor_binding_ref = value.bindings[0].binding_ref },
+  ]
+  for (const corrupt of cases) {
+    const path = tempPath(); createEmptyRegistry(path, ['outcome'])
+    mutateRegistry(path, { action: 'assign', projectId: 'outcome', role: 'builder', expectedVersion: 0, locator: 'one', ...meta })
+    const value = JSON.parse(readFileSync(path, 'utf8')); corrupt(value); writeFileSync(path, JSON.stringify(value))
+    assert.throws(() => loadRegistry(path), /registry_conflict/)
+  }
+  const path = tempPath(); createEmptyRegistry(path, ['outcome'])
+  mutateRegistry(path, { action: 'assign', projectId: 'outcome', role: 'builder', expectedVersion: 0, locator: 'one', ...meta })
+  mutateRegistry(path, { action: 'observe', projectId: 'outcome', role: 'builder', expectedVersion: 1, status: 'idle', observedAt: '2026-08-27T00:01:00.000Z', ...meta })
+  const value = JSON.parse(readFileSync(path, 'utf8')); value.bindings[0].status = 'active'; writeFileSync(path, JSON.stringify(value))
+  assert.throws(() => loadRegistry(path), /registry_conflict/)
+})
+
+test('private registry mode is enforced on create load and doctor', () => {
+  const path = tempPath(); createEmptyRegistry(path, ['outcome'])
+  assert.equal(statSync(path).mode & 0o777, 0o600)
+  mutateRegistry(path, { action: 'assign', projectId: 'outcome', role: 'builder', expectedVersion: 0, locator: 'private', ...meta })
+  assert.equal(statSync(path).mode & 0o777, 0o600)
+  for (const mode of [0o640, 0o604, 0o644]) {
+    chmodSync(path, mode)
+    assert.throws(() => loadRegistry(path), /registry_unavailable/)
+    const diagnosis = doctorRegistry(path, ['outcome'])
+    assert.equal(diagnosis.ok, false)
+    assert.deepEqual(diagnosis.issues, ['registry_permissions_too_open'])
+  }
+})
+
+test('doctor protects live locks and explicitly recovers only old identity-bound orphan locks', () => {
+  const path = tempPath(); createEmptyRegistry(path, ['outcome'])
+  const lockPath = `${path}.lock`
+  const uid = typeof process.getuid === 'function' ? process.getuid() : null
+  const processStart = execFileSync('ps', ['-p', String(process.pid), '-o', 'uid=', '-o', 'lstart='], { encoding: 'utf8' }).trim().replace(/\s+/g, ' ')
+  const base = { schema_version: 1, owner_pid: process.pid, owner_uid: uid, process_start_identity: processStart, created_at: '2026-08-27T00:00:00.000Z', owner_nonce: '11111111-1111-4111-8111-111111111111' }
+  writeFileSync(lockPath, `${JSON.stringify(base)}\n`, { mode: 0o600 })
+  const live = doctorRegistry(path, ['outcome'], { now: new Date('2026-08-27T00:10:00.000Z') })
+  assert.equal(live.ok, false); assert.equal(live.lock.state, 'live'); assert.deepEqual(live.issues, ['registry_lock_live'])
+  assert.throws(() => recoverRegistryLock(path, { recoveryRef: live.lock.recoveryRef, now: new Date('2026-08-27T00:10:00.000Z') }), /registry_lock_live/)
+  assert.equal(existsSync(lockPath), true)
+
+  const dead = { ...base, owner_pid: 99_999_999, process_start_identity: 'missing process', owner_nonce: '22222222-2222-4222-8222-222222222222' }
+  writeFileSync(lockPath, `${JSON.stringify({ ...dead, created_at: '2026-08-27T00:09:45.000Z' })}\n`, { mode: 0o600 })
+  const young = doctorRegistry(path, ['outcome'], { now: new Date('2026-08-27T00:10:00.000Z') })
+  assert.equal(young.lock.state, 'unconfirmed')
+  assert.throws(() => recoverRegistryLock(path, { recoveryRef: young.lock.recoveryRef, now: new Date('2026-08-27T00:10:00.000Z') }), /registry_lock_unconfirmed/)
+
+  writeFileSync(lockPath, `${JSON.stringify({ ...dead, owner_uid: uid === null ? 1 : uid + 1 })}\n`, { mode: 0o600 })
+  const wrongOwner = doctorRegistry(path, ['outcome'], { now: new Date('2026-08-27T00:10:00.000Z') })
+  assert.equal(wrongOwner.lock.state, 'invalid')
+  assert.throws(() => recoverRegistryLock(path, { recoveryRef: wrongOwner.lock.recoveryRef, now: new Date('2026-08-27T00:10:00.000Z') }), /registry_lock_invalid/)
+
+  writeFileSync(lockPath, `${JSON.stringify(dead)}\n`, { mode: 0o600 })
+  const orphan = doctorRegistry(path, ['outcome'], { now: new Date('2026-08-27T00:10:00.000Z') })
+  assert.equal(orphan.ok, false); assert.equal(orphan.lock.state, 'orphaned'); assert.deepEqual(orphan.issues, ['registry_lock_orphaned'])
+  assert.throws(() => recoverRegistryLock(path, { recoveryRef: '0'.repeat(64), now: new Date('2026-08-27T00:10:00.000Z') }), /registry_lock_changed/)
+  assert.deepEqual(recoverRegistryLock(path, { recoveryRef: orphan.lock.recoveryRef, now: new Date('2026-08-27T00:10:00.000Z') }), { ok: true, recovered: true })
+  assert.equal(existsSync(lockPath), false)
+  assert.equal(doctorRegistry(path, ['outcome']).ok, true)
+  assert.doesNotMatch(readFileSync(new URL('./outcome-session-registry-persistence.mjs', import.meta.url), 'utf8'), /process\.kill\s*\(/)
+})
+
+test('replacement followed by checkpoint remains a causally valid restart history', () => {
+  const path = tempPath(); createEmptyRegistry(path, ['outcome'])
+  mutateRegistry(path, { action: 'assign', projectId: 'outcome', role: 'builder', expectedVersion: 0, locator: 'one', stageId: 'stage-one', ...meta })
+  mutateRegistry(path, { action: 'replace', projectId: 'outcome', role: 'builder', expectedVersion: 1, locator: 'two', stageId: 'stage-two', handoffSha256: 'a'.repeat(64), ...meta })
+  mutateRegistry(path, { action: 'checkpoint', projectId: 'outcome', role: 'builder', expectedVersion: 2, handoffSha256: 'b'.repeat(64), checkpointRef: 'checkpoint-two', ...meta })
+  const restarted = loadRegistry(path)
+  assert.equal(restarted.bindings[1].stage_id, 'stage-two')
+  assert.equal(restarted.bindings[1].continuity_handoff_sha256, 'b'.repeat(64))
 })
 
 test('persisted public metadata rejects locator credential path UUID and provider identifier values', () => {

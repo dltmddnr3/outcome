@@ -1,11 +1,12 @@
 import { readFileSync } from 'node:fs'
 import { pathToFileURL } from 'node:url'
-import { doctorRegistry, loadRegistry, mutateRegistry, publicRegistryProjection } from './outcome-session-registry-persistence.mjs'
+import { doctorRegistry, loadRegistry, mutateRegistry, publicRegistryProjection, recoverRegistryLock } from './outcome-session-registry-persistence.mjs'
 
 const defaultTime = () => new Date().toISOString()
 
 export function runSessionControl(input) {
   if (input.action === 'doctor') return doctorRegistry(input.registryPath, input.projectIds)
+  if (input.action === 'recover-lock') return { ...recoverRegistryLock(input.registryPath, { recoveryRef: input.recoveryRef }), action: 'recover-lock' }
   if (Object.hasOwn(input, 'locator')) throw new Error('locator_private_input_required')
   if (['assign', 'replace'].includes(input.action) && (typeof input.privateInput?.locator !== 'string' || !input.privateInput.locator)) throw new Error('locator_private_input_required')
   if (input.action === 'replace' && input.role === 'planner' && !(input.routingFreeze && input.handoffVerified && input.started && input.continuityReady && /^[a-f0-9]{64}$/.test(input.handoffSha256 ?? ''))) throw new Error('planner_rotation_unsafe')
