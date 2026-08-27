@@ -11,7 +11,7 @@ if (process.env.OUTCOME_ASSERT_BUILT !== '1') {
   const fixture = finalizeDeploymentSnapshot({ source, commit: '1111111111111111111111111111111111111111', tree: '2222222222222222222222222222222222222222', asset: 'index-test.js' })
   writeFileSync(new URL('../api/deployment-snapshot.mjs', import.meta.url), `export default ${JSON.stringify(fixture)}\n`, 'utf8')
 }
-const { config: stableConfig, createStableHostRequestHandler, default: stableHandler, handleStableHostRequest } = await import('../api/index.mjs')
+const { config: stableConfig, createStableHostRequestHandler, default: stableHandler, handleStableHostRequest, requestPath } = await import('../api/index.mjs')
 const { default: snapshot } = await import('../api/deployment-snapshot.mjs')
 
 const request = (method, pathname) => handleStableHostRequest({ method, pathname })
@@ -116,6 +116,66 @@ const injectedBridgeRequest = ({ calls = [], environment = bridgeEnvironment(), 
   environment,
   runtimeFactory: accountRuntimeFactory,
   bridgeRuntimeFactory: bridgeRuntimeFactory ?? (async () => ({ bridge, allowedOrigin: 'https://preview.invalid', csrfSecret: 'synthetic-csrf-value' })),
+})
+
+test('raw bridge aliases reject dot separators backslashes controls and invalid percent before authority', async () => {
+  const calls = []
+  let authentications = 0
+  let bridgeFactories = 0
+  const runtimeFactory = async () => {
+    const runtime = await accountRuntimeFactory()
+    return { ...runtime, service: { ...runtime.service, async authenticate(token) { authentications += 1; return runtime.service.authenticate(token) } } }
+  }
+  const bridgeRequest = createStableHostRequestHandler({
+    environment: bridgeEnvironment(),
+    runtimeFactory,
+    bridgeRuntimeFactory: async () => { bridgeFactories += 1; return { bridge: bridgeStub(calls), allowedOrigin: 'https://preview.invalid', csrfSecret: 'synthetic-csrf-value' } },
+  })
+  const query = '?viewer_ref=viewer_workstation_01&viewer_class=workstation&project_id=outcome'
+  const aliases = [
+    '/api/private/bridge/events/../projection',
+    '/api/private/bridge/events/%2e%2e/projection',
+    '/api/private/bridge/projection/',
+    '/api/private/bridge//projection',
+    '/api/private/bridge/%70rojection',
+    '/api/private/bridge/events/%2E%2E/projection',
+    '/api/private/bridge/events/.%2e/projection',
+    '/api/private/bridge/events/%2e./projection',
+    '/api/private/bridge/events%2f..%2fprojection',
+    '/api/private/bridge/events%5c..%5cprojection',
+    '/api/private/bridge/events\\..\\projection',
+    '/api/private%2fbridge%2fprojection',
+    '/api/private/bridge/events/%00/projection',
+    '/api/private/bridge/events/%GG/projection',
+    '/api/private/bridge/events/\u0000/projection',
+  ]
+  for (const pathname of aliases) assert.deepEqual(await bridgeRequest({ method: 'GET', pathname: pathname + query, headers: { authorization: 'Bearer server-valid' } }), { status: 404, body: { error: 'bridge_unavailable' } }, pathname)
+  assert.equal(authentications, 0)
+  assert.equal(bridgeFactories, 0)
+  assert.deepEqual(calls, [])
+})
+
+test('request target preserves raw bridge aliases and valid Vercel catch-all query mapping', async () => {
+  const query = 'viewer_ref=viewer_workstation_01&viewer_class=workstation&project_id=outcome'
+  for (const pathname of [
+    '/api/private/bridge/events/../projection',
+    '/api/private/bridge/events/%2e%2e/projection',
+    '/api/private/bridge/events\\..\\projection',
+  ]) assert.equal(requestPath({ url: pathname + '?' + query, query: {} }), pathname + '?' + query)
+
+  const catchAll = requestPath({
+    url: '/api?path=private%2Fbridge%2Fevents%2F..%2Fprojection&viewer_ref=viewer_workstation_01&viewer_class=workstation&project_id=outcome',
+    query: { path: 'private/bridge/events/../projection' },
+  })
+  assert.equal(catchAll, '/api/private/bridge/events/../projection?' + query)
+  const calls = []
+  const bridgeRequest = injectedBridgeRequest({ calls })
+  assert.deepEqual(await bridgeRequest({ method: 'GET', pathname: catchAll, headers: { authorization: 'Bearer server-valid' } }), { status: 404, body: { error: 'bridge_unavailable' } })
+  assert.deepEqual(calls, [])
+
+  const canonical = '/api/private/bridge/projection?' + query
+  assert.equal(requestPath({ url: canonical, query: {} }), canonical)
+  assert.equal((await bridgeRequest({ method: 'GET', pathname: canonical, headers: { authorization: 'Bearer server-valid' } })).status, 200)
 })
 
 test('default disabled bridge routes are finite unavailable and preserve non-bridge responses', async () => {

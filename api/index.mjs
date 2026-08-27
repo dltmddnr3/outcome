@@ -42,27 +42,43 @@ const BRIDGE_OWNER_PATHS = new Set([
   '/api/private/bridge/sources/rotate',
 ])
 const bridgeUnavailable = () => result(404, { error: 'bridge_unavailable' })
-const isBridgePathname = (pathname) => {
-  try {
-    const path = new URL(pathname, 'https://outcome.invalid').pathname
-    return path === '/api/private/bridge' || path.startsWith(BRIDGE_PREFIX)
-  } catch {
-    return false
+const rawRequestTarget = (target) => {
+  if (typeof target !== 'string') return null
+  const absolute = target.match(/^[A-Za-z][A-Za-z0-9+.-]*:\/\/[^/?#]*(.*)$/s)
+  const value = absolute ? (absolute[1] || '/') : target
+  if (!value.startsWith('/')) return null
+  const fragment = value.indexOf('#')
+  const withoutFragment = fragment === -1 ? value : value.slice(0, fragment)
+  const query = withoutFragment.indexOf('?')
+  return {
+    path: query === -1 ? withoutFragment : withoutFragment.slice(0, query),
+    search: query === -1 ? '' : withoutFragment.slice(query),
+    ambiguous: fragment !== -1,
   }
 }
+const bridgeRequestTarget = (target) => {
+  const value = rawRequestTarget(target)
+  if (!value) return { candidate: false, valid: false, path: '', search: '' }
+  const probe = value.path.replace(/%(?:2f|5c)/gi, '/').replaceAll('\\', '/')
+  const candidate = probe === '/api/private/bridge' || probe.startsWith(BRIDGE_PREFIX)
+  const valid = candidate && !value.ambiguous && !/[.%\\\u0000-\u0020\u007f]/.test(value.path)
+  return { ...value, candidate, valid }
+}
+const isBridgePathname = (pathname) => bridgeRequestTarget(pathname).candidate
 const selectedHeaders = (headers, companion = false) => {
   const names = companion ? ['content-type'] : ['content-type', 'origin', 'x-outcome-csrf']
   return Object.fromEntries(names.map((name) => [name, String(header(headers, name))]).filter(([, value]) => value))
 }
 const bridgeLocation = (pathname) => {
   try {
-    const url = new URL(pathname, 'https://outcome.invalid')
+    const target = bridgeRequestTarget(pathname)
+    if (!target.valid) return { path: '', query: Object.create(null) }
     const query = Object.create(null)
-    for (const [key, value] of url.searchParams) {
+    for (const [key, value] of new URLSearchParams(target.search)) {
       if (Object.hasOwn(query, key)) query.__duplicate__ = true
       else query[key] = value
     }
-    return { path: url.pathname, query }
+    return { path: target.path, query }
   } catch {
     return { path: '', query: Object.create(null) }
   }
@@ -117,13 +133,9 @@ export function createStableHostRequestHandler({ environment = process.env, runt
     return runtimePromise
   }
   return async ({ method = 'GET', pathname = '/', headers = {}, body, origin } = {}) => {
-    if (!pathname.startsWith('/api/private/')) {
-      if (configured && method === 'GET' && ['/api/dashboard', '/api/dashboard/cherry-note'].includes(pathname)) return result(404, { error: 'not_found' })
-      if (configured && method === 'GET' && pathname === '/api/auth/session') return result(200, { authenticated: false, publicReadOnly: false })
-      if (configured && method === 'GET' && pathname === '/api/health') return result(200, { status: 'available', access: 'authentication_required', source: 'private_snapshot' })
-      return handleStableHostRequest({ method, pathname })
-    }
-    if (isBridgePathname(pathname)) {
+    const bridgeTarget = bridgeRequestTarget(pathname)
+    if (bridgeTarget.candidate) {
+      if (!bridgeTarget.valid) return bridgeUnavailable()
       const location = bridgeLocation(pathname)
       const projectionEnrollment = BRIDGE_PROJECTION_ENROLLMENT_PATHS.has(location.path)
       const ingestion = BRIDGE_INGESTION_PATHS.has(location.path)
@@ -155,6 +167,12 @@ export function createStableHostRequestHandler({ environment = process.env, runt
         query: location.query,
       })
     }
+    if (!pathname.startsWith('/api/private/')) {
+      if (configured && method === 'GET' && ['/api/dashboard', '/api/dashboard/cherry-note'].includes(pathname)) return result(404, { error: 'not_found' })
+      if (configured && method === 'GET' && pathname === '/api/auth/session') return result(200, { authenticated: false, publicReadOnly: false })
+      if (configured && method === 'GET' && pathname === '/api/health') return result(200, { status: 'available', access: 'authentication_required', source: 'private_snapshot' })
+      return handleStableHostRequest({ method, pathname })
+    }
     const hosted = await selectedRuntime()
     if (!hosted) return handleStableHostRequest({ method, pathname })
     if (method === 'GET' && pathname === '/api/private/config') return result(200, { ...privateAccessPublicConfig(true), publishableKey: hosted.publishableKey })
@@ -173,21 +191,24 @@ export function createStableHostRequestHandler({ environment = process.env, runt
   }
 }
 export const requestPath = (request) => {
-  const url = new URL(request.url ?? '/', 'https://outcome.invalid')
+  const target = rawRequestTarget(request.url ?? '/')
+  if (!target) return '/'
   const queryPath = Array.isArray(request.query?.path) ? request.query.path.join('/') : request.query?.path
   if (queryPath) {
-    url.searchParams.delete('path')
-    const search = url.searchParams.toString()
+    const searchParams = new URLSearchParams(target.search)
+    searchParams.delete('path')
+    const search = searchParams.toString()
     return `/api/${String(queryPath).replace(/^\/+/, '')}${search ? `?${search}` : ''}`
   }
-  return `${url.pathname}${url.search}`
+  return `${target.path}${target.search}`
 }
 
 const hostedRequest = createStableHostRequestHandler({ logger: console })
 
 const MAXIMUM_STABLE_BRIDGE_BODY_BYTES = 1_048_576
 const rawBridgeBody = async (request, pathname) => {
-  if (!isBridgePathname(pathname) || request.method === 'GET' || typeof request.body === 'string' || Buffer.isBuffer(request.body) || typeof request?.[Symbol.asyncIterator] !== 'function') return request.body
+  const target = bridgeRequestTarget(pathname)
+  if (!target.candidate || !target.valid || request.method === 'GET' || typeof request.body === 'string' || Buffer.isBuffer(request.body) || typeof request?.[Symbol.asyncIterator] !== 'function') return request.body
   const chunks = []
   let bytes = 0
   for await (const chunk of request) {
