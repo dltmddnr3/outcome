@@ -2,15 +2,18 @@ import assert from 'node:assert/strict'
 import { execFileSync } from 'node:child_process'
 import { existsSync, readFileSync, writeFileSync } from 'node:fs'
 import test from 'node:test'
+import { createContext, runInContext } from 'node:vm'
 import source from '../snapshot/outcome-package-source.json' with { type: 'json' }
 import { assertFinalizedReceipt, extractBuiltAsset, finalizeDeploymentSnapshot } from '../scripts/finalize-stable-snapshot.mjs'
 import { assertAutoDetectedNodeRuntime } from '../scripts/validate-vercel-config.mjs'
+import { AccountAccessError } from './account-access.mjs'
+import { createHostedObserverBridge, HostedObserverBridgeError } from './phase3-observer-bridge-hosted.mjs'
 
 if (process.env.OUTCOME_ASSERT_BUILT !== '1') {
   const fixture = finalizeDeploymentSnapshot({ source, commit: '1111111111111111111111111111111111111111', tree: '2222222222222222222222222222222222222222', asset: 'index-test.js' })
   writeFileSync(new URL('../api/deployment-snapshot.mjs', import.meta.url), `export default ${JSON.stringify(fixture)}\n`, 'utf8')
 }
-const { createStableHostRequestHandler, handleStableHostRequest } = await import('../api/index.mjs')
+const { config: stableConfig, createStableHostRequestHandler, default: stableHandler, handleStableHostRequest, requestPath } = await import('../api/index.mjs')
 const { default: snapshot } = await import('../api/deployment-snapshot.mjs')
 
 const request = (method, pathname) => handleStableHostRequest({ method, pathname })
@@ -77,6 +80,600 @@ test('stable host rejects every mutation and unknown GET fails closed', () => {
   }
   assert.equal(checked, 24)
   assert.deepEqual(request('GET', '/api/unknown'), { status: 404, body: { error: 'not_found' } })
+})
+
+const identityEnvironment = {
+  OUTCOME_PRIVATE_SURFACE_ENABLED: '1',
+  OUTCOME_CLERK_PUBLISHABLE_KEY: 'pk_test_boundary',
+  OUTCOME_CLERK_SECRET_KEY: 'sk_test_boundary',
+  OUTCOME_OWNER_SUBJECT: 'synthetic-owner',
+  OUTCOME_PRIVATE_ALLOWED_ORIGIN: 'https://preview.invalid',
+  OUTCOME_PRIVATE_ROLLBACK_DEPLOYMENT: 'rollback-preview',
+}
+const bridgeEnvironment = (projectionEnrollment = '1', ingestion = '1') => ({
+  ...identityEnvironment,
+  OUTCOME_OBSERVER_BRIDGE_PROJECTION_ENROLLMENT_ENABLED: projectionEnrollment,
+  OUTCOME_OBSERVER_BRIDGE_INGESTION_ENABLED: ingestion,
+})
+const accountRuntimeFactory = async () => ({
+  allowedOrigin: 'https://preview.invalid',
+  publishableKey: 'pk_test_boundary',
+  service: {
+    async authenticate(token) {
+      if (token !== 'server-valid') throw new AccountAccessError('authentication_required', 401)
+      return Object.freeze({ subject: 'synthetic-owner', issuedAt: 1, expiresAt: 2 })
+    },
+    async readWorkspace() {},
+  },
+})
+const bridgeStub = (calls, maximumBytes = 32_768) => ({
+  maxBodyBytes: maximumBytes,
+  read(value) { calls.push(['read', value]); return { projections: [] } },
+  createEnrollment(value) { calls.push(['createEnrollment', value]); return { status: 'pending' } },
+  completeEnrollment(value) { calls.push(['completeEnrollment', value]); return { status: 'source_active' } },
+  revokeSource(value) { calls.push(['revokeSource', value]); return { status: 'source_revoked' } },
+  ingest(value) { calls.push(['ingest', value]); return { status: 'accepted', ledger_revision: 1 } },
+})
+const stableBridgeCases = [
+  { path: '/api/private/bridge/projection?viewer_ref=viewer_workstation_01&viewer_class=workstation&project_id=outcome', method: 'GET', bridgeMethod: 'read', headers: { authorization: 'Bearer server-valid' } },
+  { path: '/api/private/bridge/enrollments', method: 'POST', bridgeMethod: 'createEnrollment', headers: { 'content-type': 'application/json', origin: 'https://preview.invalid', 'x-outcome-csrf': 'synthetic-csrf-value', authorization: 'Bearer server-valid' }, body: Buffer.from('{}') },
+  { path: '/api/private/bridge/enrollments/complete', method: 'POST', bridgeMethod: 'completeEnrollment', headers: { 'content-type': 'application/json' }, body: Buffer.from('{}') },
+  { path: '/api/private/bridge/sources/revoke', method: 'POST', bridgeMethod: 'revokeSource', headers: { 'content-type': 'application/json', origin: 'https://preview.invalid', 'x-outcome-csrf': 'synthetic-csrf-value', authorization: 'Bearer server-valid' }, body: Buffer.from('{}') },
+  { path: '/api/private/bridge/sources/rotate', method: 'POST', bridgeMethod: 'createEnrollment', headers: { 'content-type': 'application/json', origin: 'https://preview.invalid', 'x-outcome-csrf': 'synthetic-csrf-value', authorization: 'Bearer server-valid' }, body: Buffer.from('{}') },
+  { path: '/api/private/bridge/events', method: 'POST', bridgeMethod: 'ingest', headers: { 'content-type': 'application/json' }, body: Buffer.from('{}') },
+]
+const stableFixedStatuses = {
+  unavailable: 404, access_denied: 404, auth_unavailable: 503,
+  enrollment_invalid: 409, enrollment_conflict: 409, idempotency_conflict: 409,
+  request_conflict: 409, sequence_conflict: 409, signature_invalid: 401,
+  csrf_invalid: 403, rate_limited: 429, body_too_large: 400,
+  bad_request: 400, input_invalid: 400,
+}
+const captureHostedError = (operation) => {
+  try { operation() } catch (error) { return error }
+  assert.fail('expected hosted operation to fail')
+}
+const stableGenuineHostedOperationErrors = () => {
+  const hostedBinding = { workspace_id: 'workspace_main', project_id: 'outcome', role: 'builder', binding_version: 1, source_ref: 'source_alpha_01' }
+  const hostedViewers = [
+    { workspace_id: 'workspace_main', viewer_ref: 'viewer_workstation_01', viewer_class: 'workstation', project_ids: ['outcome'] },
+    { workspace_id: 'workspace_main', viewer_ref: 'viewer_remote_01', viewer_class: 'remote_device', project_ids: ['outcome'] },
+  ]
+  const hostedOwner = { account_ref: 'account_owner_01', workspace_id: 'workspace_main', project_ids: ['outcome'] }
+  const options = { bindings: [hostedBinding], viewers: hostedViewers, authorize_owner: () => hostedOwner, authorize_viewer: () => hostedOwner, now: () => Date.parse('2026-08-27T00:00:00.000Z') }
+  const readInput = { auth_context: { token: 'owner' }, viewer_ref: 'viewer_workstation_01', viewer_class: 'workstation', project_id: 'outcome' }
+  return [
+    ['unavailable', captureHostedError(() => createHostedObserverBridge(options).read(readInput))],
+    ['input_invalid', captureHostedError(() => createHostedObserverBridge({ ...options, feature_enabled: true }).read({}))],
+    ['access_denied', captureHostedError(() => createHostedObserverBridge({ ...options, feature_enabled: true, authorize_viewer: () => null }).read(readInput))],
+    ['auth_unavailable', captureHostedError(() => createHostedObserverBridge({ ...options, feature_enabled: true, authorize_viewer: () => { throw new Error('private auth') } }).read(readInput))],
+    ['enrollment_invalid', captureHostedError(() => createHostedObserverBridge({ ...options, feature_enabled: true }).completeEnrollment({ challenge_ref: 'challenge_missing_01', public_key_spki: 'invalid', proof_signature: 'invalid' }))],
+  ]
+}
+const stableBrandHostileFactories = (trap) => [
+  () => { const value = new Error('rate_limited'); Object.setPrototypeOf(value, HostedObserverBridgeError.prototype); Object.defineProperties(value, { name: { value: 'HostedObserverBridgeError', enumerable: true, writable: true, configurable: true }, code: { value: 'rate_limited', enumerable: true, writable: true, configurable: true } }); return value },
+  () => { const value = new HostedObserverBridgeError('rate_limited'); Object.setPrototypeOf(value, Error.prototype); return value },
+  () => { class Subclass extends HostedObserverBridgeError {}; return new Subclass('rate_limited') },
+  () => { const value = new HostedObserverBridgeError('rate_limited'); value[Symbol('extra')] = true; return value },
+  () => Object.assign(new HostedObserverBridgeError('rate_limited'), { extra: true }),
+  () => { const value = new HostedObserverBridgeError('rate_limited'); Object.defineProperty(value, 'code', { get: trap }); return value },
+  () => { const value = new HostedObserverBridgeError('rate_limited'); value.code = 'bad_request'; return value },
+  () => { const value = new HostedObserverBridgeError('rate_limited'); delete value.code; return value },
+  () => new Proxy(new HostedObserverBridgeError('rate_limited'), {}),
+  () => { const value = Proxy.revocable(new HostedObserverBridgeError('rate_limited'), {}); value.revoke(); return value.proxy },
+  () => { const value = runInContext('new Error("rate_limited")', createContext({})); Object.setPrototypeOf(value, HostedObserverBridgeError.prototype); Object.defineProperties(value, { name: { value: 'HostedObserverBridgeError', enumerable: true, writable: true, configurable: true }, code: { value: 'rate_limited', enumerable: true, writable: true, configurable: true } }); return value },
+  () => Object.freeze(new HostedObserverBridgeError('rate_limited')),
+  () => Object.seal(new HostedObserverBridgeError('rate_limited')),
+  () => new Proxy(new HostedObserverBridgeError('rate_limited'), { getPrototypeOf: trap }),
+  () => new Proxy(new HostedObserverBridgeError('rate_limited'), { ownKeys: trap }),
+  () => new Proxy(new HostedObserverBridgeError('rate_limited'), { getOwnPropertyDescriptor: trap }),
+  () => new HostedObserverBridgeError('unknown'),
+  () => { const value = {}; value.self = value; return value },
+]
+const stableAlternateNewTargetError = () => {
+  function AlternateNewTarget() {}
+  AlternateNewTarget.prototype = HostedObserverBridgeError.prototype
+  return Reflect.construct(HostedObserverBridgeError, ['rate_limited'], AlternateNewTarget)
+}
+const stableNewTargetVariantFactories = [
+  stableAlternateNewTargetError,
+  () => { class Subclass extends HostedObserverBridgeError {}; return new Subclass('rate_limited') },
+  () => Reflect.construct(HostedObserverBridgeError, ['rate_limited'], HostedObserverBridgeError.bind(null)),
+  () => new (new Proxy(HostedObserverBridgeError, {}))('rate_limited'),
+  () => { const target = new Proxy(HostedObserverBridgeError, {}); return Reflect.construct(HostedObserverBridgeError, ['rate_limited'], target) },
+  () => { const value = new HostedObserverBridgeError('rate_limited'); Object.setPrototypeOf(value, Error.prototype); return value },
+]
+const stableQaPrivateFactoryHostileFactories = () => [
+  () => Reflect.construct(new Proxy(HostedObserverBridgeError, {}), ['rate_limited'], HostedObserverBridgeError),
+  () => Reflect.construct(HostedObserverBridgeError.bind(null), ['rate_limited'], HostedObserverBridgeError),
+  () => {
+    const original = Object.getPrototypeOf(HostedObserverBridgeError.prototype)
+    try { Object.setPrototypeOf(HostedObserverBridgeError.prototype, null); return new HostedObserverBridgeError('rate_limited') }
+    finally { Object.setPrototypeOf(HostedObserverBridgeError.prototype, original) }
+  },
+  () => {
+    const marker = Symbol('qa-private-decoration')
+    try { HostedObserverBridgeError.prototype[marker] = true; return new HostedObserverBridgeError('rate_limited') }
+    finally { delete HostedObserverBridgeError.prototype[marker] }
+  },
+  () => Reflect.construct(runInContext('new Proxy(Target, {})', createContext({ Target: HostedObserverBridgeError })), ['rate_limited'], HostedObserverBridgeError),
+]
+
+test('QA private error factory root blocker is generic for every stable-host endpoint and settlement mode', async () => {
+  let calls = 0
+  for (const item of stableBridgeCases) for (const factory of stableQaPrivateFactoryHostileFactories()) for (const asynchronous of [false, true]) {
+    const failure = asynchronous
+      ? async () => { calls += 1; throw factory() }
+      : () => { calls += 1; throw factory() }
+    const bridge = { ...bridgeStub([]), [item.bridgeMethod]: failure }
+    assert.deepEqual(await injectedBridgeRequest({ bridge })({ method: item.method, pathname: item.path, headers: item.headers, body: item.body }), { status: 503, body: { error: 'bridge_unavailable' } })
+  }
+  assert.equal(calls, 60)
+})
+
+test('QA alternate newTarget blocker is generic for every stable-host endpoint and settlement mode', async () => {
+  let calls = 0
+  for (const item of stableBridgeCases) for (const asynchronous of [false, true]) {
+    const failure = asynchronous
+      ? async () => { calls += 1; throw stableAlternateNewTargetError() }
+      : () => { calls += 1; throw stableAlternateNewTargetError() }
+    const bridge = { ...bridgeStub([]), [item.bridgeMethod]: failure }
+    assert.deepEqual(await injectedBridgeRequest({ bridge })({ method: item.method, pathname: item.path, headers: item.headers, body: item.body }), { status: 503, body: { error: 'bridge_unavailable' } })
+  }
+  assert.equal(calls, 12)
+})
+
+test('newTarget construction matrix is generic for every stable-host endpoint and settlement mode', async () => {
+  let calls = 0
+  for (const item of stableBridgeCases) for (const factory of stableNewTargetVariantFactories) for (const asynchronous of [false, true]) {
+    const failure = asynchronous
+      ? async () => { calls += 1; throw factory() }
+      : () => { calls += 1; throw factory() }
+    const bridge = { ...bridgeStub([]), [item.bridgeMethod]: failure }
+    assert.deepEqual(await injectedBridgeRequest({ bridge })({ method: item.method, pathname: item.path, headers: item.headers, body: item.body }), { status: 503, body: { error: 'bridge_unavailable' } })
+  }
+  assert.equal(calls, 72)
+})
+const injectedBridgeRequest = ({ calls = [], environment = bridgeEnvironment(), bridge = bridgeStub(calls), bridgeRuntimeFactory } = {}) => createStableHostRequestHandler({
+  environment,
+  runtimeFactory: accountRuntimeFactory,
+  bridgeRuntimeFactory: bridgeRuntimeFactory ?? (async () => ({ bridge, allowedOrigin: 'https://preview.invalid', csrfSecret: 'synthetic-csrf-value' })),
+})
+
+test('raw bridge aliases reject dot separators backslashes controls and invalid percent before authority', async () => {
+  const calls = []
+  let authentications = 0
+  let bridgeFactories = 0
+  const runtimeFactory = async () => {
+    const runtime = await accountRuntimeFactory()
+    return { ...runtime, service: { ...runtime.service, async authenticate(token) { authentications += 1; return runtime.service.authenticate(token) } } }
+  }
+  const bridgeRequest = createStableHostRequestHandler({
+    environment: bridgeEnvironment(),
+    runtimeFactory,
+    bridgeRuntimeFactory: async () => { bridgeFactories += 1; return { bridge: bridgeStub(calls), allowedOrigin: 'https://preview.invalid', csrfSecret: 'synthetic-csrf-value' } },
+  })
+  const query = '?viewer_ref=viewer_workstation_01&viewer_class=workstation&project_id=outcome'
+  const aliases = [
+    '/api/private/bridge/events/../projection',
+    '/api/private/bridge/events/%2e%2e/projection',
+    '/api/private/bridge/projection/',
+    '/api/private/bridge//projection',
+    '/api/private/bridge/%70rojection',
+    '/api/private/bridge/events/%2E%2E/projection',
+    '/api/private/bridge/events/.%2e/projection',
+    '/api/private/bridge/events/%2e./projection',
+    '/api/private/bridge/events%2f..%2fprojection',
+    '/api/private/bridge/events%5c..%5cprojection',
+    '/api/private/bridge/events\\..\\projection',
+    '/api/private%2fbridge%2fprojection',
+    '/api/private/bridge/events/%00/projection',
+    '/api/private/bridge/events/%GG/projection',
+    '/api/private/bridge/events/\u0000/projection',
+  ]
+  for (const pathname of aliases) assert.deepEqual(await bridgeRequest({ method: 'GET', pathname: pathname + query, headers: { authorization: 'Bearer server-valid' } }), { status: 404, body: { error: 'bridge_unavailable' } }, pathname)
+  assert.equal(authentications, 0)
+  assert.equal(bridgeFactories, 0)
+  assert.deepEqual(calls, [])
+})
+
+test('request target preserves raw bridge aliases and valid Vercel catch-all query mapping', async () => {
+  const query = 'viewer_ref=viewer_workstation_01&viewer_class=workstation&project_id=outcome'
+  for (const pathname of [
+    '/api/private/bridge/events/../projection',
+    '/api/private/bridge/events/%2e%2e/projection',
+    '/api/private/bridge/events\\..\\projection',
+  ]) assert.equal(requestPath({ url: pathname + '?' + query, query: {} }), pathname + '?' + query)
+
+  const catchAll = requestPath({
+    url: '/api?path=private%2Fbridge%2Fevents%2F..%2Fprojection&viewer_ref=viewer_workstation_01&viewer_class=workstation&project_id=outcome',
+    query: { path: 'private/bridge/events/../projection' },
+  })
+  assert.equal(catchAll, '/api/private/bridge/events/../projection?' + query)
+  const calls = []
+  const bridgeRequest = injectedBridgeRequest({ calls })
+  assert.deepEqual(await bridgeRequest({ method: 'GET', pathname: catchAll, headers: { authorization: 'Bearer server-valid' } }), { status: 404, body: { error: 'bridge_unavailable' } })
+  assert.deepEqual(calls, [])
+
+  const canonical = '/api/private/bridge/projection?' + query
+  assert.equal(requestPath({ url: canonical, query: {} }), canonical)
+  assert.equal((await bridgeRequest({ method: 'GET', pathname: canonical, headers: { authorization: 'Bearer server-valid' } })).status, 200)
+})
+
+test('default disabled bridge routes are finite unavailable and preserve non-bridge responses', async () => {
+  const disabled = createStableHostRequestHandler({ environment: {}, bridgeRuntimeFactory: async () => { throw new Error('must not run') } })
+  for (const [method, pathname] of [
+    ['GET', '/api/private/bridge/projection'],
+    ['POST', '/api/private/bridge/enrollments'],
+    ['POST', '/api/private/bridge/enrollments/complete'],
+    ['POST', '/api/private/bridge/events'],
+    ['POST', '/api/private/bridge'],
+    ['DELETE', '/api/private/bridge/unknown'],
+  ]) assert.deepEqual(await disabled({ method, pathname, body: Buffer.from('{}') }), { status: 404, body: { error: 'bridge_unavailable' } })
+  assert.deepEqual(await disabled({ method: 'GET', pathname: '/api/health' }), request('GET', '/api/health'))
+  assert.deepEqual(await disabled({ method: 'POST', pathname: '/api/dashboard' }), request('POST', '/api/dashboard'))
+  assert.equal(stableConfig.api.bodyParser, false)
+})
+
+test('partial malformed configuration and factory throw reject invalid are cached unavailable', async () => {
+  const partial = { ...identityEnvironment, OUTCOME_OBSERVER_BRIDGE_PROJECTION_ENROLLMENT_ENABLED: '1' }
+  const malformed = bridgeEnvironment('true', '0')
+  for (const environment of [partial, malformed]) {
+    let calls = 0
+    const bridgeRequest = createStableHostRequestHandler({ environment, runtimeFactory: accountRuntimeFactory, bridgeRuntimeFactory: async () => { calls += 1; return { bridge: bridgeStub([]), allowedOrigin: 'https://preview.invalid', csrfSecret: 'synthetic-csrf-value' } } })
+    assert.deepEqual(await bridgeRequest({ method: 'GET', pathname: '/api/private/bridge/projection' }), { status: 404, body: { error: 'bridge_unavailable' } })
+    assert.equal(calls, 0)
+  }
+  for (const factory of [
+    () => { throw new Error('sensitive throw') },
+    async () => { throw new Error('sensitive reject') },
+    async () => null,
+    async () => ({}),
+  ]) {
+    let calls = 0
+    const bridgeRequest = createStableHostRequestHandler({ environment: bridgeEnvironment(), runtimeFactory: accountRuntimeFactory, bridgeRuntimeFactory: (...args) => { calls += 1; return factory(...args) } })
+    for (let index = 0; index < 2; index += 1) assert.deepEqual(await bridgeRequest({ method: 'POST', pathname: '/api/private/bridge/events', headers: { 'content-type': 'application/json' }, body: Buffer.from('{}') }), { status: 404, body: { error: 'bridge_unavailable' } })
+    assert.equal(calls, 1)
+  }
+})
+
+test('projection enrollment and ingestion flags gate their route groups independently', async () => {
+  const projectionOnly = injectedBridgeRequest({ environment: bridgeEnvironment('1', '0') })
+  assert.equal((await projectionOnly({ method: 'GET', pathname: '/api/private/bridge/projection?viewer_ref=viewer_workstation_01&viewer_class=workstation&project_id=outcome', headers: { authorization: 'Bearer server-valid' } })).status, 200)
+  assert.deepEqual(await projectionOnly({ method: 'POST', pathname: '/api/private/bridge/events', headers: { 'content-type': 'application/json' }, body: Buffer.from('{}') }), { status: 404, body: { error: 'bridge_unavailable' } })
+
+  const ingestionOnly = injectedBridgeRequest({ environment: bridgeEnvironment('0', '1') })
+  assert.equal((await ingestionOnly({ method: 'POST', pathname: '/api/private/bridge/events', headers: { 'content-type': 'application/json' }, body: Buffer.from('{}') })).status, 200)
+  assert.deepEqual(await ingestionOnly({ method: 'GET', pathname: '/api/private/bridge/projection' }), { status: 404, body: { error: 'bridge_unavailable' } })
+})
+
+test('stable host awaits async bridge completion and safely maps rejection', async () => {
+  const pathname = '/api/private/bridge/projection?viewer_ref=viewer_workstation_01&viewer_class=workstation&project_id=outcome'
+  const headers = { authorization: 'Bearer server-valid' }
+  const resolved = injectedBridgeRequest({ bridge: { ...bridgeStub([]), async read() { return { projections: [{ status: 'durable' }] } } } })
+  assert.deepEqual(await resolved({ method: 'GET', pathname, headers }), { status: 200, body: { projections: [{ status: 'durable' }] } })
+  for (const [failure, expected] of [
+    [new HostedObserverBridgeError('rate_limited'), { status: 503, body: { error: 'bridge_unavailable' } }],
+    [new Error('private database detail'), { status: 503, body: { error: 'bridge_unavailable' } }],
+  ]) {
+    let calls = 0
+    const rejected = injectedBridgeRequest({ bridge: { ...bridgeStub([]), async read() { calls += 1; throw failure } } })
+    assert.deepEqual(await rejected({ method: 'GET', pathname, headers }), expected)
+    assert.equal(calls, 1)
+  }
+})
+
+test('stable host residual bridge rejection is finite for every endpoint with one call and retry zero', async () => {
+  const cases = [
+    { path: '/api/private/bridge/projection?viewer_ref=viewer_workstation_01&viewer_class=workstation&project_id=outcome', method: 'GET', bridgeMethod: 'read', headers: { authorization: 'Bearer server-valid' } },
+    { path: '/api/private/bridge/enrollments', method: 'POST', bridgeMethod: 'createEnrollment', headers: { 'content-type': 'application/json', origin: 'https://preview.invalid', 'x-outcome-csrf': 'synthetic-csrf-value', authorization: 'Bearer server-valid' }, body: Buffer.from('{}') },
+    { path: '/api/private/bridge/enrollments/complete', method: 'POST', bridgeMethod: 'completeEnrollment', headers: { 'content-type': 'application/json' }, body: Buffer.from('{}') },
+    { path: '/api/private/bridge/sources/revoke', method: 'POST', bridgeMethod: 'revokeSource', headers: { 'content-type': 'application/json', origin: 'https://preview.invalid', 'x-outcome-csrf': 'synthetic-csrf-value', authorization: 'Bearer server-valid' }, body: Buffer.from('{}') },
+    { path: '/api/private/bridge/sources/rotate', method: 'POST', bridgeMethod: 'createEnrollment', headers: { 'content-type': 'application/json', origin: 'https://preview.invalid', 'x-outcome-csrf': 'synthetic-csrf-value', authorization: 'Bearer server-valid' }, body: Buffer.from('{}') },
+    { path: '/api/private/bridge/events', method: 'POST', bridgeMethod: 'ingest', headers: { 'content-type': 'application/json' }, body: Buffer.from('{}') },
+  ]
+  for (const item of cases) {
+    const reasons = [
+      new Proxy(new HostedObserverBridgeError('rate_limited'), { getPrototypeOf() { throw new Error('private prototype detail') } }),
+      (() => { const error = new HostedObserverBridgeError('rate_limited'); Object.defineProperty(error, 'code', { get() { throw new Error('private code detail') } }); return error })(),
+    ]
+    for (const reason of reasons) {
+      let calls = 0
+      const bridge = { ...bridgeStub([]), [item.bridgeMethod]: async () => { calls += 1; throw reason } }
+      const bridgeRequest = injectedBridgeRequest({ bridge })
+      const actual = await bridgeRequest({ method: item.method, pathname: item.path, headers: item.headers, body: item.body })
+      assert.deepEqual(actual, { status: 503, body: { error: 'bridge_unavailable' } })
+      assert.equal(calls, 1)
+      assert.doesNotMatch(JSON.stringify(actual), /private|prototype|code detail|stack/i)
+    }
+  }
+})
+
+test('re-QA brand blocker is generic for every stable-host endpoint and settlement mode', async () => {
+  const cases = [
+    { path: '/api/private/bridge/projection?viewer_ref=viewer_workstation_01&viewer_class=workstation&project_id=outcome', method: 'GET', bridgeMethod: 'read', headers: { authorization: 'Bearer server-valid' } },
+    { path: '/api/private/bridge/enrollments', method: 'POST', bridgeMethod: 'createEnrollment', headers: { 'content-type': 'application/json', origin: 'https://preview.invalid', 'x-outcome-csrf': 'synthetic-csrf-value', authorization: 'Bearer server-valid' }, body: Buffer.from('{}') },
+    { path: '/api/private/bridge/enrollments/complete', method: 'POST', bridgeMethod: 'completeEnrollment', headers: { 'content-type': 'application/json' }, body: Buffer.from('{}') },
+    { path: '/api/private/bridge/sources/revoke', method: 'POST', bridgeMethod: 'revokeSource', headers: { 'content-type': 'application/json', origin: 'https://preview.invalid', 'x-outcome-csrf': 'synthetic-csrf-value', authorization: 'Bearer server-valid' }, body: Buffer.from('{}') },
+    { path: '/api/private/bridge/sources/rotate', method: 'POST', bridgeMethod: 'createEnrollment', headers: { 'content-type': 'application/json', origin: 'https://preview.invalid', 'x-outcome-csrf': 'synthetic-csrf-value', authorization: 'Bearer server-valid' }, body: Buffer.from('{}') },
+    { path: '/api/private/bridge/events', method: 'POST', bridgeMethod: 'ingest', headers: { 'content-type': 'application/json' }, body: Buffer.from('{}') },
+  ]
+  const reasons = [
+    () => {
+      const forged = new Error('private raw identifier')
+      Object.setPrototypeOf(forged, HostedObserverBridgeError.prototype)
+      Object.defineProperty(forged, 'code', { value: 'rate_limited', enumerable: true, writable: true, configurable: true })
+      return forged
+    },
+    () => {
+      const decorated = new HostedObserverBridgeError('rate_limited')
+      decorated[Symbol('private decoration')] = true
+      return decorated
+    },
+  ]
+  for (const item of cases) for (const reason of reasons) for (const asynchronous of [false, true]) {
+    let calls = 0
+    const failure = asynchronous
+      ? async () => { calls += 1; throw reason() }
+      : () => { calls += 1; throw reason() }
+    const bridge = { ...bridgeStub([]), [item.bridgeMethod]: failure }
+    const actual = await injectedBridgeRequest({ bridge })({ method: item.method, pathname: item.path, headers: item.headers, body: item.body })
+    assert.deepEqual(actual, { status: 503, body: { error: 'bridge_unavailable' } })
+    assert.equal(calls, 1)
+  }
+})
+
+test('brand mutation matrix is generic for every stable-host endpoint and settlement mode', async () => {
+  let trapHits = 0
+  const trap = () => { trapHits += 1; throw new Error('private trap detail') }
+  let calls = 0
+  for (const item of stableBridgeCases) for (const reason of stableBrandHostileFactories(trap)) for (const asynchronous of [false, true]) {
+    const failure = asynchronous
+      ? async () => { calls += 1; throw reason() }
+      : () => { calls += 1; throw reason() }
+    const bridge = { ...bridgeStub([]), [item.bridgeMethod]: failure }
+    assert.deepEqual(await injectedBridgeRequest({ bridge })({ method: item.method, pathname: item.path, headers: item.headers, body: item.body }), { status: 503, body: { error: 'bridge_unavailable' } })
+  }
+  assert.equal(calls, 216)
+  assert.equal(trapHits, 0)
+})
+
+test('genuine hosted operation mappings cover every stable-host endpoint and settlement mode', async () => {
+  let calls = 0
+  for (const item of stableBridgeCases) for (const [code, error] of stableGenuineHostedOperationErrors()) for (const asynchronous of [false, true]) {
+    const status = stableFixedStatuses[code]
+    const failure = asynchronous
+      ? async () => { calls += 1; throw error }
+      : () => { calls += 1; throw error }
+    const bridge = { ...bridgeStub([]), [item.bridgeMethod]: failure }
+    assert.deepEqual(await injectedBridgeRequest({ bridge })({ method: item.method, pathname: item.path, headers: item.headers, body: item.body }), { status, body: { error: status === 404 || status === 503 ? 'bridge_unavailable' : code } })
+  }
+  assert.equal(calls, 60)
+})
+
+test('public constructor never confers finite stable-host mapping', async () => {
+  let calls = 0
+  for (const item of stableBridgeCases) for (const code of Object.keys(stableFixedStatuses)) for (const asynchronous of [false, true]) {
+    const failure = asynchronous
+      ? async () => { calls += 1; throw new HostedObserverBridgeError(code) }
+      : () => { calls += 1; throw new HostedObserverBridgeError(code) }
+    const bridge = { ...bridgeStub([]), [item.bridgeMethod]: failure }
+    assert.deepEqual(await injectedBridgeRequest({ bridge })({ method: item.method, pathname: item.path, headers: item.headers, body: item.body }), { status: 503, body: { error: 'bridge_unavailable' } })
+  }
+  assert.equal(calls, 168)
+})
+
+test('server auth context defeats spoof attempts for owner and viewer routes', async () => {
+  const calls = []
+  const bridgeRequest = injectedBridgeRequest({ calls })
+  const projection = await bridgeRequest({
+    method: 'GET',
+    pathname: '/api/private/bridge/projection?viewer_ref=viewer_workstation_01&viewer_class=workstation&project_id=outcome',
+    headers: { authorization: 'Bearer server-valid' },
+  })
+  assert.deepEqual(projection, { status: 200, body: { projections: [] } })
+  assert.equal(calls[0][0], 'read')
+  assert.equal(calls[0][1].auth_context.subject, 'synthetic-owner')
+  assert.equal(Object.hasOwn(calls[0][1], 'token'), false)
+
+  const headers = { 'content-type': 'application/json', origin: 'https://preview.invalid', 'x-outcome-csrf': 'synthetic-csrf-value', authorization: 'Bearer server-valid' }
+  const spoofed = await bridgeRequest({ method: 'POST', pathname: '/api/private/bridge/enrollments', headers, body: Buffer.from('{"auth_context":{"subject":"attacker"}}') })
+  assert.deepEqual(spoofed, { status: 400, body: { error: 'bad_request' } })
+  assert.equal(calls.filter(([name]) => name === 'createEnrollment').length, 0)
+  const valid = await bridgeRequest({ method: 'POST', pathname: '/api/private/bridge/enrollments', headers, body: Buffer.from('{"workspace_id":"workspace_main"}') })
+  assert.equal(valid.status, 201)
+  assert.equal(calls.at(-1)[1].auth_context.subject, 'synthetic-owner')
+})
+
+test('companion ambient authority is removed and never authenticated', async () => {
+  const calls = []
+  let authentications = 0
+  const runtimeFactory = async () => {
+    const runtime = await accountRuntimeFactory()
+    return { ...runtime, service: { ...runtime.service, async authenticate(token) { authentications += 1; return runtime.service.authenticate(token) } } }
+  }
+  const bridgeRequest = createStableHostRequestHandler({
+    environment: bridgeEnvironment(),
+    runtimeFactory,
+    bridgeRuntimeFactory: async () => ({ bridge: bridgeStub(calls), allowedOrigin: 'https://preview.invalid', csrfSecret: 'synthetic-csrf-value' }),
+  })
+  const ambient = { 'content-type': 'application/json', cookie: '__session=attacker', authorization: 'Bearer attacker' }
+  assert.equal((await bridgeRequest({ method: 'POST', pathname: '/api/private/bridge/enrollments/complete', headers: ambient, body: Buffer.from('{}') })).status, 200)
+  assert.equal((await bridgeRequest({ method: 'POST', pathname: '/api/private/bridge/events', headers: ambient, body: Buffer.from('{}') })).status, 200)
+  assert.equal(authentications, 0)
+  assert.deepEqual(calls.map(([name]) => name), ['completeEnrollment', 'ingest'])
+})
+
+test('raw bytes reach the audited body cap without JSON reserialization', async () => {
+  const calls = []
+  const bridgeRequest = injectedBridgeRequest({ calls, bridge: bridgeStub(calls, 8) })
+  const exact = Buffer.from(' {\n } ')
+  assert.equal((await bridgeRequest({ method: 'POST', pathname: '/api/private/bridge/events', headers: { 'content-type': 'application/json' }, body: exact })).status, 200)
+  assert.equal(calls[0][1].body_bytes, exact.length)
+  assert.deepEqual(await bridgeRequest({ method: 'POST', pathname: '/api/private/bridge/events', headers: { 'content-type': 'application/json' }, body: Buffer.from('{"long":1}') }), { status: 400, body: { error: 'body_too_large' } })
+})
+
+test('enabled bridge methods outside the exact allowlist remain finite and fail closed', async () => {
+  const bridgeRequest = injectedBridgeRequest()
+  assert.deepEqual(await bridgeRequest({ method: 'PATCH', pathname: '/api/private/bridge/projection' }), { status: 405, body: { error: 'read_only' } })
+  assert.deepEqual(await bridgeRequest({ method: 'POST', pathname: '/api/private/bridge/unknown', body: Buffer.from('{}') }), { status: 404, body: { error: 'bridge_unavailable' } })
+  assert.deepEqual(await bridgeRequest({ method: 'POST', pathname: '/api/private/workspace' }), { status: 405, body: { error: 'read_only' } })
+})
+
+test('private bridge response is no-store at the stable handler boundary', async () => {
+  const headers = new Map()
+  let status
+  let body
+  await stableHandler(
+    { method: 'GET', url: '/api/private/bridge/projection', query: {}, headers: {} },
+    { setHeader: (name, value) => headers.set(name, value), status(value) { status = value; return this }, json(value) { body = value; return value } },
+  )
+  assert.equal(status, 404)
+  assert.deepEqual(body, { error: 'bridge_unavailable' })
+  assert.equal(headers.get('cache-control'), 'no-store')
+})
+
+const invokeStableHandler = async (request) => {
+  const headers = new Map()
+  let status
+  let body
+  await stableHandler(request, {
+    setHeader: (name, value) => headers.set(name, value),
+    status(value) { status = value; return this },
+    json(value) { body = value; return value },
+  })
+  return { status, body, headers }
+}
+
+const streamRequest = (iterator) => ({
+  method: 'POST', url: '/api/private/bridge/events', query: {}, headers: {}, body: undefined,
+  [Symbol.asyncIterator]: iterator,
+})
+const singleChunkIterator = (chunk) => function iterator() {
+  let yielded = false
+  return { next: () => Promise.resolve(yielded ? { done: true } : (yielded = true, { value: chunk, done: false })) }
+}
+
+test('trusted runtime iterator does not use mutable function name as authority', async () => {
+  let yielded = 0
+  const iterator = function platformIterator() {
+    let done = false
+    return { next: async () => done ? { done: true } : (done = true, yielded += 1, { value: Buffer.from('{}'), done: false }) }
+  }
+  Object.defineProperty(iterator, 'name', { value: 'bound platformIterator' })
+  const actual = await invokeStableHandler(streamRequest(iterator))
+  assert.equal(actual.status, 404)
+  assert.deepEqual(actual.body, { error: 'bridge_unavailable' })
+  assert.equal(actual.headers.get('cache-control'), 'no-store')
+  assert.equal(yielded, 1)
+})
+
+test('QA stream body blocker rejects getter-bearing chunk without outward failure', async () => {
+  let getterHits = 0
+  const chunk = Object.create(null)
+  Object.defineProperty(chunk, 'valueOf', { get() { getterHits += 1; throw new Error('private chunk getter') } })
+  const actual = await invokeStableHandler(streamRequest(singleChunkIterator(chunk)))
+  assert.equal(actual.status, 404)
+  assert.deepEqual(actual.body, { error: 'bridge_unavailable' })
+  assert.equal(actual.headers.get('cache-control'), 'no-store')
+  assert.equal(getterHits, 0)
+})
+
+test('QA stream body blocker rejects thenable-shaped chunk without outward failure', async () => {
+  const chunk = Object.create(null)
+  Object.defineProperty(chunk, 'then', { value: () => assert.fail('must not assimilate chunk'), enumerable: true })
+  const actual = await invokeStableHandler(streamRequest(singleChunkIterator(chunk)))
+  assert.equal(actual.status, 404)
+  assert.deepEqual(actual.body, { error: 'bridge_unavailable' })
+  assert.equal(actual.headers.get('cache-control'), 'no-store')
+})
+
+test('reachable HTTP body chunks reject unsupported values without coercion', async () => {
+  let coercionHits = 0
+  const fail = () => { coercionHits += 1; throw new Error('must not coerce HTTP chunk') }
+  const getterChunk = Object.create(null)
+  Object.defineProperty(getterChunk, 'toString', { get: fail })
+  Object.defineProperty(getterChunk, 'valueOf', { get: fail })
+  const thenableChunk = Object.create(null)
+  Object.defineProperty(thenableChunk, 'then', { get: fail })
+  const unsupportedChunks = [getterChunk, thenableChunk, new Uint8Array([1]), new ArrayBuffer(1), new String('{}'), {}, Symbol('chunk')]
+  for (const chunk of unsupportedChunks) {
+    let closeCalls = 0
+    const request = streamRequest(() => {
+      let yielded = false
+      return {
+        next: () => yielded ? { done: true } : (yielded = true, { done: false, value: chunk }),
+        return: () => { closeCalls += 1; return { done: true } },
+      }
+    })
+    const actual = await invokeStableHandler(request)
+    assert.equal(actual.status, 404)
+    assert.deepEqual(actual.body, { error: 'bridge_unavailable' })
+    assert.equal(actual.headers.get('cache-control'), 'no-store')
+    assert.equal(closeCalls, 1)
+  }
+  assert.equal(coercionHits, 0)
+})
+
+test('ordinary platform iterator failure is finite and invalid or capped iteration closes early', async () => {
+  let calls = 0
+  const failures = [
+    streamRequest(() => { calls += 1; throw new Error('private create failure') }),
+    streamRequest(() => ({ next: () => { calls += 1; throw new Error('private next failure') } })),
+    streamRequest(() => ({ next: () => { calls += 1; return Promise.reject(new Error('private next rejection')) } })),
+    streamRequest(() => {
+      let yielded = false
+      return { next: () => yielded ? { done: true } : (yielded = true, { done: false, value: {} }), return: () => { calls += 1; throw new Error('private cleanup failure') } }
+    }),
+  ]
+  for (const request of failures) {
+    const actual = await invokeStableHandler(request)
+    assert.equal(actual.status, 404)
+    assert.deepEqual(actual.body, { error: 'bridge_unavailable' })
+    assert.equal(actual.headers.get('cache-control'), 'no-store')
+  }
+  assert.equal(calls, 4)
+
+  let invalidClose = 0
+  const invalid = streamRequest(() => {
+    let yielded = false
+    return { next: () => yielded ? { done: true } : (yielded = true, { done: false, value: new Uint8Array([1]) }), return: () => { invalidClose += 1; return { done: true } } }
+  })
+  assert.equal((await invokeStableHandler(invalid)).status, 404)
+  assert.equal(invalidClose, 1)
+
+  let cappedClose = 0
+  let cappedNext = 0
+  const capped = streamRequest(() => ({
+    next: () => { cappedNext += 1; return { done: false, value: Buffer.alloc(600_000) } },
+    return: () => { cappedClose += 1; return { done: true } },
+  }))
+  assert.equal((await invokeStableHandler(capped)).status, 404)
+  assert.equal(cappedNext, 2)
+  assert.equal(cappedClose, 1)
+})
+
+test('stream body genuine multi-chunk Buffer and string values preserve exact bytes', async () => {
+  const chunks = [' {', Buffer.from('"value":1'), '} ']
+  let index = 0
+  const request = streamRequest(() => ({ next: () => index < chunks.length ? { value: chunks[index++], done: false } : { done: true } }))
+  const stable = await invokeStableHandler(request)
+  assert.equal(stable.status, 404)
+  assert.equal(stable.headers.get('cache-control'), 'no-store')
+  assert.equal(index, chunks.length)
+  let generatorChunks = 0
+  const generator = await invokeStableHandler(streamRequest(async function * iterator() {
+    for (const chunk of chunks) { generatorChunks += 1; yield chunk }
+  }))
+  assert.equal(generator.status, 404)
+  assert.equal(generatorChunks, chunks.length)
+
+  const expected = Buffer.concat(chunks.map((chunk) => typeof chunk === 'string' ? Buffer.from(chunk) : chunk))
+  const calls = []
+  const enabled = injectedBridgeRequest({ calls, bridge: bridgeStub(calls, expected.length) })
+  assert.equal((await enabled({ method: 'POST', pathname: '/api/private/bridge/events', headers: { 'content-type': 'application/json' }, body: expected })).status, 200)
+  assert.equal(calls[0][1].body_bytes, expected.length)
+  assert.equal(expected.toString('utf8'), ' {"value":1} ')
 })
 
 test('stable snapshot has no prohibited disclosure or Gate evidence fields', () => {
