@@ -95,10 +95,16 @@ The database evidence is actual local PostgreSQL-compatible PGlite execution of 
 
 Terminal: `LOCAL_OPTION_A_CORRECTION_QA_AUDIT_EVIDENCE_FIXED_ONLY`
 
+- Measured recovery summary: transactional tombstone coverage is exact-scope, immutable-manifest-bound, and fail-closed before read resume; raw resurrection is 0.
+- Measured public mutation summary: local mutations 32/32 and API mutations 28/28 return exact `405 read_only`; empty page-body boundary remains 0/4.
+
 - Audited local candidate receipt: commit `863fb61fa076482bfe5b7e2b3535def9509e463a`, tree `3f820d2f1e6a8224a3f7e1fb612ed35df563e842`.
 - Audited semantic candidate: commit `5a368643aa33348673c5d90511a1c28c39baf1c5`, tree `0245ed2ff9e8a3d204b33232ce14faeafce2bac3`, direct parent authorization `a9d8a180701bf9e976e4eae49d13a70ed24d1e73`.
 - Fresh Re-QA evidence: commit `7f45d28d707bc0f7b23b77a86ab88fdf15d06aee`, tree `40d503476f584d2380bc7f78a03f36a268e15098`, report `docs/PHASE3_OBSERVER_BRIDGE_H3_H4_OPTION_A_FRESH_REQA_863FB61.md`, SHA-256 `2e601601439fee0b617540e4154dc5dc868cf5f9edaf5dac72046c96145bd125`, verdict `PASS_INDEPENDENT_QA_ONLY`.
 - Fresh Release Audit evidence: commit `431856769082ee5866f04b2c858409a5923b7d15`, tree `dc6f1a0f512385402e2cb91f470618e9d7109bac`, report `docs/PHASE3_OBSERVER_BRIDGE_H3_H4_OPTION_A_RELEASE_AUDIT_7F45D28.md`, SHA-256 `9216fa650dd267ef9038fe6051615f583db6d3fc2b67afc49283612fa503b226`, verdict `PASS_RELEASE_AUDIT_ONLY`.
+- Final-carrier re-audit evidence: commit `6ae6fbf359ff74e7a838fe33c291dac8bc5a9e7a`, tree `53eba5eafc4e852bfbed0c66673095bbfa440b6c`, report `docs/PHASE3_OBSERVER_BRIDGE_H3_H4_OPTION_A_FINAL_CARRIER_REAUDIT_209B8B1.md`, SHA-256 `26f2118b81705e552ad6c38b1d6cb8011e0c7a0ef0caf7674281165cb8b5ad54`, verdict `FAIL` for evidence-carrier integrity only.
+- Re-audit correction: A4 and A6 semantic evidence was already present and candidate drift was 0, but the receipt lacked the literal ordered phrases required by their strict executable predicates. The two measured summary lines above align those predicates without changing or weakening any acceptance condition.
+- Literal executable proof after correction: A1, A2, A3, A4, A5, A6, A7, A11, A12, A13, A8, A9, and A10 each exited 0 independently; total `13/13 PASS`. The checkbox-aware Gate checker separately reports `ALL MET (13 met)`.
 - Evidence graph is direct and immutable: authorization → semantic candidate → receipt carrier → Re-QA carrier → Release Audit carrier. Each QA/Audit carrier added exactly one named report. Candidate semantic drift after receipt, QA, and Audit: 0 paths and 0 bytes.
 - External operation ledger remains 0: remote database, Supabase/provider/account/project, credentials/environment/network, browser/device/session, hosted wiring, deploy, push, release, and public message were not executed.
 - Rollback remains Git-only before any external application: revert this evidence carrier, then receipt carrier `863fb61fa076482bfe5b7e2b3535def9509e463a`, then semantic candidate `5a368643aa33348673c5d90511a1c28c39baf1c5`.

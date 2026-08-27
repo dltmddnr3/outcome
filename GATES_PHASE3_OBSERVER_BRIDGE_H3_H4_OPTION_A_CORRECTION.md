@@ -17,7 +17,7 @@ Outcome: Cherry가 승인한 trusted private backend 경계에서 실패한 H3-H
 - [x] A4: immutable versioned manifest와 transactional tombstone coverage가 restore를 fail closed한다.
   CHECK: test -f docs/PHASE3_OBSERVER_BRIDGE_HOSTED_H3_H4_BUILDER_RECEIPT.md && rg -q 'missing.*conflicting.*stale.*incomplete.*inaccessible' docs/PHASE3_OBSERVER_BRIDGE_HOSTED_H3_H4_BUILDER_RECEIPT.md && rg -q 'tombstone.*coverage.*transaction|transaction.*tombstone.*coverage' docs/PHASE3_OBSERVER_BRIDGE_HOSTED_H3_H4_BUILDER_RECEIPT.md && echo A4_PASS
   EXPECT: exact valid restore only; invalid cases zero read-resume and zero raw resurrection.
-  EVIDENCE: immutable manifest and receipt bind schema/durable revision plus exact project/role/binding/source/version/deletion revision and coverage; missing/conflicting/stale/incomplete/inaccessible probes and raw resurrection attempts fail closed.
+  EVIDENCE: immutable manifest and receipt bind schema/durable revision plus exact project/role/binding/source/version/deletion revision and coverage; missing/conflicting/stale/incomplete/inaccessible probes and raw resurrection attempts fail closed. The receipt now includes the literal measured transactional tombstone coverage summary required by this CHECK.
 - [x] A5: opaque random evidence identity, exact future-skew boundary, tombstone privacy residue가 증명된다.
   CHECK: test -f docs/PHASE3_OBSERVER_BRIDGE_HOSTED_H3_H4_BUILDER_RECEIPT.md && rg -q 'opaque random|UUIDv7' docs/PHASE3_OBSERVER_BRIDGE_HOSTED_H3_H4_BUILDER_RECEIPT.md && rg -q 'below.*at.*above|below/at/above' docs/PHASE3_OBSERVER_BRIDGE_HOSTED_H3_H4_BUILDER_RECEIPT.md && rg -q 'raw resurrection.*0|no raw resurrection' docs/PHASE3_OBSERVER_BRIDGE_HOSTED_H3_H4_BUILDER_RECEIPT.md && echo A5_PASS
   EXPECT: no contiguity claim; future over-boundary denied; reconstructive residue/raw resurrection 0.
@@ -25,7 +25,7 @@ Outcome: Cherry가 승인한 trusted private backend 경계에서 실패한 H3-H
 - [x] A6: focused·security·package·full regression·build·scope와 public boundary가 통과한다.
   CHECK: test -f docs/PHASE3_OBSERVER_BRIDGE_HOSTED_H3_H4_BUILDER_RECEIPT.md && rg -q 'security.*PASS' docs/PHASE3_OBSERVER_BRIDGE_HOSTED_H3_H4_BUILDER_RECEIPT.md && rg -q 'build.*PASS' docs/PHASE3_OBSERVER_BRIDGE_HOSTED_H3_H4_BUILDER_RECEIPT.md && rg -q '405 read_only' docs/PHASE3_OBSERVER_BRIDGE_HOSTED_H3_H4_BUILDER_RECEIPT.md && echo A6_PASS
   EXPECT: all pass; anonymous private presence 0; public mutations exact `405 read_only`.
-  EVIDENCE: focused 27/27, domain 73/73, package 39/39, security 29/29, npm 305/305, full Node 244/244, build/scope/runbook/public-boundary/diff PASS; mutation boundary 32/32 exact 405 and API 28/28 read_only.
+  EVIDENCE: focused 27/27, domain 73/73, package 39/39, security 29/29, npm 305/305, full Node 244/244, build/scope/runbook/public-boundary/diff PASS; mutation boundary 32/32 exact 405 and API 28/28 read_only. The receipt now includes the literal ordered `405 read_only` measured summary required by this CHECK.
 - [x] A7: immutable Builder candidate와 receipt가 exact hashes, commands/counts, rollback, residual risk와 external operation 0을 기록한다.
   CHECK: test -f docs/PHASE3_OBSERVER_BRIDGE_HOSTED_H3_H4_BUILDER_RECEIPT.md && rg -q 'HOSTED_CODE_CANDIDATE_READY_ONLY' docs/PHASE3_OBSERVER_BRIDGE_HOSTED_H3_H4_BUILDER_RECEIPT.md && rg -q 'external operation.*0|external mutations.*0' docs/PHASE3_OBSERVER_BRIDGE_HOSTED_H3_H4_BUILDER_RECEIPT.md && rg -q 'residual risk' docs/PHASE3_OBSERVER_BRIDGE_HOSTED_H3_H4_BUILDER_RECEIPT.md && echo A7_PASS
   EXPECT: candidate ready only; no self-promotion.
