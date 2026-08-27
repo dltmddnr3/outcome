@@ -1,11 +1,27 @@
 import assert from 'node:assert/strict'
 import { readFileSync } from 'node:fs'
 import test from 'node:test'
-import { assertDashboardMeasurement, assertMobileHierarchyFlowMeasurement, assertSourceGroupOccurrences, sourceLabeledGroupStageKeys } from './browser-assertions.mjs'
+import { assertDashboardMeasurement, assertMobileHierarchyFlowMeasurement, assertSourceGroupOccurrences, resolveRoleDisclosureTargets, sourceLabeledGroupStageKeys } from './browser-assertions.mjs'
 
 const passingMeasurement = () => ({
   documentOverflow: 0, clippedDescendants: [], ellipsisTruncation: [], viewportEscape: [], siblingIntersections: [], roleDescendantIntersections: [], roleStatusOverflow: [], undersizedText: [], lowContrastText: [], undersizedControls: [], unexpectedEnglish: [], translationFallback: [], activeAnimationCount: 0, heroHeight: 352,
   pageHeading: true, sequentialHeadings: true, compactHero: true, roleGeometry: true, heroGeometry: true, mobileMapFirstFold: true, mobileDomOrder: true, mobileHierarchyTruth: true, workspaceSidebarTruth: true, workbenchTruth: true, wideCanvasTruth: true, gateDetailsTruth: true, refinedVisualSystemTruth: true, currentStageActionTruth: true, singleProgressRailTruth: true, phaseNavigationUniqueTruth: true, currentSelectionDistinctionTruth: true, folderHierarchyTruth: true, phaseCurrentMarkerTruth: true, phaseLabelsFull: true, phaseBandTruth: true, phaseOptionTitlesFull: true, desktopPhaseListFirstFold: true, liveSemantics: true, structureTruth: true, phaseCompletionTruth: true, stagePositionTruth: true, snapshotHeroTruth: true, oneMapSurface: true, roving: true, desktopColumns: true, mobileDrill: true, gateCountTruth: true, gaugeTruth: true, explorationTruth: true, groupTruth: true, singleStaleNowSignal: true, snapshotBadgeTextTruth: true, technicalCollapsed: true, technicalEvidence: true, noFabricatedProgress: true, firstFold: true,
+})
+
+test('nested summary role rows resolve the accessible title and status targets', () => {
+  const title = { textContent: '빌더' }; const status = { textContent: '대기' }
+  const summary = { querySelector: (selector) => selector === ':scope > strong' ? title : selector === ':scope > span:not(.oc-live-signal)' ? status : null }
+  const row = { querySelector: (selector) => selector === ':scope > summary' ? summary : null }
+  assert.deepEqual(resolveRoleDisclosureTargets(row, 'fixture role 1'), { summary, title, status })
+})
+
+test('missing role target fails cleanly with an explicit disclosure diagnostic', () => {
+  const status = { textContent: '대기' }; const summary = { querySelector: (selector) => selector === ':scope > span:not(.oc-live-signal)' ? status : null }
+  const row = { querySelector: (selector) => selector === ':scope > summary' ? summary : null }
+  let failure
+  try { resolveRoleDisclosureTargets(row, 'fixture role 2') } catch (error) { failure = error }
+  assert.match(failure?.message ?? '', /fixture role 2: role disclosure target missing summary=true title=false status=true/)
+  assert.doesNotMatch(failure?.message ?? '', /TypeError|selectNodeContents/)
 })
 
 test('all contracted viewport names accept the interactive hierarchy measurement', () => {
@@ -76,7 +92,7 @@ test('mobile hierarchy flow requires static positioning and zero option overlap 
   assert.throws(() => assertMobileHierarchyFlowMeasurement('mobile-390x844/outcome', { ...passing, scrollY: 958 }), /scrollY=958/)
 })
 
-test('role geometry fails closed unless every name and status stays on one line without intersections or overflow', () => {
+test('role geometry fails closed unless disclosure targets contain title and status without intersections or status overflow', () => {
   assert.throws(() => assertDashboardMeasurement('mobile-390x844/cherry-note', { ...passingMeasurement(), roleGeometry: false }), /roleGeometry=false/)
   assert.throws(() => assertDashboardMeasurement('mobile-390x844/cherry-note', { ...passingMeasurement(), roleDescendantIntersections: ['사용성·제품 검수/출시 감사'] }), /roleIntersections=/)
   assert.throws(() => assertDashboardMeasurement('mobile-390x844/cherry-note', { ...passingMeasurement(), roleStatusOverflow: ['사용성·제품 검수:114x44->114x111'] }), /roleStatusOverflow=/)
