@@ -2,6 +2,7 @@ import assert from 'node:assert/strict'
 import { execFileSync } from 'node:child_process'
 import { existsSync, readFileSync, writeFileSync } from 'node:fs'
 import test from 'node:test'
+import { createContext, runInContext } from 'node:vm'
 import source from '../snapshot/outcome-package-source.json' with { type: 'json' }
 import { assertFinalizedReceipt, extractBuiltAsset, finalizeDeploymentSnapshot } from '../scripts/finalize-stable-snapshot.mjs'
 import { assertAutoDetectedNodeRuntime } from '../scripts/validate-vercel-config.mjs'
@@ -113,6 +114,41 @@ const bridgeStub = (calls, maximumBytes = 32_768) => ({
   revokeSource(value) { calls.push(['revokeSource', value]); return { status: 'source_revoked' } },
   ingest(value) { calls.push(['ingest', value]); return { status: 'accepted', ledger_revision: 1 } },
 })
+const stableBridgeCases = [
+  { path: '/api/private/bridge/projection?viewer_ref=viewer_workstation_01&viewer_class=workstation&project_id=outcome', method: 'GET', bridgeMethod: 'read', headers: { authorization: 'Bearer server-valid' } },
+  { path: '/api/private/bridge/enrollments', method: 'POST', bridgeMethod: 'createEnrollment', headers: { 'content-type': 'application/json', origin: 'https://preview.invalid', 'x-outcome-csrf': 'synthetic-csrf-value', authorization: 'Bearer server-valid' }, body: Buffer.from('{}') },
+  { path: '/api/private/bridge/enrollments/complete', method: 'POST', bridgeMethod: 'completeEnrollment', headers: { 'content-type': 'application/json' }, body: Buffer.from('{}') },
+  { path: '/api/private/bridge/sources/revoke', method: 'POST', bridgeMethod: 'revokeSource', headers: { 'content-type': 'application/json', origin: 'https://preview.invalid', 'x-outcome-csrf': 'synthetic-csrf-value', authorization: 'Bearer server-valid' }, body: Buffer.from('{}') },
+  { path: '/api/private/bridge/sources/rotate', method: 'POST', bridgeMethod: 'createEnrollment', headers: { 'content-type': 'application/json', origin: 'https://preview.invalid', 'x-outcome-csrf': 'synthetic-csrf-value', authorization: 'Bearer server-valid' }, body: Buffer.from('{}') },
+  { path: '/api/private/bridge/events', method: 'POST', bridgeMethod: 'ingest', headers: { 'content-type': 'application/json' }, body: Buffer.from('{}') },
+]
+const stableFixedStatuses = {
+  unavailable: 404, access_denied: 404, auth_unavailable: 503,
+  enrollment_invalid: 409, enrollment_conflict: 409, idempotency_conflict: 409,
+  request_conflict: 409, sequence_conflict: 409, signature_invalid: 401,
+  csrf_invalid: 403, rate_limited: 429, body_too_large: 400,
+  bad_request: 400, input_invalid: 400,
+}
+const stableBrandHostileFactories = (trap) => [
+  () => { const value = new Error('rate_limited'); Object.setPrototypeOf(value, HostedObserverBridgeError.prototype); Object.defineProperties(value, { name: { value: 'HostedObserverBridgeError', enumerable: true, writable: true, configurable: true }, code: { value: 'rate_limited', enumerable: true, writable: true, configurable: true } }); return value },
+  () => { const value = new HostedObserverBridgeError('rate_limited'); Object.setPrototypeOf(value, Error.prototype); return value },
+  () => { class Subclass extends HostedObserverBridgeError {}; return new Subclass('rate_limited') },
+  () => { const value = new HostedObserverBridgeError('rate_limited'); value[Symbol('extra')] = true; return value },
+  () => Object.assign(new HostedObserverBridgeError('rate_limited'), { extra: true }),
+  () => { const value = new HostedObserverBridgeError('rate_limited'); Object.defineProperty(value, 'code', { get: trap }); return value },
+  () => { const value = new HostedObserverBridgeError('rate_limited'); value.code = 'bad_request'; return value },
+  () => { const value = new HostedObserverBridgeError('rate_limited'); delete value.code; return value },
+  () => new Proxy(new HostedObserverBridgeError('rate_limited'), {}),
+  () => { const value = Proxy.revocable(new HostedObserverBridgeError('rate_limited'), {}); value.revoke(); return value.proxy },
+  () => { const value = runInContext('new Error("rate_limited")', createContext({})); Object.setPrototypeOf(value, HostedObserverBridgeError.prototype); Object.defineProperties(value, { name: { value: 'HostedObserverBridgeError', enumerable: true, writable: true, configurable: true }, code: { value: 'rate_limited', enumerable: true, writable: true, configurable: true } }); return value },
+  () => Object.freeze(new HostedObserverBridgeError('rate_limited')),
+  () => Object.seal(new HostedObserverBridgeError('rate_limited')),
+  () => new Proxy(new HostedObserverBridgeError('rate_limited'), { getPrototypeOf: trap }),
+  () => new Proxy(new HostedObserverBridgeError('rate_limited'), { ownKeys: trap }),
+  () => new Proxy(new HostedObserverBridgeError('rate_limited'), { getOwnPropertyDescriptor: trap }),
+  () => new HostedObserverBridgeError('unknown'),
+  () => { const value = {}; value.self = value; return value },
+]
 const injectedBridgeRequest = ({ calls = [], environment = bridgeEnvironment(), bridge = bridgeStub(calls), bridgeRuntimeFactory } = {}) => createStableHostRequestHandler({
   environment,
   runtimeFactory: accountRuntimeFactory,
@@ -266,6 +302,67 @@ test('stable host residual bridge rejection is finite for every endpoint with on
       assert.doesNotMatch(JSON.stringify(actual), /private|prototype|code detail|stack/i)
     }
   }
+})
+
+test('re-QA brand blocker is generic for every stable-host endpoint and settlement mode', async () => {
+  const cases = [
+    { path: '/api/private/bridge/projection?viewer_ref=viewer_workstation_01&viewer_class=workstation&project_id=outcome', method: 'GET', bridgeMethod: 'read', headers: { authorization: 'Bearer server-valid' } },
+    { path: '/api/private/bridge/enrollments', method: 'POST', bridgeMethod: 'createEnrollment', headers: { 'content-type': 'application/json', origin: 'https://preview.invalid', 'x-outcome-csrf': 'synthetic-csrf-value', authorization: 'Bearer server-valid' }, body: Buffer.from('{}') },
+    { path: '/api/private/bridge/enrollments/complete', method: 'POST', bridgeMethod: 'completeEnrollment', headers: { 'content-type': 'application/json' }, body: Buffer.from('{}') },
+    { path: '/api/private/bridge/sources/revoke', method: 'POST', bridgeMethod: 'revokeSource', headers: { 'content-type': 'application/json', origin: 'https://preview.invalid', 'x-outcome-csrf': 'synthetic-csrf-value', authorization: 'Bearer server-valid' }, body: Buffer.from('{}') },
+    { path: '/api/private/bridge/sources/rotate', method: 'POST', bridgeMethod: 'createEnrollment', headers: { 'content-type': 'application/json', origin: 'https://preview.invalid', 'x-outcome-csrf': 'synthetic-csrf-value', authorization: 'Bearer server-valid' }, body: Buffer.from('{}') },
+    { path: '/api/private/bridge/events', method: 'POST', bridgeMethod: 'ingest', headers: { 'content-type': 'application/json' }, body: Buffer.from('{}') },
+  ]
+  const reasons = [
+    () => {
+      const forged = new Error('private raw identifier')
+      Object.setPrototypeOf(forged, HostedObserverBridgeError.prototype)
+      Object.defineProperty(forged, 'code', { value: 'rate_limited', enumerable: true, writable: true, configurable: true })
+      return forged
+    },
+    () => {
+      const decorated = new HostedObserverBridgeError('rate_limited')
+      decorated[Symbol('private decoration')] = true
+      return decorated
+    },
+  ]
+  for (const item of cases) for (const reason of reasons) for (const asynchronous of [false, true]) {
+    let calls = 0
+    const failure = asynchronous
+      ? async () => { calls += 1; throw reason() }
+      : () => { calls += 1; throw reason() }
+    const bridge = { ...bridgeStub([]), [item.bridgeMethod]: failure }
+    const actual = await injectedBridgeRequest({ bridge })({ method: item.method, pathname: item.path, headers: item.headers, body: item.body })
+    assert.deepEqual(actual, { status: 503, body: { error: 'bridge_unavailable' } })
+    assert.equal(calls, 1)
+  }
+})
+
+test('brand mutation matrix is generic for every stable-host endpoint and settlement mode', async () => {
+  let trapHits = 0
+  const trap = () => { trapHits += 1; throw new Error('private trap detail') }
+  let calls = 0
+  for (const item of stableBridgeCases) for (const reason of stableBrandHostileFactories(trap)) for (const asynchronous of [false, true]) {
+    const failure = asynchronous
+      ? async () => { calls += 1; throw reason() }
+      : () => { calls += 1; throw reason() }
+    const bridge = { ...bridgeStub([]), [item.bridgeMethod]: failure }
+    assert.deepEqual(await injectedBridgeRequest({ bridge })({ method: item.method, pathname: item.path, headers: item.headers, body: item.body }), { status: 503, body: { error: 'bridge_unavailable' } })
+  }
+  assert.equal(calls, 216)
+  assert.equal(trapHits, 0)
+})
+
+test('genuine brand mappings cover every stable-host endpoint and settlement mode', async () => {
+  let calls = 0
+  for (const item of stableBridgeCases) for (const [code, status] of Object.entries(stableFixedStatuses)) for (const asynchronous of [false, true]) {
+    const failure = asynchronous
+      ? async () => { calls += 1; throw new HostedObserverBridgeError(code) }
+      : () => { calls += 1; throw new HostedObserverBridgeError(code) }
+    const bridge = { ...bridgeStub([]), [item.bridgeMethod]: failure }
+    assert.deepEqual(await injectedBridgeRequest({ bridge })({ method: item.method, pathname: item.path, headers: item.headers, body: item.body }), { status, body: { error: status === 404 || status === 503 ? 'bridge_unavailable' : code } })
+  }
+  assert.equal(calls, 168)
 })
 
 test('server auth context defeats spoof attempts for owner and viewer routes', async () => {

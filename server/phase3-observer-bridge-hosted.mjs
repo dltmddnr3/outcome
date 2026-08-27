@@ -25,12 +25,45 @@ const READ_FIELDS = new Set(['auth_context', 'viewer_ref', 'viewer_class', 'proj
 const REVOKE_FIELDS = new Set(['auth_context', 'certificate_ref', 'expected_revision'])
 const ENROLLMENT_CANONICAL_FIELDS = Object.freeze(['workspace_id', 'project_id', 'role', 'binding_version', 'source_ref', 'source_version', 'key_version', 'mode', 'challenge_ref', 'challenge_nonce', 'public_key_spki'])
 const ENROLLMENT_FINGERPRINT_FIELDS = Object.freeze(['account_ref', 'workspace_id', 'project_id', 'role', 'binding_version', 'source_ref', 'mode'])
+const HOSTED_ERROR_BRAND = new WeakSet()
+const HOSTED_ERROR_ORIGINAL_CODE = new WeakMap()
+const HOSTED_API_ERROR_CODES = new Set(['unavailable', 'access_denied', 'auth_unavailable', 'enrollment_invalid', 'enrollment_conflict', 'idempotency_conflict', 'request_conflict', 'sequence_conflict', 'signature_invalid', 'csrf_invalid', 'rate_limited', 'body_too_large', 'bad_request', 'input_invalid'])
+const HOSTED_ERROR_KEYS = new Set(['stack', 'message', 'name', 'code'])
 
 export class HostedObserverBridgeError extends Error {
   constructor(code) {
     super(code)
+    let stack = ''
+    try { const value = this.stack; stack = typeof value === 'string' ? value : '' } catch {}
+    Object.defineProperty(this, 'stack', { value: stack, writable: true, enumerable: false, configurable: true })
     this.name = 'HostedObserverBridgeError'
     this.code = code
+    HOSTED_ERROR_BRAND.add(this)
+    HOSTED_ERROR_ORIGINAL_CODE.set(this, code)
+  }
+}
+
+const exactDataDescriptor = (descriptor, enumerable) => descriptor
+  && Object.hasOwn(descriptor, 'value')
+  && descriptor.writable === true
+  && descriptor.enumerable === enumerable
+  && descriptor.configurable === true
+
+export function safeHostedObserverBridgeErrorCode(error) {
+  try {
+    if (typeof error !== 'object' || error === null || isProxy(error) || !HOSTED_ERROR_BRAND.has(error)) return null
+    if (Object.getPrototypeOf(error) !== HostedObserverBridgeError.prototype) return null
+    const descriptors = Object.getOwnPropertyDescriptors(error)
+    const keys = Reflect.ownKeys(descriptors)
+    if (keys.length !== HOSTED_ERROR_KEYS.size || keys.some((key) => typeof key !== 'string' || !HOSTED_ERROR_KEYS.has(key))) return null
+    if (!exactDataDescriptor(descriptors.stack, false) || typeof descriptors.stack.value !== 'string') return null
+    if (!exactDataDescriptor(descriptors.message, false) || typeof descriptors.message.value !== 'string') return null
+    if (!exactDataDescriptor(descriptors.name, true) || descriptors.name.value !== 'HostedObserverBridgeError') return null
+    if (!exactDataDescriptor(descriptors.code, true) || typeof descriptors.code.value !== 'string') return null
+    if (descriptors.message.value !== descriptors.code.value || HOSTED_ERROR_ORIGINAL_CODE.get(error) !== descriptors.code.value || !HOSTED_API_ERROR_CODES.has(descriptors.code.value)) return null
+    return descriptors.code.value
+  } catch {
+    return null
   }
 }
 

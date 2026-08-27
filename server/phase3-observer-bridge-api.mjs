@@ -1,5 +1,5 @@
-import { isNativeError, isProxy } from 'node:util/types'
-import { HostedObserverBridgeError } from './phase3-observer-bridge-hosted.mjs'
+import { isProxy } from 'node:util/types'
+import { HostedObserverBridgeError, safeHostedObserverBridgeErrorCode } from './phase3-observer-bridge-hosted.mjs'
 
 const response = (status, body) => ({ status, body })
 const PRIVATE_PREFIX = '/api/private/bridge/'
@@ -173,20 +173,8 @@ const ERROR_STATUS = Object.freeze({
   input_invalid: 400,
 })
 
-const safeHostedErrorCode = (error) => {
-  try {
-    if (typeof error !== 'object' || error === null || isProxy(error) || !isNativeError(error)) return null
-    if (Object.getPrototypeOf(error) !== HostedObserverBridgeError.prototype) return null
-    const descriptor = Object.getOwnPropertyDescriptor(error, 'code')
-    if (!descriptor || !Object.hasOwn(descriptor, 'value') || typeof descriptor.value !== 'string' || !Object.hasOwn(ERROR_STATUS, descriptor.value)) return null
-    return descriptor.value
-  } catch {
-    return null
-  }
-}
-
 const errorResponse = (error) => {
-  const code = safeHostedErrorCode(error)
+  const code = safeHostedObserverBridgeErrorCode(error)
   if (code === null) return response(503, { error: 'bridge_unavailable' })
   const status = ERROR_STATUS[code]
   const safe = status === 404 || status === 503 ? 'bridge_unavailable' : code
