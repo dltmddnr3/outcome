@@ -155,17 +155,21 @@ export function createStableHostRequestHandler({ environment = process.env, runt
           return error?.code === 'authentication_unavailable' ? result(503, { error: 'bridge_unavailable' }) : bridgeUnavailable()
         }
       }
-      return await handleHostedObserverBridgeRequest({
-        bridge: bridgeRuntime.bridge,
-        allowed_origin: bridgeRuntime.allowedOrigin,
-        csrf_secret: bridgeRuntime.csrfSecret,
-        method,
-        path: location.path,
-        headers: selectedHeaders(headers, companion),
-        rawBody: body,
-        authContext,
-        query: location.query,
-      })
+      try {
+        return await handleHostedObserverBridgeRequest({
+          bridge: bridgeRuntime.bridge,
+          allowed_origin: bridgeRuntime.allowedOrigin,
+          csrf_secret: bridgeRuntime.csrfSecret,
+          method,
+          path: location.path,
+          headers: selectedHeaders(headers, companion),
+          rawBody: body,
+          authContext,
+          query: location.query,
+        })
+      } catch {
+        return result(503, { error: 'bridge_unavailable' })
+      }
     }
     if (!pathname.startsWith('/api/private/')) {
       if (configured && method === 'GET' && ['/api/dashboard', '/api/dashboard/cherry-note'].includes(pathname)) return result(404, { error: 'not_found' })

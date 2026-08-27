@@ -1,4 +1,4 @@
-import { isProxy } from 'node:util/types'
+import { isNativeError, isProxy } from 'node:util/types'
 import { HostedObserverBridgeError } from './phase3-observer-bridge-hosted.mjs'
 
 const response = (status, body) => ({ status, body })
@@ -156,25 +156,40 @@ function withServerFields(record, fields) {
   return output
 }
 
+const ERROR_STATUS = Object.freeze({
+  unavailable: 404,
+  access_denied: 404,
+  auth_unavailable: 503,
+  enrollment_invalid: 409,
+  enrollment_conflict: 409,
+  idempotency_conflict: 409,
+  request_conflict: 409,
+  sequence_conflict: 409,
+  signature_invalid: 401,
+  csrf_invalid: 403,
+  rate_limited: 429,
+  body_too_large: 400,
+  bad_request: 400,
+  input_invalid: 400,
+})
+
+const safeHostedErrorCode = (error) => {
+  try {
+    if (typeof error !== 'object' || error === null || isProxy(error) || !isNativeError(error)) return null
+    if (Object.getPrototypeOf(error) !== HostedObserverBridgeError.prototype) return null
+    const descriptor = Object.getOwnPropertyDescriptor(error, 'code')
+    if (!descriptor || !Object.hasOwn(descriptor, 'value') || typeof descriptor.value !== 'string' || !Object.hasOwn(ERROR_STATUS, descriptor.value)) return null
+    return descriptor.value
+  } catch {
+    return null
+  }
+}
+
 const errorResponse = (error) => {
-  if (!(error instanceof HostedObserverBridgeError)) return response(503, { error: 'bridge_unavailable' })
-  const status = {
-    unavailable: 404,
-    access_denied: 404,
-    auth_unavailable: 503,
-    enrollment_invalid: 409,
-    enrollment_conflict: 409,
-    idempotency_conflict: 409,
-    request_conflict: 409,
-    sequence_conflict: 409,
-    signature_invalid: 401,
-    csrf_invalid: 403,
-    rate_limited: 429,
-    body_too_large: 400,
-    bad_request: 400,
-    input_invalid: 400,
-  }[error.code] ?? 503
-  const safe = status === 404 ? 'bridge_unavailable' : (status === 503 ? 'bridge_unavailable' : error.code)
+  const code = safeHostedErrorCode(error)
+  if (code === null) return response(503, { error: 'bridge_unavailable' })
+  const status = ERROR_STATUS[code]
+  const safe = status === 404 || status === 503 ? 'bridge_unavailable' : code
   return response(status, { error: safe })
 }
 

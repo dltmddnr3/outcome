@@ -242,6 +242,32 @@ test('stable host awaits async bridge completion and safely maps rejection', asy
   }
 })
 
+test('stable host residual bridge rejection is finite for every endpoint with one call and retry zero', async () => {
+  const cases = [
+    { path: '/api/private/bridge/projection?viewer_ref=viewer_workstation_01&viewer_class=workstation&project_id=outcome', method: 'GET', bridgeMethod: 'read', headers: { authorization: 'Bearer server-valid' } },
+    { path: '/api/private/bridge/enrollments', method: 'POST', bridgeMethod: 'createEnrollment', headers: { 'content-type': 'application/json', origin: 'https://preview.invalid', 'x-outcome-csrf': 'synthetic-csrf-value', authorization: 'Bearer server-valid' }, body: Buffer.from('{}') },
+    { path: '/api/private/bridge/enrollments/complete', method: 'POST', bridgeMethod: 'completeEnrollment', headers: { 'content-type': 'application/json' }, body: Buffer.from('{}') },
+    { path: '/api/private/bridge/sources/revoke', method: 'POST', bridgeMethod: 'revokeSource', headers: { 'content-type': 'application/json', origin: 'https://preview.invalid', 'x-outcome-csrf': 'synthetic-csrf-value', authorization: 'Bearer server-valid' }, body: Buffer.from('{}') },
+    { path: '/api/private/bridge/sources/rotate', method: 'POST', bridgeMethod: 'createEnrollment', headers: { 'content-type': 'application/json', origin: 'https://preview.invalid', 'x-outcome-csrf': 'synthetic-csrf-value', authorization: 'Bearer server-valid' }, body: Buffer.from('{}') },
+    { path: '/api/private/bridge/events', method: 'POST', bridgeMethod: 'ingest', headers: { 'content-type': 'application/json' }, body: Buffer.from('{}') },
+  ]
+  for (const item of cases) {
+    const reasons = [
+      new Proxy(new HostedObserverBridgeError('rate_limited'), { getPrototypeOf() { throw new Error('private prototype detail') } }),
+      (() => { const error = new HostedObserverBridgeError('rate_limited'); Object.defineProperty(error, 'code', { get() { throw new Error('private code detail') } }); return error })(),
+    ]
+    for (const reason of reasons) {
+      let calls = 0
+      const bridge = { ...bridgeStub([]), [item.bridgeMethod]: async () => { calls += 1; throw reason } }
+      const bridgeRequest = injectedBridgeRequest({ bridge })
+      const actual = await bridgeRequest({ method: item.method, pathname: item.path, headers: item.headers, body: item.body })
+      assert.deepEqual(actual, { status: 503, body: { error: 'bridge_unavailable' } })
+      assert.equal(calls, 1)
+      assert.doesNotMatch(JSON.stringify(actual), /private|prototype|code detail|stack/i)
+    }
+  }
+})
+
 test('server auth context defeats spoof attempts for owner and viewer routes', async () => {
   const calls = []
   const bridgeRequest = injectedBridgeRequest({ calls })

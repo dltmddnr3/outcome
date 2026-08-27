@@ -30,6 +30,87 @@ const seamCases = [
 ]
 const seamInput = ({ path, method, headers, query, rawBody }) => ({ path, method, headers, query, rawBody, authContext: { token: 'owner' } })
 
+test('Audit hostile rejection reasons: throwing getPrototypeOf Proxy is contained', async () => {
+  const hostile = new Proxy(new HostedObserverBridgeError('rate_limited'), { getPrototypeOf() { throw new Error('private getPrototypeOf stack') } })
+  const bridge = { maxBodyBytes: 1024, read: async () => { throw hostile } }
+  assert.deepEqual(await call(bridge, seamInput(seamCases[0])), { status: 503, body: { error: 'bridge_unavailable' } })
+})
+
+test('Audit hostile rejection reasons: throwing code accessor is contained', async () => {
+  const hostile = new HostedObserverBridgeError('rate_limited')
+  Object.defineProperty(hostile, 'code', { get() { throw new Error('private code accessor stack') } })
+  const bridge = { maxBodyBytes: 1024, read: async () => { throw hostile } }
+  assert.deepEqual(await call(bridge, seamInput(seamCases[0])), { status: 503, body: { error: 'bridge_unavailable' } })
+})
+
+test('hostile rejection corpus is total for every endpoint with one call and no unhandled rejection', async () => {
+  let trapHits = 0
+  const trap = () => { trapHits += 1; throw new Error('private trap detail') }
+  const trappedProxy = new Proxy({}, {
+    get: trap, getPrototypeOf: trap, ownKeys: trap, getOwnPropertyDescriptor: trap,
+    has: trap, set: trap, setPrototypeOf: trap, defineProperty: trap, deleteProperty: trap,
+  })
+  const revocable = Proxy.revocable({}, {})
+  revocable.revoke()
+  const accessorError = new HostedObserverBridgeError('rate_limited')
+  Object.defineProperty(accessorError, 'code', { get: trap })
+  const cyclic = {}
+  cyclic.self = cyclic
+  const hostileObject = {
+    code: 'rate_limited',
+    toString: trap,
+    valueOf: trap,
+    [Symbol.iterator]: trap,
+    [Symbol.for('nodejs.util.inspect.custom')]: trap,
+    self: cyclic,
+  }
+  const reasons = [undefined, null, 'private string', 1, 1n, Symbol('private'), cyclic, hostileObject, trappedProxy, revocable.proxy, accessorError]
+  const unhandled = []
+  const listener = (reason) => unhandled.push(reason)
+  process.on('unhandledRejection', listener)
+  try {
+    for (const item of seamCases) for (const reason of reasons) {
+      let invocations = 0
+      const bridge = { maxBodyBytes: 1024, [item.bridgeMethod]: async () => { invocations += 1; throw reason } }
+      const actual = await call(bridge, seamInput(item))
+      assert.deepEqual(actual, { status: 503, body: { error: 'bridge_unavailable' } }, item.name)
+      assert.equal(invocations, 1, item.name)
+      assert.equal(JSON.stringify(actual).includes('private'), false)
+    }
+    await new Promise((resolve) => setImmediate(resolve))
+    assert.deepEqual(unhandled, [])
+    assert.equal(trapHits, 0)
+  } finally {
+    process.off('unhandledRejection', listener)
+  }
+})
+
+test('safe known error classification requires exact native type and own data code', async () => {
+  const statuses = {
+    unavailable: 404, access_denied: 404, auth_unavailable: 503,
+    enrollment_invalid: 409, enrollment_conflict: 409, idempotency_conflict: 409,
+    request_conflict: 409, sequence_conflict: 409, signature_invalid: 401,
+    csrf_invalid: 403, rate_limited: 429, body_too_large: 400,
+    bad_request: 400, input_invalid: 400,
+  }
+  for (const [code, status] of Object.entries(statuses)) for (const asynchronous of [false, true]) {
+    const error = new HostedObserverBridgeError(code)
+    if (asynchronous) Object.freeze(error)
+    const failure = asynchronous ? async () => { throw error } : () => { throw error }
+    const actual = await call({ maxBodyBytes: 1024, read: failure }, seamInput(seamCases[0]))
+    assert.deepEqual(actual, { status, body: { error: status === 404 || status === 503 ? 'bridge_unavailable' : code } })
+  }
+  class ForgedSubclass extends HostedObserverBridgeError {}
+  const inherited = Object.create({ code: 'rate_limited' })
+  const accessor = new HostedObserverBridgeError('rate_limited')
+  Object.defineProperty(accessor, 'code', { get() { throw new Error('private accessor') } })
+  const forged = [{ code: 'rate_limited' }, inherited, Object.assign(new Error('plain'), { code: 'rate_limited' }), new ForgedSubclass('rate_limited'), new HostedObserverBridgeError('unknown'), accessor]
+  for (const reason of forged) {
+    const actual = await call({ maxBodyBytes: 1024, read: async () => { throw reason } }, seamInput(seamCases[0]))
+    assert.deepEqual(actual, { status: 503, body: { error: 'bridge_unavailable' } })
+  }
+})
+
 test('sync and async bridge methods produce identical finite responses for all six endpoints', async () => {
   for (const item of seamCases) {
     for (const asynchronous of [false, true]) {
