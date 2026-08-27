@@ -90,3 +90,17 @@ The database evidence is actual local PostgreSQL-compatible PGlite execution of 
 6. A dedicated backend role does not preserve row isolation after full process or credential compromise.
 
 `learning_receipt:` deletion truth needs a locked nonempty target before revision consumption; exact recovery scope must be carried by schema relations, coverage, receipt, re-delete and audit together; canonical state vocabularies are persistence contracts rather than display aliases.
+
+## Final QA and Release Audit evidence fixation
+
+Terminal: `LOCAL_OPTION_A_CORRECTION_QA_AUDIT_EVIDENCE_FIXED_ONLY`
+
+- Audited local candidate receipt: commit `863fb61fa076482bfe5b7e2b3535def9509e463a`, tree `3f820d2f1e6a8224a3f7e1fb612ed35df563e842`.
+- Audited semantic candidate: commit `5a368643aa33348673c5d90511a1c28c39baf1c5`, tree `0245ed2ff9e8a3d204b33232ce14faeafce2bac3`, direct parent authorization `a9d8a180701bf9e976e4eae49d13a70ed24d1e73`.
+- Fresh Re-QA evidence: commit `7f45d28d707bc0f7b23b77a86ab88fdf15d06aee`, tree `40d503476f584d2380bc7f78a03f36a268e15098`, report `docs/PHASE3_OBSERVER_BRIDGE_H3_H4_OPTION_A_FRESH_REQA_863FB61.md`, SHA-256 `2e601601439fee0b617540e4154dc5dc868cf5f9edaf5dac72046c96145bd125`, verdict `PASS_INDEPENDENT_QA_ONLY`.
+- Fresh Release Audit evidence: commit `431856769082ee5866f04b2c858409a5923b7d15`, tree `dc6f1a0f512385402e2cb91f470618e9d7109bac`, report `docs/PHASE3_OBSERVER_BRIDGE_H3_H4_OPTION_A_RELEASE_AUDIT_7F45D28.md`, SHA-256 `9216fa650dd267ef9038fe6051615f583db6d3fc2b67afc49283612fa503b226`, verdict `PASS_RELEASE_AUDIT_ONLY`.
+- Evidence graph is direct and immutable: authorization → semantic candidate → receipt carrier → Re-QA carrier → Release Audit carrier. Each QA/Audit carrier added exactly one named report. Candidate semantic drift after receipt, QA, and Audit: 0 paths and 0 bytes.
+- External operation ledger remains 0: remote database, Supabase/provider/account/project, credentials/environment/network, browser/device/session, hosted wiring, deploy, push, release, and public message were not executed.
+- Rollback remains Git-only before any external application: revert this evidence carrier, then receipt carrier `863fb61fa076482bfe5b7e2b3535def9509e463a`, then semantic candidate `5a368643aa33348673c5d90511a1c28c39baf1c5`.
+- Accepted residual risk remains unchanged: full compromise of the trusted backend process or effective-role credential defeats bridge-row isolation; managed PostgreSQL/Supabase parity, hosted wiring, real persistence, and post-apply rollback remain unproven.
+- This evidence fixation does not authorize or prove O2, Phase 3 progress, Cherry acceptance, hosted migration, deploy, release, or external completion. O2 remains `OPEN/LOCKED`, Phase 3 remains `17/43`, and `EXTERNAL_OUTCOME_COMPLETE=false`.

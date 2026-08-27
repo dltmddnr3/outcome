@@ -42,14 +42,14 @@ Outcome: Cherry가 승인한 trusted private backend 경계에서 실패한 H3-H
   CHECK: node --test --test-name-pattern='restore exact scope' server/phase3-observer-bridge-postgres.test.mjs
   EXPECT: wrong/absent project, role, binding, source or version fails before receipt/audit/read resume.
   EVIDENCE: composite source-scope FK chain and hostile wrong project/role/binding/source/source-version/deletion-revision probes prove receipt/audit 0 until exact restore; persisted receipt matches all seven scope coordinates.
-- [ ] A8: fresh UX & Product QA가 동일 immutable candidate를 hostile read-only로 검증한다.
-  CHECK: test -n "$(find docs -maxdepth 1 -name 'PHASE3_OBSERVER_BRIDGE_H3_H4_OPTION_A_FRESH_QA_*.md' -print -quit)" && rg -q 'PASS_INDEPENDENT_QA_ONLY' docs/PHASE3_OBSERVER_BRIDGE_H3_H4_OPTION_A_FRESH_QA_*.md && echo A8_PASS
+- [x] A8: fresh UX & Product QA가 동일 immutable candidate를 hostile read-only로 검증한다.
+  CHECK: test "$(git show -s --format=%T 7f45d28d707bc0f7b23b77a86ab88fdf15d06aee)" = "40d503476f584d2380bc7f78a03f36a268e15098" && test "$(git show -s --format=%P 7f45d28d707bc0f7b23b77a86ab88fdf15d06aee)" = "863fb61fa076482bfe5b7e2b3535def9509e463a" && test "$(shasum -a 256 docs/PHASE3_OBSERVER_BRIDGE_H3_H4_OPTION_A_FRESH_REQA_863FB61.md | awk '{print $1}')" = "2e601601439fee0b617540e4154dc5dc868cf5f9edaf5dac72046c96145bd125" && rg -q 'PASS_INDEPENDENT_QA_ONLY' docs/PHASE3_OBSERVER_BRIDGE_H3_H4_OPTION_A_FRESH_REQA_863FB61.md && echo A8_PASS
   EXPECT: `PASS_INDEPENDENT_QA_ONLY` or exact FAIL/BLOCKED.
-  EVIDENCE: pending
-- [ ] A9: 별도 fresh Release Audit가 동일 promoted evidence carrier와 privacy/runtime/rollback/scope를 검증한다.
-  CHECK: test -n "$(find docs -maxdepth 1 -name 'PHASE3_OBSERVER_BRIDGE_H3_H4_OPTION_A_RELEASE_AUDIT_*.md' -print -quit)" && rg -q 'PASS_RELEASE_AUDIT_ONLY' docs/PHASE3_OBSERVER_BRIDGE_H3_H4_OPTION_A_RELEASE_AUDIT_*.md && echo A9_PASS
+  EVIDENCE: commit 7f45d28d707bc0f7b23b77a86ab88fdf15d06aee, tree 40d503476f584d2380bc7f78a03f36a268e15098, and report SHA-256 2e601601439fee0b617540e4154dc5dc868cf5f9edaf5dac72046c96145bd125 pin PASS_INDEPENDENT_QA_ONLY against receipt carrier 863fb61fa076482bfe5b7e2b3535def9509e463a.
+- [x] A9: 별도 fresh Release Audit가 동일 promoted evidence carrier와 privacy/runtime/rollback/scope를 검증한다.
+  CHECK: test "$(git show -s --format=%T 431856769082ee5866f04b2c858409a5923b7d15)" = "dc6f1a0f512385402e2cb91f470618e9d7109bac" && test "$(git show -s --format=%P 431856769082ee5866f04b2c858409a5923b7d15)" = "7f45d28d707bc0f7b23b77a86ab88fdf15d06aee" && test "$(shasum -a 256 docs/PHASE3_OBSERVER_BRIDGE_H3_H4_OPTION_A_RELEASE_AUDIT_7F45D28.md | awk '{print $1}')" = "9216fa650dd267ef9038fe6051615f583db6d3fc2b67afc49283612fa503b226" && rg -q 'PASS_RELEASE_AUDIT_ONLY' docs/PHASE3_OBSERVER_BRIDGE_H3_H4_OPTION_A_RELEASE_AUDIT_7F45D28.md && echo A9_PASS
   EXPECT: `PASS_RELEASE_AUDIT_ONLY` or exact FAIL/BLOCKED.
-  EVIDENCE: pending
+  EVIDENCE: commit 431856769082ee5866f04b2c858409a5923b7d15, tree dc6f1a0f512385402e2cb91f470618e9d7109bac, and report SHA-256 9216fa650dd267ef9038fe6051615f583db6d3fc2b67afc49283612fa503b226 pin PASS_RELEASE_AUDIT_ONLY against direct-parent QA carrier 7f45d28d707bc0f7b23b77a86ab88fdf15d06aee.
 - [x] A10: 원격 DB/provider/deploy/O2/progress/acceptance/release는 닫히지 않는다.
   CHECK: rg -q 'O2 remains `OPEN/LOCKED`' docs/PHASE3_OBSERVER_BRIDGE_OPTION_A_QA_CORRECTION_AMENDMENT.md && rg -q 'Phase 3 remains `17/43`' docs/PHASE3_OBSERVER_BRIDGE_OPTION_A_QA_CORRECTION_AMENDMENT.md && rg -q 'EXTERNAL_OUTCOME_COMPLETE=false' docs/PHASE3_OBSERVER_BRIDGE_OPTION_A_QA_CORRECTION_AMENDMENT.md && echo A10_PASS
   EXPECT: external mutations 0; O2 `OPEN/LOCKED`; Phase 3 `17/43`; `EXTERNAL_OUTCOME_COMPLETE=false`.
@@ -58,7 +58,3 @@ Outcome: Cherry가 승인한 trusted private backend 경계에서 실패한 H3-H
 ## ABANDON
 
 **ABANDON:** 이 Gate의 로컬 candidate·QA·Audit 완료도 원격 migration, hosted wiring, real two-viewer O2, 진행률, Cherry acceptance, deploy, release 또는 external completion이 아니다.
-
-**ABANDON:** A8은 Builder 권한 밖의 fresh UX & Product QA 전용 Gate이므로 이 candidate에서는 의도적으로 미충족이다.
-
-**ABANDON:** A9는 별도 fresh Release Audit 전용 Gate이므로 이 candidate에서는 의도적으로 미충족이다.
