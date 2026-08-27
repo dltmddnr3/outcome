@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict'
 import test from 'node:test'
 import { execFileSync } from 'node:child_process'
-import { chmodSync, existsSync, mkdtempSync, readFileSync, statSync, writeFileSync } from 'node:fs'
+import { chmodSync, existsSync, lstatSync, mkdirSync, mkdtempSync, readFileSync, statSync, symlinkSync, writeFileSync } from 'node:fs'
 import { join } from 'node:path'
 import { tmpdir } from 'node:os'
 import { createEmptyRegistry, doctorRegistry, loadRegistry, migrateLegacyRegistry, mutateRegistry, publicRegistryProjection, recoverRegistryLock } from './outcome-session-registry-persistence.mjs'
@@ -73,18 +73,38 @@ test('restart rejects causal binding and event lifecycle mismatches', () => {
   assert.throws(() => loadRegistry(path), /registry_conflict/)
 })
 
-test('private registry mode is enforced on create load and doctor', () => {
+test('private registry mode is exactly 0600 on create replacement load and doctor', () => {
   const path = tempPath(); createEmptyRegistry(path, ['outcome'])
   assert.equal(statSync(path).mode & 0o777, 0o600)
   mutateRegistry(path, { action: 'assign', projectId: 'outcome', role: 'builder', expectedVersion: 0, locator: 'private', ...meta })
   assert.equal(statSync(path).mode & 0o777, 0o600)
-  for (const mode of [0o640, 0o604, 0o644]) {
+  for (const mode of [0o000, 0o100, 0o200, 0o300, 0o400, 0o500, 0o700, 0o640, 0o604, 0o644, 0o660]) {
     chmodSync(path, mode)
     assert.throws(() => loadRegistry(path), /registry_unavailable/)
     const diagnosis = doctorRegistry(path, ['outcome'])
     assert.equal(diagnosis.ok, false)
-    assert.deepEqual(diagnosis.issues, ['registry_permissions_too_open'])
+    assert.deepEqual(diagnosis.issues, ['registry_permissions_invalid'])
   }
+  chmodSync(path, 0o600)
+  assert.equal(loadRegistry(path).schema_version, 2)
+  assert.equal(doctorRegistry(path, ['outcome']).ok, true)
+})
+
+test('registry directories and dangling or non-dangling symlinks fail closed', () => {
+  const source = tempPath(); createEmptyRegistry(source, ['outcome'])
+  for (const makePath of [
+    (path) => mkdirSync(path),
+    (path) => symlinkSync(`${path}.missing-target`, path),
+    (path) => symlinkSync(source, path),
+  ]) {
+    const path = tempPath(); makePath(path)
+    assert.throws(() => loadRegistry(path), /registry_unavailable/)
+    const diagnosis = doctorRegistry(path, ['outcome'])
+    assert.equal(diagnosis.ok, false); assert.deepEqual(diagnosis.issues, ['registry_unavailable'])
+  }
+  const dangling = tempPath(); symlinkSync(`${dangling}.missing-target`, dangling)
+  assert.throws(() => createEmptyRegistry(dangling, ['outcome']), /registry_exists/)
+  assert.equal(lstatSync(dangling).isSymbolicLink(), true)
 })
 
 test('doctor protects live locks and explicitly recovers only old identity-bound orphan locks', () => {
@@ -118,6 +138,22 @@ test('doctor protects live locks and explicitly recovers only old identity-bound
   assert.equal(existsSync(lockPath), false)
   assert.equal(doctorRegistry(path, ['outcome']).ok, true)
   assert.doesNotMatch(readFileSync(new URL('./outcome-session-registry-persistence.mjs', import.meta.url), 'utf8'), /process\.kill\s*\(/)
+})
+
+test('dangling and non-regular lock entries are invalid, stay protected, and block mutation', () => {
+  for (const makeLock of [
+    (lockPath) => symlinkSync(`${lockPath}.missing-target`, lockPath),
+    (lockPath) => { const target = `${lockPath}.target`; writeFileSync(target, '{}', { mode: 0o600 }); symlinkSync(target, lockPath) },
+    (lockPath) => mkdirSync(lockPath),
+  ]) {
+    const path = tempPath(); createEmptyRegistry(path, ['outcome']); const lockPath = `${path}.lock`; makeLock(lockPath)
+    const diagnosis = doctorRegistry(path, ['outcome'])
+    assert.equal(diagnosis.ok, false); assert.equal(diagnosis.lock.state, 'invalid'); assert.deepEqual(diagnosis.issues, ['registry_lock_invalid'])
+    assert.throws(() => recoverRegistryLock(path, { recoveryRef: diagnosis.lock.recoveryRef }), /registry_lock_invalid/)
+    assert.equal(lstatSync(lockPath).isSymbolicLink() || lstatSync(lockPath).isDirectory(), true)
+    assert.throws(() => mutateRegistry(path, { action: 'assign', projectId: 'outcome', role: 'builder', expectedVersion: 0, locator: 'private', ...meta }), /registry_busy/)
+    assert.equal(lstatSync(lockPath).isSymbolicLink() || lstatSync(lockPath).isDirectory(), true)
+  }
 })
 
 test('replacement followed by checkpoint remains a causally valid restart history', () => {

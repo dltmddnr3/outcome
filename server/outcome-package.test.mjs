@@ -110,6 +110,7 @@ test('Package installer creates the four-slot sessions companion without assignm
 test('sessions manifest accepts a stable public alias and rejects private or secret-bearing shapes', () => {
   const active = sessions.replace('active_binding_ref: null, binding_version: 0, state: unbound', 'active_binding_ref: planner-primary, binding_version: 1, state: active')
   assert.equal(fixture({ sessionsText: active }).errors.length, 0)
+  assert.equal(fixture({ sessionsText: active.replace('planner-primary', 'outcome-local-private') }).errors.length, 0)
   const hostile = [
     'codex://tenant-alpha/private-conversation/short',
     'session_id=private-value',
@@ -121,6 +122,15 @@ test('sessions manifest accepts a stable public alias and rejects private or sec
     'token=private-value',
     'sk-privatevalue123456',
     'ghp_privatevalue123456',
+    'session-private-value',
+    'thread-private-value',
+    'task-private-value',
+    'turn-private-value',
+    'sess-private-value',
+    'provider-session-12345',
+    'codex-thread-12345',
+    'openai-primary-alias',
+    'claude-primary-alias',
   ]
   for (const marker of hostile) {
     const text = active.replace('planner-primary', JSON.stringify(marker))

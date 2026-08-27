@@ -121,8 +121,8 @@ Persistence는 restart/crash 뒤 binding version, active uniqueness, event histo
 
 ### Private file 및 writer-lock 복구
 
-- v2 registry의 모든 load는 regular file과 owner-only `0600` mode를 먼저 확인한다. group/other bit가 하나라도 있으면 `registry_unavailable`이며 `doctor`는 `registry_permissions_too_open`을 반환한다. mode 수리는 operator가 원본 hash와 소유권을 확인한 뒤 별도 승인으로 수행하며 loader가 자동 chmod하지 않는다.
-- writer lock은 `0600` regular file에 owner PID, OS uid, process start identity, 생성 시각, nonce를 기록한다. `doctor`는 lock을 `live`, `unconfirmed`, `orphaned`, `invalid`로 구분한다. PID만 같고 process start identity가 다르면 live owner로 보지 않는다.
+- v2 registry의 모든 load는 POSIX regular non-symlink file과 exact `0600` mode를 `lstat` 및 no-follow descriptor에서 먼저 확인한다. `0400`, `0700`, group/other bit, symlink, directory 또는 해당 검증을 제공할 수 없는 platform은 모두 `registry_unavailable`이며 `doctor`는 mode 불일치를 `registry_permissions_invalid`로 반환한다. mode 수리는 operator가 원본 hash와 소유권을 확인한 뒤 별도 승인으로 수행하며 loader가 자동 chmod하지 않는다.
+- writer lock은 exact `0600` regular file에 owner PID, OS uid, process start identity, 생성 시각, nonce를 기록한다. lock directory entry는 `lstat`과 no-follow descriptor로 읽으며 dangling/non-dangling symlink, directory와 다른 non-regular type은 `invalid`다. `doctor`는 lock을 `live`, `unconfirmed`, `orphaned`, `invalid`로 구분한다. PID만 같고 process start identity가 다르면 live owner로 보지 않는다.
 - live lock과 생성 후 30초 미만인 unconfirmed lock은 제거하지 않는다. `recover-lock`은 routing/mutation을 중지한 operator가 `doctor`에서 받은 exact recovery ref를 다시 제출한 경우에만 30초 이상 된 orphan lock을 격리 rename 후 제거한다. recovery 과정은 어떤 PID에도 signal을 보내거나 종료하지 않는다.
 - operator flow: (1) mutation/routing freeze, (2) `doctor --registry-path <private-path>` 실행, (3) `registry_lock_orphaned`와 recovery ref 확인, (4) `recover-lock --registry-path <private-path> --recovery-ref <exact-ref>` 실행, (5) `doctor` 재실행, (6) 별도 synthetic/read-after-write 검사. `live`, `unconfirmed`, `invalid`, ref drift면 중단하고 파일/owner evidence를 보존한다.
 
@@ -138,6 +138,7 @@ Persistence는 restart/crash 뒤 binding version, active uniqueness, event histo
 
 역할 행을 열면 current binding의 public-safe metadata와 append-only transition history를 볼 수 있다. UI와 `/api/dashboard`에는 raw provider locator, session/thread/task/turn ID, local path, credential과 full private receipt가 0건이어야 한다. public-safe projection은 `binding_ref`도 직접 노출하지 않고 version/history count와 상태만 제공한다.
 Git과 Package 문서의 raw provider locator 및 private binding identifier도 0건이어야 하며, `OUTCOME_SESSIONS.md`에는 non-secret public-safe alias와 role slot만 허용한다.
+Public alias는 2-5개의 lower-case semantic segment와 최대 64자로 제한하며 provider/session/thread/task/turn 및 provider object vocabulary를 segment로 사용할 수 없다. 예를 들어 `outcome-local-private`와 `planner-primary`는 허용하지만 URI, UUID, underscore/equal/colon identifier와 `session-private-value`, `codex-thread-12345` 같은 hyphenated provider-ID shape은 거절한다.
 
 ## Source truth와 장애 처리
 

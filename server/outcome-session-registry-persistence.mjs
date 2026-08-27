@@ -1,4 +1,4 @@
-import { closeSync, existsSync, fsyncSync, linkSync, lstatSync, mkdirSync, openSync, readFileSync, renameSync, rmSync, statSync, writeFileSync } from 'node:fs'
+import { closeSync, constants, fchmodSync, fstatSync, fsyncSync, linkSync, lstatSync, mkdirSync, openSync, readFileSync, renameSync, rmSync, statSync, writeFileSync } from 'node:fs'
 import { execFileSync } from 'node:child_process'
 import { createHash, randomUUID } from 'node:crypto'
 import { dirname } from 'node:path'
@@ -34,6 +34,22 @@ const safePublicId = (value) => publicStableId(value) ? value : null
 const safePublicReason = (value) => typeof value === 'string' && SAFE_REASON.test(value) && !UUID.test(value) && !PUBLIC_IDENTIFIER.test(value) ? value : 'invalid_reason'
 const sanitizedPublicText = (value) => value == null ? null : safePublicText(value) ? value : null
 const safePublicTime = (value) => isoTime(value) ? value : null
+const exactPrivateMode = (metadata) => process.platform !== 'win32' && (metadata.mode & 0o777) === 0o600
+const sameFile = (left, right) => left.dev === right.dev && left.ino === right.ino
+
+function readExactPrivateFile(path, errorCode = 'registry_unavailable') {
+  let metadata; let descriptor
+  try {
+    metadata = lstatSync(path)
+    if (!metadata.isFile() || metadata.isSymbolicLink() || !exactPrivateMode(metadata) || !Number.isInteger(constants.O_NOFOLLOW)) fail(errorCode)
+    descriptor = openSync(path, constants.O_RDONLY | constants.O_NOFOLLOW)
+    if (!sameFile(metadata, fstatSync(descriptor))) fail(errorCode)
+    return readFileSync(descriptor)
+  } catch (error) {
+    if (error instanceof Error && error.message === errorCode) throw error
+    fail(errorCode)
+  } finally { if (descriptor !== undefined) closeSync(descriptor) }
+}
 
 function validateLifecycle(value) {
   const histories = new Map()
@@ -117,10 +133,12 @@ function validateRegistry(value) {
 }
 
 function atomicWrite(path, value) {
+  if (process.platform === 'win32' || !Number.isInteger(constants.O_NOFOLLOW)) fail('registry_unavailable')
   mkdirSync(dirname(path), { recursive: true, mode: 0o700 })
   const temp = `${path}.tmp-${process.pid}-${randomUUID()}`
   const descriptor = openSync(temp, 'wx', 0o600)
   try {
+    fchmodSync(descriptor, 0o600)
     writeFileSync(descriptor, `${JSON.stringify(value, null, 2)}\n`, 'utf8')
     fsyncSync(descriptor)
   } finally { closeSync(descriptor) }
@@ -137,18 +155,23 @@ const processIdentity = (pid) => {
 }
 const lockRef = (bytes) => createHash('sha256').update(bytes).digest('hex')
 const lockNow = (value = new Date()) => value instanceof Date ? value : new Date(value)
+const directoryEntryExists = (path) => { try { lstatSync(path); return true } catch (error) { return !(error && typeof error === 'object' && error.code === 'ENOENT') } }
 
 function inspectRegistryLock(path, options = {}) {
   const lockPath = `${path}.lock`
-  if (!existsSync(lockPath)) return { state: 'clear', recoveryRef: null, ageSeconds: null }
-  let metadata; let bytes; let value
-  try {
-    metadata = lstatSync(lockPath); bytes = readFileSync(lockPath)
-    value = JSON.parse(bytes.toString('utf8'))
-  } catch { return { state: 'invalid', recoveryRef: null, ageSeconds: null } }
+  let metadata
+  try { metadata = lstatSync(lockPath) } catch (error) { return error && typeof error === 'object' && error.code === 'ENOENT' ? { state: 'clear', recoveryRef: null, ageSeconds: null } : { state: 'invalid', recoveryRef: null, ageSeconds: null } }
   const currentUid = typeof process.getuid === 'function' ? process.getuid() : null
+  if (!metadata.isFile() || metadata.isSymbolicLink() || !exactPrivateMode(metadata) || currentUid !== null && metadata.uid !== currentUid || !Number.isInteger(constants.O_NOFOLLOW)) return { state: 'invalid', recoveryRef: null, ageSeconds: null }
+  let descriptor; let bytes; let value
+  try {
+    descriptor = openSync(lockPath, constants.O_RDONLY | constants.O_NOFOLLOW)
+    if (!sameFile(metadata, fstatSync(descriptor))) return { state: 'invalid', recoveryRef: null, ageSeconds: null }
+    bytes = readFileSync(descriptor)
+    value = JSON.parse(bytes.toString('utf8'))
+  } catch { return { state: 'invalid', recoveryRef: null, ageSeconds: null } } finally { if (descriptor !== undefined) closeSync(descriptor) }
   const recoveryRef = lockRef(bytes); const age = lockNow(options.now).getTime() - Date.parse(value?.created_at)
-  if (!metadata.isFile() || metadata.isSymbolicLink() || (metadata.mode & 0o077) !== 0 || currentUid !== null && metadata.uid !== currentUid || !value || typeof value !== 'object' || Array.isArray(value) || !hasExactKeys(value, LOCK_KEYS, [...LOCK_KEYS]) || value.schema_version !== 1 || !Number.isInteger(value.owner_pid) || value.owner_pid < 1 || value.owner_uid !== currentUid || typeof value.process_start_identity !== 'string' || !value.process_start_identity || !isoTime(value.created_at) || !UUID.test(value.owner_nonce) || !Number.isFinite(age) || age < 0) return { state: 'invalid', recoveryRef, ageSeconds: null }
+  if (!value || typeof value !== 'object' || Array.isArray(value) || !hasExactKeys(value, LOCK_KEYS, [...LOCK_KEYS]) || value.schema_version !== 1 || !Number.isInteger(value.owner_pid) || value.owner_pid < 1 || value.owner_uid !== currentUid || typeof value.process_start_identity !== 'string' || !value.process_start_identity || !isoTime(value.created_at) || !UUID.test(value.owner_nonce) || !Number.isFinite(age) || age < 0) return { state: 'invalid', recoveryRef, ageSeconds: null }
   const ageSeconds = Math.floor(age / 1000)
   if (processIdentity(value.owner_pid) === value.process_start_identity) return { state: 'live', recoveryRef, ageSeconds }
   if (age < LOCK_STALE_MILLISECONDS) return { state: 'unconfirmed', recoveryRef, ageSeconds }
@@ -161,6 +184,7 @@ function withLock(path, operation) {
   const candidatePath = `${lockPath}.candidate-${process.pid}-${randomUUID()}`
   const descriptor = openSync(candidatePath, 'wx', 0o600)
   try {
+    fchmodSync(descriptor, 0o600)
     writeFileSync(descriptor, `${JSON.stringify({ schema_version: 1, owner_pid: process.pid, owner_uid: typeof process.getuid === 'function' ? process.getuid() : null, process_start_identity: identity, created_at: new Date().toISOString(), owner_nonce: randomUUID() })}\n`, 'utf8'); fsyncSync(descriptor)
   } finally { closeSync(descriptor) }
   try { linkSync(candidatePath, lockPath) } catch (error) { rmSync(candidatePath, { force: true }); if (error && typeof error === 'object' && error.code === 'EEXIST') fail('registry_busy'); fail('registry_lock_unavailable') }
@@ -170,7 +194,7 @@ function withLock(path, operation) {
 
 export function createEmptyRegistry(path, projectIds) {
   if (!Array.isArray(projectIds) || !projectIds.length || new Set(projectIds).size !== projectIds.length || projectIds.some((id) => !publicStableId(id))) fail('invalid_project_registry')
-  if (existsSync(path)) fail('registry_exists')
+  if (directoryEntryExists(path)) fail('registry_exists')
   const registry = { schema_version: 2, revision: 0, next_event_sequence: 1, project_ids: [...projectIds], bindings: [], events: [] }
   atomicWrite(path, registry)
   return clone(registry)
@@ -178,9 +202,7 @@ export function createEmptyRegistry(path, projectIds) {
 
 export function loadRegistry(path) {
   try {
-    const metadata = lstatSync(path)
-    if (!metadata.isFile() || metadata.isSymbolicLink() || (metadata.mode & 0o077) !== 0) fail('registry_unavailable')
-    return clone(validateRegistry(JSON.parse(readFileSync(path, 'utf8'))))
+    return clone(validateRegistry(JSON.parse(readExactPrivateFile(path).toString('utf8'))))
   } catch (error) {
     if (error instanceof Error && ['registry_conflict', 'registry_unavailable'].includes(error.message)) throw error
     fail('registry_unavailable')
@@ -271,7 +293,7 @@ export function doctorRegistry(path, projectIds, options = {}) {
   let metadata
   try { metadata = lstatSync(path) } catch { return { ok: false, schemaVersion: null, revision: null, projects: 0, roleSlots: 0, issues: ['registry_unavailable'], lock: inspectRegistryLock(path, options) } }
   if (!metadata.isFile() || metadata.isSymbolicLink()) return { ok: false, schemaVersion: null, revision: null, projects: 0, roleSlots: 0, issues: ['registry_unavailable'], lock: inspectRegistryLock(path, options) }
-  if ((metadata.mode & 0o077) !== 0) return { ok: false, schemaVersion: null, revision: null, projects: 0, roleSlots: 0, issues: ['registry_permissions_too_open'], lock: inspectRegistryLock(path, options) }
+  if (!exactPrivateMode(metadata)) return { ok: false, schemaVersion: null, revision: null, projects: 0, roleSlots: 0, issues: ['registry_permissions_invalid'], lock: inspectRegistryLock(path, options) }
   let registry
   try { registry = loadRegistry(path) } catch (error) { return { ok: false, schemaVersion: null, revision: null, projects: 0, roleSlots: 0, issues: [error instanceof Error && error.message === 'registry_conflict' ? 'registry_conflict' : 'registry_unavailable'], lock: inspectRegistryLock(path, options) } }
   const issues = []; const lock = inspectRegistryLock(path, options)
@@ -290,8 +312,8 @@ export function recoverRegistryLock(path, { recoveryRef, now = new Date() } = {}
   const lockPath = `${path}.lock`; const quarantine = `${lockPath}.recovery-${randomUUID()}`
   try {
     renameSync(lockPath, quarantine)
-    if (lockRef(readFileSync(quarantine)) !== recoveryRef) {
-      if (!existsSync(lockPath)) renameSync(quarantine, lockPath)
+    if (lockRef(readExactPrivateFile(quarantine, 'registry_lock_changed')) !== recoveryRef) {
+      if (!directoryEntryExists(lockPath)) renameSync(quarantine, lockPath)
       fail('registry_lock_changed')
     }
     rmSync(quarantine)
@@ -303,7 +325,7 @@ export function recoverRegistryLock(path, { recoveryRef, now = new Date() } = {}
 }
 
 export function migrateLegacyRegistry({ legacyPath, registryPath, projectIds, occurredAt }) {
-  if (existsSync(registryPath)) fail('registry_exists')
+  if (directoryEntryExists(registryPath)) fail('registry_exists')
   const bytes = readFileSync(legacyPath); let legacy
   try { legacy = JSON.parse(bytes.toString('utf8')) } catch { fail('registry_unavailable') }
   if (!legacy || typeof legacy !== 'object' || Array.isArray(legacy) || Object.hasOwn(legacy, 'schema_version') || !Array.isArray(legacy.bindings)) fail('legacy_schema_invalid')
