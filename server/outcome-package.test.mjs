@@ -52,7 +52,10 @@ function registryFixture(ids = ['alpha', 'beta', 'gamma']) {
 test('project registry default config preserves Cherry Note and OUTCOME through the validated loader', () => {
   const definitions = loadProjectRegistry({ repositoryRoot: resolve('.') })
   assert.equal(definitions.length, 2)
-  assert.deepEqual(definitions.map(({ contractFile, mapFile }) => [contractFile, mapFile]), [['OUTCOME_CONTRACT.md', 'OUTCOME_MAP.md'], ['docs/OUTCOME_CONTRACT.md', 'docs/OUTCOME_MAP.md']])
+  assert.deepEqual(definitions.map(({ contractFile, mapFile, sessionsFile }) => [contractFile, mapFile, sessionsFile]), [
+    ['OUTCOME_CONTRACT.md', 'OUTCOME_MAP.md', 'OUTCOME_SESSIONS.md'],
+    ['docs/OUTCOME_CONTRACT.md', 'docs/OUTCOME_MAP.md', 'docs/OUTCOME_SESSIONS.md'],
+  ])
   assert.equal(definitions.every(({ root }) => isAbsolute(root)), true)
 })
 

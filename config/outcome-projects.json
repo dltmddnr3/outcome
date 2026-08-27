@@ -4,7 +4,8 @@
     {
       "root": "../Cherry Note",
       "contract_file": "OUTCOME_CONTRACT.md",
-      "map_file": "OUTCOME_MAP.md"
+      "map_file": "OUTCOME_MAP.md",
+      "sessions_file": "OUTCOME_SESSIONS.md"
     },
     {
       "root": ".",
