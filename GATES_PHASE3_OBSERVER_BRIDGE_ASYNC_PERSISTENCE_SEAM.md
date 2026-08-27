@@ -26,10 +26,10 @@ Outcome: audited private Observer Bridge API boundary가 sync 구현과 future a
   CHECK: test "$(rg -l 'handleHostedObserverBridgeRequest' --glob '!docs/**' --glob '!GATES*' . | sort | tr '\n' ' ')" = "./api/index.mjs ./server/phase3-observer-bridge-api.mjs ./server/phase3-observer-bridge-api.test.mjs " && node --test server/phase3-observer-bridge.test.mjs server/phase3-observer-bridge-api.test.mjs server/phase3-observer-bridge-hosted.test.mjs server/phase3-observer-bridge-postgres.test.mjs server/phase3-observer-bridge-operations.test.mjs server/account-access-api.test.mjs server/account-access-hosted.test.mjs server/account-access-identity-runtime.test.mjs server/stable-host.test.mjs
   EXPECT: no unawaited call site and all focused bridge/account behavior passes.
   EVIDENCE: inventory finds only implementation, awaited stable-host caller, and fully awaited API tests; bridge/account targeted matrix passes 115/115.
-- [ ] A7: full Node, frontend, build, security/public/mutation/scope/runbook/boundary/diff and immutable receipt checks pass.
+- [x] A7: full Node, frontend, build, security/public/mutation/scope/runbook/boundary/diff and immutable receipt checks pass.
   CHECK: test -f docs/PHASE3_OBSERVER_BRIDGE_ASYNC_PERSISTENCE_SEAM_BUILDER_RECEIPT.md && rg -q 'full Node: PASS' docs/PHASE3_OBSERVER_BRIDGE_ASYNC_PERSISTENCE_SEAM_BUILDER_RECEIPT.md && rg -q 'full frontend: PASS' docs/PHASE3_OBSERVER_BRIDGE_ASYNC_PERSISTENCE_SEAM_BUILDER_RECEIPT.md && rg -q 'build: PASS' docs/PHASE3_OBSERVER_BRIDGE_ASYNC_PERSISTENCE_SEAM_BUILDER_RECEIPT.md && rg -q 'security/public/mutation/scope/runbook/boundary/diff: PASS' docs/PHASE3_OBSERVER_BRIDGE_ASYNC_PERSISTENCE_SEAM_BUILDER_RECEIPT.md && rg -q 'external mutations: 0' docs/PHASE3_OBSERVER_BRIDGE_ASYNC_PERSISTENCE_SEAM_BUILDER_RECEIPT.md && rg -q 'O2: OPEN/LOCKED' docs/PHASE3_OBSERVER_BRIDGE_ASYNC_PERSISTENCE_SEAM_BUILDER_RECEIPT.md && rg -q 'Phase 3: 17/43' docs/PHASE3_OBSERVER_BRIDGE_ASYNC_PERSISTENCE_SEAM_BUILDER_RECEIPT.md && rg -q 'EXTERNAL_OUTCOME_COMPLETE=false' docs/PHASE3_OBSERVER_BRIDGE_ASYNC_PERSISTENCE_SEAM_BUILDER_RECEIPT.md && echo A7_PASS
   EXPECT: measured proportional checks pass; receipt pins rollback, false completions, learning, and all locked boundaries.
-  EVIDENCE: pending.
+  EVIDENCE: receipt records Node 236/236, frontend 89/89, build 1,652 modules, security 40/40, public 4/4, mutation 32/32 and 28/28 API, scope 47, runbook, boundary 0, diff PASS, external mutations 0, rollback, seven false-completion controls, residual risk, and learning.
 
 ## ABANDON
 
