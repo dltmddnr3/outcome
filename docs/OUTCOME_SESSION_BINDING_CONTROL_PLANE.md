@@ -116,7 +116,7 @@ Planner replace의 routing freeze, verified handoff, `STARTED`, `CONTINUITY_READ
 - migration 전 원본 byte SHA-256과 file mode를 receipt에 기록
 - active라고 쓰였더라도 최신 observation 근거가 없으면 `stale`, 자동 활성화하지 않음
 - v2 registry를 temp file에 완전히 쓰고 fsync/rename으로 원자 교체
-- 최초 registry 생성은 완전한 exact-`0600` temp inode를 exclusive hard-link publication으로 공개한다. 동시에 시작한 creator 중 하나만 성공하며 기존 path를 rename으로 덮어쓰지 않는다.
+- registry root를 처음 세울 수 있는 empty creation과 legacy migration은 모두 완전한 exact-`0600` temp inode를 동일한 exclusive hard-link publication primitive로 공개한다. create/create, migrate/migrate, create/migrate가 동시에 시작되어도 하나만 성공하고 loser는 `registry_exists`이며 기존 file, symlink, directory를 follow하거나 rename으로 덮어쓰지 않는다. migration source는 read-only로 유지하고 loser는 source receipt를 반환하지 않으며 temp/lock residue를 남기지 않는다.
 - migration event와 각 role의 version/history를 생성
 - validation 실패 시 원본을 보존하고 `registry_unavailable` 또는 `registry_conflict`
 - migration 과정에서 Git, Package 문서, raw locator 또는 progress를 변경하지 않음

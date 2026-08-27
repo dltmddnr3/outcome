@@ -153,7 +153,7 @@ function atomicWrite(path, value) {
   try { fsyncSync(directory) } finally { closeSync(directory) }
 }
 
-function atomicCreate(path, value) {
+function atomicPublishNewRegistry(path, value) {
   if (process.platform === 'win32' || !Number.isInteger(constants.O_NOFOLLOW)) fail('registry_unavailable')
   mkdirSync(dirname(path), { recursive: true, mode: 0o700 })
   const temp = `${path}.tmp-${process.pid}-${randomUUID()}`
@@ -214,7 +214,7 @@ function withLock(path, operation) {
 export function createEmptyRegistry(path, projectIds) {
   if (!Array.isArray(projectIds) || !projectIds.length || new Set(projectIds).size !== projectIds.length || projectIds.some((id) => !publicStableId(id))) fail('invalid_project_registry')
   const registry = { schema_version: 2, revision: 0, next_event_sequence: 1, project_ids: [...projectIds], bindings: [], events: [] }
-  atomicCreate(path, registry)
+  atomicPublishNewRegistry(path, registry)
   return clone(registry)
 }
 
@@ -346,7 +346,6 @@ export function recoverRegistryLock(path, { recoveryRef, now = new Date() } = {}
 }
 
 export function migrateLegacyRegistry({ legacyPath, registryPath, projectIds, occurredAt }) {
-  if (directoryEntryExists(registryPath)) fail('registry_exists')
   const bytes = readFileSync(legacyPath); let legacy
   try { legacy = JSON.parse(bytes.toString('utf8')) } catch { fail('registry_unavailable') }
   if (!legacy || typeof legacy !== 'object' || Array.isArray(legacy) || Object.hasOwn(legacy, 'schema_version') || !Array.isArray(legacy.bindings)) fail('legacy_schema_invalid')
@@ -360,6 +359,7 @@ export function migrateLegacyRegistry({ legacyPath, registryPath, projectIds, oc
     appendEvent(registry, migrationInput, 0, 1)
     appendEvent(registry, { ...migrationInput, action: 'observe' }, 1, 1, { observation_status: 'stale' })
   }
-  validateRegistry(registry); atomicWrite(registryPath, registry)
-  return { source_sha256: createHash('sha256').update(bytes).digest('hex'), source_mode: (statSync(legacyPath).mode & 0o777).toString(8).padStart(4, '0'), migrated_bindings: registry.bindings.length, stale_by_default: true }
+  const receipt = { source_sha256: createHash('sha256').update(bytes).digest('hex'), source_mode: (statSync(legacyPath).mode & 0o777).toString(8).padStart(4, '0'), migrated_bindings: registry.bindings.length, stale_by_default: true }
+  validateRegistry(registry); atomicPublishNewRegistry(registryPath, registry)
+  return receipt
 }

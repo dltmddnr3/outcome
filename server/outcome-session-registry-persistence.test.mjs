@@ -1,13 +1,26 @@
 import assert from 'node:assert/strict'
 import test from 'node:test'
 import { execFileSync, spawn } from 'node:child_process'
-import { chmodSync, existsSync, lstatSync, mkdirSync, mkdtempSync, readFileSync, statSync, symlinkSync, writeFileSync } from 'node:fs'
-import { join } from 'node:path'
+import { createHash } from 'node:crypto'
+import { chmodSync, existsSync, lstatSync, mkdirSync, mkdtempSync, readFileSync, readdirSync, statSync, symlinkSync, writeFileSync } from 'node:fs'
+import { basename, dirname, join } from 'node:path'
 import { tmpdir } from 'node:os'
 import { createEmptyRegistry, doctorRegistry, loadRegistry, migrateLegacyRegistry, mutateRegistry, publicRegistryProjection, recoverRegistryLock } from './outcome-session-registry-persistence.mjs'
 
 const tempPath = () => join(mkdtempSync(join(tmpdir(), 'outcome-session-v2-')), 'registry.json')
 const meta = { actorClass: 'builder', reasonClass: 'approved_local_test', occurredAt: '2026-08-27T00:00:00.000Z', publicAlias: 'builder-primary' }
+
+const synchronizedChildren = async (scripts) => {
+  const attempts = scripts.map((script, index) => {
+    const child = spawn(process.execPath, ['--input-type=module', '--eval', script]); let output = ''; let markReady
+    const ready = new Promise((resolve) => { markReady = resolve })
+    child.stdout.on('data', (chunk) => { output += chunk; if (output.includes('ready\n')) markReady() })
+    const done = new Promise((resolve) => child.on('close', () => resolve({ index, output: output.replace('ready\n', '') })))
+    return { child, ready, done }
+  })
+  await Promise.all(attempts.map(({ ready }) => ready)); for (const { child } of attempts) child.stdin.end('start')
+  return Promise.all(attempts.map(({ done }) => done))
+}
 
 test('synchronized initial creators publish exactly one complete private registry', async () => {
   const path = tempPath(); const moduleUrl = new URL('./outcome-session-registry-persistence.mjs', import.meta.url).href
@@ -25,6 +38,58 @@ test('synchronized initial creators publish exactly one complete private registr
   assert.equal(results.filter(({ output }) => output === 'registry_exists').length, 11)
   assert.deepEqual(loadRegistry(path).project_ids, [`project-${winners[0].index}`])
   assert.equal(statSync(path).mode & 0o777, 0o600)
+})
+
+test('synchronized legacy migrations publish one receipt and leave 23 deterministic losers', async () => {
+  const root = mkdtempSync(join(tmpdir(), 'outcome-migration-race-')); const target = join(root, 'registry.json')
+  const moduleUrl = new URL('./outcome-session-registry-persistence.mjs', import.meta.url).href; const sources = []
+  const scripts = Array.from({ length: 24 }, (_, index) => {
+    const projectId = `race-${index}`; const source = join(root, `legacy-${index}.json`)
+    const bytes = `${JSON.stringify({ bindings: [{ project_id: projectId, role: 'builder', locator_ref: `private-${index}` }] })}\n`
+    writeFileSync(source, bytes, { mode: 0o600 }); sources.push({ source, bytes, projectId })
+    return `import { migrateLegacyRegistry } from ${JSON.stringify(moduleUrl)}; process.stdout.write('ready\\n'); process.stdin.once('data', () => { try { const receipt = migrateLegacyRegistry({ legacyPath: ${JSON.stringify(source)}, registryPath: ${JSON.stringify(target)}, projectIds: [${JSON.stringify(projectId)}], occurredAt: '2026-08-27T00:00:00.000Z' }); process.stdout.write(JSON.stringify({ ok: true, receipt })) } catch (error) { process.stdout.write(JSON.stringify({ ok: false, error: error.message })) } })`
+  })
+  const results = (await synchronizedChildren(scripts)).map(({ index, output }) => ({ index, ...JSON.parse(output) }))
+  const winners = results.filter(({ ok }) => ok); const losers = results.filter(({ ok }) => !ok)
+  assert.equal(winners.length, 1); assert.equal(losers.length, 23); assert.equal(losers.every(({ error }) => error === 'registry_exists'), true); assert.equal(losers.every((row) => !Object.hasOwn(row, 'receipt')), true)
+  const winner = sources[winners[0].index]
+  assert.equal(winners[0].receipt.source_sha256, createHash('sha256').update(winner.bytes).digest('hex')); assert.equal(winners[0].receipt.source_mode, '0600')
+  assert.deepEqual(loadRegistry(target).project_ids, [winner.projectId]); assert.equal(statSync(target).mode & 0o777, 0o600)
+  for (const { source, bytes } of sources) assert.equal(readFileSync(source, 'utf8'), bytes)
+  assert.deepEqual(readdirSync(dirname(target)).filter((name) => name.startsWith(`${basename(target)}.`)), [])
+})
+
+test('root publication collision allows only create or migrate to acknowledge one target', async () => {
+  const root = mkdtempSync(join(tmpdir(), 'outcome-root-collision-')); const target = join(root, 'registry.json'); const source = join(root, 'legacy.json')
+  const bindings = Array.from({ length: 200 }, (_, index) => ({ project_id: `migration-${index}`, role: 'builder', locator_ref: `private-${index}` }))
+  const sourceBytes = `${JSON.stringify({ bindings })}\n`; writeFileSync(source, sourceBytes, { mode: 0o600 })
+  const moduleUrl = new URL('./outcome-session-registry-persistence.mjs', import.meta.url).href
+  const scripts = [
+    `import { createEmptyRegistry } from ${JSON.stringify(moduleUrl)}; process.stdout.write('ready\\n'); process.stdin.once('data', () => { try { createEmptyRegistry(${JSON.stringify(target)}, ['create-winner']); process.stdout.write('success') } catch (error) { process.stdout.write(error.message) } })`,
+    `import { migrateLegacyRegistry } from ${JSON.stringify(moduleUrl)}; process.stdout.write('ready\\n'); process.stdin.once('data', () => { try { migrateLegacyRegistry({ legacyPath: ${JSON.stringify(source)}, registryPath: ${JSON.stringify(target)}, projectIds: ${JSON.stringify(bindings.map(({ project_id }) => project_id))}, occurredAt: '2026-08-27T00:00:00.000Z' }); process.stdout.write('success') } catch (error) { process.stdout.write(error.message) } })`,
+  ]
+  const results = await synchronizedChildren(scripts); assert.equal(results.filter(({ output }) => output === 'success').length, 1)
+  assert.equal(results.filter(({ output }) => output === 'registry_exists').length, 1)
+  const registry = loadRegistry(target); assert.equal(registry.project_ids.length === 1 || registry.project_ids.length === 200, true)
+  assert.equal(statSync(target).mode & 0o777, 0o600); assert.equal(readFileSync(source, 'utf8'), sourceBytes)
+  assert.deepEqual(readdirSync(root).filter((name) => name.startsWith(`${basename(target)}.`)), [])
+})
+
+test('migration target object variants fail closed without follow overwrite or residue', () => {
+  for (const makeTarget of [
+    (target) => writeFileSync(target, 'existing', { mode: 0o600 }),
+    (target) => symlinkSync(`${target}.missing`, target),
+    (target) => { writeFileSync(`${target}.real`, 'existing', { mode: 0o600 }); symlinkSync(`${target}.real`, target) },
+    (target) => mkdirSync(target),
+  ]) {
+    const root = mkdtempSync(join(tmpdir(), 'outcome-migration-target-')); const source = join(root, 'legacy.json'); const target = join(root, 'registry.json')
+    const sourceBytes = `${JSON.stringify({ bindings: [{ project_id: 'outcome', role: 'builder', locator_ref: 'private' }] })}\n`; writeFileSync(source, sourceBytes, { mode: 0o600 }); makeTarget(target)
+    const targetMetadata = lstatSync(target); const targetBytes = targetMetadata.isFile() && !targetMetadata.isSymbolicLink() ? readFileSync(target) : null
+    assert.throws(() => migrateLegacyRegistry({ legacyPath: source, registryPath: target, projectIds: ['outcome'], occurredAt: '2026-08-27T00:00:00.000Z' }), /registry_exists/)
+    assert.equal(readFileSync(source, 'utf8'), sourceBytes); assert.equal(lstatSync(target).isSymbolicLink(), targetMetadata.isSymbolicLink()); assert.equal(lstatSync(target).isDirectory(), targetMetadata.isDirectory())
+    if (targetBytes) assert.deepEqual(readFileSync(target), targetBytes)
+    assert.deepEqual(readdirSync(root).filter((name) => name.startsWith(`${basename(target)}.tmp-`) || name === `${basename(target)}.lock`), [])
+  }
 })
 
 test('direct Planner replace cannot bypass continuity guards and archive eligibility requires the control read-back', () => {
