@@ -1,15 +1,20 @@
 import { isProxy } from 'node:util/types'
 
-const CONFIG_FIELDS = new Set(['feature_enabled', 'ingest_enabled', 'read_only', 'schema_version', 'durable_revision', 'cache_revision', 'rate_limit_count', 'rate_window_ms', 'body_limit_bytes', 'cost_limit_units', 'freshness_ms', 'now', 'clone'])
+const CONFIG_FIELDS = new Set(['feature_enabled', 'ingest_enabled', 'read_only', 'schema_version', 'durable_revision', 'cache_revision', 'rate_limit_count', 'rate_window_ms', 'body_limit_bytes', 'cost_limit_units', 'freshness_ms', 'future_skew_ms', 'load_restore_evidence', 'now', 'clone'])
 const ADMIT_FIELDS = new Set(['body_bytes', 'cost_units'])
 const PROJECTION_FIELDS = new Set(['status_code', 'observed_at', 'expires_at', 'durable_revision', 'cache_revision'])
 const DISABLE_FIELDS = new Set(['expected_revision', 'reason_code'])
-const RESTORE_FIELDS = new Set(['expected_revision', 'schema_version', 'durable_revision', 'cache_revision', 'tombstones_applied', 'backup_digest'])
+const RESTORE_FIELDS = new Set(['expected_revision', 'manifest_ref', 'manifest_digest', 'restore_receipt_ref'])
 const RETENTION_FIELDS = new Set(['expected_revision', 'expired_challenges', 'expired_replays', 'expired_events', 'tombstone_written'])
 const EXPORT_FIELDS = new Set(['expected_revision'])
 const STATUS_CODES = new Set(['기획 진행 중', '구현 진행 중', '테스트 실행 중', '사용성·제품 검수 중', '출시 감사 중', '결정 대기 중'])
 const REASONS = new Set(['operator_action', 'schema_mismatch', 'cost_stop', 'rate_limited', 'source_compromise'])
 const DIGEST = /^[0-9a-f]{64}$/
+const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-7[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/
+const RESTORE_EVIDENCE_FIELDS = new Set(['manifest', 'receipt'])
+const MANIFEST_FIELDS = new Set(['manifest_ref', 'manifest_digest', 'schema_version', 'durable_revision', 'tombstone_count', 'tombstone_coverage_digest'])
+const RECEIPT_FIELDS = new Set(['restore_receipt_ref', 'manifest_ref', 'manifest_digest', 'schema_version', 'durable_revision', 'tombstone_count', 'tombstone_coverage_digest', 'state'])
+export const OBSERVER_BRIDGE_FUTURE_SKEW_MS = 5_000
 
 export class ObserverBridgeOperationsError extends Error {
   constructor(code) {
@@ -69,9 +74,11 @@ export function createObserverBridgeOperations(options = {}) {
   const bodyLimit = config.body_limit_bytes ?? 32_768
   const costLimit = config.cost_limit_units ?? 1_000
   const freshnessMs = config.freshness_ms ?? 60_000
+  const futureSkewMs = config.future_skew_ms ?? OBSERVER_BRIDGE_FUTURE_SKEW_MS
+  const loadRestoreEvidence = config.load_restore_evidence
   const now = config.now ?? Date.now
   const clone = config.clone ?? structuredClone
-  if (schemaVersion !== 1 || !nonNegative(initialDurable) || !nonNegative(initialCache) || initialCache > initialDurable || !positive(rateLimit) || !positive(rateWindow) || !positive(bodyLimit) || !positive(costLimit) || !positive(freshnessMs) || typeof now !== 'function' || isProxy(now) || typeof clone !== 'function' || isProxy(clone)) fail('configuration_invalid')
+  if (schemaVersion !== 1 || !nonNegative(initialDurable) || !nonNegative(initialCache) || initialCache > initialDurable || !positive(rateLimit) || !positive(rateWindow) || !positive(bodyLimit) || !positive(costLimit) || !positive(freshnessMs) || !nonNegative(futureSkewMs) || loadRestoreEvidence !== undefined && (typeof loadRestoreEvidence !== 'function' || isProxy(loadRestoreEvidence)) || typeof now !== 'function' || isProxy(now) || typeof clone !== 'function' || isProxy(clone)) fail('configuration_invalid')
 
   let state = {
     feature: config.feature_enabled === true ? 'on' : 'off',
@@ -140,6 +147,7 @@ export function createObserverBridgeOperations(options = {}) {
       if (value.status_code !== null && !STATUS_CODES.has(value.status_code) || !iso(value.observed_at) || !iso(value.expires_at) || !nonNegative(value.durable_revision) || !nonNegative(value.cache_revision) || value.cache_revision > value.durable_revision || value.durable_revision !== state.durable_revision || value.cache_revision > state.durable_revision) fail('revision_conflict')
       const at = clock()
       const age = at - Date.parse(value.observed_at)
+      if (-age > futureSkewMs) fail('future_observation')
       let freshness = 'fresh'
       if (at > Date.parse(value.expires_at) || age > freshnessMs) freshness = age > freshnessMs * 2 ? 'offline' : 'stale'
       return { status_code: freshness === 'fresh' ? value.status_code : null, freshness_class: freshness, durable_revision: value.durable_revision, cache_revision: value.cache_revision }
@@ -161,9 +169,16 @@ export function createObserverBridgeOperations(options = {}) {
     restore(input) {
       return mutate((draft) => {
         const value = ownRecord(input, RESTORE_FIELDS)
-        if (!nonNegative(value.expected_revision) || value.schema_version !== 1 || !nonNegative(value.durable_revision) || !nonNegative(value.cache_revision) || typeof value.tombstones_applied !== 'boolean' || typeof value.backup_digest !== 'string' || !DIGEST.test(value.backup_digest)) fail('input_invalid')
-        if (value.expected_revision !== draft.revision || draft.feature !== 'off' || value.schema_version !== draft.schema_version || value.durable_revision !== draft.durable_revision || value.cache_revision > value.durable_revision || !value.tombstones_applied) fail('restore_denied')
-        draft.cache_revision = value.cache_revision
+        if (!nonNegative(value.expected_revision) || !UUID.test(value.manifest_ref) || !DIGEST.test(value.manifest_digest) || !UUID.test(value.restore_receipt_ref)) fail('input_invalid')
+        if (value.expected_revision !== draft.revision || draft.feature !== 'off' || typeof loadRestoreEvidence !== 'function') fail('restore_denied')
+        let evidence
+        try { evidence = ownRecord(loadRestoreEvidence({ manifest_ref: value.manifest_ref, restore_receipt_ref: value.restore_receipt_ref }), RESTORE_EVIDENCE_FIELDS, RESTORE_EVIDENCE_FIELDS, 'restore_denied') } catch { fail('restore_denied') }
+        const manifest = ownRecord(evidence.manifest, MANIFEST_FIELDS, MANIFEST_FIELDS, 'restore_denied')
+        const receipt = ownRecord(evidence.receipt, RECEIPT_FIELDS, RECEIPT_FIELDS, 'restore_denied')
+        const manifestValid = manifest.manifest_ref === value.manifest_ref && manifest.manifest_digest === value.manifest_digest && manifest.schema_version === draft.schema_version && manifest.durable_revision === draft.durable_revision && nonNegative(manifest.tombstone_count) && DIGEST.test(manifest.tombstone_coverage_digest)
+        const receiptValid = receipt.restore_receipt_ref === value.restore_receipt_ref && receipt.manifest_ref === manifest.manifest_ref && receipt.manifest_digest === manifest.manifest_digest && receipt.schema_version === manifest.schema_version && receipt.durable_revision === manifest.durable_revision && receipt.tombstone_count === manifest.tombstone_count && receipt.tombstone_coverage_digest === manifest.tombstone_coverage_digest && receipt.state === 'applied'
+        if (!manifestValid || !receiptValid) fail('restore_denied')
+        draft.cache_revision = manifest.durable_revision
         draft.ingest = 'disabled'
         draft.mode = 'read_only'
         draft.revision += 1

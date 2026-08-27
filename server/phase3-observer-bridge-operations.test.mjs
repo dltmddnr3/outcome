@@ -1,8 +1,9 @@
 import assert from 'node:assert/strict'
 import test from 'node:test'
-import { createObserverBridgeOperations, ObserverBridgeOperationsError } from './phase3-observer-bridge-operations.mjs'
+import { createObserverBridgeOperations, OBSERVER_BRIDGE_FUTURE_SKEW_MS, ObserverBridgeOperationsError } from './phase3-observer-bridge-operations.mjs'
 
 const BASE = Date.parse('2026-08-27T00:00:00.000Z')
+const uuid7 = (character) => `018f0000-0000-7000-8000-${character.repeat(12)}`
 const expectCode = (operation, code) => assert.throws(operation, (error) => error instanceof ObserverBridgeOperationsError && error.code === code)
 
 test('operations default feature off, ingest disabled and read-only with no authority fields', () => {
@@ -38,14 +39,19 @@ test('freshness decays to stale and offline without replay or progress inference
 })
 
 test('disable and exact restore stay read-only, CAS-bound and require tombstone replay', () => {
-  const operations = createObserverBridgeOperations({ feature_enabled: true, ingest_enabled: true, read_only: false, durable_revision: 4, cache_revision: 4 })
+  const manifest = { manifest_ref: uuid7('a'), manifest_digest: 'a'.repeat(64), schema_version: 1, durable_revision: 4, tombstone_count: 1, tombstone_coverage_digest: 'b'.repeat(64) }
+  const receipt = { restore_receipt_ref: uuid7('b'), manifest_ref: manifest.manifest_ref, manifest_digest: manifest.manifest_digest, schema_version: 1, durable_revision: 4, tombstone_count: 1, tombstone_coverage_digest: manifest.tombstone_coverage_digest, state: 'applied' }
+  const operations = createObserverBridgeOperations({ feature_enabled: true, ingest_enabled: true, read_only: false, durable_revision: 4, cache_revision: 4, load_restore_evidence: () => ({ manifest, receipt }) })
   assert.deepEqual(operations.disable({ expected_revision: 0, reason_code: 'source_compromise' }), { status: 'disabled', revision: 1, reason_code: 'source_compromise' })
   expectCode(() => operations.disable({ expected_revision: 0, reason_code: 'operator_action' }), 'revision_conflict')
-  const manifest = { expected_revision: 1, schema_version: 1, durable_revision: 4, cache_revision: 4, tombstones_applied: true, backup_digest: 'a'.repeat(64) }
-  expectCode(() => operations.restore({ ...manifest, schema_version: 2 }), 'input_invalid')
-  expectCode(() => operations.restore({ ...manifest, tombstones_applied: false }), 'restore_denied')
-  expectCode(() => operations.restore({ ...manifest, cache_revision: 5 }), 'restore_denied')
-  assert.deepEqual(operations.restore(manifest), { status: 'restore_verified', revision: 2, durable_revision: 4, mode: 'read_only' })
+  const input = { expected_revision: 1, manifest_ref: manifest.manifest_ref, manifest_digest: manifest.manifest_digest, restore_receipt_ref: receipt.restore_receipt_ref }
+  expectCode(() => operations.restore({ ...input, manifest_digest: 'c'.repeat(64) }), 'restore_denied')
+  expectCode(() => operations.restore({ ...input, expected_revision: 0 }), 'restore_denied')
+  const incomplete = createObserverBridgeOperations({ durable_revision: 4, cache_revision: 4, load_restore_evidence: () => ({ manifest, receipt: { ...receipt, tombstone_count: 0 } }) })
+  expectCode(() => incomplete.restore({ ...input, expected_revision: 0 }), 'restore_denied')
+  const inaccessible = createObserverBridgeOperations({ durable_revision: 4, cache_revision: 4, load_restore_evidence: () => { throw new Error('unavailable') } })
+  expectCode(() => inaccessible.restore({ ...input, expected_revision: 0 }), 'restore_denied')
+  assert.deepEqual(operations.restore(input), { status: 'restore_verified', revision: 2, durable_revision: 4, mode: 'read_only' })
   assert.deepEqual(operations.status(), { feature: 'off', ingest: 'disabled', mode: 'read_only', revision: 2, schema_version: 1 })
 })
 
@@ -101,4 +107,15 @@ test('hostile primitive and Proxy inputs fail before traps and state changes', (
   expectCode(() => operations.admit(accessor), 'input_invalid')
   assert.equal(hits, 0)
   assert.equal(operations.metrics().audit_count, 0)
+})
+
+test('future skew below and at boundary may project while above boundary cannot publish NOW', () => {
+  const futureSkew = OBSERVER_BRIDGE_FUTURE_SKEW_MS
+  assert.equal(futureSkew, 5_000)
+  let clock = BASE
+  const operations = createObserverBridgeOperations({ durable_revision: 1, cache_revision: 1, future_skew_ms: futureSkew, now: () => clock })
+  const input = { status_code: '구현 진행 중', expires_at: new Date(BASE + 60_000).toISOString(), durable_revision: 1, cache_revision: 1 }
+  assert.equal(operations.projection({ ...input, observed_at: new Date(BASE + futureSkew - 1).toISOString() }).status_code, '구현 진행 중')
+  assert.equal(operations.projection({ ...input, observed_at: new Date(BASE + futureSkew).toISOString() }).status_code, '구현 진행 중')
+  expectCode(() => operations.projection({ ...input, observed_at: new Date(BASE + futureSkew + 1).toISOString() }), 'future_observation')
 })

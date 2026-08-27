@@ -2,11 +2,8 @@ begin;
 
 do $$
 begin
-  if not exists (select 1 from pg_roles where rolname = 'outcome_bridge_ingest') then
-    create role outcome_bridge_ingest nologin nobypassrls;
-  end if;
-  if not exists (select 1 from pg_roles where rolname = 'outcome_bridge_operations') then
-    create role outcome_bridge_operations nologin nobypassrls;
+  if not exists (select 1 from pg_roles where rolname = 'outcome_bridge_backend') then
+    create role outcome_bridge_backend nologin nobypassrls;
   end if;
 end
 $$;
@@ -79,7 +76,7 @@ on outcome_private.bridge_source_keys(workspace_id, project_id, role, binding_ve
 where state = 'active';
 
 create table outcome_private.bridge_events (
-  event_id bigint generated always as identity primary key,
+  event_id uuid primary key check (event_id::text ~ '^[0-9a-f]{8}-[0-9a-f]{4}-7[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$'),
   workspace_id text not null,
   project_id text not null,
   role text not null,
@@ -145,7 +142,7 @@ create table outcome_private.bridge_projections (
 );
 
 create table outcome_private.bridge_audit (
-  audit_id bigint generated always as identity primary key,
+  audit_id uuid primary key check (audit_id::text ~ '^[0-9a-f]{8}-[0-9a-f]{4}-7[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$'),
   workspace_id text not null,
   project_id text not null,
   role text not null check (role in ('planner','builder','ux_product_qa','release_audit')),
@@ -163,6 +160,7 @@ create table outcome_private.bridge_tombstones (
   role text not null check (role in ('planner','builder','ux_product_qa','release_audit')),
   binding_version integer not null check (binding_version > 0),
   deletion_revision bigint not null check (deletion_revision > 0),
+  deletion_receipt_digest text not null check (deletion_receipt_digest ~ '^[0-9a-f]{64}$'),
   purge_before timestamptz not null,
   tombstoned_at timestamptz not null,
   restore_redelete_required boolean not null default true check (restore_redelete_required),
@@ -176,6 +174,31 @@ create table outcome_private.bridge_schema_versions (
   schema_version integer not null check (schema_version = 1),
   durable_revision bigint not null check (durable_revision >= 0),
   updated_at timestamptz not null
+);
+
+create table outcome_private.bridge_backup_manifests (
+  manifest_ref uuid primary key check (manifest_ref::text ~ '^[0-9a-f]{8}-[0-9a-f]{4}-7[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$'),
+  workspace_id text not null references outcome_private.workspaces(id) on delete cascade,
+  manifest_schema_version integer not null check (manifest_schema_version = 1),
+  bridge_schema_version integer not null check (bridge_schema_version = 1),
+  durable_revision bigint not null check (durable_revision >= 0),
+  tombstone_count integer not null check (tombstone_count >= 0),
+  tombstone_coverage_digest text not null check (tombstone_coverage_digest ~ '^[0-9a-f]{64}$'),
+  manifest_digest text not null unique check (manifest_digest ~ '^[0-9a-f]{64}$'),
+  stored_at timestamptz not null
+);
+
+create table outcome_private.bridge_restore_receipts (
+  restore_receipt_ref uuid primary key check (restore_receipt_ref::text ~ '^[0-9a-f]{8}-[0-9a-f]{4}-7[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$'),
+  manifest_ref uuid not null references outcome_private.bridge_backup_manifests(manifest_ref),
+  workspace_id text not null references outcome_private.workspaces(id) on delete cascade,
+  bridge_schema_version integer not null check (bridge_schema_version = 1),
+  durable_revision bigint not null check (durable_revision >= 0),
+  tombstone_count integer not null check (tombstone_count >= 0),
+  tombstone_coverage_digest text not null check (tombstone_coverage_digest ~ '^[0-9a-f]{64}$'),
+  manifest_digest text not null check (manifest_digest ~ '^[0-9a-f]{64}$'),
+  restored_at timestamptz not null,
+  unique (workspace_id, manifest_ref, durable_revision)
 );
 
 alter table outcome_private.bridge_enrollment_challenges enable row level security;
@@ -196,76 +219,32 @@ alter table outcome_private.bridge_tombstones enable row level security;
 alter table outcome_private.bridge_tombstones force row level security;
 alter table outcome_private.bridge_schema_versions enable row level security;
 alter table outcome_private.bridge_schema_versions force row level security;
+alter table outcome_private.bridge_backup_manifests enable row level security;
+alter table outcome_private.bridge_backup_manifests force row level security;
+alter table outcome_private.bridge_restore_receipts enable row level security;
+alter table outcome_private.bridge_restore_receipts force row level security;
 
-revoke all on outcome_private.bridge_enrollment_challenges, outcome_private.bridge_sources, outcome_private.bridge_source_keys, outcome_private.bridge_events, outcome_private.bridge_request_replay, outcome_private.bridge_projections, outcome_private.bridge_audit, outcome_private.bridge_tombstones, outcome_private.bridge_schema_versions from public, anon, authenticated, outcome_bridge_ingest, outcome_bridge_operations;
-revoke all on sequence outcome_private.bridge_events_event_id_seq, outcome_private.bridge_audit_audit_id_seq from public, anon, authenticated, outcome_bridge_ingest, outcome_bridge_operations;
-grant usage on schema outcome_private to authenticated, outcome_bridge_ingest, outcome_bridge_operations;
+revoke all on outcome_private.bridge_enrollment_challenges, outcome_private.bridge_sources, outcome_private.bridge_source_keys, outcome_private.bridge_events, outcome_private.bridge_request_replay, outcome_private.bridge_projections, outcome_private.bridge_audit, outcome_private.bridge_tombstones, outcome_private.bridge_schema_versions, outcome_private.bridge_backup_manifests, outcome_private.bridge_restore_receipts from public, anon, authenticated, outcome_bridge_backend;
+grant usage on schema outcome_private to authenticated, outcome_bridge_backend;
 grant select on outcome_private.bridge_projections to authenticated;
-grant select, insert, update on outcome_private.bridge_enrollment_challenges, outcome_private.bridge_sources, outcome_private.bridge_source_keys, outcome_private.bridge_projections to outcome_bridge_ingest;
-grant select on outcome_private.bridge_schema_versions to outcome_bridge_ingest;
-grant select, insert on outcome_private.bridge_events, outcome_private.bridge_request_replay, outcome_private.bridge_audit to outcome_bridge_ingest;
-grant usage on sequence outcome_private.bridge_events_event_id_seq, outcome_private.bridge_audit_audit_id_seq to outcome_bridge_ingest;
-grant select, insert, update on outcome_private.bridge_sources, outcome_private.bridge_source_keys, outcome_private.bridge_projections to outcome_bridge_operations;
-grant select, insert, update on outcome_private.bridge_schema_versions to outcome_bridge_operations;
-grant select, insert on outcome_private.bridge_audit, outcome_private.bridge_tombstones to outcome_bridge_operations;
-grant usage on sequence outcome_private.bridge_audit_audit_id_seq to outcome_bridge_operations;
-grant delete on outcome_private.bridge_enrollment_challenges, outcome_private.bridge_source_keys, outcome_private.bridge_events, outcome_private.bridge_request_replay, outcome_private.bridge_projections to outcome_bridge_operations;
+grant select, insert, update, delete on outcome_private.bridge_enrollment_challenges, outcome_private.bridge_sources, outcome_private.bridge_source_keys, outcome_private.bridge_projections to outcome_bridge_backend;
+grant select, insert, delete on outcome_private.bridge_events, outcome_private.bridge_request_replay to outcome_bridge_backend;
+grant select, insert on outcome_private.bridge_audit, outcome_private.bridge_tombstones, outcome_private.bridge_backup_manifests, outcome_private.bridge_restore_receipts to outcome_bridge_backend;
+grant select, update on outcome_private.bridge_schema_versions to outcome_bridge_backend;
 
 create policy bridge_projection_owner_read on outcome_private.bridge_projections for select to authenticated
 using (outcome_private.outcome_workspace_project_visible(workspace_id, project_id));
 
-create policy bridge_ingest_challenge_all on outcome_private.bridge_enrollment_challenges for all to outcome_bridge_ingest
-using (workspace_id = current_setting('outcome.bridge.workspace_id', true) and project_id = current_setting('outcome.bridge.project_id', true))
-with check (workspace_id = current_setting('outcome.bridge.workspace_id', true) and project_id = current_setting('outcome.bridge.project_id', true));
-create policy bridge_ingest_source_all on outcome_private.bridge_sources for all to outcome_bridge_ingest
-using (workspace_id = current_setting('outcome.bridge.workspace_id', true) and project_id = current_setting('outcome.bridge.project_id', true))
-with check (workspace_id = current_setting('outcome.bridge.workspace_id', true) and project_id = current_setting('outcome.bridge.project_id', true));
-create policy bridge_ingest_key_all on outcome_private.bridge_source_keys for all to outcome_bridge_ingest
-using (workspace_id = current_setting('outcome.bridge.workspace_id', true) and project_id = current_setting('outcome.bridge.project_id', true))
-with check (workspace_id = current_setting('outcome.bridge.workspace_id', true) and project_id = current_setting('outcome.bridge.project_id', true));
-create policy bridge_ingest_event_insert on outcome_private.bridge_events for insert to outcome_bridge_ingest
-with check (workspace_id = current_setting('outcome.bridge.workspace_id', true) and project_id = current_setting('outcome.bridge.project_id', true));
-create policy bridge_ingest_event_read on outcome_private.bridge_events for select to outcome_bridge_ingest
-using (workspace_id = current_setting('outcome.bridge.workspace_id', true) and project_id = current_setting('outcome.bridge.project_id', true));
-create policy bridge_ingest_replay_insert on outcome_private.bridge_request_replay for insert to outcome_bridge_ingest
-with check (workspace_id = current_setting('outcome.bridge.workspace_id', true) and project_id = current_setting('outcome.bridge.project_id', true));
-create policy bridge_ingest_replay_read on outcome_private.bridge_request_replay for select to outcome_bridge_ingest
-using (workspace_id = current_setting('outcome.bridge.workspace_id', true) and project_id = current_setting('outcome.bridge.project_id', true));
-create policy bridge_ingest_projection_all on outcome_private.bridge_projections for all to outcome_bridge_ingest
-using (workspace_id = current_setting('outcome.bridge.workspace_id', true) and project_id = current_setting('outcome.bridge.project_id', true))
-with check (workspace_id = current_setting('outcome.bridge.workspace_id', true) and project_id = current_setting('outcome.bridge.project_id', true));
-create policy bridge_ingest_audit_insert on outcome_private.bridge_audit for insert to outcome_bridge_ingest
-with check (workspace_id = current_setting('outcome.bridge.workspace_id', true) and project_id = current_setting('outcome.bridge.project_id', true));
-create policy bridge_ingest_audit_read on outcome_private.bridge_audit for select to outcome_bridge_ingest
-using (workspace_id = current_setting('outcome.bridge.workspace_id', true) and project_id = current_setting('outcome.bridge.project_id', true));
-
-create policy bridge_operations_source_all on outcome_private.bridge_sources for all to outcome_bridge_operations
-using (workspace_id = current_setting('outcome.bridge.workspace_id', true) and project_id = current_setting('outcome.bridge.project_id', true))
-with check (workspace_id = current_setting('outcome.bridge.workspace_id', true) and project_id = current_setting('outcome.bridge.project_id', true));
-create policy bridge_operations_key_all on outcome_private.bridge_source_keys for all to outcome_bridge_operations
-using (workspace_id = current_setting('outcome.bridge.workspace_id', true) and project_id = current_setting('outcome.bridge.project_id', true))
-with check (workspace_id = current_setting('outcome.bridge.workspace_id', true) and project_id = current_setting('outcome.bridge.project_id', true));
-create policy bridge_operations_projection_all on outcome_private.bridge_projections for all to outcome_bridge_operations
-using (workspace_id = current_setting('outcome.bridge.workspace_id', true) and project_id = current_setting('outcome.bridge.project_id', true))
-with check (workspace_id = current_setting('outcome.bridge.workspace_id', true) and project_id = current_setting('outcome.bridge.project_id', true));
-create policy bridge_operations_audit_insert on outcome_private.bridge_audit for insert to outcome_bridge_operations
-with check (workspace_id = current_setting('outcome.bridge.workspace_id', true) and project_id = current_setting('outcome.bridge.project_id', true));
-create policy bridge_operations_tombstone_insert on outcome_private.bridge_tombstones for insert to outcome_bridge_operations
-with check (workspace_id = current_setting('outcome.bridge.workspace_id', true) and project_id = current_setting('outcome.bridge.project_id', true));
-create policy bridge_operations_purge_challenge on outcome_private.bridge_enrollment_challenges for delete to outcome_bridge_operations
-using (workspace_id = current_setting('outcome.bridge.workspace_id', true) and project_id = current_setting('outcome.bridge.project_id', true));
-create policy bridge_operations_purge_key on outcome_private.bridge_source_keys for delete to outcome_bridge_operations
-using (workspace_id = current_setting('outcome.bridge.workspace_id', true) and project_id = current_setting('outcome.bridge.project_id', true));
-create policy bridge_operations_purge_event on outcome_private.bridge_events for delete to outcome_bridge_operations
-using (workspace_id = current_setting('outcome.bridge.workspace_id', true) and project_id = current_setting('outcome.bridge.project_id', true));
-create policy bridge_operations_purge_replay on outcome_private.bridge_request_replay for delete to outcome_bridge_operations
-using (workspace_id = current_setting('outcome.bridge.workspace_id', true) and project_id = current_setting('outcome.bridge.project_id', true));
-create policy bridge_operations_purge_projection on outcome_private.bridge_projections for delete to outcome_bridge_operations
-using (workspace_id = current_setting('outcome.bridge.workspace_id', true) and project_id = current_setting('outcome.bridge.project_id', true));
-create policy bridge_ingest_schema_read on outcome_private.bridge_schema_versions for select to outcome_bridge_ingest
-using (workspace_id = current_setting('outcome.bridge.workspace_id', true));
-create policy bridge_operations_schema_all on outcome_private.bridge_schema_versions for all to outcome_bridge_operations
-using (workspace_id = current_setting('outcome.bridge.workspace_id', true))
-with check (workspace_id = current_setting('outcome.bridge.workspace_id', true));
+create policy bridge_backend_challenge on outcome_private.bridge_enrollment_challenges for all to outcome_bridge_backend using (true) with check (true);
+create policy bridge_backend_source on outcome_private.bridge_sources for all to outcome_bridge_backend using (true) with check (true);
+create policy bridge_backend_key on outcome_private.bridge_source_keys for all to outcome_bridge_backend using (true) with check (true);
+create policy bridge_backend_event on outcome_private.bridge_events for all to outcome_bridge_backend using (true) with check (true);
+create policy bridge_backend_replay on outcome_private.bridge_request_replay for all to outcome_bridge_backend using (true) with check (true);
+create policy bridge_backend_projection on outcome_private.bridge_projections for all to outcome_bridge_backend using (true) with check (true);
+create policy bridge_backend_audit on outcome_private.bridge_audit for all to outcome_bridge_backend using (true) with check (true);
+create policy bridge_backend_tombstone on outcome_private.bridge_tombstones for all to outcome_bridge_backend using (true) with check (true);
+create policy bridge_backend_schema on outcome_private.bridge_schema_versions for all to outcome_bridge_backend using (true) with check (true);
+create policy bridge_backend_manifest on outcome_private.bridge_backup_manifests for all to outcome_bridge_backend using (true) with check (true);
+create policy bridge_backend_restore_receipt on outcome_private.bridge_restore_receipts for all to outcome_bridge_backend using (true) with check (true);
 
 commit;
