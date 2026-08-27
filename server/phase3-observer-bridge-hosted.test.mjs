@@ -42,6 +42,33 @@ test('error brand classifier accepts only genuine exact known errors and does no
   assert.equal(Object.keys(module).some((key) => /brand|original.code/i.test(key)), false)
 })
 
+test('exact newTarget brand admission accepts direct and Reflect exact-class construction only', () => {
+  const codes = ['unavailable', 'access_denied', 'auth_unavailable', 'enrollment_invalid', 'enrollment_conflict', 'idempotency_conflict', 'request_conflict', 'sequence_conflict', 'signature_invalid', 'csrf_invalid', 'rate_limited', 'body_too_large', 'bad_request', 'input_invalid']
+  for (const code of codes) {
+    assert.equal(safeHostedObserverBridgeErrorCode(new HostedObserverBridgeError(code)), code)
+    assert.equal(safeHostedObserverBridgeErrorCode(Reflect.construct(HostedObserverBridgeError, [code], HostedObserverBridgeError)), code)
+  }
+})
+
+test('newTarget construction matrix rejects alternate subclass bound proxy and prototype mutation', () => {
+  function AlternateNewTarget() {}
+  AlternateNewTarget.prototype = HostedObserverBridgeError.prototype
+  class Subclass extends HostedObserverBridgeError {}
+  const BoundNewTarget = HostedObserverBridgeError.bind(null)
+  const ProxyConstructor = new Proxy(HostedObserverBridgeError, {})
+  const prototypeMutation = new HostedObserverBridgeError('rate_limited')
+  Object.setPrototypeOf(prototypeMutation, Error.prototype)
+  const values = [
+    Reflect.construct(HostedObserverBridgeError, ['rate_limited'], AlternateNewTarget),
+    new Subclass('rate_limited'),
+    Reflect.construct(HostedObserverBridgeError, ['rate_limited'], BoundNewTarget),
+    new ProxyConstructor('rate_limited'),
+    Reflect.construct(HostedObserverBridgeError, ['rate_limited'], ProxyConstructor),
+    prototypeMutation,
+  ]
+  for (const value of values) assert.equal(safeHostedObserverBridgeErrorCode(value), null)
+})
+
 test('brand mutation matrix rejects spoof mutation decoration subclass proxy cross-realm frozen sealed and traps', () => {
   let trapHits = 0
   const trap = () => { trapHits += 1; throw new Error('private trap') }

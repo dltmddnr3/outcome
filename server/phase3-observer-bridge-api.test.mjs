@@ -57,6 +57,41 @@ const brandHostileFactories = (trap) => [
   () => new HostedObserverBridgeError('unknown'),
   () => { const value = {}; value.self = value; return value },
 ]
+const alternateNewTargetError = () => {
+  function AlternateNewTarget() {}
+  AlternateNewTarget.prototype = HostedObserverBridgeError.prototype
+  return Reflect.construct(HostedObserverBridgeError, ['rate_limited'], AlternateNewTarget)
+}
+const newTargetVariantFactories = [
+  alternateNewTargetError,
+  () => { class Subclass extends HostedObserverBridgeError {}; return new Subclass('rate_limited') },
+  () => Reflect.construct(HostedObserverBridgeError, ['rate_limited'], HostedObserverBridgeError.bind(null)),
+  () => new (new Proxy(HostedObserverBridgeError, {}))('rate_limited'),
+  () => { const target = new Proxy(HostedObserverBridgeError, {}); return Reflect.construct(HostedObserverBridgeError, ['rate_limited'], target) },
+  () => { const value = new HostedObserverBridgeError('rate_limited'); Object.setPrototypeOf(value, Error.prototype); return value },
+]
+
+test('QA alternate newTarget blocker is generic for every direct API endpoint and settlement mode', async () => {
+  let calls = 0
+  for (const item of seamCases) for (const asynchronous of [false, true]) {
+    const failure = asynchronous
+      ? async () => { calls += 1; throw alternateNewTargetError() }
+      : () => { calls += 1; throw alternateNewTargetError() }
+    assert.deepEqual(await call({ maxBodyBytes: 1024, [item.bridgeMethod]: failure }, seamInput(item)), { status: 503, body: { error: 'bridge_unavailable' } })
+  }
+  assert.equal(calls, 12)
+})
+
+test('newTarget construction matrix is generic for every direct API endpoint and settlement mode', async () => {
+  let calls = 0
+  for (const item of seamCases) for (const factory of newTargetVariantFactories) for (const asynchronous of [false, true]) {
+    const failure = asynchronous
+      ? async () => { calls += 1; throw factory() }
+      : () => { calls += 1; throw factory() }
+    assert.deepEqual(await call({ maxBodyBytes: 1024, [item.bridgeMethod]: failure }, seamInput(item)), { status: 503, body: { error: 'bridge_unavailable' } })
+  }
+  assert.equal(calls, 72)
+})
 
 test('re-QA brand blocker is generic for every direct API endpoint and settlement mode', async () => {
   const reasons = [

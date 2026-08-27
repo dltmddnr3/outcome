@@ -38,8 +38,10 @@ export class HostedObserverBridgeError extends Error {
     Object.defineProperty(this, 'stack', { value: stack, writable: true, enumerable: false, configurable: true })
     this.name = 'HostedObserverBridgeError'
     this.code = code
-    HOSTED_ERROR_BRAND.add(this)
-    HOSTED_ERROR_ORIGINAL_CODE.set(this, code)
+    if (new.target === HostedObserverBridgeError) {
+      HOSTED_ERROR_BRAND.add(this)
+      HOSTED_ERROR_ORIGINAL_CODE.set(this, code)
+    }
   }
 }
 

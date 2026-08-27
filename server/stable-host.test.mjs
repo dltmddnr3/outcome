@@ -149,6 +149,43 @@ const stableBrandHostileFactories = (trap) => [
   () => new HostedObserverBridgeError('unknown'),
   () => { const value = {}; value.self = value; return value },
 ]
+const stableAlternateNewTargetError = () => {
+  function AlternateNewTarget() {}
+  AlternateNewTarget.prototype = HostedObserverBridgeError.prototype
+  return Reflect.construct(HostedObserverBridgeError, ['rate_limited'], AlternateNewTarget)
+}
+const stableNewTargetVariantFactories = [
+  stableAlternateNewTargetError,
+  () => { class Subclass extends HostedObserverBridgeError {}; return new Subclass('rate_limited') },
+  () => Reflect.construct(HostedObserverBridgeError, ['rate_limited'], HostedObserverBridgeError.bind(null)),
+  () => new (new Proxy(HostedObserverBridgeError, {}))('rate_limited'),
+  () => { const target = new Proxy(HostedObserverBridgeError, {}); return Reflect.construct(HostedObserverBridgeError, ['rate_limited'], target) },
+  () => { const value = new HostedObserverBridgeError('rate_limited'); Object.setPrototypeOf(value, Error.prototype); return value },
+]
+
+test('QA alternate newTarget blocker is generic for every stable-host endpoint and settlement mode', async () => {
+  let calls = 0
+  for (const item of stableBridgeCases) for (const asynchronous of [false, true]) {
+    const failure = asynchronous
+      ? async () => { calls += 1; throw stableAlternateNewTargetError() }
+      : () => { calls += 1; throw stableAlternateNewTargetError() }
+    const bridge = { ...bridgeStub([]), [item.bridgeMethod]: failure }
+    assert.deepEqual(await injectedBridgeRequest({ bridge })({ method: item.method, pathname: item.path, headers: item.headers, body: item.body }), { status: 503, body: { error: 'bridge_unavailable' } })
+  }
+  assert.equal(calls, 12)
+})
+
+test('newTarget construction matrix is generic for every stable-host endpoint and settlement mode', async () => {
+  let calls = 0
+  for (const item of stableBridgeCases) for (const factory of stableNewTargetVariantFactories) for (const asynchronous of [false, true]) {
+    const failure = asynchronous
+      ? async () => { calls += 1; throw factory() }
+      : () => { calls += 1; throw factory() }
+    const bridge = { ...bridgeStub([]), [item.bridgeMethod]: failure }
+    assert.deepEqual(await injectedBridgeRequest({ bridge })({ method: item.method, pathname: item.path, headers: item.headers, body: item.body }), { status: 503, body: { error: 'bridge_unavailable' } })
+  }
+  assert.equal(calls, 72)
+})
 const injectedBridgeRequest = ({ calls = [], environment = bridgeEnvironment(), bridge = bridgeStub(calls), bridgeRuntimeFactory } = {}) => createStableHostRequestHandler({
   environment,
   runtimeFactory: accountRuntimeFactory,
