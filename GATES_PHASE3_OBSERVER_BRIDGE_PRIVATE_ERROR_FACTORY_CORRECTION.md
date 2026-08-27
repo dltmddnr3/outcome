@@ -26,10 +26,10 @@ Outcome: only module-private hosted and API failure paths can confer finite erro
   CHECK: node --test server/phase3-observer-bridge-api.test.mjs server/phase3-observer-bridge-hosted.test.mjs server/stable-host.test.mjs server/phase3-observer-bridge.test.mjs server/phase3-observer-bridge-postgres.test.mjs server/phase3-observer-bridge-operations.test.mjs server/account-access-api.test.mjs server/account-access-hosted.test.mjs server/account-access-identity-runtime.test.mjs
   EXPECT: targeted matrix passes without API/index, package, migration, config, or UI changes.
   EVIDENCE: targeted 140/140 PASS; full Node 261/261 PASS; production API/index unchanged.
-- [ ] P7: full frontend/build/security/public/mutation/scope/runbook/boundary/diff, privacy scan, and immutable receipt checks pass.
+- [x] P7: full frontend/build/security/public/mutation/scope/runbook/boundary/diff, privacy scan, and immutable receipt checks pass.
   CHECK: test -f docs/PHASE3_OBSERVER_BRIDGE_PRIVATE_ERROR_FACTORY_CORRECTION_BUILDER_RECEIPT.md && rg -q 'full Node: PASS' docs/PHASE3_OBSERVER_BRIDGE_PRIVATE_ERROR_FACTORY_CORRECTION_BUILDER_RECEIPT.md && rg -q 'full frontend: PASS' docs/PHASE3_OBSERVER_BRIDGE_PRIVATE_ERROR_FACTORY_CORRECTION_BUILDER_RECEIPT.md && rg -q 'build: PASS' docs/PHASE3_OBSERVER_BRIDGE_PRIVATE_ERROR_FACTORY_CORRECTION_BUILDER_RECEIPT.md && rg -q 'security/public/mutation/scope/runbook/boundary/diff: PASS' docs/PHASE3_OBSERVER_BRIDGE_PRIVATE_ERROR_FACTORY_CORRECTION_BUILDER_RECEIPT.md && rg -q 'external mutations: 0' docs/PHASE3_OBSERVER_BRIDGE_PRIVATE_ERROR_FACTORY_CORRECTION_BUILDER_RECEIPT.md && rg -q 'O2: OPEN/LOCKED' docs/PHASE3_OBSERVER_BRIDGE_PRIVATE_ERROR_FACTORY_CORRECTION_BUILDER_RECEIPT.md && rg -q 'Phase 3: 17/43' docs/PHASE3_OBSERVER_BRIDGE_PRIVATE_ERROR_FACTORY_CORRECTION_BUILDER_RECEIPT.md && rg -q 'EXTERNAL_OUTCOME_COMPLETE=false' docs/PHASE3_OBSERVER_BRIDGE_PRIVATE_ERROR_FACTORY_CORRECTION_BUILDER_RECEIPT.md && echo P7_PASS
   EXPECT: Builder-only correction evidence is complete without external or release promotion.
-  EVIDENCE: pending.
+  EVIDENCE: full Node 261/261; frontend 89/89; build 1,652 modules; security 48/48; public 4/4; local mutation 32/32 and API read-only 28/28; scope 47; runbook, public boundary, privacy and diff PASS; external mutations 0.
 
 ## ABANDON
 
