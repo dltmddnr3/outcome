@@ -52,6 +52,50 @@ test('duplicate active and event history gaps fail closed on restart', () => {
   }
 })
 
+test('persisted public metadata rejects locator credential path UUID and provider identifier values', () => {
+  const hostile = [
+    'codex://tenant-alpha/private-conversation/short',
+    'token=private-value',
+    '/Users/cherry/private-registry',
+    '123e4567-e89b-12d3-a456-426614174000',
+    'session_id=private-value',
+    'thread_private_value',
+    'task_private_value',
+    'turn_private_value',
+  ]
+  const targets = [
+    (value, marker) => { value.project_ids[0] = marker; value.bindings[0].project_id = marker; value.events[0].project_id = marker },
+    (value, marker) => { value.bindings[0].provider_class = marker },
+    (value, marker) => { value.bindings[0].status = marker },
+    (value, marker) => { value.bindings[0].phase_id = marker },
+    (value, marker) => { value.bindings[0].scope_id = marker },
+    (value, marker) => { value.bindings[0].stage_id = marker },
+    (value, marker) => { value.bindings[0].bound_at = marker },
+    (value, marker) => { value.bindings[0].observed_at = marker },
+    (value, marker) => { value.bindings[0].activity = marker },
+    (value, marker) => { value.events[0].actor_class = marker },
+    (value, marker) => { value.events[0].action = marker },
+    (value, marker) => { value.events[0].reason_class = marker },
+    (value, marker) => { value.events[0].stage_id = marker },
+    (value, marker) => { value.events[0].occurred_at = marker },
+  ]
+  for (const marker of hostile) for (const inject of targets) {
+    const path = tempPath(); createEmptyRegistry(path, ['outcome'])
+    mutateRegistry(path, { action: 'assign', projectId: 'outcome', role: 'builder', expectedVersion: 0, locator: 'private', stageId: 'stage-one', ...meta })
+    const value = JSON.parse(readFileSync(path, 'utf8')); inject(value, marker); writeFileSync(path, JSON.stringify(value))
+    assert.throws(() => loadRegistry(path), /registry_conflict/, `${marker}:${inject}`)
+  }
+})
+
+test('persisted bindings and events reject unknown keys', () => {
+  for (const inject of [(value) => { value.bindings[0].unexpected_public = 'value' }, (value) => { value.events[0].unexpected_public = 'value' }]) {
+    const path = tempPath(); createEmptyRegistry(path, ['outcome'])
+    mutateRegistry(path, { action: 'assign', projectId: 'outcome', role: 'builder', expectedVersion: 0, locator: 'private', ...meta })
+    const value = JSON.parse(readFileSync(path, 'utf8')); inject(value); writeFileSync(path, JSON.stringify(value))
+    assert.throws(() => loadRegistry(path), /registry_conflict/)
+  }
+})
+
 test('versionless bindings migrate with byte hash and mode receipt, stale defaults, and no raw public identifiers', () => {
   const legacyPath = tempPath(); const targetPath = tempPath()
   writeFileSync(legacyPath, JSON.stringify({ bindings: [{ project_id: 'outcome', role: 'planner', status: 'active', locator_ref: 'private-old', observed_at: '2026-08-01T00:00:00.000Z' }] }))

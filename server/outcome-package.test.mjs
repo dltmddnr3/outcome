@@ -4,6 +4,7 @@ import { mkdtempSync, mkdirSync, readFileSync, utimesSync, writeFileSync } from 
 import { isAbsolute, join, resolve } from 'node:path'
 import { tmpdir } from 'node:os'
 import { buildPackageModel, collectOutcomePackages, installOutcomeSessions, loadBindingRegistry, loadProjectRegistry, parseGateLedger, parseGithubConnector, projectPublicPackages } from './outcome-package.mjs'
+import { createEmptyRegistry, mutateRegistry } from './outcome-session-registry-persistence.mjs'
 
 const map = (overrides = '') => `# Map\n\`\`\`yaml\nschema_version: 1\nproject_id: demo\ntitle: Demo\nphases:\n  - id: phase-one\n    title: Phase\n    purpose: Phase purpose\n    scopes:\n      - id: scope-one\n        title: Scope\n        purpose: Scope purpose\n        stages:\n          - id: stage-one\n            title: Stage\n            purpose: Stage purpose\n            depends_on: []\n            gates_file: GATES_STAGE.md\n            implementation_state: work_in_progress\n            evidence_closure_state: pending\n${overrides}\n\`\`\`\n`
 const contract = '- Project ID: `demo`\n- Project name: `Demo`\n- Outcome: Measured outcome\n- Acceptance authority: `Cherry`\n'
@@ -112,6 +113,31 @@ test('runtime collector projects corrupt v2 state as unavailable instead of unbo
   const model = fixture({ registry: loadBindingRegistry(path) })
   assert.equal(model.bindings.every(({ status }) => status === 'registry_unavailable'), true)
   assert.equal(model.now.status, 'registry_unavailable')
+})
+
+test('QA hostile persisted metadata fails closed and reaches no public dashboard byte', () => {
+  const marker = 'codex://tenant-alpha/private-conversation/short'
+  const path = join(mkdtempSync(join(tmpdir(), 'outcome-hostile-registry-')), 'registry.json')
+  createEmptyRegistry(path, ['demo'])
+  mutateRegistry(path, { action: 'assign', projectId: 'demo', role: 'planner', expectedVersion: 0, locator: 'private', stageId: 'stage-one', actorClass: 'builder', reasonClass: 'approved_local_test', occurredAt: '2026-08-27T00:00:00.000Z' })
+  const value = JSON.parse(readFileSync(path, 'utf8'))
+  value.bindings[0].stage_id = marker; value.events[0].reason_class = marker; value.events[0].stage_id = marker
+  writeFileSync(path, JSON.stringify(value))
+  const registry = loadBindingRegistry(path)
+  const publicText = JSON.stringify(projectPublicPackages({ projects: [fixture({ registry })] }))
+  assert.equal(registry.error, 'registry_conflict')
+  assert.equal(publicText.includes(marker), false)
+  for (const token of ['locator_ref', 'provider_locator', 'session_id', 'thread_id', 'task_id', 'turn_id']) assert.equal(publicText.includes(token), false, token)
+})
+
+test('role history summary keeps a 44px target and focus indication through responsive CSS', () => {
+  const styles = readFileSync(resolve('src/styles.css'), 'utf8')
+  const summaryRules = [...styles.matchAll(/\.oc-role-row>summary\{([^}]*)\}/g)].map((match) => match[1])
+  assert.equal(summaryRules.length > 0, true)
+  assert.equal(summaryRules.every((rule) => /min-height:44px/.test(rule)), true)
+  assert.match(styles, /\.oc-role-row>summary:focus-visible\{[^}]*outline:/)
+  assert.doesNotMatch(styles, /@media\(max-width:[^)]+\)\{[^}]*\.oc-role-row>summary\{[^}]*min-height:(?:3[0-9]|4[0-3])px/)
+  assert.doesNotMatch(styles, /\.oc-role-row\{[^}]*min-height:(?:3[0-9]|4[0-3])px/)
 })
 test('missing package documents fail closed unknown', () => { const model = buildPackageModel({ root: '/missing', contractFile: 'none', mapFile: 'none' }); assert.equal(model.status, 'unknown'); assert.ok(model.errors.includes('contract_missing')) })
 test('reference mismatch fails closed conflict', () => { const model = fixture({ mapText: map().replace('project_id: demo', 'project_id: other') }); assert.equal(model.status, 'conflict'); assert.ok(model.errors.includes('project_reference_mismatch')) })

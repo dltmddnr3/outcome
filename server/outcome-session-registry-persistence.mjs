@@ -9,16 +9,36 @@ const ALL_STATUSES = new Set([...CURRENT_STATUSES, 'replaced', 'revoked'])
 const ACTIONS = new Set(['assign', 'replace', 'revoke', 'observe', 'checkpoint'])
 const PROJECT_ID = /^[a-z0-9]+(?:-[a-z0-9]+)*$/
 const SHA256 = /^[a-f0-9]{64}$/
+const UUID = /^[a-f0-9]{8}-[a-f0-9]{4}-[1-8][a-f0-9]{3}-[89ab][a-f0-9]{3}-[a-f0-9]{12}$/i
+const SAFE_CLASS = /^[a-z][a-z0-9_-]{0,63}$/
+const SAFE_REASON = /^[a-z0-9_:-]{1,96}$/
+const PUBLIC_IDENTIFIER = /(?:\b[a-z][a-z0-9+.-]*:\/\/|\b(?:session|thread|task|turn)_id(?:[:=]|%[0-9a-f]{2})|\b(?:sess|thread|task|turn)_[a-z0-9])/i
+const REGISTRY_KEYS = new Set(['schema_version', 'revision', 'next_event_sequence', 'project_ids', 'bindings', 'events'])
+const BINDING_KEYS = new Set(['binding_ref', 'project_id', 'role', 'provider_class', 'locator_ref', 'binding_version', 'status', 'phase_id', 'scope_id', 'stage_id', 'bound_at', 'observed_at', 'predecessor_binding_ref', 'successor_binding_ref', 'continuity_handoff_sha256', 'last_checkpoint_ref', 'replaced_at', 'revoked_at', 'activity', 'predecessor_archive_eligible'])
+const BINDING_REQUIRED_KEYS = ['binding_ref', 'project_id', 'role', 'provider_class', 'locator_ref', 'binding_version', 'status', 'phase_id', 'scope_id', 'stage_id', 'bound_at', 'observed_at', 'predecessor_binding_ref', 'successor_binding_ref', 'continuity_handoff_sha256', 'last_checkpoint_ref']
+const EVENT_KEYS = new Set(['event_ref', 'sequence', 'project_id', 'role', 'action', 'before_version', 'after_version', 'actor_class', 'reason_class', 'occurred_at', 'stage_id', 'handoff_sha256', 'evidence_receipt_ref', 'observation_status'])
+const EVENT_REQUIRED_KEYS = ['event_ref', 'sequence', 'project_id', 'role', 'action', 'before_version', 'after_version', 'actor_class', 'reason_class', 'occurred_at', 'stage_id']
 const clone = (value) => structuredClone(value)
 const fail = (code) => { throw new Error(code) }
+const hasExactKeys = (value, allowed, required) => Object.keys(value).every((key) => allowed.has(key)) && required.every((key) => Object.hasOwn(value, key))
+const isoTime = (value) => typeof value === 'string' && Number.isFinite(Date.parse(value)) && new Date(value).toISOString() === value
+const nullableIsoTime = (value) => value === null || isoTime(value)
+const publicStableId = (value) => typeof value === 'string' && PROJECT_ID.test(value) && !UUID.test(value) && !PUBLIC_IDENTIFIER.test(value)
+const nullableStableId = (value) => value === null || publicStableId(value)
+const nullablePrivateRef = (value) => value === null || typeof value === 'string' && UUID.test(value)
+const safePublicText = (value) => typeof value === 'string' && value.length <= 512 && !PUBLIC_IDENTIFIER.test(value) && sanitizeEvidenceText(value) === value
+const safePublicId = (value) => publicStableId(value) ? value : null
+const safePublicReason = (value) => typeof value === 'string' && SAFE_REASON.test(value) && !UUID.test(value) && !PUBLIC_IDENTIFIER.test(value) ? value : 'invalid_reason'
+const sanitizedPublicText = (value) => value == null ? null : safePublicText(value) ? value : null
+const safePublicTime = (value) => isoTime(value) ? value : null
 
 function validateRegistry(value) {
   if (!value || typeof value !== 'object' || Array.isArray(value) || value.schema_version !== 2) fail('registry_unavailable')
-  if (!Number.isInteger(value.revision) || value.revision < 0 || !Array.isArray(value.project_ids) || !Array.isArray(value.bindings) || !Array.isArray(value.events)) fail('registry_conflict')
-  if (new Set(value.project_ids).size !== value.project_ids.length || value.project_ids.some((id) => typeof id !== 'string' || !PROJECT_ID.test(id))) fail('registry_conflict')
+  if (!hasExactKeys(value, REGISTRY_KEYS, [...REGISTRY_KEYS]) || !Number.isInteger(value.revision) || value.revision < 0 || !Array.isArray(value.project_ids) || !Array.isArray(value.bindings) || !Array.isArray(value.events)) fail('registry_conflict')
+  if (new Set(value.project_ids).size !== value.project_ids.length || value.project_ids.some((id) => !publicStableId(id))) fail('registry_conflict')
   const active = new Set(); const versions = new Map(); const bindingRefs = new Set(); const eventRefs = new Set(); let expectedSequence = 1; const eventVersions = new Map()
   for (const binding of value.bindings) {
-    if (!binding || !value.project_ids.includes(binding.project_id) || !SESSION_ROLES.includes(binding.role) || !ALL_STATUSES.has(binding.status) || !Number.isInteger(binding.binding_version) || binding.binding_version < 1 || typeof binding.binding_ref !== 'string' || !binding.binding_ref || bindingRefs.has(binding.binding_ref) || typeof binding.locator_ref !== 'string' || !binding.locator_ref || typeof binding.provider_class !== 'string' || !/^[a-z][a-z0-9_-]{0,31}$/.test(binding.provider_class) || typeof binding.bound_at !== 'string' || !Number.isFinite(Date.parse(binding.bound_at))) fail('registry_conflict')
+    if (!binding || typeof binding !== 'object' || Array.isArray(binding) || !hasExactKeys(binding, BINDING_KEYS, BINDING_REQUIRED_KEYS) || !value.project_ids.includes(binding.project_id) || !SESSION_ROLES.includes(binding.role) || !ALL_STATUSES.has(binding.status) || !Number.isInteger(binding.binding_version) || binding.binding_version < 1 || typeof binding.binding_ref !== 'string' || !UUID.test(binding.binding_ref) || bindingRefs.has(binding.binding_ref) || typeof binding.locator_ref !== 'string' || !binding.locator_ref || typeof binding.provider_class !== 'string' || !/^[a-z][a-z0-9_-]{0,31}$/.test(binding.provider_class) || UUID.test(binding.provider_class) || PUBLIC_IDENTIFIER.test(binding.provider_class) || !isoTime(binding.bound_at) || !nullableIsoTime(binding.observed_at) || !nullableStableId(binding.phase_id) || !nullableStableId(binding.scope_id) || !nullableStableId(binding.stage_id) || !nullablePrivateRef(binding.predecessor_binding_ref) || !nullablePrivateRef(binding.successor_binding_ref) || !(binding.continuity_handoff_sha256 === null || SHA256.test(binding.continuity_handoff_sha256)) || !(binding.last_checkpoint_ref === null || typeof binding.last_checkpoint_ref === 'string' && binding.last_checkpoint_ref.length > 0) || !(binding.replaced_at === undefined || isoTime(binding.replaced_at)) || !(binding.revoked_at === undefined || isoTime(binding.revoked_at)) || !(binding.activity === undefined || binding.activity === null || safePublicText(binding.activity)) || !(binding.predecessor_archive_eligible === undefined || typeof binding.predecessor_archive_eligible === 'boolean')) fail('registry_conflict')
     bindingRefs.add(binding.binding_ref)
     const key = `${binding.project_id}:${binding.role}`; const prior = versions.get(key) ?? 0
     if (binding.binding_version <= prior) fail('registry_conflict')
@@ -26,7 +46,7 @@ function validateRegistry(value) {
     if (CURRENT_STATUSES.has(binding.status)) { if (active.has(key)) fail('registry_conflict'); active.add(key) }
   }
   for (const event of value.events) {
-    if (!event || event.sequence !== expectedSequence || typeof event.event_ref !== 'string' || !event.event_ref || eventRefs.has(event.event_ref) || !value.project_ids.includes(event.project_id) || !SESSION_ROLES.includes(event.role) || !ACTIONS.has(event.action) || typeof event.occurred_at !== 'string' || !Number.isFinite(Date.parse(event.occurred_at))) fail('registry_conflict')
+    if (!event || typeof event !== 'object' || Array.isArray(event) || !hasExactKeys(event, EVENT_KEYS, EVENT_REQUIRED_KEYS) || event.sequence !== expectedSequence || typeof event.event_ref !== 'string' || !UUID.test(event.event_ref) || eventRefs.has(event.event_ref) || !value.project_ids.includes(event.project_id) || !SESSION_ROLES.includes(event.role) || !ACTIONS.has(event.action) || !isoTime(event.occurred_at) || !SAFE_CLASS.test(event.actor_class) || UUID.test(event.actor_class) || PUBLIC_IDENTIFIER.test(event.actor_class) || !SAFE_REASON.test(event.reason_class) || UUID.test(event.reason_class) || PUBLIC_IDENTIFIER.test(event.reason_class) || !nullableStableId(event.stage_id) || !(event.handoff_sha256 === undefined || event.handoff_sha256 === null || SHA256.test(event.handoff_sha256)) || !(event.evidence_receipt_ref === undefined || typeof event.evidence_receipt_ref === 'string' && event.evidence_receipt_ref.length > 0) || !(event.observation_status === undefined || CURRENT_STATUSES.has(event.observation_status))) fail('registry_conflict')
     eventRefs.add(event.event_ref)
     const key = `${event.project_id}:${event.role}`; const before = eventVersions.get(key) ?? 0
     if (event.before_version !== before || !Number.isInteger(event.after_version) || event.after_version < before || event.after_version > before + 1) fail('registry_conflict')
@@ -60,7 +80,7 @@ function withLock(path, operation) {
 }
 
 export function createEmptyRegistry(path, projectIds) {
-  if (!Array.isArray(projectIds) || !projectIds.length || new Set(projectIds).size !== projectIds.length || projectIds.some((id) => typeof id !== 'string' || !PROJECT_ID.test(id))) fail('invalid_project_registry')
+  if (!Array.isArray(projectIds) || !projectIds.length || new Set(projectIds).size !== projectIds.length || projectIds.some((id) => !publicStableId(id))) fail('invalid_project_registry')
   if (existsSync(path)) fail('registry_exists')
   const registry = { schema_version: 2, revision: 0, next_event_sequence: 1, project_ids: [...projectIds], bindings: [], events: [] }
   atomicWrite(path, registry)
@@ -82,10 +102,10 @@ function validateInput(registry, input) {
   if (!registry.project_ids.includes(input.projectId)) fail('project_not_found')
   if (!SESSION_ROLES.includes(input.role)) fail('unsupported_role')
   if (!Number.isInteger(input.expectedVersion) || input.expectedVersion < 0) fail('expected_version_required')
-  if (typeof input.actorClass !== 'string' || !input.actorClass || typeof input.reasonClass !== 'string' || !/^[a-z0-9_:-]{1,96}$/.test(input.reasonClass)) fail('mutation_metadata_required')
+  if (typeof input.actorClass !== 'string' || !SAFE_CLASS.test(input.actorClass) || UUID.test(input.actorClass) || PUBLIC_IDENTIFIER.test(input.actorClass) || typeof input.reasonClass !== 'string' || !SAFE_REASON.test(input.reasonClass) || UUID.test(input.reasonClass) || PUBLIC_IDENTIFIER.test(input.reasonClass)) fail('mutation_metadata_required')
   if (typeof input.occurredAt !== 'string' || !Number.isFinite(Date.parse(input.occurredAt))) fail('occurred_at_required')
-  for (const value of [input.phaseId, input.scopeId, input.stageId]) if (value != null && (typeof value !== 'string' || !PROJECT_ID.test(value))) fail('invalid_stage_placement')
-  if (input.providerClass != null && (typeof input.providerClass !== 'string' || !/^[a-z][a-z0-9_-]{0,31}$/.test(input.providerClass))) fail('unsupported_provider')
+  for (const value of [input.phaseId, input.scopeId, input.stageId]) if (value != null && !publicStableId(value)) fail('invalid_stage_placement')
+  if (input.providerClass != null && (typeof input.providerClass !== 'string' || !/^[a-z][a-z0-9_-]{0,31}$/.test(input.providerClass) || UUID.test(input.providerClass) || PUBLIC_IDENTIFIER.test(input.providerClass))) fail('unsupported_provider')
 }
 
 function appendEvent(registry, input, beforeVersion, afterVersion, extras = {}) {
@@ -145,11 +165,11 @@ export function publicRegistryProjection(registry, projectId) {
     const bindings = historyFor(registry, projectId, role); const current = bindings.find((binding) => CURRENT_STATUSES.has(binding.status)) ?? null
     const events = registry.events.filter((event) => event.project_id === projectId && event.role === role)
     return {
-      project_id: projectId, role, status: current?.status ?? 'unbound', binding_version: current?.binding_version ?? bindings.at(-1)?.binding_version ?? 0,
-      history_count: bindings.length, bound_at: current?.bound_at ?? null, observed_at: current?.observed_at ?? null, activity: current?.activity == null ? null : sanitizeEvidenceText(current.activity),
-      phase_id: current?.phase_id ?? null, scope_id: current?.scope_id ?? null, stage_id: current?.stage_id ?? null,
+      project_id: safePublicId(projectId), role, status: current?.status ?? 'unbound', binding_version: current?.binding_version ?? bindings.at(-1)?.binding_version ?? 0,
+      history_count: bindings.length, bound_at: safePublicTime(current?.bound_at), observed_at: safePublicTime(current?.observed_at), activity: sanitizedPublicText(current?.activity),
+      phase_id: safePublicId(current?.phase_id), scope_id: safePublicId(current?.scope_id), stage_id: safePublicId(current?.stage_id),
       rotating: current?.status === 'rotating', has_predecessor: Boolean(current?.predecessor_binding_ref),
-      history: events.map((event) => ({ action: event.action, before_version: event.before_version, after_version: event.after_version, occurred_at: event.occurred_at, reason_class: event.reason_class, stage_id: event.stage_id ?? null })),
+      history: events.map((event) => ({ action: event.action, before_version: event.before_version, after_version: event.after_version, occurred_at: safePublicTime(event.occurred_at), reason_class: safePublicReason(event.reason_class), stage_id: safePublicId(event.stage_id) })),
     }
   })
 }
