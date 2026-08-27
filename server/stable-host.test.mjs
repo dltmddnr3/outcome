@@ -7,7 +7,7 @@ import source from '../snapshot/outcome-package-source.json' with { type: 'json'
 import { assertFinalizedReceipt, extractBuiltAsset, finalizeDeploymentSnapshot } from '../scripts/finalize-stable-snapshot.mjs'
 import { assertAutoDetectedNodeRuntime } from '../scripts/validate-vercel-config.mjs'
 import { AccountAccessError } from './account-access.mjs'
-import { HostedObserverBridgeError } from './phase3-observer-bridge-hosted.mjs'
+import { createHostedObserverBridge, HostedObserverBridgeError } from './phase3-observer-bridge-hosted.mjs'
 
 if (process.env.OUTCOME_ASSERT_BUILT !== '1') {
   const fixture = finalizeDeploymentSnapshot({ source, commit: '1111111111111111111111111111111111111111', tree: '2222222222222222222222222222222222222222', asset: 'index-test.js' })
@@ -129,6 +129,27 @@ const stableFixedStatuses = {
   csrf_invalid: 403, rate_limited: 429, body_too_large: 400,
   bad_request: 400, input_invalid: 400,
 }
+const captureHostedError = (operation) => {
+  try { operation() } catch (error) { return error }
+  assert.fail('expected hosted operation to fail')
+}
+const stableGenuineHostedOperationErrors = () => {
+  const hostedBinding = { workspace_id: 'workspace_main', project_id: 'outcome', role: 'builder', binding_version: 1, source_ref: 'source_alpha_01' }
+  const hostedViewers = [
+    { workspace_id: 'workspace_main', viewer_ref: 'viewer_workstation_01', viewer_class: 'workstation', project_ids: ['outcome'] },
+    { workspace_id: 'workspace_main', viewer_ref: 'viewer_remote_01', viewer_class: 'remote_device', project_ids: ['outcome'] },
+  ]
+  const hostedOwner = { account_ref: 'account_owner_01', workspace_id: 'workspace_main', project_ids: ['outcome'] }
+  const options = { bindings: [hostedBinding], viewers: hostedViewers, authorize_owner: () => hostedOwner, authorize_viewer: () => hostedOwner, now: () => Date.parse('2026-08-27T00:00:00.000Z') }
+  const readInput = { auth_context: { token: 'owner' }, viewer_ref: 'viewer_workstation_01', viewer_class: 'workstation', project_id: 'outcome' }
+  return [
+    ['unavailable', captureHostedError(() => createHostedObserverBridge(options).read(readInput))],
+    ['input_invalid', captureHostedError(() => createHostedObserverBridge({ ...options, feature_enabled: true }).read({}))],
+    ['access_denied', captureHostedError(() => createHostedObserverBridge({ ...options, feature_enabled: true, authorize_viewer: () => null }).read(readInput))],
+    ['auth_unavailable', captureHostedError(() => createHostedObserverBridge({ ...options, feature_enabled: true, authorize_viewer: () => { throw new Error('private auth') } }).read(readInput))],
+    ['enrollment_invalid', captureHostedError(() => createHostedObserverBridge({ ...options, feature_enabled: true }).completeEnrollment({ challenge_ref: 'challenge_missing_01', public_key_spki: 'invalid', proof_signature: 'invalid' }))],
+  ]
+}
 const stableBrandHostileFactories = (trap) => [
   () => { const value = new Error('rate_limited'); Object.setPrototypeOf(value, HostedObserverBridgeError.prototype); Object.defineProperties(value, { name: { value: 'HostedObserverBridgeError', enumerable: true, writable: true, configurable: true }, code: { value: 'rate_limited', enumerable: true, writable: true, configurable: true } }); return value },
   () => { const value = new HostedObserverBridgeError('rate_limited'); Object.setPrototypeOf(value, Error.prototype); return value },
@@ -162,6 +183,33 @@ const stableNewTargetVariantFactories = [
   () => { const target = new Proxy(HostedObserverBridgeError, {}); return Reflect.construct(HostedObserverBridgeError, ['rate_limited'], target) },
   () => { const value = new HostedObserverBridgeError('rate_limited'); Object.setPrototypeOf(value, Error.prototype); return value },
 ]
+const stableQaPrivateFactoryHostileFactories = () => [
+  () => Reflect.construct(new Proxy(HostedObserverBridgeError, {}), ['rate_limited'], HostedObserverBridgeError),
+  () => Reflect.construct(HostedObserverBridgeError.bind(null), ['rate_limited'], HostedObserverBridgeError),
+  () => {
+    const original = Object.getPrototypeOf(HostedObserverBridgeError.prototype)
+    try { Object.setPrototypeOf(HostedObserverBridgeError.prototype, null); return new HostedObserverBridgeError('rate_limited') }
+    finally { Object.setPrototypeOf(HostedObserverBridgeError.prototype, original) }
+  },
+  () => {
+    const marker = Symbol('qa-private-decoration')
+    try { HostedObserverBridgeError.prototype[marker] = true; return new HostedObserverBridgeError('rate_limited') }
+    finally { delete HostedObserverBridgeError.prototype[marker] }
+  },
+  () => Reflect.construct(runInContext('new Proxy(Target, {})', createContext({ Target: HostedObserverBridgeError })), ['rate_limited'], HostedObserverBridgeError),
+]
+
+test('QA private error factory root blocker is generic for every stable-host endpoint and settlement mode', async () => {
+  let calls = 0
+  for (const item of stableBridgeCases) for (const factory of stableQaPrivateFactoryHostileFactories()) for (const asynchronous of [false, true]) {
+    const failure = asynchronous
+      ? async () => { calls += 1; throw factory() }
+      : () => { calls += 1; throw factory() }
+    const bridge = { ...bridgeStub([]), [item.bridgeMethod]: failure }
+    assert.deepEqual(await injectedBridgeRequest({ bridge })({ method: item.method, pathname: item.path, headers: item.headers, body: item.body }), { status: 503, body: { error: 'bridge_unavailable' } })
+  }
+  assert.equal(calls, 60)
+})
 
 test('QA alternate newTarget blocker is generic for every stable-host endpoint and settlement mode', async () => {
   let calls = 0
@@ -305,7 +353,7 @@ test('stable host awaits async bridge completion and safely maps rejection', asy
   const resolved = injectedBridgeRequest({ bridge: { ...bridgeStub([]), async read() { return { projections: [{ status: 'durable' }] } } } })
   assert.deepEqual(await resolved({ method: 'GET', pathname, headers }), { status: 200, body: { projections: [{ status: 'durable' }] } })
   for (const [failure, expected] of [
-    [new HostedObserverBridgeError('rate_limited'), { status: 429, body: { error: 'rate_limited' } }],
+    [new HostedObserverBridgeError('rate_limited'), { status: 503, body: { error: 'bridge_unavailable' } }],
     [new Error('private database detail'), { status: 503, body: { error: 'bridge_unavailable' } }],
   ]) {
     let calls = 0
@@ -390,14 +438,27 @@ test('brand mutation matrix is generic for every stable-host endpoint and settle
   assert.equal(trapHits, 0)
 })
 
-test('genuine brand mappings cover every stable-host endpoint and settlement mode', async () => {
+test('genuine hosted operation mappings cover every stable-host endpoint and settlement mode', async () => {
   let calls = 0
-  for (const item of stableBridgeCases) for (const [code, status] of Object.entries(stableFixedStatuses)) for (const asynchronous of [false, true]) {
+  for (const item of stableBridgeCases) for (const [code, error] of stableGenuineHostedOperationErrors()) for (const asynchronous of [false, true]) {
+    const status = stableFixedStatuses[code]
+    const failure = asynchronous
+      ? async () => { calls += 1; throw error }
+      : () => { calls += 1; throw error }
+    const bridge = { ...bridgeStub([]), [item.bridgeMethod]: failure }
+    assert.deepEqual(await injectedBridgeRequest({ bridge })({ method: item.method, pathname: item.path, headers: item.headers, body: item.body }), { status, body: { error: status === 404 || status === 503 ? 'bridge_unavailable' : code } })
+  }
+  assert.equal(calls, 60)
+})
+
+test('public constructor never confers finite stable-host mapping', async () => {
+  let calls = 0
+  for (const item of stableBridgeCases) for (const code of Object.keys(stableFixedStatuses)) for (const asynchronous of [false, true]) {
     const failure = asynchronous
       ? async () => { calls += 1; throw new HostedObserverBridgeError(code) }
       : () => { calls += 1; throw new HostedObserverBridgeError(code) }
     const bridge = { ...bridgeStub([]), [item.bridgeMethod]: failure }
-    assert.deepEqual(await injectedBridgeRequest({ bridge })({ method: item.method, pathname: item.path, headers: item.headers, body: item.body }), { status, body: { error: status === 404 || status === 503 ? 'bridge_unavailable' : code } })
+    assert.deepEqual(await injectedBridgeRequest({ bridge })({ method: item.method, pathname: item.path, headers: item.headers, body: item.body }), { status: 503, body: { error: 'bridge_unavailable' } })
   }
   assert.equal(calls, 168)
 })

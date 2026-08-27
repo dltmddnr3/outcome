@@ -20,11 +20,39 @@ const viewers = Object.freeze([
 const binding = Object.freeze({ workspace_id: 'workspace_main', project_id: 'outcome', role: 'builder', binding_version: 1, source_ref: 'source_alpha_01' })
 const expectCode = (fn, code) => assert.throws(fn, (error) => error instanceof HostedObserverBridgeError && error.code === code)
 
-test('error brand classifier accepts only genuine exact known errors and does not export its brand', async () => {
+const qaPrivateFactoryHostileErrors = () => {
+  const proxyTarget = Reflect.construct(new Proxy(HostedObserverBridgeError, {}), ['rate_limited'], HostedObserverBridgeError)
+  const boundTarget = Reflect.construct(HostedObserverBridgeError.bind(null), ['rate_limited'], HostedObserverBridgeError)
+  const originalParent = Object.getPrototypeOf(HostedObserverBridgeError.prototype)
+  let mutatedPrototype
+  let decoratedPrototype
+  try {
+    Object.setPrototypeOf(HostedObserverBridgeError.prototype, null)
+    mutatedPrototype = new HostedObserverBridgeError('rate_limited')
+  } finally {
+    Object.setPrototypeOf(HostedObserverBridgeError.prototype, originalParent)
+  }
+  const marker = Symbol('qa-private-decoration')
+  try {
+    HostedObserverBridgeError.prototype[marker] = true
+    decoratedPrototype = new HostedObserverBridgeError('rate_limited')
+  } finally {
+    delete HostedObserverBridgeError.prototype[marker]
+  }
+  const crossRealmProxyTarget = runInContext('new Proxy(Target, {})', createContext({ Target: HostedObserverBridgeError }))
+  const crossRealmProxy = Reflect.construct(crossRealmProxyTarget, ['rate_limited'], HostedObserverBridgeError)
+  return [proxyTarget, boundTarget, mutatedPrototype, decoratedPrototype, crossRealmProxy]
+}
+
+test('QA private error factory root blocker rejects all five constructor counterexamples', () => {
+  for (const error of qaPrivateFactoryHostileErrors()) assert.equal(safeHostedObserverBridgeErrorCode(error), null)
+})
+
+test('public constructor never confers hosted error authority and private state is not exported', async () => {
   const codes = ['unavailable', 'access_denied', 'auth_unavailable', 'enrollment_invalid', 'enrollment_conflict', 'idempotency_conflict', 'request_conflict', 'sequence_conflict', 'signature_invalid', 'csrf_invalid', 'rate_limited', 'body_too_large', 'bad_request', 'input_invalid']
   for (const code of codes) {
     const error = new HostedObserverBridgeError(code)
-    assert.equal(safeHostedObserverBridgeErrorCode(error), code)
+    assert.equal(safeHostedObserverBridgeErrorCode(error), null)
     const descriptors = Object.getOwnPropertyDescriptors(error)
     assert.deepEqual(Reflect.ownKeys(descriptors), ['stack', 'message', 'name', 'code'])
     assert.equal(Object.hasOwn(descriptors.stack, 'value'), true)
@@ -34,20 +62,41 @@ test('error brand classifier accepts only genuine exact known errors and does no
   const prepareStackTrace = Error.prepareStackTrace
   try {
     Error.prepareStackTrace = () => { throw new Error('private stack formatter') }
-    assert.equal(safeHostedObserverBridgeErrorCode(new HostedObserverBridgeError('rate_limited')), 'rate_limited')
+    assert.equal(safeHostedObserverBridgeErrorCode(new HostedObserverBridgeError('rate_limited')), null)
   } finally {
     Error.prepareStackTrace = prepareStackTrace
   }
   const module = await import('./phase3-observer-bridge-hosted.mjs')
-  assert.equal(Object.keys(module).some((key) => /brand|original.code/i.test(key)), false)
+  assert.equal(Object.keys(module).some((key) => /brand|token|original.code|error.*factory|fail/i.test(key)), false)
 })
 
-test('exact newTarget brand admission accepts direct and Reflect exact-class construction only', () => {
+test('public constructor never confers through direct or Reflect exact-class construction', () => {
   const codes = ['unavailable', 'access_denied', 'auth_unavailable', 'enrollment_invalid', 'enrollment_conflict', 'idempotency_conflict', 'request_conflict', 'sequence_conflict', 'signature_invalid', 'csrf_invalid', 'rate_limited', 'body_too_large', 'bad_request', 'input_invalid']
   for (const code of codes) {
-    assert.equal(safeHostedObserverBridgeErrorCode(new HostedObserverBridgeError(code)), code)
-    assert.equal(safeHostedObserverBridgeErrorCode(Reflect.construct(HostedObserverBridgeError, [code], HostedObserverBridgeError)), code)
+    assert.equal(safeHostedObserverBridgeErrorCode(new HostedObserverBridgeError(code)), null)
+    assert.equal(safeHostedObserverBridgeErrorCode(Reflect.construct(HostedObserverBridgeError, [code], HostedObserverBridgeError)), null)
   }
+})
+
+const captureHostedError = (operation) => {
+  try { operation() } catch (error) { return error }
+  assert.fail('expected hosted operation to fail')
+}
+
+const genuineHostedOperationErrors = () => {
+  const options = { bindings: [binding], viewers, authorize_owner: () => owner, authorize_viewer: () => owner, now: () => BASE }
+  const readInput = { auth_context: { token: 'owner' }, viewer_ref: 'viewer_workstation_01', viewer_class: 'workstation', project_id: 'outcome' }
+  return [
+    ['unavailable', captureHostedError(() => createHostedObserverBridge(options).read(readInput))],
+    ['input_invalid', captureHostedError(() => createHostedObserverBridge({ ...options, feature_enabled: true }).read({}))],
+    ['access_denied', captureHostedError(() => createHostedObserverBridge({ ...options, feature_enabled: true, authorize_viewer: () => null }).read(readInput))],
+    ['auth_unavailable', captureHostedError(() => createHostedObserverBridge({ ...options, feature_enabled: true, authorize_viewer: () => { throw new Error('private auth') } }).read(readInput))],
+    ['enrollment_invalid', captureHostedError(() => createHostedObserverBridge({ ...options, feature_enabled: true }).completeEnrollment({ challenge_ref: 'challenge_missing_01', public_key_spki: 'invalid', proof_signature: 'invalid' }))],
+  ]
+}
+
+test('genuine hosted operation mappings retain private finite codes', () => {
+  for (const [code, error] of genuineHostedOperationErrors()) assert.equal(safeHostedObserverBridgeErrorCode(error), code)
 })
 
 test('newTarget construction matrix rejects alternate subclass bound proxy and prototype mutation', () => {

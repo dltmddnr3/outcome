@@ -1,6 +1,6 @@
 import { createHash, createPublicKey, timingSafeEqual, verify as nodeVerify } from 'node:crypto'
 import { isProxy } from 'node:util/types'
-import { canonicalObserverBridgeBytes, createPhase3ObserverBridge } from './phase3-observer-bridge.mjs'
+import { canonicalObserverBridgeBytes, createPhase3ObserverBridge, ObserverBridgeError } from './phase3-observer-bridge.mjs'
 
 const ROLES = new Set(['planner', 'builder', 'ux_product_qa', 'release_audit'])
 const VIEWER_CLASSES = new Set(['workstation', 'remote_device'])
@@ -27,18 +27,20 @@ const ENROLLMENT_CANONICAL_FIELDS = Object.freeze(['workspace_id', 'project_id',
 const ENROLLMENT_FINGERPRINT_FIELDS = Object.freeze(['account_ref', 'workspace_id', 'project_id', 'role', 'binding_version', 'source_ref', 'mode'])
 const HOSTED_ERROR_BRAND = new WeakSet()
 const HOSTED_ERROR_ORIGINAL_CODE = new WeakMap()
+const HOSTED_ERROR_TOKEN = Object.freeze(Object.create(null))
 const HOSTED_API_ERROR_CODES = new Set(['unavailable', 'access_denied', 'auth_unavailable', 'enrollment_invalid', 'enrollment_conflict', 'idempotency_conflict', 'request_conflict', 'sequence_conflict', 'signature_invalid', 'csrf_invalid', 'rate_limited', 'body_too_large', 'bad_request', 'input_invalid'])
+const DOMAIN_ERROR_CODES = new Set(['signature_invalid', 'out_of_order', 'resync_required'])
 const HOSTED_ERROR_KEYS = new Set(['stack', 'message', 'name', 'code'])
 
 export class HostedObserverBridgeError extends Error {
-  constructor(code) {
+  constructor(code, token) {
     super(code)
     let stack = ''
     try { const value = this.stack; stack = typeof value === 'string' ? value : '' } catch {}
     Object.defineProperty(this, 'stack', { value: stack, writable: true, enumerable: false, configurable: true })
     this.name = 'HostedObserverBridgeError'
     this.code = code
-    if (new.target === HostedObserverBridgeError) {
+    if (token === HOSTED_ERROR_TOKEN) {
       HOSTED_ERROR_BRAND.add(this)
       HOSTED_ERROR_ORIGINAL_CODE.set(this, code)
     }
@@ -69,7 +71,18 @@ export function safeHostedObserverBridgeErrorCode(error) {
   }
 }
 
-const fail = (code) => { throw new HostedObserverBridgeError(code) }
+const safeDomainErrorCode = (error) => {
+  try {
+    if (typeof error !== 'object' || error === null || isProxy(error) || Object.getPrototypeOf(error) !== ObserverBridgeError.prototype) return null
+    const descriptor = Object.getOwnPropertyDescriptor(error, 'code')
+    if (!descriptor || !Object.hasOwn(descriptor, 'value') || typeof descriptor.value !== 'string') return null
+    return DOMAIN_ERROR_CODES.has(descriptor.value) ? descriptor.value : null
+  } catch {
+    return null
+  }
+}
+
+const fail = (code) => { throw new HostedObserverBridgeError(code, HOSTED_ERROR_TOKEN) }
 const positiveInteger = (value) => typeof value === 'number' && Number.isSafeInteger(value) && value > 0
 const nonNegativeInteger = (value) => typeof value === 'number' && Number.isSafeInteger(value) && value >= 0
 const safeId = (value) => typeof value === 'string' && SAFE_ID.test(value)
@@ -197,7 +210,7 @@ function publicKeyFromSpki(value) {
     if (der.toString('base64url') !== value) fail('input_invalid')
     key = createPublicKey({ key: der, format: 'der', type: 'spki' })
   } catch (error) {
-    if (error instanceof HostedObserverBridgeError) throw error
+    if (safeHostedObserverBridgeErrorCode(error) !== null) throw error
     fail('input_invalid')
   }
   if (key.type !== 'public' || key.asymmetricKeyType !== 'ed25519') fail('input_invalid')
@@ -519,8 +532,9 @@ export function createHostedObserverBridge(options = {}) {
             action = { type: 'ingest', at: nowValue, event: { ...value.event } }
           }
         } catch (error) {
-          if (error?.code === 'signature_invalid') fail('signature_invalid')
-          if (['out_of_order', 'resync_required'].includes(error?.code)) fail('sequence_conflict')
+          const code = safeDomainErrorCode(error)
+          if (code === 'signature_invalid') fail('signature_invalid')
+          if (code === 'out_of_order' || code === 'resync_required') fail('sequence_conflict')
           fail('domain_unavailable')
         }
         if (domainResponse?.status === 'conflict') fail('sequence_conflict')

@@ -37,6 +37,21 @@ const fixedStatuses = {
   csrf_invalid: 403, rate_limited: 429, body_too_large: 400,
   bad_request: 400, input_invalid: 400,
 }
+const captureHostedError = (operation) => {
+  try { operation() } catch (error) { return error }
+  assert.fail('expected hosted operation to fail')
+}
+const genuineHostedOperationErrors = () => {
+  const options = { bindings: [binding], viewers, authorize_owner: () => owner, authorize_viewer: () => owner, now: () => BASE }
+  const readInput = { auth_context: { token: 'owner' }, viewer_ref: 'viewer_workstation_01', viewer_class: 'workstation', project_id: 'outcome' }
+  return [
+    ['unavailable', captureHostedError(() => createHostedObserverBridge(options).read(readInput))],
+    ['input_invalid', captureHostedError(() => createHostedObserverBridge({ ...options, feature_enabled: true }).read({}))],
+    ['access_denied', captureHostedError(() => createHostedObserverBridge({ ...options, feature_enabled: true, authorize_viewer: () => null }).read(readInput))],
+    ['auth_unavailable', captureHostedError(() => createHostedObserverBridge({ ...options, feature_enabled: true, authorize_viewer: () => { throw new Error('private auth') } }).read(readInput))],
+    ['enrollment_invalid', captureHostedError(() => createHostedObserverBridge({ ...options, feature_enabled: true }).completeEnrollment({ challenge_ref: 'challenge_missing_01', public_key_spki: 'invalid', proof_signature: 'invalid' }))],
+  ]
+}
 const brandHostileFactories = (trap) => [
   () => { const value = new Error('rate_limited'); Object.setPrototypeOf(value, HostedObserverBridgeError.prototype); Object.defineProperties(value, { name: { value: 'HostedObserverBridgeError', enumerable: true, writable: true, configurable: true }, code: { value: 'rate_limited', enumerable: true, writable: true, configurable: true } }); return value },
   () => { const value = new HostedObserverBridgeError('rate_limited'); Object.setPrototypeOf(value, Error.prototype); return value },
@@ -70,6 +85,35 @@ const newTargetVariantFactories = [
   () => { const target = new Proxy(HostedObserverBridgeError, {}); return Reflect.construct(HostedObserverBridgeError, ['rate_limited'], target) },
   () => { const value = new HostedObserverBridgeError('rate_limited'); Object.setPrototypeOf(value, Error.prototype); return value },
 ]
+const qaPrivateFactoryHostileFactories = () => {
+  const factories = [
+    () => Reflect.construct(new Proxy(HostedObserverBridgeError, {}), ['rate_limited'], HostedObserverBridgeError),
+    () => Reflect.construct(HostedObserverBridgeError.bind(null), ['rate_limited'], HostedObserverBridgeError),
+    () => {
+      const original = Object.getPrototypeOf(HostedObserverBridgeError.prototype)
+      try { Object.setPrototypeOf(HostedObserverBridgeError.prototype, null); return new HostedObserverBridgeError('rate_limited') }
+      finally { Object.setPrototypeOf(HostedObserverBridgeError.prototype, original) }
+    },
+    () => {
+      const marker = Symbol('qa-private-decoration')
+      try { HostedObserverBridgeError.prototype[marker] = true; return new HostedObserverBridgeError('rate_limited') }
+      finally { delete HostedObserverBridgeError.prototype[marker] }
+    },
+    () => Reflect.construct(runInContext('new Proxy(Target, {})', createContext({ Target: HostedObserverBridgeError })), ['rate_limited'], HostedObserverBridgeError),
+  ]
+  return factories
+}
+
+test('QA private error factory root blocker is generic for every direct API endpoint and settlement mode', async () => {
+  let calls = 0
+  for (const item of seamCases) for (const factory of qaPrivateFactoryHostileFactories()) for (const asynchronous of [false, true]) {
+    const failure = asynchronous
+      ? async () => { calls += 1; throw factory() }
+      : () => { calls += 1; throw factory() }
+    assert.deepEqual(await call({ maxBodyBytes: 1024, [item.bridgeMethod]: failure }, seamInput(item)), { status: 503, body: { error: 'bridge_unavailable' } })
+  }
+  assert.equal(calls, 60)
+})
 
 test('QA alternate newTarget blocker is generic for every direct API endpoint and settlement mode', async () => {
   let calls = 0
@@ -132,15 +176,16 @@ test('brand mutation matrix is generic for every direct API endpoint and settlem
   assert.equal(trapHits, 0)
 })
 
-test('genuine brand mappings cover every direct API endpoint and settlement mode', async () => {
+test('genuine hosted operation mappings cover every direct API endpoint and settlement mode', async () => {
   let calls = 0
-  for (const item of seamCases) for (const [code, status] of Object.entries(fixedStatuses)) for (const asynchronous of [false, true]) {
+  for (const item of seamCases) for (const [code, error] of genuineHostedOperationErrors()) for (const asynchronous of [false, true]) {
+    const status = fixedStatuses[code]
     const failure = asynchronous
-      ? async () => { calls += 1; throw new HostedObserverBridgeError(code) }
-      : () => { calls += 1; throw new HostedObserverBridgeError(code) }
+      ? async () => { calls += 1; throw error }
+      : () => { calls += 1; throw error }
     assert.deepEqual(await call({ maxBodyBytes: 1024, [item.bridgeMethod]: failure }, seamInput(item)), { status, body: { error: status === 404 || status === 503 ? 'bridge_unavailable' : code } })
   }
-  assert.equal(calls, 168)
+  assert.equal(calls, 60)
 })
 
 test('Audit hostile rejection reasons: throwing getPrototypeOf Proxy is contained', async () => {
@@ -198,12 +243,12 @@ test('hostile rejection corpus is total for every endpoint with one call and no 
   }
 })
 
-test('safe known error classification requires exact native type and own data code', async () => {
+test('public constructor never confers finite API mapping', async () => {
   for (const [code, status] of Object.entries(fixedStatuses)) for (const asynchronous of [false, true]) {
     const error = new HostedObserverBridgeError(code)
     const failure = asynchronous ? async () => { throw error } : () => { throw error }
     const actual = await call({ maxBodyBytes: 1024, read: failure }, seamInput(seamCases[0]))
-    assert.deepEqual(actual, { status, body: { error: status === 404 || status === 503 ? 'bridge_unavailable' : code } })
+    assert.deepEqual(actual, { status: 503, body: { error: 'bridge_unavailable' } }, `${code}:${status}:${asynchronous}`)
   }
   class ForgedSubclass extends HostedObserverBridgeError {}
   const inherited = Object.create({ code: 'rate_limited' })
@@ -233,10 +278,10 @@ test('sync and async bridge methods produce identical finite responses for all s
   }
 })
 
-test('sync throws and async rejections retain known mapping and hide unknown detail', async () => {
+test('sync throws and async rejections hide externally constructed and unknown detail', async () => {
   const cases = [
-    { failure: () => { throw new HostedObserverBridgeError('rate_limited') }, expected: { status: 429, body: { error: 'rate_limited' } } },
-    { failure: async () => { throw new HostedObserverBridgeError('rate_limited') }, expected: { status: 429, body: { error: 'rate_limited' } } },
+    { failure: () => { throw new HostedObserverBridgeError('rate_limited') }, expected: { status: 503, body: { error: 'bridge_unavailable' } } },
+    { failure: async () => { throw new HostedObserverBridgeError('rate_limited') }, expected: { status: 503, body: { error: 'bridge_unavailable' } } },
     { failure: () => { throw new Error('private sync identifier') }, expected: { status: 503, body: { error: 'bridge_unavailable' } } },
     { failure: async () => { throw new Error('private async identifier') }, expected: { status: 503, body: { error: 'bridge_unavailable' } } },
   ]
@@ -339,6 +384,19 @@ test('Proxy and accessor request bodies are rejected without trap or getter exec
   const accessorResponse = await call(bridge, { method: 'POST', path: '/api/private/bridge/enrollments', headers: { 'content-type': 'application/json', origin: 'https://preview.example', 'x-outcome-csrf': 'csrf-safe-value' }, rawBody: accessor, authContext: { token: 'owner' } })
   assert.equal(accessorResponse.status, 400)
   assert.equal(hits, 0)
+})
+
+test('private API error mappings preserve parser body and CSRF responses without public constructor authority', async () => {
+  const bridge = { maxBodyBytes: 1, read: () => ({ projections: [] }), createEnrollment: () => assert.fail('must fail before bridge call') }
+  const badRequest = await call(bridge, { method: 'GET', path: '/api/private/bridge/projection', headers: {}, query: new Proxy({}, {}), authContext: { token: 'owner' } })
+  const bodyTooLarge = await call(bridge, { method: 'POST', path: '/api/private/bridge/enrollments/complete', headers: { 'content-type': 'application/json' }, rawBody: '{}', authContext: null })
+  const csrfInvalid = await call({ ...bridge, maxBodyBytes: 1024 }, { method: 'POST', path: '/api/private/bridge/enrollments', headers: { 'content-type': 'application/json', origin: 'https://wrong.example', 'x-outcome-csrf': 'wrong' }, rawBody: '{}', authContext: { token: 'owner' } })
+  assert.deepEqual(badRequest, { status: 400, body: { error: 'bad_request' } })
+  assert.deepEqual(bodyTooLarge, { status: 400, body: { error: 'body_too_large' } })
+  assert.deepEqual(csrfInvalid, { status: 403, body: { error: 'csrf_invalid' } })
+  assert.deepEqual(await call({ maxBodyBytes: 1024, read: () => { throw new HostedObserverBridgeError('csrf_invalid') } }, seamInput(seamCases[0])), { status: 503, body: { error: 'bridge_unavailable' } })
+  const module = await import('./phase3-observer-bridge-api.mjs')
+  assert.equal(Object.keys(module).some((key) => /brand|token|error.*factory|fail/i.test(key)), false)
 })
 
 test('QA RED F3 counts actual raw padded UTF-8 bytes before parsing', async () => {
