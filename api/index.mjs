@@ -155,7 +155,7 @@ export function createStableHostRequestHandler({ environment = process.env, runt
           return error?.code === 'authentication_unavailable' ? result(503, { error: 'bridge_unavailable' }) : bridgeUnavailable()
         }
       }
-      return handleHostedObserverBridgeRequest({
+      return await handleHostedObserverBridgeRequest({
         bridge: bridgeRuntime.bridge,
         allowed_origin: bridgeRuntime.allowedOrigin,
         csrf_secret: bridgeRuntime.csrfSecret,

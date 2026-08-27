@@ -6,6 +6,7 @@ import source from '../snapshot/outcome-package-source.json' with { type: 'json'
 import { assertFinalizedReceipt, extractBuiltAsset, finalizeDeploymentSnapshot } from '../scripts/finalize-stable-snapshot.mjs'
 import { assertAutoDetectedNodeRuntime } from '../scripts/validate-vercel-config.mjs'
 import { AccountAccessError } from './account-access.mjs'
+import { HostedObserverBridgeError } from './phase3-observer-bridge-hosted.mjs'
 
 if (process.env.OUTCOME_ASSERT_BUILT !== '1') {
   const fixture = finalizeDeploymentSnapshot({ source, commit: '1111111111111111111111111111111111111111', tree: '2222222222222222222222222222222222222222', asset: 'index-test.js' })
@@ -223,6 +224,22 @@ test('projection enrollment and ingestion flags gate their route groups independ
   const ingestionOnly = injectedBridgeRequest({ environment: bridgeEnvironment('0', '1') })
   assert.equal((await ingestionOnly({ method: 'POST', pathname: '/api/private/bridge/events', headers: { 'content-type': 'application/json' }, body: Buffer.from('{}') })).status, 200)
   assert.deepEqual(await ingestionOnly({ method: 'GET', pathname: '/api/private/bridge/projection' }), { status: 404, body: { error: 'bridge_unavailable' } })
+})
+
+test('stable host awaits async bridge completion and safely maps rejection', async () => {
+  const pathname = '/api/private/bridge/projection?viewer_ref=viewer_workstation_01&viewer_class=workstation&project_id=outcome'
+  const headers = { authorization: 'Bearer server-valid' }
+  const resolved = injectedBridgeRequest({ bridge: { ...bridgeStub([]), async read() { return { projections: [{ status: 'durable' }] } } } })
+  assert.deepEqual(await resolved({ method: 'GET', pathname, headers }), { status: 200, body: { projections: [{ status: 'durable' }] } })
+  for (const [failure, expected] of [
+    [new HostedObserverBridgeError('rate_limited'), { status: 429, body: { error: 'rate_limited' } }],
+    [new Error('private database detail'), { status: 503, body: { error: 'bridge_unavailable' } }],
+  ]) {
+    let calls = 0
+    const rejected = injectedBridgeRequest({ bridge: { ...bridgeStub([]), async read() { calls += 1; throw failure } } })
+    assert.deepEqual(await rejected({ method: 'GET', pathname, headers }), expected)
+    assert.equal(calls, 1)
+  }
 })
 
 test('server auth context defeats spoof attempts for owner and viewer routes', async () => {

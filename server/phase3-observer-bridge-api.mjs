@@ -192,7 +192,7 @@ function requireOwnerBoundary(headers, allowedOrigin, csrfSecret) {
   if (typeof allowedOrigin !== 'string' || typeof csrfSecret !== 'string' || headers.origin !== allowedOrigin || headers['x-outcome-csrf'] !== csrfSecret) throw new HostedObserverBridgeError('csrf_invalid')
 }
 
-export function handleHostedObserverBridgeRequest(input = {}) {
+export async function handleHostedObserverBridgeRequest(input = {}) {
   let request
   try { request = ownRecord(input, INPUT_FIELDS, new Set(['method', 'path'])) } catch (error) { return errorResponse(error) }
   const method = request.method
@@ -205,7 +205,7 @@ export function handleHostedObserverBridgeRequest(input = {}) {
     if (path === '/api/private/bridge/projection') {
       if (method !== 'GET') return response(405, { error: 'read_only' })
       const query = materializeJson(request.query ?? {})
-      return response(200, request.bridge.read({ auth_context: request.authContext, viewer_ref: query.viewer_ref, viewer_class: query.viewer_class, project_id: query.project_id }))
+      return response(200, await request.bridge.read({ auth_context: request.authContext, viewer_ref: query.viewer_ref, viewer_class: query.viewer_class, project_id: query.project_id }))
     }
     const postPaths = new Set(['/api/private/bridge/enrollments', '/api/private/bridge/enrollments/complete', '/api/private/bridge/sources/revoke', '/api/private/bridge/sources/rotate', '/api/private/bridge/events'])
     if (!postPaths.has(path)) return response(404, { error: 'bridge_unavailable' })
@@ -215,31 +215,31 @@ export function handleHostedObserverBridgeRequest(input = {}) {
       const parsed = parseRawJson(request.rawBody, request.bridge.maxBodyBytes)
       if (Object.hasOwn(parsed.value, 'auth_context')) throw new HostedObserverBridgeError('bad_request')
       requireOwnerBoundary(headers, request.allowed_origin, request.csrf_secret)
-      return response(201, request.bridge.createEnrollment(withServerFields(parsed.value, { auth_context: request.authContext })))
+      return response(201, await request.bridge.createEnrollment(withServerFields(parsed.value, { auth_context: request.authContext })))
     }
     if (path === '/api/private/bridge/enrollments/complete') {
       requireJson(headers)
-      return response(200, request.bridge.completeEnrollment(parseRawJson(request.rawBody, request.bridge.maxBodyBytes).value))
+      return response(200, await request.bridge.completeEnrollment(parseRawJson(request.rawBody, request.bridge.maxBodyBytes).value))
     }
     if (path === '/api/private/bridge/sources/revoke') {
       requireJson(headers)
       const parsed = parseRawJson(request.rawBody, request.bridge.maxBodyBytes)
       if (Object.hasOwn(parsed.value, 'auth_context')) throw new HostedObserverBridgeError('bad_request')
       requireOwnerBoundary(headers, request.allowed_origin, request.csrf_secret)
-      return response(200, request.bridge.revokeSource(withServerFields(parsed.value, { auth_context: request.authContext })))
+      return response(200, await request.bridge.revokeSource(withServerFields(parsed.value, { auth_context: request.authContext })))
     }
     if (path === '/api/private/bridge/sources/rotate') {
       requireJson(headers)
       const parsed = parseRawJson(request.rawBody, request.bridge.maxBodyBytes)
       if (Object.hasOwn(parsed.value, 'auth_context')) throw new HostedObserverBridgeError('bad_request')
       requireOwnerBoundary(headers, request.allowed_origin, request.csrf_secret)
-      return response(201, request.bridge.createEnrollment(withServerFields(parsed.value, { mode: 'rotate', auth_context: request.authContext })))
+      return response(201, await request.bridge.createEnrollment(withServerFields(parsed.value, { mode: 'rotate', auth_context: request.authContext })))
     }
     if (path === '/api/private/bridge/events') {
       requireJson(headers)
       const parsed = parseRawJson(request.rawBody, request.bridge.maxBodyBytes)
       if (Object.hasOwn(parsed.value, 'body_bytes')) throw new HostedObserverBridgeError('bad_request')
-      return response(200, request.bridge.ingest(withServerFields(parsed.value, { body_bytes: parsed.bytes })))
+      return response(200, await request.bridge.ingest(withServerFields(parsed.value, { body_bytes: parsed.bytes })))
     }
     return response(404, { error: 'bridge_unavailable' })
   } catch (error) {
