@@ -587,6 +587,147 @@ test('raw body hostile matrix stays finite at the stable handler boundary', asyn
   assert.equal(trapHits, 0)
 })
 
+const streamRequest = (iterator) => ({
+  method: 'POST', url: '/api/private/bridge/events', query: {}, headers: {}, body: undefined,
+  [Symbol.asyncIterator]: iterator,
+})
+const singleChunkIterator = (chunk) => function iterator() {
+  let yielded = false
+  return { next: () => Promise.resolve(yielded ? { done: true } : (yielded = true, { value: chunk, done: false })) }
+}
+
+test('QA stream body blocker rejects getter-bearing chunk without outward failure', async () => {
+  let getterHits = 0
+  const chunk = Object.create(null)
+  Object.defineProperty(chunk, 'valueOf', { get() { getterHits += 1; throw new Error('private chunk getter') } })
+  const actual = await invokeStableHandler(streamRequest(singleChunkIterator(chunk)))
+  assert.equal(actual.status, 404)
+  assert.deepEqual(actual.body, { error: 'bridge_unavailable' })
+  assert.equal(actual.headers.get('cache-control'), 'no-store')
+  assert.equal(getterHits, 0)
+})
+
+test('QA stream body blocker rejects Proxy iterator function without apply', async () => {
+  let applyHits = 0
+  const iterator = new Proxy(singleChunkIterator(Buffer.from('{}')), { apply() { applyHits += 1; throw new Error('private iterator apply') } })
+  const actual = await invokeStableHandler(streamRequest(iterator))
+  assert.equal(actual.status, 404)
+  assert.deepEqual(actual.body, { error: 'bridge_unavailable' })
+  assert.equal(actual.headers.get('cache-control'), 'no-store')
+  assert.equal(applyHits, 0)
+})
+
+test('QA stream body blocker rejects thenable-shaped chunk without outward failure', async () => {
+  const chunk = Object.create(null)
+  Object.defineProperty(chunk, 'then', { value: () => assert.fail('must not assimilate chunk'), enumerable: true })
+  const actual = await invokeStableHandler(streamRequest(singleChunkIterator(chunk)))
+  assert.equal(actual.status, 404)
+  assert.deepEqual(actual.body, { error: 'bridge_unavailable' })
+  assert.equal(actual.headers.get('cache-control'), 'no-store')
+})
+
+test('stream body hostile iterator matrix rejects request iterator result and chunk surfaces', async () => {
+  let trapHits = 0
+  const trap = () => { trapHits += 1; throw new Error('private stream trap') }
+  const proxyHandler = { get: trap, getPrototypeOf: trap, ownKeys: trap, getOwnPropertyDescriptor: trap, apply: trap }
+  const revokedRequest = Proxy.revocable(streamRequest(singleChunkIterator(Buffer.from('{}'))), {})
+  revokedRequest.revoke()
+  for (const request of [new Proxy(streamRequest(singleChunkIterator(Buffer.from('{}'))), proxyHandler), revokedRequest.proxy]) {
+    const actual = await invokeStableHandler(request)
+    assert.equal(actual.status, 400)
+    assert.deepEqual(actual.body, { error: 'bad_request' })
+    assert.equal(actual.headers.get('cache-control'), 'no-store')
+  }
+
+  const accessorRequest = streamRequest(singleChunkIterator(Buffer.from('{}')))
+  Object.defineProperty(accessorRequest, Symbol.asyncIterator, { get: trap })
+  const revokedIterator = Proxy.revocable(singleChunkIterator(Buffer.from('{}')), {})
+  revokedIterator.revoke()
+  const revokedIteratorRequest = streamRequest(revokedIterator.proxy)
+  const iteratorObjectProxy = streamRequest(() => new Proxy({ next: () => Promise.resolve({ done: true }) }, proxyHandler))
+  const boundIterator = streamRequest(singleChunkIterator(Buffer.from('{}')).bind(null))
+  const nextAccessor = streamRequest(() => { const value = {}; Object.defineProperty(value, 'next', { get: trap }); return value })
+  const nextProxyFunction = streamRequest(() => ({ next: new Proxy(() => ({ done: true }), proxyHandler) }))
+  const resultProxy = streamRequest(() => ({ next: () => new Proxy({ done: true }, proxyHandler) }))
+  const resultAccessor = streamRequest(() => ({ next: () => { const value = {}; Object.defineProperty(value, 'done', { get: trap }); return value } }))
+  const resultThenable = streamRequest(() => ({ next: () => ({ done: false, value: Buffer.from('{}'), then: trap }) }))
+  for (const request of [accessorRequest, revokedIteratorRequest, iteratorObjectProxy, boundIterator, nextAccessor, nextProxyFunction, resultProxy, resultAccessor, resultThenable]) {
+    const actual = await invokeStableHandler(request)
+    assert.equal(actual.status, 404)
+    assert.deepEqual(actual.body, { error: 'bridge_unavailable' })
+    assert.equal(actual.headers.get('cache-control'), 'no-store')
+  }
+
+  const chunkWithGetter = Object.create(null)
+  Object.defineProperty(chunkWithGetter, 'toString', { get: trap })
+  const chunkThenable = Object.create(null)
+  Object.defineProperty(chunkThenable, 'then', { get: trap })
+  const unsupportedChunks = [chunkWithGetter, chunkThenable, new Uint8Array([1]), new ArrayBuffer(1), {}, Symbol('chunk')]
+  for (const chunk of unsupportedChunks) {
+    const actual = await invokeStableHandler(streamRequest(singleChunkIterator(chunk)))
+    assert.equal(actual.status, 404)
+    assert.deepEqual(actual.body, { error: 'bridge_unavailable' })
+  }
+  assert.equal(trapHits, 0)
+})
+
+test('stream body trusted failure is finite and invalid or capped iteration closes early', async () => {
+  let calls = 0
+  const failures = [
+    streamRequest(() => { calls += 1; throw new Error('private create failure') }),
+    streamRequest(() => ({ next: () => { calls += 1; throw new Error('private next failure') } })),
+    streamRequest(() => ({ next: () => { calls += 1; return Promise.reject(new Error('private next rejection')) } })),
+  ]
+  for (const request of failures) {
+    const actual = await invokeStableHandler(request)
+    assert.equal(actual.status, 404)
+    assert.deepEqual(actual.body, { error: 'bridge_unavailable' })
+    assert.equal(actual.headers.get('cache-control'), 'no-store')
+  }
+  assert.equal(calls, 3)
+
+  let invalidClose = 0
+  const invalid = streamRequest(() => {
+    let yielded = false
+    return { next: () => yielded ? { done: true } : (yielded = true, { done: false, value: new Uint8Array([1]) }), return: () => { invalidClose += 1; return { done: true } } }
+  })
+  assert.equal((await invokeStableHandler(invalid)).status, 404)
+  assert.equal(invalidClose, 1)
+
+  let cappedClose = 0
+  let cappedNext = 0
+  const capped = streamRequest(() => ({
+    next: () => { cappedNext += 1; return { done: false, value: Buffer.alloc(600_000) } },
+    return: () => { cappedClose += 1; return { done: true } },
+  }))
+  assert.equal((await invokeStableHandler(capped)).status, 404)
+  assert.equal(cappedNext, 2)
+  assert.equal(cappedClose, 1)
+})
+
+test('stream body genuine multi-chunk Buffer and string values preserve exact bytes', async () => {
+  const chunks = [' {', Buffer.from('"value":1'), '} ']
+  let index = 0
+  const request = streamRequest(() => ({ next: () => index < chunks.length ? { value: chunks[index++], done: false } : { done: true } }))
+  const stable = await invokeStableHandler(request)
+  assert.equal(stable.status, 404)
+  assert.equal(stable.headers.get('cache-control'), 'no-store')
+  assert.equal(index, chunks.length)
+  let generatorChunks = 0
+  const generator = await invokeStableHandler(streamRequest(async function * iterator() {
+    for (const chunk of chunks) { generatorChunks += 1; yield chunk }
+  }))
+  assert.equal(generator.status, 404)
+  assert.equal(generatorChunks, chunks.length)
+
+  const expected = Buffer.concat(chunks.map((chunk) => typeof chunk === 'string' ? Buffer.from(chunk) : chunk))
+  const calls = []
+  const enabled = injectedBridgeRequest({ calls, bridge: bridgeStub(calls, expected.length) })
+  assert.equal((await enabled({ method: 'POST', pathname: '/api/private/bridge/events', headers: { 'content-type': 'application/json' }, body: expected })).status, 200)
+  assert.equal(calls[0][1].body_bytes, expected.length)
+  assert.equal(expected.toString('utf8'), ' {"value":1} ')
+})
+
 test('stable snapshot has no prohibited disclosure or Gate evidence fields', () => {
   const text = JSON.stringify(snapshot)
   for (const pattern of [/\/Users\//, /\/tmp\//, /(?:session|thread|turn|task)[_-]?id/i, /\b[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}\b/i, /\b[0-9a-f]{40}\b/i, /\b[0-9a-f]{64}\b/i, /(?:token|secret|password|authorization)\s*[:=]/i]) assert.doesNotMatch(text, pattern)
