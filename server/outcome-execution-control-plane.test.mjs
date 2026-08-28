@@ -143,6 +143,32 @@ test('F3 lifecycle is append-only observed-receipt bound and exact duplicates ar
   assert.throws(() => plane.transition(transition('handoff_rejected', { decision: 'rejected' })), code('terminal_attempt'))
 })
 
+test('F3 canonical hyphenated project ID completes and replays one five-event lifecycle', () => {
+  const cherryRegistry = { bindings: [{ project_id: 'cherry-note', role: 'builder', version: 1, state: 'active', health: 'fresh' }] }
+  const command = startCommand({ project_id: 'cherry-note', action: 'read_only', risk_class: 'lightweight', stage_gate_present: false })
+  const plane = createOutcomeExecutionControlPlane({ registry: cherryRegistry, clock: (() => { let value = 100; return () => value++ })() })
+  plane.start(command)
+  plane.transition(transition('dispatch_observed', { receipt_observed: true, receipt_class: 'provider_ack' }))
+  plane.transition(transition('execution_started', { receipt_observed: true, receipt_class: 'target_started' }))
+  plane.transition(transition('role_result_recorded', { result_class: 'candidate_ready' }))
+  plane.transition(transition('handoff_accepted', { decision: 'accepted' }))
+
+  const snapshot = plane.exportPrivateState()
+  assert.deepEqual(snapshot.events.map((event) => event.lifecycle), ['start_validated', 'dispatch_observed', 'execution_started', 'role_result_recorded', 'handoff_accepted'])
+  const restarted = createOutcomeExecutionControlPlane({ registry: cherryRegistry, snapshot, clock: () => 200 })
+  assert.deepEqual(restarted.exportPrivateState(), snapshot)
+  assert.deepEqual(restarted.start(command), { outcome: 'started', role: 'builder', binding_version: 1, lifecycle: 'start_validated', gate_policy: 'no_task_gate', idempotent: true })
+  assert.equal(restarted.projectPublic().roles[0].project_id, 'cherry-note')
+})
+
+test('F3 project ID grammar rejects malformed values without widening internal identifiers', () => {
+  for (const project_id of ['-cherry', 'cherry-', 'cherry--note', 'Cherry-note', 'cherry.note', `a${'-b'.repeat(48)}`]) {
+    assert.throws(() => createOutcomeExecutionControlPlane({ registry: { bindings: [{ project_id, role: 'builder', version: 1, state: 'active', health: 'fresh' }] }, clock: () => 100 }), code('invalid_registry'))
+  }
+  const plane = createOutcomeExecutionControlPlane({ registry: { bindings: [{ project_id: 'cherry-note', role: 'builder', version: 1, state: 'active', health: 'fresh' }] }, clock: () => 100 })
+  assert.throws(() => plane.start(startCommand({ project_id: 'cherry-note', instruction_id: 'invalid-instruction' })), code('invalid_command'))
+})
+
 test('F3 delivery unknown is terminal and retry requires a new explicit Planner attempt plus current binding revalidation', () => {
   const plane = createOutcomeExecutionControlPlane({ registry: registry(), clock: () => 100 })
   plane.start(startCommand())

@@ -45,6 +45,7 @@ const TERMINAL = new Set(['handoff_accepted', 'handoff_rejected', 'delivery_unkn
 const LIFECYCLE = new Set(['start_validated', 'dispatch_observed', 'execution_started', 'role_result_recorded', ...TERMINAL])
 const ROTATION_REASONS = new Set(['repeated_timeout', 'context_loss', 'source_drift', 'role_drift', 'candidate_drift', 'cherry_maintenance'])
 const IDENTIFIER = /^[a-z][a-z0-9_]{0,95}$/
+const PROJECT_IDENTIFIER = /^[a-z][a-z0-9_]*(?:-[a-z0-9_]+)*$/
 const DIGEST = /^[a-f0-9]{64}$/
 
 const snapshotRecord = (value, code = 'invalid_command') => {
@@ -100,6 +101,10 @@ const identifier = (value, code = 'invalid_command') => {
   if (typeof value !== 'string' || !IDENTIFIER.test(value)) fail(code)
   return value
 }
+const projectIdentifier = (value, code = 'invalid_command') => {
+  if (typeof value !== 'string' || value.length > 96 || !PROJECT_IDENTIFIER.test(value)) fail(code)
+  return value
+}
 const member = (value, set, code = 'invalid_command') => {
   if (typeof value !== 'string' || !set.has(value)) fail(code)
   return value
@@ -121,7 +126,7 @@ const sameInstructionIdentity = (left, right) => left.project_id === right.proje
 const normalizeBinding = (value) => {
   const row = exactRecord(value, ['project_id', 'role', 'version', 'state', 'health'], 'invalid_registry')
   return {
-    project_id: identifier(row.project_id, 'invalid_registry'),
+    project_id: projectIdentifier(row.project_id, 'invalid_registry'),
     role: member(row.role, ROLES, 'invalid_registry'),
     version: integer(row.version, 1, 'invalid_registry'),
     state: member(row.state, BINDING_STATES, 'invalid_registry'),
@@ -193,7 +198,7 @@ const eventFingerprintFromStoredFacts = (event) => {
 const normalizeStoredRotationRecommendation = (value) => {
   const row = exactRecord(value, ROTATION_RECOMMENDATION_KEYS, 'corrupt_snapshot')
   const recommendation = {
-    project_id: identifier(row.project_id, 'corrupt_snapshot'),
+    project_id: projectIdentifier(row.project_id, 'corrupt_snapshot'),
     role: member(row.role, ROLES, 'corrupt_snapshot'),
     expected_binding_version: integer(row.expected_binding_version, 1, 'corrupt_snapshot'),
     reason_class: member(row.reason_class, ROTATION_REASONS, 'corrupt_snapshot'),
@@ -222,7 +227,7 @@ const normalizeSnapshot = (value) => {
     return {
       instruction_id: identifier(row.instruction_id, 'corrupt_snapshot'),
       attempt_id: identifier(row.attempt_id, 'corrupt_snapshot'),
-      project_id: identifier(row.project_id, 'corrupt_snapshot'),
+      project_id: projectIdentifier(row.project_id, 'corrupt_snapshot'),
       role: member(row.role, ROLES, 'corrupt_snapshot'),
       binding_version: integer(row.binding_version, 1, 'corrupt_snapshot'),
       action: identifier(row.action, 'corrupt_snapshot'),
@@ -261,7 +266,7 @@ const normalizeSnapshot = (value) => {
       return { state: normalized.state, observed_at: normalized.observed_at }
     })
     return {
-      project_id: identifier(row.project_id, 'corrupt_snapshot'),
+      project_id: projectIdentifier(row.project_id, 'corrupt_snapshot'),
       role: member(row.role, ROLES, 'corrupt_snapshot'),
       predecessor_version: integer(row.predecessor_version, 1, 'corrupt_snapshot'),
       successor_version: row.successor_version === null ? null : integer(row.successor_version, 1, 'corrupt_snapshot'),
@@ -394,7 +399,7 @@ export const createOutcomeExecutionControlPlane = ({ registry, snapshot, clock =
   const normalizeStart = (value) => {
     const row = exactRecord(value, ['project_id', 'role', 'instruction_id', 'attempt_id', 'expected_binding_version', 'action', 'risk_class', 'source_state', 'stage_gate_present', 'authority', 'retry_of_attempt_id'])
     const result = {
-      project_id: identifier(row.project_id), role: member(row.role, ROLES), instruction_id: identifier(row.instruction_id), attempt_id: identifier(row.attempt_id),
+      project_id: projectIdentifier(row.project_id), role: member(row.role, ROLES), instruction_id: identifier(row.instruction_id), attempt_id: identifier(row.attempt_id),
       expected_binding_version: integer(row.expected_binding_version, 1), action: identifier(row.action), risk_class: member(row.risk_class, RISK),
       source_state: member(row.source_state, new Set(['matched', 'conflict'])),
       stage_gate_present: bool(row.stage_gate_present), authority: member(row.authority, AUTHORITIES), retry_of_attempt_id: nullableIdentifier(row.retry_of_attempt_id),
@@ -485,7 +490,7 @@ export const createOutcomeExecutionControlPlane = ({ registry, snapshot, clock =
   const normalizeRotation = (value) => {
     const row = exactRecord(value, ['project_id', 'role', 'expected_binding_version', 'reason_class', 'checkpoint_digest', 'source_pinned', 'candidate_pinned', 'receipt_pinned', 'authority_pinned', 'closed_evidence_count', 'open_gate_count', 'next_action_class', 'stop_condition_class', 'rollback_class', 'external_mutation_count', 'false_completion_count'])
     const command = {
-      project_id: identifier(row.project_id), role: member(row.role, ROLES), expected_binding_version: integer(row.expected_binding_version, 1), reason_class: member(row.reason_class, ROTATION_REASONS),
+      project_id: projectIdentifier(row.project_id), role: member(row.role, ROLES), expected_binding_version: integer(row.expected_binding_version, 1), reason_class: member(row.reason_class, ROTATION_REASONS),
       checkpoint_digest: typeof row.checkpoint_digest === 'string' && DIGEST.test(row.checkpoint_digest) ? row.checkpoint_digest : fail('invalid_command'),
       source_pinned: bool(row.source_pinned), candidate_pinned: bool(row.candidate_pinned), receipt_pinned: bool(row.receipt_pinned), authority_pinned: bool(row.authority_pinned),
       closed_evidence_count: integer(row.closed_evidence_count), open_gate_count: integer(row.open_gate_count), next_action_class: identifier(row.next_action_class), stop_condition_class: identifier(row.stop_condition_class), rollback_class: identifier(row.rollback_class),
@@ -516,7 +521,7 @@ export const createOutcomeExecutionControlPlane = ({ registry, snapshot, clock =
     const keys = ['project_id', 'role', 'expected_binding_version', 'successor_binding_version', 'checkpoint_digest', ...(confirmation ? ['registry_read_after_write'] : ['started', 'continuity_ready'])]
     const row = exactRecord(value, keys)
     return {
-      project_id: identifier(row.project_id), role: member(row.role, ROLES), expected_binding_version: integer(row.expected_binding_version, 1), successor_binding_version: integer(row.successor_binding_version, 1),
+      project_id: projectIdentifier(row.project_id), role: member(row.role, ROLES), expected_binding_version: integer(row.expected_binding_version, 1), successor_binding_version: integer(row.successor_binding_version, 1),
       checkpoint_digest: typeof row.checkpoint_digest === 'string' && DIGEST.test(row.checkpoint_digest) ? row.checkpoint_digest : fail('invalid_command'),
       ...(confirmation ? { registry_read_after_write: bool(row.registry_read_after_write) } : { started: bool(row.started), continuity_ready: bool(row.continuity_ready) }),
     }
@@ -562,7 +567,7 @@ export const createOutcomeExecutionControlPlane = ({ registry, snapshot, clock =
 
   const normalizeWork = (value) => {
     const row = exactRecord(value, ['project_id', 'role', 'action', 'risk_class', 'source_state', 'expected_binding_version', 'dependency_state', 'authority', 'stage_gate_present'])
-    const command = { project_id: identifier(row.project_id), role: member(row.role, ROLES), action: identifier(row.action), risk_class: member(row.risk_class, RISK), source_state: member(row.source_state, new Set(['matched', 'conflict'])), expected_binding_version: integer(row.expected_binding_version, 1), dependency_state: member(row.dependency_state, new Set(['satisfied', 'blocked'])), authority: member(row.authority, AUTHORITIES), stage_gate_present: bool(row.stage_gate_present) }
+    const command = { project_id: projectIdentifier(row.project_id), role: member(row.role, ROLES), action: identifier(row.action), risk_class: member(row.risk_class, RISK), source_state: member(row.source_state, new Set(['matched', 'conflict'])), expected_binding_version: integer(row.expected_binding_version, 1), dependency_state: member(row.dependency_state, new Set(['satisfied', 'blocked'])), authority: member(row.authority, AUTHORITIES), stage_gate_present: bool(row.stage_gate_present) }
     if (actionRisk(command.action) !== command.risk_class) fail('invalid_command')
     return command
   }
