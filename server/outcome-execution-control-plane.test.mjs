@@ -7,6 +7,22 @@ import {
   ExecutionControlError,
   createOutcomeExecutionControlPlane,
 } from './outcome-execution-control-plane.mjs'
+import { createTrustedRoleEvidenceResolver } from './outcome-role-transport-evidence.mjs'
+
+const evidenceBindings = [
+  ['outcome', 'planner', 2, 'outcome_planner'], ['outcome', 'builder', 1, 'outcome_builder'], ['outcome', 'ux_product_qa', 2, 'outcome_ux_product_qa'], ['outcome', 'release_audit', 2, 'outcome_release_audit'],
+  ['cherry-note', 'builder', 1, 'cherry_note_builder'], ['second', 'builder', 1, 'outcome_builder'],
+].map(([project_id, role, binding_version, public_alias]) => ({ project_id, role, binding_version, public_alias, state: 'active', destination_ref: `private-${project_id}-${role}` }))
+const evidenceResolver = createTrustedRoleEvidenceResolver({
+  bindings: evidenceBindings,
+  peer_threads: evidenceBindings.map(({ project_id, role, destination_ref }) => ({ project_id, role, destination_ref, observation_cursor: 1 })),
+  clock: () => 50,
+})
+const createPlane = (options) => createOutcomeExecutionControlPlane({ ...options, evidenceResolver })
+const startEvidence = new Map()
+const providerEvidence = new Map()
+let observationCursor = 10
+const attemptKey = (value) => `${value.instruction_id}\u0000${value.attempt_id}`
 
 const binding = (overrides = {}) => ({ public_alias: 'outcome_builder', transport_class: 'codex_app_peer_thread', ...overrides })
 
@@ -20,7 +36,8 @@ const registry = (overrides = []) => ({
   ],
 })
 
-const startCommand = (overrides = {}) => ({
+const startCommand = (overrides = {}) => {
+  const command = {
   project_id: 'outcome',
   role: 'builder',
   instruction_id: 'synthetic_instruction_alpha',
@@ -34,31 +51,38 @@ const startCommand = (overrides = {}) => ({
   retry_of_attempt_id: null,
   transport_class: 'codex_app_peer_thread',
   public_alias: 'outcome_builder',
-  public_binding_version: 1,
-  public_binding_state: 'active',
-  peer_thread_match_count: 1,
-  peer_thread_binding_verified: true,
   ...overrides,
-})
+  }
+  if (!Object.hasOwn(command, 'trusted_evidence')) {
+    try { command.trusted_evidence = evidenceResolver.resolveStart({ project_id: command.project_id, role: command.role, binding_version: command.expected_binding_version, public_alias: command.public_alias, instruction_id: command.instruction_id, attempt_id: command.attempt_id }) } catch { command.trusted_evidence = Object.freeze(Object.create(null)) }
+  }
+  startEvidence.set(attemptKey(command), command.trusted_evidence)
+  return command
+}
 
-const transition = (event, overrides = {}) => ({
-  instruction_id: 'synthetic_instruction_alpha',
-  attempt_id: 'synthetic_attempt_1',
-  event,
-  ...overrides,
-})
+const transition = (event, overrides = {}) => {
+  const command = { instruction_id: 'synthetic_instruction_alpha', attempt_id: 'synthetic_attempt_1', event, ...overrides }
+  delete command.receipt_observed; delete command.receipt_class
+  const key = attemptKey(command)
+  if (!Object.hasOwn(command, 'trusted_evidence') && event === 'dispatch_observed') {
+    try { command.trusted_evidence = evidenceResolver.providerSend(startEvidence.get(key), { observation_cursor: observationCursor++ }); providerEvidence.set(key, command.trusted_evidence) } catch { command.trusted_evidence = Object.freeze(Object.create(null)) }
+  } else if (!Object.hasOwn(command, 'trusted_evidence') && event === 'execution_started') {
+    try { command.trusted_evidence = evidenceResolver.destinationStart(providerEvidence.get(key), { observation_cursor: observationCursor++, observation_kind: 'started' }) } catch { command.trusted_evidence = Object.freeze(Object.create(null)) }
+  }
+  return command
+}
 
 const code = (expected) => (error) => error instanceof ExecutionControlError && error.code === expected
 const canonicalFingerprint = (value) => JSON.stringify(value, Object.keys(value).sort())
 const retryIdentityDrifts = [
   ['project drift', { project_id: 'second' }],
-  ['role and action drift', { role: 'planner', expected_binding_version: 2, action: 'plan', public_alias: 'outcome_planner', public_binding_version: 2 }],
+  ['role and action drift', { role: 'planner', expected_binding_version: 2, action: 'plan', public_alias: 'outcome_planner' }],
   ['action drift', { action: 'verify' }],
   ['action and risk drift', { action: 'explain', risk_class: 'lightweight', stage_gate_present: false }],
 ]
 
 test('R1 R4 role-looking sub-agent transports fail closed without sequence allocation', () => {
-  const plane = createOutcomeExecutionControlPlane({ registry: registry(), clock: () => 100 })
+  const plane = createPlane({ registry: registry(), clock: () => 100 })
   for (const public_alias of ['session_binding_builder_v2', 'fresh_qa_agent', 'release_audit_helper']) {
     const before = plane.exportPrivateState()
     assert.deepEqual(plane.start(startCommand({ transport_class: 'bounded_read_only_subagent', public_alias })), { outcome: 'safe_hold', reason: 'role_transport_denied' })
@@ -69,36 +93,47 @@ test('R1 R4 role-looking sub-agent transports fail closed without sequence alloc
 })
 
 test('R2 exact public binding and peer-thread resolution fail closed atomically', () => {
-  const plane = createOutcomeExecutionControlPlane({ registry: registry(), clock: () => 100 })
-  const hostile = [
-    { public_alias: 'builder' },
-    { public_binding_version: 2 },
-    { public_binding_state: 'replaced' },
-    { peer_thread_match_count: 0 },
-    { peer_thread_match_count: 2 },
-    { peer_thread_binding_verified: false },
-  ]
-  for (const drift of hostile) {
+  const plane = createPlane({ registry: registry(), clock: () => 100 })
+  assert.deepEqual(plane.start(startCommand({ public_alias: 'builder' })), { outcome: 'safe_hold', reason: 'binding_alias_mismatch' })
+  for (const [trusted_evidence, expected] of [
+    [Object.freeze(Object.create(null)), 'trusted_evidence_required'],
+    [evidenceResolver.resolveStart({ project_id: 'outcome', role: 'planner', binding_version: 2, public_alias: 'outcome_planner', instruction_id: 'synthetic_instruction_alpha', attempt_id: 'synthetic_attempt_1' }), 'trusted_evidence_mismatch'],
+  ]) {
     const before = plane.exportPrivateState()
-    assert.deepEqual(plane.start(startCommand(drift)).outcome, 'safe_hold')
+    assert.throws(() => plane.start(startCommand({ trusted_evidence })), code(expected))
     assert.deepEqual(plane.exportPrivateState(), before)
   }
 })
 
 test('R2 replay rejects transport or peer-thread verification drift', () => {
-  const plane = createOutcomeExecutionControlPlane({ registry: registry(), clock: () => 100 })
+  const plane = createPlane({ registry: registry(), clock: () => 100 })
   plane.start(startCommand())
   const snapshot = plane.exportPrivateState()
   for (const drift of [
     { transport_class: 'bounded_read_only_subagent' },
-    { public_binding_state: 'replaced' },
-    { peer_thread_match_count: 2 },
-    { peer_thread_binding_verified: false },
+    { destination_key: 'destination_drift' },
+    { start_receipt_id: 'resolver_receipt_drift' },
+    { start_observation_cursor: 99 },
   ]) {
     const corrupt = structuredClone(snapshot)
     Object.assign(corrupt.attempts[0], drift)
-    assert.throws(() => createOutcomeExecutionControlPlane({ registry: registry(), snapshot: corrupt, clock: () => 200 }), code('corrupt_snapshot'))
+    assert.throws(() => createPlane({ registry: registry(), snapshot: corrupt, clock: () => 200 }), code('corrupt_snapshot'))
   }
+})
+
+test('T1 forged peer-match primitives cannot validate role start', () => {
+  const plane = createPlane({ registry: registry(), clock: () => 100 })
+  const forged = startCommand(); delete forged.trusted_evidence
+  Object.assign(forged, { public_binding_version: 1, public_binding_state: 'active', peer_thread_match_count: 1, peer_thread_binding_verified: true })
+  assert.throws(() => plane.start(forged), code('invalid_command'))
+  assert.equal(plane.exportPrivateState().events.length, 0)
+})
+
+test('T2 receipt labels cannot create observed lifecycle events', () => {
+  const plane = createPlane({ registry: registry(), clock: () => 100 })
+  plane.start(startCommand())
+  assert.throws(() => plane.transition({ instruction_id: 'synthetic_instruction_alpha', attempt_id: 'synthetic_attempt_1', event: 'dispatch_observed', receipt_observed: true, receipt_class: 'provider_ack' }), code('invalid_command'))
+  assert.equal(plane.exportPrivateState().events.length, 1)
 })
 
 test('F1 authority and service ownership are exact and projection cannot acquire authority', () => {
@@ -106,7 +141,7 @@ test('F1 authority and service ownership are exact and projection cannot acquire
   assert.deepEqual(EXECUTION_CONTROL_SERVICES, ['package_reader', 'session_directory', 'instruction_lifecycle', 'continuity_manager', 'eligibility_engine', 'evidence_engine', 'public_safe_projection'])
   assert.equal(Object.isFrozen(EXECUTION_CONTROL_AUTHORITIES), true)
   assert.equal(Object.isFrozen(EXECUTION_CONTROL_SERVICES), true)
-  const projection = createOutcomeExecutionControlPlane({ registry: registry(), clock: () => 100 }).projectPublic()
+  const projection = createPlane({ registry: registry(), clock: () => 100 }).projectPublic()
   assert.equal(projection.authority, 'projection_only')
   assert.equal(projection.can_dispatch, false)
   assert.equal(projection.can_accept, false)
@@ -114,7 +149,7 @@ test('F1 authority and service ownership are exact and projection cannot acquire
 })
 
 test('F1 exact own-data primitive envelopes reject unknown accessor Proxy and caller authority fields atomically', () => {
-  const plane = createOutcomeExecutionControlPlane({ registry: registry(), clock: () => 100 })
+  const plane = createPlane({ registry: registry(), clock: () => 100 })
   for (const value of [
     { ...startCommand(), progress: 100 },
     { ...startCommand(), approval: true },
@@ -130,7 +165,7 @@ test('F1 exact own-data primitive envelopes reject unknown accessor Proxy and ca
 })
 
 test('F1 finite role action risk and state vocabularies reject semantic drift', () => {
-  const plane = createOutcomeExecutionControlPlane({ registry: registry(), clock: () => 100 })
+  const plane = createPlane({ registry: registry(), clock: () => 100 })
   for (const value of [
     startCommand({ role: 'operator' }),
     startCommand({ action: 'invented_action' }),
@@ -145,19 +180,19 @@ test('F1 finite role action risk and state vocabularies reject semantic drift', 
 test('F1 registry and work arrays reject Proxy sparse accessor and decorated shapes without execution', () => {
   const trap = () => assert.fail('array trap must not execute')
   const proxied = new Proxy([], { get: trap, getOwnPropertyDescriptor: trap, ownKeys: trap })
-  assert.throws(() => createOutcomeExecutionControlPlane({ registry: { bindings: proxied }, clock: () => 100 }), code('invalid_registry'))
+  assert.throws(() => createPlane({ registry: { bindings: proxied }, clock: () => 100 }), code('invalid_registry'))
   const accessor = []
   Object.defineProperty(accessor, '0', { get: trap, enumerable: true })
   accessor.length = 1
-  assert.throws(() => createOutcomeExecutionControlPlane({ registry: { bindings: accessor }, clock: () => 100 }), code('invalid_registry'))
+  assert.throws(() => createPlane({ registry: { bindings: accessor }, clock: () => 100 }), code('invalid_registry'))
   const sparse = new Array(1)
-  assert.throws(() => createOutcomeExecutionControlPlane({ registry: { bindings: sparse }, clock: () => 100 }), code('invalid_registry'))
-  const plane = createOutcomeExecutionControlPlane({ registry: registry(), clock: () => 100 })
+  assert.throws(() => createPlane({ registry: { bindings: sparse }, clock: () => 100 }), code('invalid_registry'))
+  const plane = createPlane({ registry: registry(), clock: () => 100 })
   assert.throws(() => plane.selectNext(proxied), code('invalid_command'))
 })
 
 test('F2 logical role address snapshots exact current binding and rejects unhealthy wrong or cross-project targets', () => {
-  const plane = createOutcomeExecutionControlPlane({ registry: registry(), clock: () => 100 })
+  const plane = createPlane({ registry: registry(), clock: () => 100 })
   const started = plane.start(startCommand())
   assert.deepEqual(started, { outcome: 'started', role: 'builder', binding_version: 1, lifecycle: 'start_validated', gate_policy: 'reuse_stage_gate', idempotent: false })
   assert.equal(plane.exportPrivateState().attempts[0].binding_version, 1)
@@ -172,17 +207,17 @@ test('F2 logical role address snapshots exact current binding and rejects unheal
     [[binding({ project_id: 'outcome', role: 'builder', version: 1, state: 'revoked', health: 'fresh' })], startCommand(), 'binding_revoked'],
     [[binding({ project_id: 'outcome', role: 'builder', version: 1, state: 'conflict', health: 'fresh' })], startCommand(), 'binding_conflict'],
   ]) {
-    const isolated = createOutcomeExecutionControlPlane({ registry: { bindings: entry }, clock: () => 100 })
+    const isolated = createPlane({ registry: { bindings: entry }, clock: () => 100 })
     assert.deepEqual(isolated.start(command), { outcome: 'safe_hold', reason })
     assert.equal(isolated.exportPrivateState().events.length, 0)
   }
 })
 
 test('F3 lifecycle is append-only observed-receipt bound and exact duplicates are idempotent', () => {
-  const plane = createOutcomeExecutionControlPlane({ registry: registry(), clock: (() => { let value = 100; return () => value++ })() })
+  const plane = createPlane({ registry: registry(), clock: (() => { let value = 100; return () => value++ })() })
   plane.start(startCommand())
-  assert.throws(() => plane.transition(transition('dispatch_observed', { receipt_observed: false, receipt_class: 'provider_ack' })), code('receipt_required'))
-  assert.throws(() => plane.transition(transition('execution_started', { receipt_observed: true, receipt_class: 'target_started' })), code('invalid_transition'))
+  assert.throws(() => plane.transition({ instruction_id: 'synthetic_instruction_alpha', attempt_id: 'synthetic_attempt_1', event: 'dispatch_observed', receipt_observed: false, receipt_class: 'provider_ack' }), code('invalid_command'))
+  assert.throws(() => plane.transition(transition('execution_started')), code('trusted_evidence_required'))
   const dispatched = transition('dispatch_observed', { receipt_observed: true, receipt_class: 'provider_ack' })
   assert.equal(plane.transition(dispatched).lifecycle, 'dispatch_observed')
   assert.equal(plane.transition(dispatched).idempotent, true)
@@ -198,7 +233,7 @@ test('F3 lifecycle is append-only observed-receipt bound and exact duplicates ar
 test('F3 canonical hyphenated project ID completes and replays one five-event lifecycle', () => {
   const cherryRegistry = { bindings: [binding({ project_id: 'cherry-note', role: 'builder', version: 1, state: 'active', health: 'fresh', public_alias: 'cherry_note_builder' })] }
   const command = startCommand({ project_id: 'cherry-note', action: 'read_only', risk_class: 'lightweight', stage_gate_present: false, public_alias: 'cherry_note_builder' })
-  const plane = createOutcomeExecutionControlPlane({ registry: cherryRegistry, clock: (() => { let value = 100; return () => value++ })() })
+  const plane = createPlane({ registry: cherryRegistry, clock: (() => { let value = 100; return () => value++ })() })
   plane.start(command)
   plane.transition(transition('dispatch_observed', { receipt_observed: true, receipt_class: 'provider_ack' }))
   plane.transition(transition('execution_started', { receipt_observed: true, receipt_class: 'target_started' }))
@@ -207,7 +242,7 @@ test('F3 canonical hyphenated project ID completes and replays one five-event li
 
   const snapshot = plane.exportPrivateState()
   assert.deepEqual(snapshot.events.map((event) => event.lifecycle), ['start_validated', 'dispatch_observed', 'execution_started', 'role_result_recorded', 'handoff_accepted'])
-  const restarted = createOutcomeExecutionControlPlane({ registry: cherryRegistry, snapshot, clock: () => 200 })
+  const restarted = createPlane({ registry: cherryRegistry, snapshot, clock: () => 200 })
   assert.deepEqual(restarted.exportPrivateState(), snapshot)
   assert.deepEqual(restarted.start(command), { outcome: 'started', role: 'builder', binding_version: 1, lifecycle: 'start_validated', gate_policy: 'no_task_gate', idempotent: true })
   assert.equal(restarted.projectPublic().roles[0].project_id, 'cherry-note')
@@ -215,14 +250,14 @@ test('F3 canonical hyphenated project ID completes and replays one five-event li
 
 test('F3 project ID grammar rejects malformed values without widening internal identifiers', () => {
   for (const project_id of ['-cherry', 'cherry-', 'cherry--note', 'Cherry-note', 'cherry.note', `a${'-b'.repeat(48)}`]) {
-    assert.throws(() => createOutcomeExecutionControlPlane({ registry: { bindings: [binding({ project_id, role: 'builder', version: 1, state: 'active', health: 'fresh' })] }, clock: () => 100 }), code('invalid_registry'))
+    assert.throws(() => createPlane({ registry: { bindings: [binding({ project_id, role: 'builder', version: 1, state: 'active', health: 'fresh' })] }, clock: () => 100 }), code('invalid_registry'))
   }
-  const plane = createOutcomeExecutionControlPlane({ registry: { bindings: [binding({ project_id: 'cherry-note', role: 'builder', version: 1, state: 'active', health: 'fresh', public_alias: 'cherry_note_builder' })] }, clock: () => 100 })
+  const plane = createPlane({ registry: { bindings: [binding({ project_id: 'cherry-note', role: 'builder', version: 1, state: 'active', health: 'fresh', public_alias: 'cherry_note_builder' })] }, clock: () => 100 })
   assert.throws(() => plane.start(startCommand({ project_id: 'cherry-note', instruction_id: 'invalid-instruction' })), code('invalid_command'))
 })
 
 test('F3 delivery unknown is terminal and retry requires a new explicit Planner attempt plus current binding revalidation', () => {
-  const plane = createOutcomeExecutionControlPlane({ registry: registry(), clock: () => 100 })
+  const plane = createPlane({ registry: registry(), clock: () => 100 })
   plane.start(startCommand())
   assert.equal(plane.transition(transition('delivery_unknown', { reason_class: 'missing_ack' })).lifecycle, 'delivery_unknown')
   assert.throws(() => plane.transition(transition('dispatch_observed', { receipt_observed: true, receipt_class: 'provider_ack' })), code('terminal_attempt'))
@@ -243,7 +278,7 @@ const rotationCommand = (overrides = {}) => ({
 })
 
 test('F4 rotation requires complete checkpoint successor continuity and registry read-after-write before archive eligibility', () => {
-  const plane = createOutcomeExecutionControlPlane({ registry: registry(), clock: () => 100 })
+  const plane = createPlane({ registry: registry(), clock: () => 100 })
   assert.throws(() => plane.recommendRotation(rotationCommand({ receipt_pinned: false })), code('checkpoint_incomplete'))
   assert.equal(plane.recommendRotation(rotationCommand()).rotation_state, 'handoff_required')
   assert.throws(() => plane.verifySuccessor({ project_id: 'outcome', role: 'builder', expected_binding_version: 1, successor_binding_version: 2, checkpoint_digest: 'a'.repeat(64), started: true, continuity_ready: false }), code('successor_not_ready'))
@@ -253,7 +288,7 @@ test('F4 rotation requires complete checkpoint successor continuity and registry
 })
 
 test('F5 proportional policy creates no lightweight Gate reuses standard Gate and safe-holds high risk', () => {
-  const plane = createOutcomeExecutionControlPlane({ registry: registry(), clock: () => 100 })
+  const plane = createPlane({ registry: registry(), clock: () => 100 })
   const light = plane.start(startCommand({ instruction_id: 'light', attempt_id: 'light_1', action: 'explain', risk_class: 'lightweight', stage_gate_present: false }))
   assert.equal(light.gate_policy, 'no_task_gate')
   const standard = plane.start(startCommand({ instruction_id: 'standard', attempt_id: 'standard_1' }))
@@ -264,7 +299,7 @@ test('F5 proportional policy creates no lightweight Gate reuses standard Gate an
 })
 
 test('F5 next selection skips blocked workstreams without dispatch or normal-path human approval', () => {
-  const plane = createOutcomeExecutionControlPlane({ registry: registry(), clock: () => 100 })
+  const plane = createPlane({ registry: registry(), clock: () => 100 })
   const plan = plane.selectNext([
     { project_id: 'outcome', role: 'planner', action: 'plan', risk_class: 'standard', source_state: 'matched', expected_binding_version: 2, dependency_state: 'blocked', authority: 'within_scope', stage_gate_present: true },
     { project_id: 'outcome', role: 'builder', action: 'implement', risk_class: 'standard', source_state: 'matched', expected_binding_version: 1, dependency_state: 'satisfied', authority: 'within_scope', stage_gate_present: true },
@@ -275,9 +310,10 @@ test('F5 next selection skips blocked workstreams without dispatch or normal-pat
 })
 
 test('F6 duplicate attempt conflicts consume no sequence and exact duplicate start is idempotent', () => {
-  const plane = createOutcomeExecutionControlPlane({ registry: registry(), clock: () => 100 })
-  assert.equal(plane.start(startCommand()).idempotent, false)
-  assert.equal(plane.start(startCommand()).idempotent, true)
+  const plane = createPlane({ registry: registry(), clock: () => 100 })
+  const exact = startCommand()
+  assert.equal(plane.start(exact).idempotent, false)
+  assert.equal(plane.start(exact).idempotent, true)
   assert.throws(() => plane.start(startCommand({ action: 'verify' })), code('duplicate_attempt_conflict'))
   const state = plane.exportPrivateState()
   assert.equal(state.attempts.length, 1)
@@ -287,24 +323,24 @@ test('F6 duplicate attempt conflicts consume no sequence and exact duplicate sta
 
 test('F6 clock materialization and reentry failures are atomic', () => {
   let plane
-  plane = createOutcomeExecutionControlPlane({ registry: registry(), clock: () => { plane.projectPublic(); plane.start(startCommand({ instruction_id: 'nested' })); return 100 } })
+  plane = createPlane({ registry: registry(), clock: () => { plane.projectPublic(); plane.start(startCommand({ instruction_id: 'nested' })); return 100 } })
   assert.throws(() => plane.start(startCommand()), code('reentry_detected'))
   assert.equal(plane.exportPrivateState().events.length, 0)
 
-  const badClock = createOutcomeExecutionControlPlane({ registry: registry(), clock: () => { throw new Error('clock unavailable') } })
+  const badClock = createPlane({ registry: registry(), clock: () => { throw new Error('clock unavailable') } })
   assert.throws(() => badClock.start(startCommand()), code('clock_unavailable'))
   assert.equal(badClock.exportPrivateState().events.length, 0)
 
-  const badClone = createOutcomeExecutionControlPlane({ registry: registry(), clock: () => 100, materialize: () => { throw new Error('clone unavailable') } })
+  const badClone = createPlane({ registry: registry(), clock: () => 100, materialize: () => { throw new Error('clone unavailable') } })
   assert.throws(() => badClone.start(startCommand()), code('materialization_failed'))
   assert.equal(badClone.exportPrivateState().events.length, 0)
 
-  const substituted = createOutcomeExecutionControlPlane({ registry: registry(), clock: () => 100, materialize: () => ({ schema_version: 1, attempts: [], events: [], rotations: [] }) })
+  const substituted = createPlane({ registry: registry(), clock: () => 100, materialize: () => ({ schema_version: 1, attempts: [], events: [], rotations: [] }) })
   assert.throws(() => substituted.start(startCommand()), code('materialization_failed'))
   assert.equal(substituted.exportPrivateState().events.length, 0)
 
   let tick = 101
-  const backwards = createOutcomeExecutionControlPlane({ registry: registry(), clock: () => tick-- })
+  const backwards = createPlane({ registry: registry(), clock: () => tick-- })
   backwards.start(startCommand())
   assert.throws(() => backwards.transition(transition('dispatch_observed', { receipt_observed: true, receipt_class: 'provider_ack' })), code('clock_unavailable'))
   assert.equal(backwards.exportPrivateState().events.length, 1)
@@ -312,7 +348,7 @@ test('F6 clock materialization and reentry failures are atomic', () => {
 
 test('QF-1 hostile in-place materializer mutation is rejected without state or sequence consumption', () => {
   let corruptDraft = true
-  const plane = createOutcomeExecutionControlPlane({
+  const plane = createPlane({
     registry: registry(),
     clock: () => 100,
     materialize: (next) => {
@@ -333,29 +369,29 @@ test('QF-1 hostile in-place materializer mutation is rejected without state or s
 })
 
 test('F6 restart replay is byte-parity and corrupt or out-of-order events fail closed', () => {
-  const first = createOutcomeExecutionControlPlane({ registry: registry(), clock: () => 100 })
+  const first = createPlane({ registry: registry(), clock: () => 100 })
   first.start(startCommand())
   first.transition(transition('dispatch_observed', { receipt_observed: true, receipt_class: 'provider_ack' }))
   const snapshot = first.exportPrivateState()
-  const restarted = createOutcomeExecutionControlPlane({ registry: registry(), snapshot, clock: () => 200 })
+  const restarted = createPlane({ registry: registry(), snapshot, clock: () => 200 })
   assert.deepEqual(restarted.exportPrivateState(), snapshot)
   assert.deepEqual(restarted.projectPublic(), first.projectPublic())
   const corrupt = structuredClone(snapshot)
   corrupt.events[1].sequence = 9
-  assert.throws(() => createOutcomeExecutionControlPlane({ registry: registry(), snapshot: corrupt, clock: () => 200 }), code('corrupt_snapshot'))
+  assert.throws(() => createPlane({ registry: registry(), snapshot: corrupt, clock: () => 200 }), code('corrupt_snapshot'))
   const semanticCorrupt = structuredClone(snapshot)
   semanticCorrupt.attempts[0].action = 'invented_action'
-  assert.throws(() => createOutcomeExecutionControlPlane({ registry: registry(), snapshot: semanticCorrupt, clock: () => 200 }), code('corrupt_snapshot'))
+  assert.throws(() => createPlane({ registry: registry(), snapshot: semanticCorrupt, clock: () => 200 }), code('corrupt_snapshot'))
 })
 
 test('QF-2 replay derives canonical fingerprints and preserves exact duplicate idempotency', () => {
-  const dispatched = transition('dispatch_observed', { receipt_observed: true, receipt_class: 'provider_ack' })
-  const first = createOutcomeExecutionControlPlane({ registry: registry(), clock: () => 100 })
+  const first = createPlane({ registry: registry(), clock: () => 100 })
   first.start(startCommand())
+  const dispatched = transition('dispatch_observed')
   first.transition(dispatched)
   const snapshot = first.exportPrivateState()
 
-  const restarted = createOutcomeExecutionControlPlane({ registry: registry(), snapshot, clock: () => 200 })
+  const restarted = createPlane({ registry: registry(), snapshot, clock: () => 200 })
   assert.deepEqual(restarted.transition(dispatched), { outcome: 'event_recorded', lifecycle: 'dispatch_observed', idempotent: true })
 
   for (const corrupt of [
@@ -363,11 +399,11 @@ test('QF-2 replay derives canonical fingerprints and preserves exact duplicate i
     (() => { const value = structuredClone(snapshot); value.events[1].fingerprint = 'poison'; value.attempts[0].last_fingerprint = 'poison'; return value })(),
     (() => { const value = structuredClone(snapshot); value.attempts[0].start_fingerprint = 'poison'; return value })(),
     (() => { const value = structuredClone(snapshot); value.attempts[0].last_fingerprint = value.events[0].fingerprint; return value })(),
-  ]) assert.throws(() => createOutcomeExecutionControlPlane({ registry: registry(), snapshot: corrupt, clock: () => 200 }), code('corrupt_snapshot'))
+  ]) assert.throws(() => createPlane({ registry: registry(), snapshot: corrupt, clock: () => 200 }), code('corrupt_snapshot'))
 })
 
 test('QF-3 replacement confirmation first and duplicate responses match persisted state', () => {
-  const plane = createOutcomeExecutionControlPlane({ registry: registry(), clock: () => 100 })
+  const plane = createPlane({ registry: registry(), clock: () => 100 })
   plane.recommendRotation(rotationCommand())
   plane.verifySuccessor({ project_id: 'outcome', role: 'builder', expected_binding_version: 1, successor_binding_version: 2, checkpoint_digest: 'a'.repeat(64), started: true, continuity_ready: true })
   const confirmation = { project_id: 'outcome', role: 'builder', expected_binding_version: 1, successor_binding_version: 2, checkpoint_digest: 'a'.repeat(64), registry_read_after_write: true }
@@ -379,39 +415,39 @@ test('QF-3 replacement confirmation first and duplicate responses match persiste
 })
 
 test('RQF-1 retry replay requires its start sequence after referenced delivery unknown', () => {
-  const plane = createOutcomeExecutionControlPlane({ registry: registry(), clock: () => 100 })
+  const plane = createPlane({ registry: registry(), clock: () => 100 })
   plane.start(startCommand())
   plane.transition(transition('delivery_unknown', { reason_class: 'missing_ack' }))
   const retry = startCommand({ attempt_id: 'synthetic_attempt_2', retry_of_attempt_id: 'synthetic_attempt_1' })
   plane.start(retry)
   const valid = plane.exportPrivateState()
-  const restarted = createOutcomeExecutionControlPlane({ registry: registry(), snapshot: valid, clock: () => 200 })
+  const restarted = createPlane({ registry: registry(), snapshot: valid, clock: () => 200 })
   assert.equal(restarted.start(retry).idempotent, true)
 
   const reordered = structuredClone(valid)
   reordered.events = [reordered.events[0], reordered.events[2], reordered.events[1]]
   reordered.events.forEach((event, index) => { event.sequence = index + 1 })
 
-  assert.throws(() => createOutcomeExecutionControlPlane({ registry: registry(), snapshot: reordered, clock: () => 200 }), code('corrupt_snapshot'))
+  assert.throws(() => createPlane({ registry: registry(), snapshot: reordered, clock: () => 200 }), code('corrupt_snapshot'))
 })
 
 test('RQF-2 rotation replay validates recommendation fingerprint and remains idempotent', () => {
-  const plane = createOutcomeExecutionControlPlane({ registry: registry(), clock: () => 100 })
+  const plane = createPlane({ registry: registry(), clock: () => 100 })
   assert.equal(plane.recommendRotation(rotationCommand()).idempotent, false)
   const snapshot = plane.exportPrivateState()
-  const restarted = createOutcomeExecutionControlPlane({ registry: registry(), snapshot, clock: () => 200 })
+  const restarted = createPlane({ registry: registry(), snapshot, clock: () => 200 })
   assert.deepEqual(restarted.recommendRotation(rotationCommand()), { outcome: 'rotation_plan', rotation_state: 'handoff_required', binding_switch_eligible: false, predecessor_archive_eligible: false, idempotent: true })
 
   const corrupt = structuredClone(snapshot)
   corrupt.rotations[0].fingerprint = 'poison'
-  assert.throws(() => createOutcomeExecutionControlPlane({ registry: registry(), snapshot: corrupt, clock: () => 200 }), code('corrupt_snapshot'))
+  assert.throws(() => createPlane({ registry: registry(), snapshot: corrupt, clock: () => 200 }), code('corrupt_snapshot'))
   const factsCorrupt = structuredClone(snapshot)
   factsCorrupt.rotations[0].recommendation.false_completion_count += 1
-  assert.throws(() => createOutcomeExecutionControlPlane({ registry: registry(), snapshot: factsCorrupt, clock: () => 200 }), code('corrupt_snapshot'))
+  assert.throws(() => createPlane({ registry: registry(), snapshot: factsCorrupt, clock: () => 200 }), code('corrupt_snapshot'))
 })
 
 test('RQF-3 successor re-verification returns persisted confirmed state and archive eligibility', () => {
-  const plane = createOutcomeExecutionControlPlane({ registry: registry(), clock: () => 100 })
+  const plane = createPlane({ registry: registry(), clock: () => 100 })
   plane.recommendRotation(rotationCommand())
   const verification = { project_id: 'outcome', role: 'builder', expected_binding_version: 1, successor_binding_version: 2, checkpoint_digest: 'a'.repeat(64), started: true, continuity_ready: true }
   plane.verifySuccessor(verification)
@@ -421,7 +457,7 @@ test('RQF-3 successor re-verification returns persisted confirmed state and arch
 })
 
 test('V2F-1 retry lineage consumes each unknown attempt once and extends only the latest attempt', () => {
-  const plane = createOutcomeExecutionControlPlane({ registry: registry(), clock: () => 100 })
+  const plane = createPlane({ registry: registry(), clock: () => 100 })
   plane.start(startCommand())
   plane.transition(transition('delivery_unknown', { reason_class: 'missing_ack' }))
   plane.start(startCommand({ attempt_id: 'synthetic_attempt_2', retry_of_attempt_id: 'synthetic_attempt_1' }))
@@ -434,7 +470,7 @@ test('V2F-1 retry lineage consumes each unknown attempt once and extends only th
 })
 
 test('V2F-1 replay rejects sibling retry branches independent of attempt row order', () => {
-  const plane = createOutcomeExecutionControlPlane({ registry: registry(), clock: () => 100 })
+  const plane = createPlane({ registry: registry(), clock: () => 100 })
   plane.start(startCommand())
   plane.transition(transition('delivery_unknown', { reason_class: 'missing_ack' }))
   plane.start(startCommand({ attempt_id: 'synthetic_attempt_2', retry_of_attempt_id: 'synthetic_attempt_1' }))
@@ -446,15 +482,15 @@ test('V2F-1 replay rejects sibling retry branches independent of attempt row ord
   for (const attempts of [branched.attempts, [...branched.attempts].reverse()]) {
     const candidate = structuredClone(branched)
     candidate.attempts = attempts
-    assert.throws(() => createOutcomeExecutionControlPlane({ registry: registry(), snapshot: candidate, clock: () => 200 }), code('corrupt_snapshot'))
+    assert.throws(() => createPlane({ registry: registry(), snapshot: candidate, clock: () => 200 }), code('corrupt_snapshot'))
   }
 })
 
 test('V2F-2 replay rejects duplicate logical rotation keys in every record order', () => {
-  const first = createOutcomeExecutionControlPlane({ registry: registry(), clock: () => 100 })
+  const first = createPlane({ registry: registry(), clock: () => 100 })
   first.recommendRotation(rotationCommand())
   const firstRotation = first.exportPrivateState().rotations[0]
-  const second = createOutcomeExecutionControlPlane({ registry: registry(), clock: () => 100 })
+  const second = createPlane({ registry: registry(), clock: () => 100 })
   second.recommendRotation(rotationCommand({ checkpoint_digest: 'b'.repeat(64), reason_class: 'source_drift' }))
   const secondRotation = second.exportPrivateState().rotations[0]
 
@@ -462,30 +498,30 @@ test('V2F-2 replay rejects duplicate logical rotation keys in every record order
     [firstRotation, structuredClone(firstRotation)],
     [firstRotation, secondRotation],
     [secondRotation, firstRotation],
-  ]) assert.throws(() => createOutcomeExecutionControlPlane({ registry: registry(), snapshot: { schema_version: 1, attempts: [], events: [], rotations }, clock: () => 200 }), code('corrupt_snapshot'))
+  ]) assert.throws(() => createPlane({ registry: registry(), snapshot: { schema_version: 1, attempts: [], events: [], rotations }, clock: () => 200 }), code('corrupt_snapshot'))
 })
 
 test('V2F-2 unique rotation records normalize to logical-key order', () => {
-  const builder = createOutcomeExecutionControlPlane({ registry: registry(), clock: () => 100 })
+  const builder = createPlane({ registry: registry(), clock: () => 100 })
   builder.recommendRotation(rotationCommand())
-  const planner = createOutcomeExecutionControlPlane({ registry: registry(), clock: () => 100 })
+  const planner = createPlane({ registry: registry(), clock: () => 100 })
   planner.recommendRotation(rotationCommand({ role: 'planner', expected_binding_version: 2, checkpoint_digest: 'b'.repeat(64) }))
   const rotations = [planner.exportPrivateState().rotations[0], builder.exportPrivateState().rotations[0]]
   const snapshot = { schema_version: 1, attempts: [], events: [], rotations }
 
-  const normalized = createOutcomeExecutionControlPlane({ registry: registry(), snapshot, clock: () => 200 }).exportPrivateState().rotations
+  const normalized = createPlane({ registry: registry(), snapshot, clock: () => 200 }).exportPrivateState().rotations
   assert.deepEqual(normalized.map((rotation) => rotation.role), ['builder', 'planner'])
-  assert.deepEqual(createOutcomeExecutionControlPlane({ registry: registry(), snapshot: { ...snapshot, rotations: [...rotations].reverse() }, clock: () => 200 }).exportPrivateState().rotations, normalized)
+  assert.deepEqual(createPlane({ registry: registry(), snapshot: { ...snapshot, rotations: [...rotations].reverse() }, clock: () => 200 }).exportPrivateState().rotations, normalized)
 })
 
 test('V2F-3 public current role state folds latest event sequence independent of attempt storage order', () => {
-  const plane = createOutcomeExecutionControlPlane({ registry: registry(), clock: () => 100 })
+  const plane = createPlane({ registry: registry(), clock: () => 100 })
   plane.start(startCommand())
   plane.transition(transition('delivery_unknown', { reason_class: 'missing_ack' }))
   plane.start(startCommand({ attempt_id: 'synthetic_attempt_2', retry_of_attempt_id: 'synthetic_attempt_1' }))
   const snapshot = plane.exportPrivateState()
   snapshot.attempts.reverse()
-  const restarted = createOutcomeExecutionControlPlane({ registry: registry(), snapshot, clock: () => 200 })
+  const restarted = createPlane({ registry: registry(), snapshot, clock: () => 200 })
 
   assert.equal(restarted.projectPublic().roles.find((role) => role.role === 'builder').state, 'start_validated')
   assert.deepEqual(restarted.exportPrivateState().attempts.map((attempt) => attempt.attempt_id), ['synthetic_attempt_1', 'synthetic_attempt_2'])
@@ -496,7 +532,7 @@ test('V2F-3 public current role state folds latest event sequence independent of
 
 for (const [label, drift] of retryIdentityDrifts) {
   test(`V3F-1 retry rejects ${label} atomically`, () => {
-    const plane = createOutcomeExecutionControlPlane({ registry: registry([binding({ project_id: 'second', role: 'builder', version: 1, state: 'active', health: 'fresh' })]), clock: () => 100 })
+    const plane = createPlane({ registry: registry([binding({ project_id: 'second', role: 'builder', version: 1, state: 'active', health: 'fresh' })]), clock: () => 100 })
     plane.start(startCommand())
     plane.transition(transition('delivery_unknown', { reason_class: 'missing_ack' }))
     const before = plane.exportPrivateState()
@@ -509,7 +545,7 @@ for (const [label, drift] of retryIdentityDrifts) {
 
 test('V3F-1 replay rejects identity-drifted retries in either attempt row order', () => {
   const replayRegistry = registry([binding({ project_id: 'second', role: 'builder', version: 1, state: 'active', health: 'fresh' })])
-  const plane = createOutcomeExecutionControlPlane({ registry: replayRegistry, clock: () => 100 })
+  const plane = createPlane({ registry: replayRegistry, clock: () => 100 })
   plane.start(startCommand())
   plane.transition(transition('delivery_unknown', { reason_class: 'missing_ack' }))
   plane.start(startCommand({ attempt_id: 'synthetic_attempt_2', retry_of_attempt_id: 'synthetic_attempt_1' }))
@@ -526,13 +562,13 @@ test('V3F-1 replay rejects identity-drifted retries in either attempt row order'
     for (const attempts of [corrupt.attempts, [...corrupt.attempts].reverse()]) {
       const candidate = structuredClone(corrupt)
       candidate.attempts = attempts
-      assert.throws(() => createOutcomeExecutionControlPlane({ registry: replayRegistry, snapshot: candidate, clock: () => 200 }), code('corrupt_snapshot'))
+      assert.throws(() => createPlane({ registry: replayRegistry, snapshot: candidate, clock: () => 200 }), code('corrupt_snapshot'))
     }
   }
 })
 
 test('F7 public projection serializes zero private identifiers digests content paths credentials or completion authority', () => {
-  const plane = createOutcomeExecutionControlPlane({ registry: registry(), clock: () => 100 })
+  const plane = createPlane({ registry: registry(), clock: () => 100 })
   plane.start(startCommand({ instruction_id: 'private_instruction_marker', attempt_id: 'private_attempt_marker' }))
   plane.recommendRotation(rotationCommand({ checkpoint_digest: 'b'.repeat(64) }))
   const serialized = JSON.stringify(plane.projectPublic())
@@ -543,6 +579,6 @@ test('F7 public projection serializes zero private identifiers digests content p
 test('F8 exported surface is local-only and has no provider dispatch session archive or retry operation', async () => {
   const module = await import('./outcome-execution-control-plane.mjs')
   assert.deepEqual(Object.keys(module).sort(), ['EXECUTION_CONTROL_AUTHORITIES', 'EXECUTION_CONTROL_SERVICES', 'ExecutionControlError', 'createOutcomeExecutionControlPlane'])
-  const plane = createOutcomeExecutionControlPlane({ registry: registry(), clock: () => 100 })
+  const plane = createPlane({ registry: registry(), clock: () => 100 })
   for (const name of ['dispatch', 'sendMessage', 'createSession', 'archiveSession', 'retry', 'deploy', 'release']) assert.equal(plane[name], undefined)
 })

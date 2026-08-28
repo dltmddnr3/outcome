@@ -1,4 +1,5 @@
 import { isProxy } from 'node:util/types'
+import { isTrustedRoleEvidenceResolver } from './outcome-role-transport-evidence.mjs'
 
 export const EXECUTION_CONTROL_AUTHORITIES = Object.freeze({
   outcome: 'contract_map',
@@ -149,8 +150,8 @@ const normalizeRegistry = (value) => {
   return bindings
 }
 
-const ATTEMPT_KEYS = ['instruction_id', 'attempt_id', 'project_id', 'role', 'binding_version', 'action', 'risk_class', 'source_state', 'stage_gate_present', 'authority', 'retry_of_attempt_id', 'transport_class', 'public_alias', 'public_binding_state', 'peer_thread_match_count', 'peer_thread_binding_verified', 'state', 'start_fingerprint', 'last_fingerprint', 'result_class', 'started_at']
-const EVENT_KEYS = ['sequence', 'instruction_id', 'attempt_id', 'lifecycle', 'binding_version', 'observed_at', 'fingerprint', 'detail_class']
+const ATTEMPT_KEYS = ['instruction_id', 'attempt_id', 'project_id', 'role', 'binding_version', 'action', 'risk_class', 'source_state', 'stage_gate_present', 'authority', 'retry_of_attempt_id', 'transport_class', 'public_alias', 'destination_key', 'start_receipt_id', 'start_observation_cursor', 'state', 'start_fingerprint', 'last_fingerprint', 'result_class', 'started_at']
+const EVENT_KEYS = ['sequence', 'instruction_id', 'attempt_id', 'lifecycle', 'binding_version', 'observed_at', 'fingerprint', 'detail_class', 'receipt_id', 'observation_cursor']
 const ROTATION_KEYS = ['project_id', 'role', 'predecessor_version', 'successor_version', 'checkpoint_digest', 'fingerprint', 'recommendation', 'history']
 const ROTATION_EVENT_KEYS = ['state', 'observed_at']
 const ROTATION_RECOMMENDATION_KEYS = ['project_id', 'role', 'expected_binding_version', 'reason_class', 'checkpoint_digest', 'source_pinned', 'candidate_pinned', 'receipt_pinned', 'authority_pinned', 'closed_evidence_count', 'open_gate_count', 'next_action_class', 'stop_condition_class', 'rollback_class', 'external_mutation_count', 'false_completion_count']
@@ -179,10 +180,9 @@ const startFingerprintFromStoredFacts = (attempt) => fingerprint({
   retry_of_attempt_id: attempt.retry_of_attempt_id,
   transport_class: attempt.transport_class,
   public_alias: attempt.public_alias,
-  public_binding_version: attempt.binding_version,
-  public_binding_state: attempt.public_binding_state,
-  peer_thread_match_count: attempt.peer_thread_match_count,
-  peer_thread_binding_verified: attempt.peer_thread_binding_verified,
+  destination_key: attempt.destination_key,
+  resolver_receipt_id: attempt.start_receipt_id,
+  observation_cursor: attempt.start_observation_cursor,
 })
 
 const eventFingerprintFromStoredFacts = (event) => {
@@ -192,8 +192,9 @@ const eventFingerprintFromStoredFacts = (event) => {
     event: event.lifecycle,
   }
   if (event.lifecycle === 'dispatch_observed' || event.lifecycle === 'execution_started') {
-    command.receipt_observed = true
-    command.receipt_class = member(event.detail_class, new Set(event.lifecycle === 'dispatch_observed' ? ['provider_ack'] : ['target_started']), 'corrupt_snapshot')
+    command.receipt_class = member(event.detail_class, new Set(event.lifecycle === 'dispatch_observed' ? ['provider_send'] : ['destination_start']), 'corrupt_snapshot')
+    command.resolver_receipt_id = identifier(event.receipt_id, 'corrupt_snapshot')
+    command.observation_cursor = integer(event.observation_cursor, 0, 'corrupt_snapshot')
   } else if (event.lifecycle === 'role_result_recorded') {
     command.result_class = member(event.detail_class, RESULT_CLASSES, 'corrupt_snapshot')
   } else if (event.lifecycle === 'handoff_accepted' || event.lifecycle === 'handoff_rejected') {
@@ -247,9 +248,9 @@ const normalizeSnapshot = (value) => {
       retry_of_attempt_id: nullableIdentifier(row.retry_of_attempt_id, 'corrupt_snapshot'),
       transport_class: member(row.transport_class, new Set(['codex_app_peer_thread']), 'corrupt_snapshot'),
       public_alias: identifier(row.public_alias, 'corrupt_snapshot'),
-      public_binding_state: member(row.public_binding_state, BINDING_STATES, 'corrupt_snapshot'),
-      peer_thread_match_count: integer(row.peer_thread_match_count, 0, 'corrupt_snapshot'),
-      peer_thread_binding_verified: bool(row.peer_thread_binding_verified, 'corrupt_snapshot'),
+      destination_key: identifier(row.destination_key, 'corrupt_snapshot'),
+      start_receipt_id: identifier(row.start_receipt_id, 'corrupt_snapshot'),
+      start_observation_cursor: integer(row.start_observation_cursor, 0, 'corrupt_snapshot'),
       state: member(row.state, LIFECYCLE, 'corrupt_snapshot'),
       start_fingerprint: typeof row.start_fingerprint === 'string' ? row.start_fingerprint : fail('corrupt_snapshot'),
       last_fingerprint: typeof row.last_fingerprint === 'string' ? row.last_fingerprint : fail('corrupt_snapshot'),
@@ -257,7 +258,6 @@ const normalizeSnapshot = (value) => {
       started_at: Number.isFinite(row.started_at) ? row.started_at : fail('corrupt_snapshot'),
     }
   })
-  if (attempts.some((attempt) => attempt.public_binding_state !== 'active' || attempt.peer_thread_match_count !== 1 || !attempt.peer_thread_binding_verified)) fail('corrupt_snapshot')
   if (attempts.some((attempt) => actionRisk(attempt.action) !== attempt.risk_class)) fail('corrupt_snapshot')
   const events = safeArray(root.events, 'corrupt_snapshot').map((item) => {
     const row = exactRecord(item, EVENT_KEYS, 'corrupt_snapshot')
@@ -270,6 +270,8 @@ const normalizeSnapshot = (value) => {
       observed_at: Number.isFinite(row.observed_at) ? row.observed_at : fail('corrupt_snapshot'),
       fingerprint: typeof row.fingerprint === 'string' ? row.fingerprint : fail('corrupt_snapshot'),
       detail_class: row.detail_class === null ? null : identifier(row.detail_class, 'corrupt_snapshot'),
+      receipt_id: row.receipt_id === null ? null : identifier(row.receipt_id, 'corrupt_snapshot'),
+      observation_cursor: row.observation_cursor === null ? null : integer(row.observation_cursor, 0, 'corrupt_snapshot'),
     }
   })
   const rotations = safeArray(root.rotations, 'corrupt_snapshot').map((item) => {
@@ -302,11 +304,11 @@ const normalizeSnapshot = (value) => {
     if (ownEvents.length === 0 || ownEvents[0].lifecycle !== 'start_validated') fail('corrupt_snapshot')
     startSequenceByAttempt.set(key, ownEvents[0].sequence)
     const expectedStartFingerprint = startFingerprintFromStoredFacts(attempt)
-    if (attempt.start_fingerprint !== expectedStartFingerprint || ownEvents[0].fingerprint !== expectedStartFingerprint || ownEvents[0].detail_class !== null) fail('corrupt_snapshot')
+    if (attempt.start_fingerprint !== expectedStartFingerprint || ownEvents[0].fingerprint !== expectedStartFingerprint || ownEvents[0].detail_class !== 'trusted_resolution' || ownEvents[0].receipt_id !== attempt.start_receipt_id || ownEvents[0].observation_cursor !== attempt.start_observation_cursor) fail('corrupt_snapshot')
     let state = 'start_validated'
     for (const event of ownEvents.slice(1)) {
       if (!transitionAllowed(state, event.lifecycle)) fail('corrupt_snapshot')
-      if (event.fingerprint !== eventFingerprintFromStoredFacts(event)) fail('corrupt_snapshot')
+      if (event.fingerprint !== eventFingerprintFromStoredFacts(event) || ((event.lifecycle === 'dispatch_observed' || event.lifecycle === 'execution_started') !== (event.receipt_id !== null && event.observation_cursor !== null))) fail('corrupt_snapshot')
       state = event.lifecycle
     }
     const resultEvent = ownEvents.find((event) => event.lifecycle === 'role_result_recorded')
@@ -358,9 +360,9 @@ const normalizeSnapshot = (value) => {
 const emptyState = () => ({ schema_version: 1, attempts: [], events: [], rotations: [] })
 const cloneState = (value) => structuredClone(value)
 
-export const createOutcomeExecutionControlPlane = ({ registry, snapshot, clock = Date.now, materialize = structuredClone } = {}) => {
+export const createOutcomeExecutionControlPlane = ({ registry, snapshot, clock = Date.now, materialize = structuredClone, evidenceResolver } = {}) => {
   const bindings = normalizeRegistry(registry)
-  if (typeof clock !== 'function' || typeof materialize !== 'function') fail('invalid_dependency')
+  if (typeof clock !== 'function' || typeof materialize !== 'function' || !isTrustedRoleEvidenceResolver(evidenceResolver)) fail('invalid_dependency')
   let state = snapshot === undefined ? emptyState() : normalizeSnapshot(snapshot)
   let mutating = false
   let reentryDetected = false
@@ -412,14 +414,13 @@ export const createOutcomeExecutionControlPlane = ({ registry, snapshot, clock =
   }
 
   const normalizeStart = (value) => {
-    const row = exactRecord(value, ['project_id', 'role', 'instruction_id', 'attempt_id', 'expected_binding_version', 'action', 'risk_class', 'source_state', 'stage_gate_present', 'authority', 'retry_of_attempt_id', 'transport_class', 'public_alias', 'public_binding_version', 'public_binding_state', 'peer_thread_match_count', 'peer_thread_binding_verified'])
+    const row = exactRecord(value, ['project_id', 'role', 'instruction_id', 'attempt_id', 'expected_binding_version', 'action', 'risk_class', 'source_state', 'stage_gate_present', 'authority', 'retry_of_attempt_id', 'transport_class', 'public_alias', 'trusted_evidence'])
     const result = {
       project_id: projectIdentifier(row.project_id), role: member(row.role, ROLES), instruction_id: identifier(row.instruction_id), attempt_id: identifier(row.attempt_id),
       expected_binding_version: integer(row.expected_binding_version, 1), action: identifier(row.action), risk_class: member(row.risk_class, RISK),
       source_state: member(row.source_state, new Set(['matched', 'conflict'])),
       stage_gate_present: bool(row.stage_gate_present), authority: member(row.authority, AUTHORITIES), retry_of_attempt_id: nullableIdentifier(row.retry_of_attempt_id),
-      transport_class: member(row.transport_class, ROLE_TRANSPORTS), public_alias: identifier(row.public_alias), public_binding_version: integer(row.public_binding_version, 1),
-      public_binding_state: member(row.public_binding_state, BINDING_STATES), peer_thread_match_count: integer(row.peer_thread_match_count), peer_thread_binding_verified: bool(row.peer_thread_binding_verified),
+      transport_class: member(row.transport_class, ROLE_TRANSPORTS), public_alias: identifier(row.public_alias), trusted_evidence: row.trusted_evidence,
     }
     if (actionRisk(result.action) !== result.risk_class) fail('invalid_command')
     return result
@@ -440,52 +441,52 @@ export const createOutcomeExecutionControlPlane = ({ registry, snapshot, clock =
     if (resolution.error) return { outcome: 'safe_hold', reason: resolution.error }
     if (resolution.binding.transport_class !== command.transport_class) return { outcome: 'safe_hold', reason: 'binding_transport_mismatch' }
     if (resolution.binding.public_alias !== command.public_alias) return { outcome: 'safe_hold', reason: 'binding_alias_mismatch' }
-    if (command.public_binding_version !== resolution.binding.version) return { outcome: 'safe_hold', reason: 'public_binding_version_conflict' }
-    if (command.public_binding_state !== resolution.binding.state) return { outcome: 'safe_hold', reason: 'public_binding_state_conflict' }
-    if (command.peer_thread_match_count !== 1) return { outcome: 'safe_hold', reason: command.peer_thread_match_count === 0 ? 'peer_thread_missing' : 'peer_thread_conflict' }
-    if (!command.peer_thread_binding_verified) return { outcome: 'safe_hold', reason: 'peer_thread_binding_unverified' }
-    const startFingerprint = fingerprint(command)
+    let trusted
+    try { trusted = evidenceResolver.inspectStart(command.trusted_evidence, { project_id: command.project_id, role: command.role, binding_version: resolution.binding.version, public_alias: command.public_alias, instruction_id: command.instruction_id, attempt_id: command.attempt_id }) } catch (error) { fail(error instanceof Error ? error.message : 'trusted_evidence_required') }
+    const startFacts = { ...command }; delete startFacts.trusted_evidence
+    Object.assign(startFacts, { destination_key: trusted.destination_key, resolver_receipt_id: trusted.receipt_id, observation_cursor: trusted.observation_cursor })
+    const startFingerprint = fingerprint(startFacts)
     const existing = state.attempts.find((attempt) => attempt.instruction_id === command.instruction_id && attempt.attempt_id === command.attempt_id)
     if (existing) {
       if (existing.start_fingerprint !== startFingerprint) fail('duplicate_attempt_conflict')
       return startedResult(existing, true)
     }
+    if (trusted.consumed) fail('trusted_evidence_replayed')
     const instructionAttempts = state.attempts.filter((attempt) => attempt.instruction_id === command.instruction_id)
     if (instructionAttempts.length > 0) {
       if (command.retry_of_attempt_id === null) fail('retry_reference_required')
       const prior = instructionAttempts.at(-1)
       if (command.retry_of_attempt_id !== prior.attempt_id || prior.state !== 'delivery_unknown' || instructionAttempts.some((attempt) => attempt.retry_of_attempt_id === prior.attempt_id) || !sameInstructionIdentity(command, prior)) fail('invalid_retry_reference')
     } else if (command.retry_of_attempt_id !== null) fail('invalid_retry_reference')
-    return mutate((next, observedAt) => {
+    const result = mutate((next, observedAt) => {
       const attempt = {
         instruction_id: command.instruction_id, attempt_id: command.attempt_id, project_id: command.project_id, role: command.role,
         binding_version: resolution.binding.version, action: command.action, risk_class: command.risk_class, source_state: command.source_state, stage_gate_present: command.stage_gate_present,
         authority: command.authority, retry_of_attempt_id: command.retry_of_attempt_id, state: 'start_validated', start_fingerprint: startFingerprint,
-        transport_class: command.transport_class, public_alias: command.public_alias, public_binding_state: command.public_binding_state,
-        peer_thread_match_count: command.peer_thread_match_count, peer_thread_binding_verified: command.peer_thread_binding_verified,
+        transport_class: command.transport_class, public_alias: command.public_alias, destination_key: trusted.destination_key,
+        start_receipt_id: trusted.receipt_id, start_observation_cursor: trusted.observation_cursor,
         last_fingerprint: startFingerprint, result_class: null, started_at: observedAt,
       }
       next.attempts.push(attempt)
-      next.events.push({ sequence: next.events.length + 1, instruction_id: attempt.instruction_id, attempt_id: attempt.attempt_id, lifecycle: 'start_validated', binding_version: attempt.binding_version, observed_at: observedAt, fingerprint: startFingerprint, detail_class: null })
+      next.events.push({ sequence: next.events.length + 1, instruction_id: attempt.instruction_id, attempt_id: attempt.attempt_id, lifecycle: 'start_validated', binding_version: attempt.binding_version, observed_at: observedAt, fingerprint: startFingerprint, detail_class: 'trusted_resolution', receipt_id: trusted.receipt_id, observation_cursor: trusted.observation_cursor })
       return startedResult(attempt, false)
     })
+    try { evidenceResolver.commit(command.trusted_evidence) } catch { fail('trusted_evidence_replayed') }
+    return result
   }
 
   const normalizeTransition = (value) => {
     const base = snapshotRecord(value)
     const event = member(base.event, new Set(['dispatch_observed', 'execution_started', 'role_result_recorded', 'handoff_accepted', 'handoff_rejected', 'delivery_unknown', 'cancelled', 'failed', 'quarantined', 'safe_hold']))
     let keys
-    if (event === 'dispatch_observed' || event === 'execution_started') keys = ['instruction_id', 'attempt_id', 'event', 'receipt_observed', 'receipt_class']
+    if (event === 'dispatch_observed' || event === 'execution_started') keys = ['instruction_id', 'attempt_id', 'event', 'trusted_evidence']
     else if (event === 'role_result_recorded') keys = ['instruction_id', 'attempt_id', 'event', 'result_class']
     else if (event === 'handoff_accepted' || event === 'handoff_rejected') keys = ['instruction_id', 'attempt_id', 'event', 'decision']
     else keys = ['instruction_id', 'attempt_id', 'event', 'reason_class']
     const row = exactRecord(value, keys)
     const command = { instruction_id: identifier(row.instruction_id), attempt_id: identifier(row.attempt_id), event }
-    if (event === 'dispatch_observed' || event === 'execution_started') {
-      command.receipt_observed = bool(row.receipt_observed)
-      command.receipt_class = member(row.receipt_class, new Set(event === 'dispatch_observed' ? ['provider_ack'] : ['target_started']))
-      if (!command.receipt_observed) fail('receipt_required')
-    } else if (event === 'role_result_recorded') command.result_class = member(row.result_class, RESULT_CLASSES)
+    if (event === 'dispatch_observed' || event === 'execution_started') command.trusted_evidence = row.trusted_evidence
+    else if (event === 'role_result_recorded') command.result_class = member(row.result_class, RESULT_CLASSES)
     else if (event === 'handoff_accepted' || event === 'handoff_rejected') {
       command.decision = member(row.decision, new Set(['accepted', 'rejected']))
       if (command.decision !== (event === 'handoff_accepted' ? 'accepted' : 'rejected')) fail('invalid_command')
@@ -498,19 +499,29 @@ export const createOutcomeExecutionControlPlane = ({ registry, snapshot, clock =
     const command = normalizeTransition(value)
     const attempt = state.attempts.find((item) => item.instruction_id === command.instruction_id && item.attempt_id === command.attempt_id)
     if (!attempt) fail('attempt_missing')
-    const eventFingerprint = fingerprint(command)
-    if (attempt.last_fingerprint === eventFingerprint) return { outcome: 'event_recorded', lifecycle: attempt.state, idempotent: true }
     if (TERMINAL.has(attempt.state)) fail('terminal_attempt')
+    let trusted
+    if (command.event === 'dispatch_observed' || command.event === 'execution_started') {
+      const expected = { project_id: attempt.project_id, role: attempt.role, binding_version: attempt.binding_version, instruction_id: attempt.instruction_id, attempt_id: attempt.attempt_id, destination_key: attempt.destination_key }
+      try { trusted = command.event === 'dispatch_observed' ? evidenceResolver.inspectProvider(command.trusted_evidence, expected) : evidenceResolver.inspectDestination(command.trusted_evidence, expected) } catch (error) { fail(error instanceof Error ? error.message : 'trusted_evidence_required') }
+    }
+    const eventFacts = { ...command }; delete eventFacts.trusted_evidence
+    if (trusted) Object.assign(eventFacts, { receipt_class: command.event === 'dispatch_observed' ? 'provider_send' : 'destination_start', resolver_receipt_id: trusted.receipt_id, observation_cursor: trusted.observation_cursor })
+    const eventFingerprint = fingerprint(eventFacts)
+    if (attempt.last_fingerprint === eventFingerprint) return { outcome: 'event_recorded', lifecycle: attempt.state, idempotent: true }
+    if (trusted?.consumed) fail('trusted_evidence_replayed')
     if (!transitionAllowed(attempt.state, command.event)) fail('invalid_transition')
-    return mutate((next, observedAt) => {
+    const result = mutate((next, observedAt) => {
       const mutable = next.attempts.find((item) => item.instruction_id === command.instruction_id && item.attempt_id === command.attempt_id)
       mutable.state = command.event
       mutable.last_fingerprint = eventFingerprint
       if (command.result_class) mutable.result_class = command.result_class
-      const detailClass = command.receipt_class ?? command.result_class ?? command.decision ?? command.reason_class ?? null
-      next.events.push({ sequence: next.events.length + 1, instruction_id: mutable.instruction_id, attempt_id: mutable.attempt_id, lifecycle: command.event, binding_version: mutable.binding_version, observed_at: observedAt, fingerprint: eventFingerprint, detail_class: detailClass })
+      const detailClass = eventFacts.receipt_class ?? command.result_class ?? command.decision ?? command.reason_class ?? null
+      next.events.push({ sequence: next.events.length + 1, instruction_id: mutable.instruction_id, attempt_id: mutable.attempt_id, lifecycle: command.event, binding_version: mutable.binding_version, observed_at: observedAt, fingerprint: eventFingerprint, detail_class: detailClass, receipt_id: trusted?.receipt_id ?? null, observation_cursor: trusted?.observation_cursor ?? null })
       return { outcome: 'event_recorded', lifecycle: command.event, idempotent: false }
     })
+    if (trusted) try { evidenceResolver.commit(command.trusted_evidence) } catch { fail('trusted_evidence_replayed') }
+    return result
   }
 
   const normalizeRotation = (value) => {
