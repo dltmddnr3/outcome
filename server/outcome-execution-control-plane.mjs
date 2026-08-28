@@ -47,6 +47,7 @@ const ROTATION_REASONS = new Set(['repeated_timeout', 'context_loss', 'source_dr
 const IDENTIFIER = /^[a-z][a-z0-9_]{0,95}$/
 const PROJECT_IDENTIFIER = /^[a-z][a-z0-9_]*(?:-[a-z0-9_]+)*$/
 const DIGEST = /^[a-f0-9]{64}$/
+const ROLE_TRANSPORTS = new Set(['codex_app_peer_thread', 'bounded_read_only_subagent'])
 
 const snapshotRecord = (value, code = 'invalid_command') => {
   if (typeof value !== 'object' || value === null || isProxy(value)) fail(code)
@@ -121,16 +122,18 @@ const nullableIdentifier = (value, code = 'invalid_command') => value === null ?
 const fingerprint = (value) => JSON.stringify(value, Object.keys(value).sort())
 
 const actionRisk = (action) => LIGHT_ACTIONS.has(action) ? 'lightweight' : STANDARD_ACTIONS.has(action) ? 'standard' : HIGH_ACTIONS.has(action) ? 'high_risk' : null
-const sameInstructionIdentity = (left, right) => left.project_id === right.project_id && left.role === right.role && left.action === right.action && left.risk_class === right.risk_class
+const sameInstructionIdentity = (left, right) => left.project_id === right.project_id && left.role === right.role && left.action === right.action && left.risk_class === right.risk_class && left.transport_class === right.transport_class && left.public_alias === right.public_alias
 
 const normalizeBinding = (value) => {
-  const row = exactRecord(value, ['project_id', 'role', 'version', 'state', 'health'], 'invalid_registry')
+  const row = exactRecord(value, ['project_id', 'role', 'version', 'state', 'health', 'public_alias', 'transport_class'], 'invalid_registry')
   return {
     project_id: projectIdentifier(row.project_id, 'invalid_registry'),
     role: member(row.role, ROLES, 'invalid_registry'),
     version: integer(row.version, 1, 'invalid_registry'),
     state: member(row.state, BINDING_STATES, 'invalid_registry'),
     health: member(row.health, HEALTH, 'invalid_registry'),
+    public_alias: identifier(row.public_alias, 'invalid_registry'),
+    transport_class: member(row.transport_class, new Set(['codex_app_peer_thread']), 'invalid_registry'),
   }
 }
 
@@ -146,7 +149,7 @@ const normalizeRegistry = (value) => {
   return bindings
 }
 
-const ATTEMPT_KEYS = ['instruction_id', 'attempt_id', 'project_id', 'role', 'binding_version', 'action', 'risk_class', 'source_state', 'stage_gate_present', 'authority', 'retry_of_attempt_id', 'state', 'start_fingerprint', 'last_fingerprint', 'result_class', 'started_at']
+const ATTEMPT_KEYS = ['instruction_id', 'attempt_id', 'project_id', 'role', 'binding_version', 'action', 'risk_class', 'source_state', 'stage_gate_present', 'authority', 'retry_of_attempt_id', 'transport_class', 'public_alias', 'public_binding_state', 'peer_thread_match_count', 'peer_thread_binding_verified', 'state', 'start_fingerprint', 'last_fingerprint', 'result_class', 'started_at']
 const EVENT_KEYS = ['sequence', 'instruction_id', 'attempt_id', 'lifecycle', 'binding_version', 'observed_at', 'fingerprint', 'detail_class']
 const ROTATION_KEYS = ['project_id', 'role', 'predecessor_version', 'successor_version', 'checkpoint_digest', 'fingerprint', 'recommendation', 'history']
 const ROTATION_EVENT_KEYS = ['state', 'observed_at']
@@ -174,6 +177,12 @@ const startFingerprintFromStoredFacts = (attempt) => fingerprint({
   stage_gate_present: attempt.stage_gate_present,
   authority: attempt.authority,
   retry_of_attempt_id: attempt.retry_of_attempt_id,
+  transport_class: attempt.transport_class,
+  public_alias: attempt.public_alias,
+  public_binding_version: attempt.binding_version,
+  public_binding_state: attempt.public_binding_state,
+  peer_thread_match_count: attempt.peer_thread_match_count,
+  peer_thread_binding_verified: attempt.peer_thread_binding_verified,
 })
 
 const eventFingerprintFromStoredFacts = (event) => {
@@ -236,6 +245,11 @@ const normalizeSnapshot = (value) => {
       stage_gate_present: bool(row.stage_gate_present, 'corrupt_snapshot'),
       authority: member(row.authority, AUTHORITIES, 'corrupt_snapshot'),
       retry_of_attempt_id: nullableIdentifier(row.retry_of_attempt_id, 'corrupt_snapshot'),
+      transport_class: member(row.transport_class, new Set(['codex_app_peer_thread']), 'corrupt_snapshot'),
+      public_alias: identifier(row.public_alias, 'corrupt_snapshot'),
+      public_binding_state: member(row.public_binding_state, BINDING_STATES, 'corrupt_snapshot'),
+      peer_thread_match_count: integer(row.peer_thread_match_count, 0, 'corrupt_snapshot'),
+      peer_thread_binding_verified: bool(row.peer_thread_binding_verified, 'corrupt_snapshot'),
       state: member(row.state, LIFECYCLE, 'corrupt_snapshot'),
       start_fingerprint: typeof row.start_fingerprint === 'string' ? row.start_fingerprint : fail('corrupt_snapshot'),
       last_fingerprint: typeof row.last_fingerprint === 'string' ? row.last_fingerprint : fail('corrupt_snapshot'),
@@ -243,6 +257,7 @@ const normalizeSnapshot = (value) => {
       started_at: Number.isFinite(row.started_at) ? row.started_at : fail('corrupt_snapshot'),
     }
   })
+  if (attempts.some((attempt) => attempt.public_binding_state !== 'active' || attempt.peer_thread_match_count !== 1 || !attempt.peer_thread_binding_verified)) fail('corrupt_snapshot')
   if (attempts.some((attempt) => actionRisk(attempt.action) !== attempt.risk_class)) fail('corrupt_snapshot')
   const events = safeArray(root.events, 'corrupt_snapshot').map((item) => {
     const row = exactRecord(item, EVENT_KEYS, 'corrupt_snapshot')
@@ -397,12 +412,14 @@ export const createOutcomeExecutionControlPlane = ({ registry, snapshot, clock =
   }
 
   const normalizeStart = (value) => {
-    const row = exactRecord(value, ['project_id', 'role', 'instruction_id', 'attempt_id', 'expected_binding_version', 'action', 'risk_class', 'source_state', 'stage_gate_present', 'authority', 'retry_of_attempt_id'])
+    const row = exactRecord(value, ['project_id', 'role', 'instruction_id', 'attempt_id', 'expected_binding_version', 'action', 'risk_class', 'source_state', 'stage_gate_present', 'authority', 'retry_of_attempt_id', 'transport_class', 'public_alias', 'public_binding_version', 'public_binding_state', 'peer_thread_match_count', 'peer_thread_binding_verified'])
     const result = {
       project_id: projectIdentifier(row.project_id), role: member(row.role, ROLES), instruction_id: identifier(row.instruction_id), attempt_id: identifier(row.attempt_id),
       expected_binding_version: integer(row.expected_binding_version, 1), action: identifier(row.action), risk_class: member(row.risk_class, RISK),
       source_state: member(row.source_state, new Set(['matched', 'conflict'])),
       stage_gate_present: bool(row.stage_gate_present), authority: member(row.authority, AUTHORITIES), retry_of_attempt_id: nullableIdentifier(row.retry_of_attempt_id),
+      transport_class: member(row.transport_class, ROLE_TRANSPORTS), public_alias: identifier(row.public_alias), public_binding_version: integer(row.public_binding_version, 1),
+      public_binding_state: member(row.public_binding_state, BINDING_STATES), peer_thread_match_count: integer(row.peer_thread_match_count), peer_thread_binding_verified: bool(row.peer_thread_binding_verified),
     }
     if (actionRisk(result.action) !== result.risk_class) fail('invalid_command')
     return result
@@ -413,6 +430,7 @@ export const createOutcomeExecutionControlPlane = ({ registry, snapshot, clock =
   const start = (value) => {
     ensureMutationEntry()
     const command = normalizeStart(value)
+    if (command.transport_class !== 'codex_app_peer_thread') return { outcome: 'safe_hold', reason: 'role_transport_denied' }
     if (command.source_state === 'conflict') return { outcome: 'safe_hold', reason: 'source_conflict' }
     if (command.authority === 'missing' || command.authority === 'conflict') return { outcome: 'safe_hold', reason: `authority_${command.authority}` }
     if (command.risk_class === 'high_risk') return { outcome: 'safe_hold', reason: 'high_risk_boundary' }
@@ -420,6 +438,12 @@ export const createOutcomeExecutionControlPlane = ({ registry, snapshot, clock =
     if (command.risk_class === 'lightweight' && command.stage_gate_present) fail('invalid_command')
     const resolution = resolveBinding(command.project_id, command.role, command.expected_binding_version)
     if (resolution.error) return { outcome: 'safe_hold', reason: resolution.error }
+    if (resolution.binding.transport_class !== command.transport_class) return { outcome: 'safe_hold', reason: 'binding_transport_mismatch' }
+    if (resolution.binding.public_alias !== command.public_alias) return { outcome: 'safe_hold', reason: 'binding_alias_mismatch' }
+    if (command.public_binding_version !== resolution.binding.version) return { outcome: 'safe_hold', reason: 'public_binding_version_conflict' }
+    if (command.public_binding_state !== resolution.binding.state) return { outcome: 'safe_hold', reason: 'public_binding_state_conflict' }
+    if (command.peer_thread_match_count !== 1) return { outcome: 'safe_hold', reason: command.peer_thread_match_count === 0 ? 'peer_thread_missing' : 'peer_thread_conflict' }
+    if (!command.peer_thread_binding_verified) return { outcome: 'safe_hold', reason: 'peer_thread_binding_unverified' }
     const startFingerprint = fingerprint(command)
     const existing = state.attempts.find((attempt) => attempt.instruction_id === command.instruction_id && attempt.attempt_id === command.attempt_id)
     if (existing) {
@@ -437,6 +461,8 @@ export const createOutcomeExecutionControlPlane = ({ registry, snapshot, clock =
         instruction_id: command.instruction_id, attempt_id: command.attempt_id, project_id: command.project_id, role: command.role,
         binding_version: resolution.binding.version, action: command.action, risk_class: command.risk_class, source_state: command.source_state, stage_gate_present: command.stage_gate_present,
         authority: command.authority, retry_of_attempt_id: command.retry_of_attempt_id, state: 'start_validated', start_fingerprint: startFingerprint,
+        transport_class: command.transport_class, public_alias: command.public_alias, public_binding_state: command.public_binding_state,
+        peer_thread_match_count: command.peer_thread_match_count, peer_thread_binding_verified: command.peer_thread_binding_verified,
         last_fingerprint: startFingerprint, result_class: null, started_at: observedAt,
       }
       next.attempts.push(attempt)

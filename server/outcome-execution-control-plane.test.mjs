@@ -8,12 +8,14 @@ import {
   createOutcomeExecutionControlPlane,
 } from './outcome-execution-control-plane.mjs'
 
+const binding = (overrides = {}) => ({ public_alias: 'outcome_builder', transport_class: 'codex_app_peer_thread', ...overrides })
+
 const registry = (overrides = []) => ({
   bindings: [
-    { project_id: 'outcome', role: 'planner', version: 2, state: 'active', health: 'fresh' },
-    { project_id: 'outcome', role: 'builder', version: 1, state: 'active', health: 'fresh' },
-    { project_id: 'outcome', role: 'ux_product_qa', version: 2, state: 'active', health: 'fresh' },
-    { project_id: 'outcome', role: 'release_audit', version: 2, state: 'active', health: 'fresh' },
+    { project_id: 'outcome', role: 'planner', version: 2, state: 'active', health: 'fresh', public_alias: 'outcome_planner', transport_class: 'codex_app_peer_thread' },
+    { project_id: 'outcome', role: 'builder', version: 1, state: 'active', health: 'fresh', public_alias: 'outcome_builder', transport_class: 'codex_app_peer_thread' },
+    { project_id: 'outcome', role: 'ux_product_qa', version: 2, state: 'active', health: 'fresh', public_alias: 'outcome_ux_product_qa', transport_class: 'codex_app_peer_thread' },
+    { project_id: 'outcome', role: 'release_audit', version: 2, state: 'active', health: 'fresh', public_alias: 'outcome_release_audit', transport_class: 'codex_app_peer_thread' },
     ...overrides,
   ],
 })
@@ -30,6 +32,12 @@ const startCommand = (overrides = {}) => ({
   stage_gate_present: true,
   authority: 'within_scope',
   retry_of_attempt_id: null,
+  transport_class: 'codex_app_peer_thread',
+  public_alias: 'outcome_builder',
+  public_binding_version: 1,
+  public_binding_state: 'active',
+  peer_thread_match_count: 1,
+  peer_thread_binding_verified: true,
   ...overrides,
 })
 
@@ -44,10 +52,54 @@ const code = (expected) => (error) => error instanceof ExecutionControlError && 
 const canonicalFingerprint = (value) => JSON.stringify(value, Object.keys(value).sort())
 const retryIdentityDrifts = [
   ['project drift', { project_id: 'second' }],
-  ['role and action drift', { role: 'planner', expected_binding_version: 2, action: 'plan' }],
+  ['role and action drift', { role: 'planner', expected_binding_version: 2, action: 'plan', public_alias: 'outcome_planner', public_binding_version: 2 }],
   ['action drift', { action: 'verify' }],
   ['action and risk drift', { action: 'explain', risk_class: 'lightweight', stage_gate_present: false }],
 ]
+
+test('R1 R4 role-looking sub-agent transports fail closed without sequence allocation', () => {
+  const plane = createOutcomeExecutionControlPlane({ registry: registry(), clock: () => 100 })
+  for (const public_alias of ['session_binding_builder_v2', 'fresh_qa_agent', 'release_audit_helper']) {
+    const before = plane.exportPrivateState()
+    assert.deepEqual(plane.start(startCommand({ transport_class: 'bounded_read_only_subagent', public_alias })), { outcome: 'safe_hold', reason: 'role_transport_denied' })
+    assert.deepEqual(plane.exportPrivateState(), before)
+  }
+  assert.equal(plane.start(startCommand()).idempotent, false)
+  assert.equal(plane.exportPrivateState().events[0].sequence, 1)
+})
+
+test('R2 exact public binding and peer-thread resolution fail closed atomically', () => {
+  const plane = createOutcomeExecutionControlPlane({ registry: registry(), clock: () => 100 })
+  const hostile = [
+    { public_alias: 'builder' },
+    { public_binding_version: 2 },
+    { public_binding_state: 'replaced' },
+    { peer_thread_match_count: 0 },
+    { peer_thread_match_count: 2 },
+    { peer_thread_binding_verified: false },
+  ]
+  for (const drift of hostile) {
+    const before = plane.exportPrivateState()
+    assert.deepEqual(plane.start(startCommand(drift)).outcome, 'safe_hold')
+    assert.deepEqual(plane.exportPrivateState(), before)
+  }
+})
+
+test('R2 replay rejects transport or peer-thread verification drift', () => {
+  const plane = createOutcomeExecutionControlPlane({ registry: registry(), clock: () => 100 })
+  plane.start(startCommand())
+  const snapshot = plane.exportPrivateState()
+  for (const drift of [
+    { transport_class: 'bounded_read_only_subagent' },
+    { public_binding_state: 'replaced' },
+    { peer_thread_match_count: 2 },
+    { peer_thread_binding_verified: false },
+  ]) {
+    const corrupt = structuredClone(snapshot)
+    Object.assign(corrupt.attempts[0], drift)
+    assert.throws(() => createOutcomeExecutionControlPlane({ registry: registry(), snapshot: corrupt, clock: () => 200 }), code('corrupt_snapshot'))
+  }
+})
 
 test('F1 authority and service ownership are exact and projection cannot acquire authority', () => {
   assert.deepEqual(Object.keys(EXECUTION_CONTROL_AUTHORITIES), ['outcome', 'stage_acceptance', 'current_session', 'now', 'instruction', 'rotation', 'role_result', 'qa', 'audit', 'acceptance'])
@@ -112,13 +164,13 @@ test('F2 logical role address snapshots exact current binding and rejects unheal
 
   for (const [entry, command, reason] of [
     [[], startCommand({ project_id: 'other' }), 'binding_missing'],
-    [[{ project_id: 'other', role: 'builder', version: 1, state: 'active', health: 'fresh' }], startCommand(), 'binding_cross_project'],
-    [[{ project_id: 'outcome', role: 'builder', version: 2, state: 'active', health: 'fresh' }], startCommand(), 'binding_version_conflict'],
-    [[{ project_id: 'outcome', role: 'builder', version: 1, state: 'active', health: 'stale' }], startCommand(), 'binding_stale'],
-    [[{ project_id: 'outcome', role: 'builder', version: 1, state: 'active', health: 'offline' }], startCommand(), 'binding_offline'],
-    [[{ project_id: 'outcome', role: 'builder', version: 1, state: 'replaced', health: 'fresh' }], startCommand(), 'binding_replaced'],
-    [[{ project_id: 'outcome', role: 'builder', version: 1, state: 'revoked', health: 'fresh' }], startCommand(), 'binding_revoked'],
-    [[{ project_id: 'outcome', role: 'builder', version: 1, state: 'conflict', health: 'fresh' }], startCommand(), 'binding_conflict'],
+    [[binding({ project_id: 'other', role: 'builder', version: 1, state: 'active', health: 'fresh' })], startCommand(), 'binding_cross_project'],
+    [[binding({ project_id: 'outcome', role: 'builder', version: 2, state: 'active', health: 'fresh' })], startCommand(), 'binding_version_conflict'],
+    [[binding({ project_id: 'outcome', role: 'builder', version: 1, state: 'active', health: 'stale' })], startCommand(), 'binding_stale'],
+    [[binding({ project_id: 'outcome', role: 'builder', version: 1, state: 'active', health: 'offline' })], startCommand(), 'binding_offline'],
+    [[binding({ project_id: 'outcome', role: 'builder', version: 1, state: 'replaced', health: 'fresh' })], startCommand(), 'binding_replaced'],
+    [[binding({ project_id: 'outcome', role: 'builder', version: 1, state: 'revoked', health: 'fresh' })], startCommand(), 'binding_revoked'],
+    [[binding({ project_id: 'outcome', role: 'builder', version: 1, state: 'conflict', health: 'fresh' })], startCommand(), 'binding_conflict'],
   ]) {
     const isolated = createOutcomeExecutionControlPlane({ registry: { bindings: entry }, clock: () => 100 })
     assert.deepEqual(isolated.start(command), { outcome: 'safe_hold', reason })
@@ -144,8 +196,8 @@ test('F3 lifecycle is append-only observed-receipt bound and exact duplicates ar
 })
 
 test('F3 canonical hyphenated project ID completes and replays one five-event lifecycle', () => {
-  const cherryRegistry = { bindings: [{ project_id: 'cherry-note', role: 'builder', version: 1, state: 'active', health: 'fresh' }] }
-  const command = startCommand({ project_id: 'cherry-note', action: 'read_only', risk_class: 'lightweight', stage_gate_present: false })
+  const cherryRegistry = { bindings: [binding({ project_id: 'cherry-note', role: 'builder', version: 1, state: 'active', health: 'fresh', public_alias: 'cherry_note_builder' })] }
+  const command = startCommand({ project_id: 'cherry-note', action: 'read_only', risk_class: 'lightweight', stage_gate_present: false, public_alias: 'cherry_note_builder' })
   const plane = createOutcomeExecutionControlPlane({ registry: cherryRegistry, clock: (() => { let value = 100; return () => value++ })() })
   plane.start(command)
   plane.transition(transition('dispatch_observed', { receipt_observed: true, receipt_class: 'provider_ack' }))
@@ -163,9 +215,9 @@ test('F3 canonical hyphenated project ID completes and replays one five-event li
 
 test('F3 project ID grammar rejects malformed values without widening internal identifiers', () => {
   for (const project_id of ['-cherry', 'cherry-', 'cherry--note', 'Cherry-note', 'cherry.note', `a${'-b'.repeat(48)}`]) {
-    assert.throws(() => createOutcomeExecutionControlPlane({ registry: { bindings: [{ project_id, role: 'builder', version: 1, state: 'active', health: 'fresh' }] }, clock: () => 100 }), code('invalid_registry'))
+    assert.throws(() => createOutcomeExecutionControlPlane({ registry: { bindings: [binding({ project_id, role: 'builder', version: 1, state: 'active', health: 'fresh' })] }, clock: () => 100 }), code('invalid_registry'))
   }
-  const plane = createOutcomeExecutionControlPlane({ registry: { bindings: [{ project_id: 'cherry-note', role: 'builder', version: 1, state: 'active', health: 'fresh' }] }, clock: () => 100 })
+  const plane = createOutcomeExecutionControlPlane({ registry: { bindings: [binding({ project_id: 'cherry-note', role: 'builder', version: 1, state: 'active', health: 'fresh', public_alias: 'cherry_note_builder' })] }, clock: () => 100 })
   assert.throws(() => plane.start(startCommand({ project_id: 'cherry-note', instruction_id: 'invalid-instruction' })), code('invalid_command'))
 })
 
@@ -444,7 +496,7 @@ test('V2F-3 public current role state folds latest event sequence independent of
 
 for (const [label, drift] of retryIdentityDrifts) {
   test(`V3F-1 retry rejects ${label} atomically`, () => {
-    const plane = createOutcomeExecutionControlPlane({ registry: registry([{ project_id: 'second', role: 'builder', version: 1, state: 'active', health: 'fresh' }]), clock: () => 100 })
+    const plane = createOutcomeExecutionControlPlane({ registry: registry([binding({ project_id: 'second', role: 'builder', version: 1, state: 'active', health: 'fresh' })]), clock: () => 100 })
     plane.start(startCommand())
     plane.transition(transition('delivery_unknown', { reason_class: 'missing_ack' }))
     const before = plane.exportPrivateState()
@@ -456,7 +508,7 @@ for (const [label, drift] of retryIdentityDrifts) {
 }
 
 test('V3F-1 replay rejects identity-drifted retries in either attempt row order', () => {
-  const replayRegistry = registry([{ project_id: 'second', role: 'builder', version: 1, state: 'active', health: 'fresh' }])
+  const replayRegistry = registry([binding({ project_id: 'second', role: 'builder', version: 1, state: 'active', health: 'fresh' })])
   const plane = createOutcomeExecutionControlPlane({ registry: replayRegistry, clock: () => 100 })
   plane.start(startCommand())
   plane.transition(transition('delivery_unknown', { reason_class: 'missing_ack' }))
