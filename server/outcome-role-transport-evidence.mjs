@@ -4,6 +4,7 @@ import { isProxy } from 'node:util/types'
 const AUTHORITY_PUBLIC_KEY = createPublicKey(`-----BEGIN PUBLIC KEY-----
 MCowBQYDK2VwAyEAdwx1zFiFyJYsiA2ffdTTFEDA4BeL++oAzpT92jBp32s=
 -----END PUBLIC KEY-----`)
+const trustedRuntimeNow = Date.now.bind(Date)
 const trustedVerifiers = new WeakSet()
 const fail = (code) => { throw new Error(code) }
 const exactObject = (value, keys) => {
@@ -24,8 +25,8 @@ const same = (facts, expected, keys) => keys.every((key) => facts[key] === expec
 
 export const isTrustedRoleEvidenceResolver = (value) => trustedVerifiers.has(value)
 
-export function createTrustedRoleEvidenceVerifier({ clock = Date.now } = {}) {
-  if (typeof clock !== 'function') fail('trusted_verifier_invalid')
+export function createTrustedRoleEvidenceVerifier(...args) {
+  if (args.length !== 0) fail('trusted_verifier_invalid')
   const consumed = new Set()
   const inspect = (token, kind, expected) => {
     let envelope
@@ -34,7 +35,7 @@ export function createTrustedRoleEvidenceVerifier({ clock = Date.now } = {}) {
     let payload
     try { payload = exactObject(envelope.payload, keys) } catch { fail('trusted_evidence_required') }
     if (payload.kind !== kind || typeof envelope.signature !== 'string' || !verify(null, Buffer.from(JSON.stringify(envelope.payload)), AUTHORITY_PUBLIC_KEY, Buffer.from(envelope.signature, 'base64'))) fail('trusted_evidence_required')
-    const now = clock(); if (!Number.isFinite(now)) fail('trusted_clock_unavailable')
+    const now = trustedRuntimeNow(); if (!Number.isFinite(now)) fail('trusted_clock_unavailable')
     if (safeInteger(payload.issued_at) > now || now > safeInteger(payload.expires_at)) fail('trusted_evidence_stale')
     if (!same(payload, expected, kind === 'start' ? EXPECT_START : EXPECT_CORRELATED)) fail('trusted_evidence_mismatch')
     if (!Number.isSafeInteger(payload.binding_version) || payload.binding_version < 1 || !Number.isSafeInteger(payload.observation_cursor) || payload.observation_cursor < 0 || typeof payload.receipt_id !== 'string' || !payload.receipt_id) fail('trusted_evidence_invalid')

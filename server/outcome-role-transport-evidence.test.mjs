@@ -1,21 +1,34 @@
 import assert from 'node:assert/strict'
+import { spawnSync } from 'node:child_process'
 import test from 'node:test'
-import * as surface from './outcome-role-transport-evidence.mjs'
-import { createTrustedRoleEvidenceVerifier, isTrustedRoleEvidenceResolver } from './outcome-role-transport-evidence.mjs'
 import { createFixtureEvidenceAuthority } from './outcome-role-transport-evidence-fixtures.test.mjs'
-import { createOutcomeExecutionControlPlane } from './outcome-execution-control-plane.mjs'
+
+const actualDateNow = Date.now
+Date.now = () => 100
+const surface = await import('./outcome-role-transport-evidence.mjs')
+const { createTrustedRoleEvidenceVerifier, isTrustedRoleEvidenceResolver } = surface
+const { createOutcomeExecutionControlPlane } = await import('./outcome-execution-control-plane.mjs')
+Date.now = actualDateNow
 
 const facts = { project_id: 'outcome', role: 'builder', binding_version: 3, public_alias: 'builder_successor', instruction_id: 'instruction_alpha', attempt_id: 'attempt_alpha' }
-const fixture = (clock = () => 100) => { const verifier = createTrustedRoleEvidenceVerifier({ clock }); return { verifier, authority: createFixtureEvidenceAuthority(verifier) } }
+const fixture = () => { const verifier = createTrustedRoleEvidenceVerifier(); return { verifier, authority: createFixtureEvidenceAuthority(verifier) } }
 
 test('T0 public surface cannot mint authority from invented binding and peer data', () => {
   assert.equal(surface.createTrustedRoleEvidenceResolver, undefined)
   assert.equal(surface.createTrustedRoleEvidenceAuthority, undefined)
-  const verifier = createTrustedRoleEvidenceVerifier({ clock: () => 100 })
+  const verifier = createTrustedRoleEvidenceVerifier()
   const plane = createOutcomeExecutionControlPlane({ registry: { bindings: [{ project_id: 'outcome', role: 'builder', version: 3, state: 'active', health: 'fresh', public_alias: 'builder_successor', transport_class: 'codex_app_peer_thread' }] }, clock: () => 100, evidenceResolver: verifier })
   const invented = { payload: { kind: 'start', ...facts, destination_key: 'invented', observation_cursor: 1, receipt_id: 'invented', issued_at: 0, expires_at: 1000 }, signature: 'invented' }
   assert.throws(() => plane.start({ project_id: 'outcome', role: 'builder', instruction_id: 'instruction_alpha', attempt_id: 'attempt_alpha', expected_binding_version: 3, action: 'implement', risk_class: 'standard', source_state: 'matched', stage_gate_present: true, authority: 'within_scope', retry_of_attempt_id: null, transport_class: 'codex_app_peer_thread', public_alias: 'builder_successor', trusted_evidence: invented }), /trusted_evidence_required/)
   assert.deepEqual(plane.exportPrivateState().events, [])
+})
+
+test('C1 C2 expired signed evidence cannot be revived by a caller backdated clock', () => {
+  assert.throws(() => createTrustedRoleEvidenceVerifier({ clock: () => 100 }), /trusted_verifier_invalid/)
+  const script = `import { createTrustedRoleEvidenceVerifier } from ${JSON.stringify(new URL('./outcome-role-transport-evidence.mjs', import.meta.url).href)}; import { createFixtureEvidenceAuthority } from ${JSON.stringify(new URL('./outcome-role-transport-evidence-fixtures.test.mjs', import.meta.url).href)}; import { createOutcomeExecutionControlPlane } from ${JSON.stringify(new URL('./outcome-execution-control-plane.mjs', import.meta.url).href)}; const verifier=createTrustedRoleEvidenceVerifier(); const authority=createFixtureEvidenceAuthority(verifier); const plane=createOutcomeExecutionControlPlane({registry:{bindings:[{project_id:'outcome',role:'builder',version:3,state:'active',health:'fresh',public_alias:'builder_successor',transport_class:'codex_app_peer_thread'}]},clock:()=>100,evidenceResolver:verifier}); const trusted_evidence=authority.resolveStart({project_id:'outcome',role:'builder',binding_version:3,public_alias:'builder_successor',instruction_id:'instruction_alpha',attempt_id:'attempt_alpha'}); let code='none'; try { plane.start({project_id:'outcome',role:'builder',instruction_id:'instruction_alpha',attempt_id:'attempt_alpha',expected_binding_version:3,action:'implement',risk_class:'standard',source_state:'matched',stage_gate_present:true,authority:'within_scope',retry_of_attempt_id:null,transport_class:'codex_app_peer_thread',public_alias:'builder_successor',trusted_evidence}) } catch(error) { code=error.code }; process.stdout.write(JSON.stringify({code,events:plane.exportPrivateState().events.length}))`
+  const result = spawnSync(process.execPath, ['--input-type=module', '-e', script], { encoding: 'utf8' })
+  assert.equal(result.status, 0)
+  assert.deepEqual(JSON.parse(result.stdout), { code: 'trusted_evidence_stale', events: 0 })
 })
 
 test('T1 pinned verifier rejects mismatch, stale, tamper, and replay', () => {
@@ -27,8 +40,6 @@ test('T1 pinned verifier rejects mismatch, stale, tamper, and replay', () => {
   assert.throws(() => verifier.inspectStart(tampered, { ...facts, role: 'planner' }), /trusted_evidence_required/)
   verifier.commit(start); assert.equal(verifier.inspectStart(start, facts).consumed, true)
   assert.throws(() => verifier.commit(start), /trusted_evidence_replayed/)
-  const stale = fixture(() => 1001)
-  assert.throws(() => stale.verifier.inspectStart(stale.authority.resolveStart(facts), facts), /trusted_evidence_stale/)
 })
 
 test('T2 signed provider and destination receipts preserve correlation and cursor', () => {

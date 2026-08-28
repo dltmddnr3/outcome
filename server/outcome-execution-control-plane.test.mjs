@@ -1,23 +1,26 @@
 import test from 'node:test'
 import assert from 'node:assert/strict'
 
-import {
+const actualDateNow = Date.now
+Date.now = () => 50
+const {
   EXECUTION_CONTROL_AUTHORITIES,
   EXECUTION_CONTROL_SERVICES,
   ExecutionControlError,
   createOutcomeExecutionControlPlane,
-} from './outcome-execution-control-plane.mjs'
-import { createTrustedRoleEvidenceVerifier } from './outcome-role-transport-evidence.mjs'
+} = await import('./outcome-execution-control-plane.mjs')
+const { createTrustedRoleEvidenceVerifier } = await import('./outcome-role-transport-evidence.mjs')
+Date.now = actualDateNow
 import { createFixtureEvidenceAuthority } from './outcome-role-transport-evidence-fixtures.test.mjs'
 
 const evidenceBindings = [
   ['outcome', 'planner', 2, 'outcome_planner'], ['outcome', 'builder', 1, 'outcome_builder'], ['outcome', 'ux_product_qa', 2, 'outcome_ux_product_qa'], ['outcome', 'release_audit', 2, 'outcome_release_audit'],
   ['cherry-note', 'builder', 1, 'cherry_note_builder'], ['second', 'builder', 1, 'outcome_builder'],
 ].map(([project_id, role, binding_version, public_alias]) => ({ project_id, role, binding_version, public_alias, state: 'active', destination_ref: `private-${project_id}-${role}` }))
-let evidenceResolver = createTrustedRoleEvidenceVerifier({ clock: () => 50 })
+let evidenceResolver = createTrustedRoleEvidenceVerifier()
 let evidenceAuthority = createFixtureEvidenceAuthority(evidenceResolver)
 const createPlane = (options) => {
-  evidenceResolver = createTrustedRoleEvidenceVerifier({ clock: () => 50 })
+  evidenceResolver = createTrustedRoleEvidenceVerifier()
   evidenceAuthority = createFixtureEvidenceAuthority(evidenceResolver)
   observationCursor = 11
   return createOutcomeExecutionControlPlane({ ...options, evidenceResolver })
