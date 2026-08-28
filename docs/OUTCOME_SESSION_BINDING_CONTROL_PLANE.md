@@ -93,6 +93,7 @@ Private registry는 source control 밖의 권한 제한 파일 또는 향후 acc
 - `checkpoint`: content-addressed continuity handoff/receipt를 active binding에 연결
 
 CLI나 admin UI가 raw locator를 argv, URL, 일반 log에 기록하지 않는다. locator 입력은 private file descriptor, stdin 또는 protected provider adapter를 사용한다. `doctor` 외 mutation은 actor, reason, expected version과 audit event가 없으면 거절한다.
+Private locator 또는 secret-bearing stdin은 PTY를 절대 사용하지 않는다. mutation 전에 no-echo pipe, private file descriptor 또는 protected adapter임을 검증하지 못하면 `SAFE_HOLD`한다.
 
 ## Planner와 root routing 보호
 
