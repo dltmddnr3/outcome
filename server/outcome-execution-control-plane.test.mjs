@@ -7,18 +7,21 @@ import {
   ExecutionControlError,
   createOutcomeExecutionControlPlane,
 } from './outcome-execution-control-plane.mjs'
-import { createTrustedRoleEvidenceResolver } from './outcome-role-transport-evidence.mjs'
+import { createTrustedRoleEvidenceVerifier } from './outcome-role-transport-evidence.mjs'
+import { createFixtureEvidenceAuthority } from './outcome-role-transport-evidence-fixtures.test.mjs'
 
 const evidenceBindings = [
   ['outcome', 'planner', 2, 'outcome_planner'], ['outcome', 'builder', 1, 'outcome_builder'], ['outcome', 'ux_product_qa', 2, 'outcome_ux_product_qa'], ['outcome', 'release_audit', 2, 'outcome_release_audit'],
   ['cherry-note', 'builder', 1, 'cherry_note_builder'], ['second', 'builder', 1, 'outcome_builder'],
 ].map(([project_id, role, binding_version, public_alias]) => ({ project_id, role, binding_version, public_alias, state: 'active', destination_ref: `private-${project_id}-${role}` }))
-const evidenceResolver = createTrustedRoleEvidenceResolver({
-  bindings: evidenceBindings,
-  peer_threads: evidenceBindings.map(({ project_id, role, destination_ref }) => ({ project_id, role, destination_ref, observation_cursor: 1 })),
-  clock: () => 50,
-})
-const createPlane = (options) => createOutcomeExecutionControlPlane({ ...options, evidenceResolver })
+let evidenceResolver = createTrustedRoleEvidenceVerifier({ clock: () => 50 })
+let evidenceAuthority = createFixtureEvidenceAuthority(evidenceResolver)
+const createPlane = (options) => {
+  evidenceResolver = createTrustedRoleEvidenceVerifier({ clock: () => 50 })
+  evidenceAuthority = createFixtureEvidenceAuthority(evidenceResolver)
+  observationCursor = 11
+  return createOutcomeExecutionControlPlane({ ...options, evidenceResolver })
+}
 const startEvidence = new Map()
 const providerEvidence = new Map()
 let observationCursor = 10
@@ -54,7 +57,7 @@ const startCommand = (overrides = {}) => {
   ...overrides,
   }
   if (!Object.hasOwn(command, 'trusted_evidence')) {
-    try { command.trusted_evidence = evidenceResolver.resolveStart({ project_id: command.project_id, role: command.role, binding_version: command.expected_binding_version, public_alias: command.public_alias, instruction_id: command.instruction_id, attempt_id: command.attempt_id }) } catch { command.trusted_evidence = Object.freeze(Object.create(null)) }
+    try { command.trusted_evidence = evidenceAuthority.resolveStart({ project_id: command.project_id, role: command.role, binding_version: command.expected_binding_version, public_alias: command.public_alias, instruction_id: command.instruction_id, attempt_id: command.attempt_id }) } catch { command.trusted_evidence = Object.freeze(Object.create(null)) }
   }
   startEvidence.set(attemptKey(command), command.trusted_evidence)
   return command
@@ -65,9 +68,9 @@ const transition = (event, overrides = {}) => {
   delete command.receipt_observed; delete command.receipt_class
   const key = attemptKey(command)
   if (!Object.hasOwn(command, 'trusted_evidence') && event === 'dispatch_observed') {
-    try { command.trusted_evidence = evidenceResolver.providerSend(startEvidence.get(key), { observation_cursor: observationCursor++ }); providerEvidence.set(key, command.trusted_evidence) } catch { command.trusted_evidence = Object.freeze(Object.create(null)) }
+    try { const source = startEvidence.get(key); if (!source?.payload) throw new Error('missing start evidence'); const cursor = source.payload.project_id === 'cherry-note' ? 13 : observationCursor++; command.trusted_evidence = evidenceAuthority.providerSend(source, { observation_cursor: cursor }); providerEvidence.set(key, command.trusted_evidence) } catch { command.trusted_evidence = Object.freeze(Object.create(null)) }
   } else if (!Object.hasOwn(command, 'trusted_evidence') && event === 'execution_started') {
-    try { command.trusted_evidence = evidenceResolver.destinationStart(providerEvidence.get(key), { observation_cursor: observationCursor++, observation_kind: 'started' }) } catch { command.trusted_evidence = Object.freeze(Object.create(null)) }
+    try { const source = providerEvidence.get(key); if (!source?.payload) throw new Error('missing provider evidence'); const cursor = source.payload.project_id === 'cherry-note' ? 14 : observationCursor++; command.trusted_evidence = evidenceAuthority.destinationStart(source, { observation_cursor: cursor, observation_kind: 'started' }) } catch { command.trusted_evidence = Object.freeze(Object.create(null)) }
   }
   return command
 }
@@ -97,7 +100,7 @@ test('R2 exact public binding and peer-thread resolution fail closed atomically'
   assert.deepEqual(plane.start(startCommand({ public_alias: 'builder' })), { outcome: 'safe_hold', reason: 'binding_alias_mismatch' })
   for (const [trusted_evidence, expected] of [
     [Object.freeze(Object.create(null)), 'trusted_evidence_required'],
-    [evidenceResolver.resolveStart({ project_id: 'outcome', role: 'planner', binding_version: 2, public_alias: 'outcome_planner', instruction_id: 'synthetic_instruction_alpha', attempt_id: 'synthetic_attempt_1' }), 'trusted_evidence_mismatch'],
+    [evidenceAuthority.resolveStart({ project_id: 'outcome', role: 'planner', binding_version: 2, public_alias: 'outcome_planner', instruction_id: 'synthetic_instruction_alpha', attempt_id: 'synthetic_attempt_1' }), 'trusted_evidence_mismatch'],
   ]) {
     const before = plane.exportPrivateState()
     assert.throws(() => plane.start(startCommand({ trusted_evidence })), code(expected))

@@ -1,46 +1,43 @@
 import assert from 'node:assert/strict'
 import test from 'node:test'
-import { createTrustedRoleEvidenceResolver, isTrustedRoleEvidenceResolver } from './outcome-role-transport-evidence.mjs'
+import * as surface from './outcome-role-transport-evidence.mjs'
+import { createTrustedRoleEvidenceVerifier, isTrustedRoleEvidenceResolver } from './outcome-role-transport-evidence.mjs'
+import { createFixtureEvidenceAuthority } from './outcome-role-transport-evidence-fixtures.test.mjs'
+import { createOutcomeExecutionControlPlane } from './outcome-execution-control-plane.mjs'
 
 const facts = { project_id: 'outcome', role: 'builder', binding_version: 3, public_alias: 'builder_successor', instruction_id: 'instruction_alpha', attempt_id: 'attempt_alpha' }
-const fixture = ({ duplicate = false } = {}) => {
-  let now = 100
-  const binding = { project_id: 'outcome', role: 'builder', binding_version: 3, public_alias: 'builder_successor', state: 'active', destination_ref: 'private-destination' }
-  const thread = { project_id: 'outcome', role: 'builder', destination_ref: 'private-destination', observation_cursor: 7 }
-  const resolver = createTrustedRoleEvidenceResolver({ bindings: [binding], peer_threads: duplicate ? [thread, { ...thread }] : [thread], clock: () => now, ttl_ms: 10 })
-  return { resolver, tick(value) { now = value } }
-}
+const fixture = (clock = () => 100) => { const verifier = createTrustedRoleEvidenceVerifier({ clock }); return { verifier, authority: createFixtureEvidenceAuthority(verifier) } }
 
-test('T1 resolver requires exact-one binding and peer thread and rejects mismatch stale and replay', () => {
-  const { resolver, tick } = fixture()
-  assert.equal(isTrustedRoleEvidenceResolver(resolver), true)
-  const start = resolver.resolveStart(facts)
-  assert.throws(() => resolver.inspectStart(start, { ...facts, role: 'planner' }), /trusted_evidence_mismatch/)
-  assert.equal(resolver.inspectStart(start, facts).observation_cursor, 7)
-  resolver.commit(start)
-  assert.equal(resolver.inspectStart(start, facts).consumed, true)
-  assert.throws(() => resolver.commit(start), /trusted_evidence_replayed/)
-  const stale = resolver.resolveStart({ ...facts, attempt_id: 'attempt_stale' })
-  tick(111)
-  assert.throws(() => resolver.inspectStart(stale, { ...facts, attempt_id: 'attempt_stale' }), /trusted_evidence_stale/)
-  assert.throws(() => fixture({ duplicate: true }).resolver.resolveStart(facts), /trusted_resolution_failed/)
+test('T0 public surface cannot mint authority from invented binding and peer data', () => {
+  assert.equal(surface.createTrustedRoleEvidenceResolver, undefined)
+  assert.equal(surface.createTrustedRoleEvidenceAuthority, undefined)
+  const verifier = createTrustedRoleEvidenceVerifier({ clock: () => 100 })
+  const plane = createOutcomeExecutionControlPlane({ registry: { bindings: [{ project_id: 'outcome', role: 'builder', version: 3, state: 'active', health: 'fresh', public_alias: 'builder_successor', transport_class: 'codex_app_peer_thread' }] }, clock: () => 100, evidenceResolver: verifier })
+  const invented = { payload: { kind: 'start', ...facts, destination_key: 'invented', observation_cursor: 1, receipt_id: 'invented', issued_at: 0, expires_at: 1000 }, signature: 'invented' }
+  assert.throws(() => plane.start({ project_id: 'outcome', role: 'builder', instruction_id: 'instruction_alpha', attempt_id: 'attempt_alpha', expected_binding_version: 3, action: 'implement', risk_class: 'standard', source_state: 'matched', stage_gate_present: true, authority: 'within_scope', retry_of_attempt_id: null, transport_class: 'codex_app_peer_thread', public_alias: 'builder_successor', trusted_evidence: invented }), /trusted_evidence_required/)
+  assert.deepEqual(plane.exportPrivateState().events, [])
 })
 
-test('T2 provider and destination receipts require correlation and increasing fresh cursor', () => {
-  const { resolver } = fixture()
-  const start = resolver.resolveStart(facts)
-  assert.throws(() => resolver.providerSend(start, { observation_cursor: 8 }), /trusted_evidence_required/)
-  resolver.commit(start)
-  assert.throws(() => resolver.providerSend(start, { observation_cursor: 7 }), /trusted_evidence_stale/)
-  const provider = resolver.providerSend(start, { observation_cursor: 8 })
-  const expected = { ...facts, destination_key: resolver.inspectStart(start, facts).destination_key }
-  assert.throws(() => resolver.inspectProvider(provider, { ...expected, attempt_id: 'attempt_wrong' }), /trusted_evidence_mismatch/)
-  assert.throws(() => resolver.inspectDestination(provider, expected), /trusted_evidence_required/)
-  resolver.commit(provider)
-  assert.throws(() => resolver.destinationStart(provider, { observation_cursor: 8, observation_kind: 'started' }), /trusted_evidence_stale/)
-  assert.throws(() => resolver.destinationStart(provider, { observation_cursor: 9, observation_kind: 'prior_turn_started' }), /trusted_evidence_stale/)
-  const destination = resolver.destinationStart(provider, { observation_cursor: 9, observation_kind: 'new_turn' })
-  assert.equal(resolver.inspectDestination(destination, expected).observation_cursor, 9)
-  resolver.commit(destination)
-  assert.throws(() => resolver.commit(destination), /trusted_evidence_replayed/)
+test('T1 pinned verifier rejects mismatch, stale, tamper, and replay', () => {
+  const { verifier, authority } = fixture(); const start = authority.resolveStart(facts)
+  assert.equal(isTrustedRoleEvidenceResolver(verifier), true)
+  assert.throws(() => verifier.inspectStart(start, { ...facts, role: 'planner' }), /trusted_evidence_mismatch/)
+  assert.equal(verifier.inspectStart(start, facts).observation_cursor, 7)
+  const tampered = structuredClone(start); tampered.payload.role = 'planner'
+  assert.throws(() => verifier.inspectStart(tampered, { ...facts, role: 'planner' }), /trusted_evidence_required/)
+  verifier.commit(start); assert.equal(verifier.inspectStart(start, facts).consumed, true)
+  assert.throws(() => verifier.commit(start), /trusted_evidence_replayed/)
+  const stale = fixture(() => 1001)
+  assert.throws(() => stale.verifier.inspectStart(stale.authority.resolveStart(facts), facts), /trusted_evidence_stale/)
+})
+
+test('T2 signed provider and destination receipts preserve correlation and cursor', () => {
+  const { verifier, authority } = fixture(); const start = authority.resolveStart(facts); verifier.commit(start)
+  const provider = authority.providerSend(start, { observation_cursor: 8 })
+  const expected = { ...facts, destination_key: verifier.inspectStart(start, facts).destination_key }
+  assert.throws(() => verifier.inspectProvider(provider, { ...expected, attempt_id: 'attempt_wrong' }), /trusted_evidence_mismatch/)
+  verifier.commit(provider)
+  const destination = authority.destinationStart(provider, { observation_cursor: 9, observation_kind: 'new_turn' })
+  assert.equal(verifier.inspectDestination(destination, expected).observation_cursor, 9)
+  verifier.commit(destination); assert.throws(() => verifier.commit(destination), /trusted_evidence_replayed/)
 })

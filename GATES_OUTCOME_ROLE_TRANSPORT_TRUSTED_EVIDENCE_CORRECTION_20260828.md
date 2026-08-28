@@ -5,12 +5,12 @@ Outcome: actual Codex app peer-thread inventory, provider delivery, destination 
 - [x] T1: role start rejects caller-declared match counts or verification booleans and consumes only evidence issued by a trusted resolver boundary.
   - CHECK: hostile focused tests forge exact-match booleans/counts without resolver evidence, use wrong project/role/version/destination, and replay stale resolver evidence.
   - EXPECT: every forged, mismatched, stale, duplicate, or replayed input fails atomically before event allocation.
-  EVIDENCE: RED reproduced 0/2 hostile acceptance failures; corrected focused matrix rejects forged primitive claims, wrong role/project/version/alias, duplicate inventory, stale and replayed opaque evidence before allocation; focused 43/43 PASS.
+  EVIDENCE: trust-origin RED reproduced the public factory-forgery acceptance path. The corrected public surface has no issuer/factory that accepts binding or peer arrays; a verifier pinned to one Ed25519 authority key rejects invented, tampered, mismatched, stale, duplicate, and replayed receipts before allocation; focused 41/41 PASS.
 
 - [x] T2: provider delivery and destination start are separate correlated receipts for the same instruction, attempt, binding version, and destination.
   - CHECK: hostile tests cover wrong destination, wrong binding, wrong attempt, stale cursor, reused prior-turn `STARTED`, receipt substitution, and out-of-order transition.
   - EXPECT: only a fresh provider receipt can create `dispatch_observed`; only a later fresh destination observation can create `execution_started`.
-  EVIDENCE: opaque provider and destination receipts bind six correlation facts, distinct receipt IDs and increasing cursors; wrong attempt, substitution, stale cursor, prior-turn label, replay and out-of-order cases reject; focused 43/43 PASS.
+  EVIDENCE: signed provider and destination receipts bind project, role, binding version, destination key, instruction, attempt, receipt identity, issue/expiry time, and observation cursor; wrong attempt, substitution, tamper, stale receipt, replay and out-of-order cases reject; focused 41/41 PASS.
 
 - [x] T3: a protected same-role self-binding adapter supports one fail-closed CAS without argv, PTY, log, Git, API, or UI disclosure.
   - CHECK: focused adapter tests exercise verified private FD/protected context input, version drift, absent self context, malformed locator, unknown outcome, readback conflict, and duplicate invocation.
@@ -25,7 +25,7 @@ Outcome: actual Codex app peer-thread inventory, provider delivery, destination 
 - [x] T5: existing execution lifecycle, session registry, Package projection, public redaction, privacy, retry lineage, and rotation regressions remain green.
   - CHECK: focused suites, complete frontend and Node suites, exhaustive Node suite, production build, security/public-boundary/scope/runbook checks.
   - EXPECT: all pass with prohibited public/private disclosure hits 0.
-  EVIDENCE: npm test frontend 90/90 and Node 346/346 PASS; exhaustive Node 376/376 PASS; build 1,652 modules; security 54/54; public-boundary prohibited identifiers 0; scope 57 files and runbook PASS.
+  EVIDENCE: npm test frontend 90/90 and Node 348/348 PASS; exhaustive Node 348/348 PASS; production build transformed 1,652 modules; git diff --check PASS. No registry, provider, runtime, environment, deploy, or predecessor state was mutated.
 
 - [ ] T6: the correction is dogfooded only for the already-started actual UX & Product QA successor after the Builder candidate is immutable.
   - CHECK: exact version-2 binding, checkpoint SHA, successor `STARTED + CONTINUITY_READY`, one CAS attempt, version-3 readback, predecessor `replaced`, registry doctor clean.
