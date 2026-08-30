@@ -5,6 +5,7 @@ import { fileURLToPath } from 'node:url'
 import YAML from 'yaml'
 import { sanitizeEvidenceText, sanitizeRemotePayload } from './cherry-note-dashboard.mjs'
 import { isPublicSessionAlias, loadRegistry, publicRegistryProjection } from './outcome-session-registry-persistence.mjs'
+import { applyOutcomeModelV2Pilot } from './outcome-model-v2.mjs'
 
 const ROLES = ['planner', 'builder', 'ux_product_qa', 'release_audit']
 const STABLE_ID = /^[a-z0-9]+(?:-[a-z0-9]+)*$/
@@ -328,8 +329,10 @@ export function loadProjectRegistry({ environment = process.env, repositoryRoot 
 }
 
 export function collectOutcomePackages({ bindingRegistry = [], now = new Date(), environment, repositoryRoot } = {}) {
-  const definitions = loadProjectRegistry({ environment, repositoryRoot })
-  return { schemaVersion: 2, observedAt: now.toISOString(), projects: definitions.map((definition) => buildPackageModel({ ...definition, bindingRegistry, now })) }
+  const resolvedEnvironment = environment ?? process.env
+  const definitions = loadProjectRegistry({ environment: resolvedEnvironment, repositoryRoot })
+  const value = { schemaVersion: 2, observedAt: now.toISOString(), projects: definitions.map((definition) => buildPackageModel({ ...definition, bindingRegistry, now })) }
+  return applyOutcomeModelV2Pilot(value, { environment: resolvedEnvironment, source_revision: resolvedEnvironment.OUTCOME_MODEL_V2_SOURCE_REVISION, observed_at: value.observedAt })
 }
 
 export function projectPublicPackages(value) {
