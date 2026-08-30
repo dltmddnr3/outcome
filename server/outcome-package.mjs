@@ -340,6 +340,27 @@ export function projectPublicPackages(value) {
   for (const project of projected.projects ?? []) for (const phase of project.phases ?? []) for (const scope of phase.scopes ?? []) for (const stage of scope.stages ?? []) {
     if (Array.isArray(stage.gate?.gates)) stage.gate.gates = stage.gate.gates.map(({ evidence: _evidence, ...gate }) => gate)
   }
+  if (projected.modelV2?.schemaVersion === 2 && Array.isArray(projected.modelV2.projects)) projected.modelV2 = {
+    schemaVersion: 2,
+    authority: 'projection_only',
+    projects: projected.modelV2.projects.map((entry) => ({
+      project_id: entry.project_id,
+      graph: {
+        schema_version: 2,
+        project: { id: entry.graph?.project?.id },
+        destinations: (entry.graph?.destinations ?? []).map((row) => ({ id: row.id, project_id: row.project_id, depends_on: row.depends_on, primary: row.primary })),
+        milestones: (entry.graph?.milestones ?? []).map((row) => ({ id: row.id, destination_id: row.destination_id, depends_on: row.depends_on, predicate_ids: row.predicate_ids })),
+        acceptance_predicates: (entry.graph?.acceptance_predicates ?? []).map((row) => ({ id: row.id, milestone_id: row.milestone_id, authority: row.authority })),
+        evidence_claims: (entry.graph?.evidence_claims ?? []).map((row) => ({ id: row.id, predicate_id: row.predicate_id, freshness: row.freshness, reproducible: row.reproducible })),
+      },
+      projection: {
+        schema_version: 2, source_revision: entry.projection?.source_revision, observed_at: entry.projection?.observed_at, primary_destination: entry.projection?.primary_destination,
+        ready_frontier: entry.projection?.ready_frontier, progress: entry.projection?.progress, next_action: entry.projection?.next_action, cherry_action: entry.projection?.cherry_action,
+        stale: entry.projection?.stale, conflict: entry.projection?.conflict, blockers: entry.projection?.blockers, delivery_unknown_count: entry.projection?.delivery_unknown_count,
+        automatic_retry_count: entry.projection?.automatic_retry_count, verification_required: entry.projection?.verification_required,
+      },
+    })),
+  }
   return projected
 }
 

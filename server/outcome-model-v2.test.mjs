@@ -57,7 +57,8 @@ test('P7 candidate identity and verification trigger ignore no-semantic-delta hi
 
 test('P8 default-off returns the exact v1 object and enabled mode is projection-only', () => {
   const project = v1(); const collection = { schemaVersion: 2, observedAt: project.observedAt, projects: [project] }
-  assert.equal(applyOutcomeModelV2Pilot(collection, { environment: {} }), collection)
+  const bytes = JSON.stringify(collection)
+  for (const flag of [undefined, 'true', '01', ' 1', '1 ']) { const environment = flag === undefined ? {} : { OUTCOME_MODEL_V2_ENABLED: flag }; assert.equal(applyOutcomeModelV2Pilot(collection, { environment }), collection); assert.equal(JSON.stringify(collection), bytes) }
   const enabled = applyOutcomeModelV2Pilot(collection, { environment: { OUTCOME_MODEL_V2_ENABLED: '1' }, source_revision: source })
   assert.equal(enabled.modelV2.authority, 'projection_only'); assert.equal(Object.hasOwn(collection, 'modelV2'), false)
 })
@@ -72,4 +73,23 @@ test('S3 correction handoff and status artifacts stay outside active graph while
   const input = v1(); input.corrections = [{ id: 'correction-one' }]; input.handoffs = [{ id: 'handoff-one' }]; input.status_history = [{ id: 'status-one' }]
   const translated = translateV1Package(input); const serialized = JSON.stringify(translated)
   assert.doesNotMatch(serialized, /correction-one|handoff-one|status-one/); assert.match(JSON.stringify(input), /correction-one|handoff-one|status-one/)
+})
+
+test('D1 rejects every accepted Proxy before any trap or adapter callback executes', () => {
+  let traps = 0; let callbacks = 0
+  const proxied = (value) => new Proxy(value, { get() { traps += 1; return undefined }, ownKeys() { traps += 1; return [] }, getOwnPropertyDescriptor() { traps += 1; return undefined }, getPrototypeOf() { traps += 1; return null } })
+  const variants = []
+  for (const key of ['project', 'destinations', 'milestones', 'acceptance_predicates', 'evidence_claims']) variants.push({ ...graph(), [key]: proxied(graph()[key]) })
+  variants.push({ ...graph(), destinations: [proxied(graph().destinations[0])] }, { ...graph(), milestones: [proxied(graph().milestones[0])] }, { ...graph(), acceptance_predicates: [proxied(graph().acceptance_predicates[0])] }, { ...graph(), evidence_claims: [proxied({ id: 'claim-one', predicate_id: 'predicate-one', source_ref: 'source', producer: 'builder', freshness: 'source-pinned', reproducible: true })] })
+  for (const value of [proxied(graph()), ...variants]) assert.throws(() => validateOutcomeGraph(value), /proxy_forbidden/)
+  const projectionBase = { graph: graph(), source_revision: source, observed_at: '2026-08-31T00:00:00.000Z' }
+  const work = { id: 'work-one', milestone_id: 'milestone-one', fingerprint: 'same', acceptance_gap_delta: 1, uncertainty_delta: 0, blocker_delta: 0, user_value_delta: 1, reversible: true, cost: 1 }
+  const attempt = { id: 'attempt-one', work_id: 'work-one', fingerprint: 'same', state: 'delivery_unknown', automatic_retry_count: 0 }
+  const lease = { work_id: 'work-one', key: 'builder', expires_at: '2026-09-01T00:00:00.000Z' }
+  const history = { candidate_identity: 'candidate-one', semantic_delta: true, verified: false }
+  assert.throws(() => projectOutcomeV2(proxied(projectionBase)), /proxy_forbidden/)
+  for (const overrides of [{ work_items: [proxied(work)] }, { attempts: [proxied(attempt)] }, { leases: [proxied(lease)] }, { mission_envelope: proxied({ expires_at: '2026-09-01T00:00:00.000Z' }) }, { verification_history: [proxied(history)] }]) assert.throws(() => projectOutcomeV2({ ...projectionBase, ...overrides }), /proxy_forbidden/)
+  const adapter = createCodexRuntimeAdapter({ selectNext() { callbacks += 1 }, start() { callbacks += 1 }, transition() { callbacks += 1 }, projectPublic() { callbacks += 1 } })
+  for (const invoke of [() => adapter.select(proxied([])), () => adapter.select([{ command: proxied({}) }]), () => adapter.startValidated(proxied({})), () => adapter.recordObserved(proxied({})), () => adapter.recordEvidenceEvaluation(proxied({}))]) assert.throws(invoke, /proxy_forbidden/)
+  assert.equal(traps, 0); assert.equal(callbacks, 0)
 })
