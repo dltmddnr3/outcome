@@ -63,7 +63,7 @@ export function AccountWorkspace({ state = 'unavailable', workspace, ownerVerifi
       {sessionPresent && onLogout && <button className="account-workspace__loading-cancel" type="button" data-private-logout="true" onClick={() => void transition('logout', onLogout)}>로그인 취소</button>}
     </section>
   </main>
-  if (state === 'ready' && workspace?.dashboard) return <OutcomeDashboard initialData={workspace.dashboard} onUnauthorized={() => undefined} onLogout={onLogout} />
+  if (state === 'ready' && workspace?.dashboard) return <OutcomeDashboard initialData={workspace.dashboard} privateProjects={projects} onUnauthorized={() => undefined} onLogout={onLogout} />
   return <main className="account-workspace" data-account-state={state} data-completion-authority="false">
     <header className="account-workspace__header">
       <div><span className="account-workspace__eyebrow">OUTCOME · 비공개</span><h1>Cherry 전용 비공개 워크스페이스</h1></div>
@@ -87,12 +87,20 @@ export function AccountWorkspace({ state = 'unavailable', workspace, ownerVerifi
     </section>
     {state === 'ready' && project && <section className="account-workspace__ready" aria-label="비공개 프로젝트 결과 위계">
       <nav className="account-workspace__projects" aria-label="비공개 프로젝트 전환">{projects.map((item) => <button type="button" key={item.project.id} data-private-project={item.project.id} aria-pressed={item.project.id === project.project.id} onClick={() => chooseProject(item)}>{item.project.name}</button>)}</nav>
-      <div className="account-workspace__position"><p data-private-actual><strong>실제 현재</strong><span>{actual}</span></p><p data-private-selected><strong>선택 위치</strong><span>{selected}</span></p></div>
-      <div className="account-workspace__hierarchy">
-        <section><h3>페이즈</h3>{project.phases.map((item) => <button type="button" key={item.id} data-private-phase={item.id} aria-selected={item.id === phase?.id} aria-current={item.id === project.current.phaseId ? 'step' : undefined} data-actual-current={item.id === project.current.phaseId} onClick={() => choosePhase(item.id)}>{item.title}{item.id === project.current.phaseId && <em>실제 현재</em>}</button>)}</section>
-        <section><h3>범위</h3>{phase?.scopes.map((item) => <button type="button" key={item.id} data-private-scope={item.id} aria-selected={item.id === scope?.id} aria-current={item.id === project.current.scopeId ? 'step' : undefined} data-actual-current={item.id === project.current.scopeId} onClick={() => chooseScope(item.id)}>{item.title}{item.id === project.current.scopeId && <em>실제 현재</em>}</button>)}</section>
-        <section><h3>스테이지</h3>{scope?.stages.map((item) => <button type="button" key={item.id} data-private-stage={item.id} aria-selected={item.id === stage?.id} aria-current={item.id === project.current.stageId ? 'step' : undefined} data-actual-current={item.id === project.current.stageId} onClick={() => chooseStage(item.id)}>{item.title}{item.id === project.current.stageId && <em>실제 현재</em>}</button>)}</section>
-        <section className="account-workspace__gates"><h3>완료 조건</h3>{stage?.gate?.gates?.length ? <ol>{stage.gate.gates.map((gate) => <li key={gate.id} data-gate-closed={gate.closed}><b>{gate.id}</b><span>{gate.title}</span><em>{gate.closed ? '확인됨' : '확인 대기'}</em></li>)}</ol> : <p>완료 조건 근거 없음</p>}</section>
+      <div className="account-workspace__regions">
+        {project.modelV2 ? <CurrentProjection projection={project.modelV2} /> : <section className="current-projection current-projection--missing" role="status"><h2>Current Projection을 표시할 수 없습니다</h2><p>서버가 검증한 Model v2 projection이 없어 v1 정보로 대신 계산하지 않습니다.</p></section>}
+        <details className="account-workspace__compatibility">
+          <summary><span>v1 호환 정보</span><small>역할·기술 근거는 필요할 때만 확인</small></summary>
+          <div className="account-workspace__compatibility-content">
+            <div className="account-workspace__position"><p data-private-actual><strong>실제 현재</strong><span>{actual}</span></p><p data-private-selected><strong>선택 위치</strong><span>{selected}</span></p></div>
+            <div className="account-workspace__hierarchy">
+              <section><h3>페이즈</h3>{project.phases.map((item) => <button type="button" key={item.id} data-private-phase={item.id} aria-selected={item.id === phase?.id} aria-current={item.id === project.current.phaseId ? 'step' : undefined} data-actual-current={item.id === project.current.phaseId} onClick={() => choosePhase(item.id)}>{item.title}{item.id === project.current.phaseId && <em>실제 현재</em>}</button>)}</section>
+              <section><h3>범위</h3>{phase?.scopes.map((item) => <button type="button" key={item.id} data-private-scope={item.id} aria-selected={item.id === scope?.id} aria-current={item.id === project.current.scopeId ? 'step' : undefined} data-actual-current={item.id === project.current.scopeId} onClick={() => chooseScope(item.id)}>{item.title}{item.id === project.current.scopeId && <em>실제 현재</em>}</button>)}</section>
+              <section><h3>스테이지</h3>{scope?.stages.map((item) => <button type="button" key={item.id} data-private-stage={item.id} aria-selected={item.id === stage?.id} aria-current={item.id === project.current.stageId ? 'step' : undefined} data-actual-current={item.id === project.current.stageId} onClick={() => chooseStage(item.id)}>{item.title}{item.id === project.current.stageId && <em>실제 현재</em>}</button>)}</section>
+              <section className="account-workspace__gates"><h3>완료 조건</h3>{stage?.gate?.gates?.length ? <ol>{stage.gate.gates.map((gate) => <li key={gate.id} data-gate-closed={gate.closed}><b>{gate.id}</b><span>{gate.title}</span><em>{gate.closed ? '확인됨' : '확인 대기'}</em></li>)}</ol> : <p>완료 조건 근거 없음</p>}</section>
+            </div>
+          </div>
+        </details>
       </div>
     </section>}
     <footer>
@@ -103,4 +111,5 @@ export function AccountWorkspace({ state = 'unavailable', workspace, ownerVerifi
 }
 import { type ReactNode, useState } from 'react'
 import type { PrivateProjectProjection, PrivateWorkspaceView } from '../lib/api'
+import { CurrentProjection } from './CurrentProjection'
 import { OutcomeDashboard } from './OutcomeDashboard'

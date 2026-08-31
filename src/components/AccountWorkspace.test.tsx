@@ -5,9 +5,10 @@ import deploymentFixture from '../../snapshot/outcome-package-source.json'
 import type { OutcomeDashboardData } from './OutcomeDashboard'
 
 const render = (state: keyof typeof accountWorkspaceStateCopy) => renderToStaticMarkup(<AccountWorkspace state={state} />)
+const modelV2 = (id: string, label: string) => ({ schemaVersion: 1 as const, modelVersion: 2 as const, project: { id, label }, destination: { id: `${id}-destination`, label: `${label} Destination` }, remainingAcceptanceGap: { remaining: 2, total: 5 }, now: { observedAt: '2026-08-31T08:00:00.000Z', state: 'ready' as const }, readyBoundary: [`${label} next boundary`], nextAction: `${label} next action`, cherryAction: `${label} Cherry action`, state: 'ready' as const, events: [] })
 const readyWorkspace = { projects: [
-  { project: { id: 'cherry-note', name: 'Cherry Note' }, phases: [{ id: 'cherry-phase', title: '체리 단계', scopes: [{ id: 'cherry-scope', title: '체리 범위', stages: [{ id: 'cherry-current', title: '체리 현재', gate: { gates: [{ id: 'C1', title: '체리 완료 조건', closed: false }] } }, { id: 'cherry-selected', title: '체리 선택', gate: { gates: [{ id: 'C2', title: '선택 완료 조건', closed: true }] } }] }] }], current: { phaseId: 'cherry-phase', scopeId: 'cherry-scope', stageId: 'cherry-current' } },
-  { project: { id: 'outcome', name: 'OUTCOME' }, phases: [{ id: 'outcome-phase', title: '아웃컴 단계', scopes: [{ id: 'outcome-scope', title: '아웃컴 범위', stages: [{ id: 'outcome-current', title: '아웃컴 현재', gate: { gates: [{ id: 'O1', title: '아웃컴 완료 조건', closed: false }] } }] }] }], current: { phaseId: 'outcome-phase', scopeId: 'outcome-scope', stageId: 'outcome-current' } },
+  { project: { id: 'cherry-note', name: 'Cherry Note' }, phases: [{ id: 'cherry-phase', title: '체리 단계', scopes: [{ id: 'cherry-scope', title: '체리 범위', stages: [{ id: 'cherry-current', title: '체리 현재', gate: { gates: [{ id: 'C1', title: '체리 완료 조건', closed: false }] } }, { id: 'cherry-selected', title: '체리 선택', gate: { gates: [{ id: 'C2', title: '선택 완료 조건', closed: true }] } }] }] }], current: { phaseId: 'cherry-phase', scopeId: 'cherry-scope', stageId: 'cherry-current' }, modelV2: modelV2('cherry-note', 'Cherry Note') },
+  { project: { id: 'outcome', name: 'OUTCOME' }, phases: [{ id: 'outcome-phase', title: '아웃컴 단계', scopes: [{ id: 'outcome-scope', title: '아웃컴 범위', stages: [{ id: 'outcome-current', title: '아웃컴 현재', gate: { gates: [{ id: 'O1', title: '아웃컴 완료 조건', closed: false }] } }] }] }], current: { phaseId: 'outcome-phase', scopeId: 'outcome-scope', stageId: 'outcome-current' }, modelV2: modelV2('outcome', 'OUTCOME') },
 ] }
 
 describe('account workspace presentation contract', () => {
@@ -54,19 +55,34 @@ describe('account workspace presentation contract', () => {
     const html = renderToStaticMarkup(<AccountWorkspace state="ready" workspace={readyWorkspace} />)
     expect(html.match(/data-private-project=/g)).toHaveLength(2)
     for (const label of ['프로젝트', '페이즈', '범위', '스테이지', '완료 조건', '실제 현재']) expect(html).toContain(label)
+    expect(html).toContain('Current Projection')
+    expect(html).toContain('Cherry Note Destination')
+    expect(html).toContain('<details class="account-workspace__compatibility">')
+    expect(html).not.toContain('<details class="account-workspace__compatibility" open="">')
     expect(html).toContain('aria-current="step"')
     expect(html).toContain('aria-selected="true"')
   })
 
-  it('비공개 snapshot envelope가 있으면 기존 OUTCOME 사이드바와 프로젝트 여정을 그대로 사용한다', () => {
+  it('비공개 snapshot envelope는 기존 sidebar를 유지하고 Model v2를 primary로 표시한다', () => {
     const dashboard = { ...deploymentFixture, build: { repository: 'test/repo', ref: 'test', commit: null, tree: null, asset: null, runtimeNowPinned: false } } as unknown as OutcomeDashboardData
     const html = renderToStaticMarkup(<AccountWorkspace state="ready" workspace={{ ...readyWorkspace, dashboard }} onLogout={async () => {}} />)
     expect(html).toContain('oc-global-nav')
     expect(html).toContain('oc-project-switcher')
     expect(html).toContain('프로젝트 여정')
+    expect(html).toContain('Current Projection')
+    expect(html).toContain('<details class="oc-v1-compatibility">')
+    expect(html).not.toContain('<details class="oc-v1-compatibility" open="">')
     expect(html.match(/data-private-project=/g)).toHaveLength(2)
     expect(html).toContain('data-private-logout="true"')
     expect(html).not.toContain('account-workspace__ready')
+  })
+
+  it('Model v2가 없는 legacy dashboard envelope는 기존 shell을 그대로 연다', () => {
+    const dashboard = { ...deploymentFixture, build: { repository: 'test/repo', ref: 'test', commit: null, tree: null, asset: null, runtimeNowPinned: false } } as unknown as OutcomeDashboardData
+    const legacyProjects = readyWorkspace.projects.map(({ modelV2: _modelV2, ...project }) => project)
+    const html = renderToStaticMarkup(<AccountWorkspace state="ready" workspace={{ projects: legacyProjects, dashboard }} />)
+    expect(html).toContain('<details class="oc-v1-compatibility" open="">')
+    expect(html).not.toContain('Current Projection')
   })
 
   it('login은 실제 OAuth가 아닌 주입 어댑터 전환을 명시하고 ready에는 로그아웃이 있다', () => {
