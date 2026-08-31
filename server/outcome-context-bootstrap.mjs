@@ -8,8 +8,8 @@ const PRIVATE_ID_CLASS = /(?:^|-)(?:thread|session|task|turn)(?:-id)?(?:-|$)/
 const PLAIN = Object.getPrototypeOf({})
 const DEFAULT_EXCLUSIONS = Object.freeze(['historical_gate_families', 'correction_chains', 'raw_conversation', 'roadmap_2', 'unrelated_skills'])
 const CURRENT_GATE = 'GATES_OUTCOME_MODEL_V2_LOCAL_DEFAULT_AND_SERVICE_PROJECTION.md'
-const CURRENT_HANDOFFS = new Set(['docs/OUTCOME_MODEL_V2_LOCAL_DEFAULT_CONTEXT_CANARY_BUILDER_HANDOFF.md', 'docs/OUTCOME_MODEL_V2_LOCAL_DEFAULT_CONTEXT_CANARY_QA_CORRECTION_BUILDER_HANDOFF.md'])
-const EXPANSION_SOURCES = new Set(['docs/OUTCOME_CONTRACT.md', 'docs/OUTCOME_MAP.md', 'docs/OUTCOME_MODEL_V2_LOCAL_DEFAULT_AND_SERVICE_PROJECTION_CONTRACT.md', 'docs/OUTCOME_MODEL_V2_LOCAL_DEFAULT_CONTEXT_CANARY_FRESH_QA_RECEIPT.md'])
+const CURRENT_HANDOFF = 'docs/OUTCOME_MODEL_V2_LOCAL_DEFAULT_CONTEXT_SELECTOR_BOUNDARY_CORRECTION_BUILDER_HANDOFF.md'
+const EXPANSION_SOURCES = new Set(['docs/OUTCOME_CONTRACT.md', 'docs/OUTCOME_MAP.md', 'docs/OUTCOME_MODEL_V2_LOCAL_DEFAULT_AND_SERVICE_PROJECTION_CONTRACT.md', 'docs/OUTCOME_MODEL_V2_LOCAL_DEFAULT_CONTEXT_CANARY_FRESH_QA_RECEIPT.md', 'docs/OUTCOME_MODEL_V2_LOCAL_DEFAULT_CONTEXT_CANARY_MANIFEST_RECOMPILE_FRESH_REQA_RECEIPT.md'])
 const ROLE_SKILLS = new Set(['mango-implementation-engineer'])
 const GATE_PREDICATES = Object.freeze(['D1', 'D2', 'A1', 'A2', 'A3', 'A4', 'Q1', 'B1', 'B2', 'B3', 'Q2', 'A5', 'C1'])
 
@@ -29,12 +29,13 @@ const record = (value, code = 'invalid_bootstrap_shape') => {
 }
 const exact = (value, keys, code = 'invalid_bootstrap_shape') => {
   record(value, code)
-  const actual = Object.keys(value)
+  if (Object.getOwnPropertySymbols(value).length) throw new Error(code)
+  const actual = Object.getOwnPropertyNames(value)
   if (actual.length !== keys.length || actual.some((key) => !keys.includes(key))) throw new Error(code)
   return value
 }
 const array = (value, code = 'invalid_bootstrap_shape') => {
-  if (!Array.isArray(value) || Object.keys(value).length !== value.length) throw new Error(code)
+  if (!Array.isArray(value) || Object.getOwnPropertySymbols(value).length || Object.getOwnPropertyNames(value).length !== value.length + 1 || Object.keys(value).length !== value.length) throw new Error(code)
   return value
 }
 const safeId = (value, code = 'invalid_bootstrap_id') => {
@@ -52,6 +53,7 @@ const freeze = (value) => {
 }
 const digestMap = (value) => {
   record(value, 'invalid_source_digests')
+  if (Object.getOwnPropertySymbols(value).length || Object.getOwnPropertyNames(value).length !== Object.keys(value).length) throw new Error('invalid_source_digests')
   const entries = Object.entries(value).sort(([left], [right]) => left.localeCompare(right))
   if (!entries.length || entries.some(([key, digest]) => { try { safeId(key, 'invalid_source_digests') } catch { return true }; return !SHA256.test(digest) })) throw new Error('invalid_source_digests')
   return Object.fromEntries(entries)
@@ -85,7 +87,7 @@ export function compileOutcomeContextBootstrap(value) {
     next_action: projection.next_action,
     cherry_action: projection.cherry_action,
     current_gate_ref: value.current_gate_ref === CURRENT_GATE ? value.current_gate_ref : (() => { throw new Error('non_current_gate_forbidden') })(),
-    current_handoff_ref: CURRENT_HANDOFFS.has(value.current_handoff_ref) ? value.current_handoff_ref : (() => { throw new Error('non_current_handoff_forbidden') })(),
+    current_handoff_ref: value.current_handoff_ref === CURRENT_HANDOFF ? value.current_handoff_ref : (() => { throw new Error('non_current_handoff_forbidden') })(),
   }
   return freeze({ ...content, snapshot_digest: createHash('sha256').update(stable(content)).digest('hex') })
 }
@@ -94,6 +96,8 @@ export function validateOutcomeContextBootstrap(snapshot, expectedSourceDigests)
   rejectProxyTree(snapshot); rejectProxyTree(expectedSourceDigests)
   exact(snapshot, ['schema_version', 'source_digests', 'destination_version', 'primary_destination', 'acceptance_gap', 'ready_frontier', 'active_work', 'next_action', 'cherry_action', 'current_gate_ref', 'current_handoff_ref', 'snapshot_digest'])
   if (snapshot.schema_version !== 1 || !SHA256.test(snapshot.snapshot_digest)) throw new Error('invalid_bootstrap_snapshot')
+  exact(snapshot.acceptance_gap, ['remaining', 'closed', 'total'], 'invalid_acceptance_gap')
+  if (snapshot.acceptance_gap.remaining !== snapshot.acceptance_gap.total - snapshot.acceptance_gap.closed) throw new Error('invalid_acceptance_gap')
   const recompiled = compileOutcomeContextBootstrap({
     source_digests: snapshot.source_digests,
     destination_version: snapshot.destination_version,
@@ -109,6 +113,8 @@ export function validateOutcomeContextBootstrap(snapshot, expectedSourceDigests)
 
 export function selectOutcomeBootstrapContext(snapshot, value) {
   rejectProxyTree(snapshot); rejectProxyTree(value)
+  const snapshotValidation = validateOutcomeContextBootstrap(snapshot, snapshot.source_digests)
+  if (snapshotValidation.outcome !== 'ready') throw new Error('invalid_bootstrap_snapshot')
   exact(value, ['role_skill', 'expansions'])
   const roleSkill = safeId(value.role_skill)
   if (!ROLE_SKILLS.has(roleSkill)) throw new Error('unrelated_skill_forbidden')

@@ -9,7 +9,7 @@ const input = () => ({
   projection: { primary_destination: 'destination-one', progress: { closed: 1, total: 4 }, ready_frontier: ['milestone-one'], next_action: 'work-one', cherry_action: null },
   active_work: { work_id: 'work-one', state: 'execution-started' },
   current_gate_ref: 'GATES_OUTCOME_MODEL_V2_LOCAL_DEFAULT_AND_SERVICE_PROJECTION.md',
-  current_handoff_ref: 'docs/OUTCOME_MODEL_V2_LOCAL_DEFAULT_CONTEXT_CANARY_BUILDER_HANDOFF.md',
+  current_handoff_ref: 'docs/OUTCOME_MODEL_V2_LOCAL_DEFAULT_CONTEXT_SELECTOR_BOUNDARY_CORRECTION_BUILDER_HANDOFF.md',
 })
 
 test('A2 bootstrap is deterministic content addressed and contains only the selective projection', () => {
@@ -76,7 +76,7 @@ test('Q1 F1 private identifier classes fail in every projectable identifier fiel
 })
 
 test('Q1 F2 pinned source Gate and evidence drift require cold compile with no retry', () => {
-  const expected = { agents: digest('a'), contract: digest('b'), map: digest('c'), 'slice-contract': digest('d'), gate: digest('e'), handoff: digest('f'), 'manifest-handoff': digest('1'), 'qa-receipt': digest('2'), 'reqa-receipt': digest('3') }
+  const expected = { agents: digest('a'), contract: digest('b'), map: digest('c'), 'slice-contract': digest('d'), gate: digest('e'), handoff: digest('f'), 'qa-receipt': digest('1'), 'latest-qa-receipt': digest('2') }
   assert.deepEqual(validateOutcomeSourceManifest(expected, expected), { outcome: 'ready', automatic_retry_count: 0 })
   for (const key of Object.keys(expected)) assert.deepEqual(validateOutcomeSourceManifest({ ...expected, [key]: digest('9') }, expected), { outcome: 'cold_compile_required', reason: 'source_digest_drift', automatic_retry_count: 0 })
 })
@@ -88,4 +88,33 @@ test('Q1 F2 complete current Gate keeps Q1 ready until independent QA evidence p
   assert.equal(failed.length, 13); assert.equal(failed.find((row) => row.id === 'Q1').closed, false); assert.deepEqual(failed.find((row) => row.id === 'B1').depends_on, ['Q1'])
   const passed = compileCurrentGateFrontier(gate, 'Status: `PASS_INDEPENDENT_UX_PRODUCT_QA_ONLY`')
   assert.equal(passed.find((row) => row.id === 'Q1').closed, true)
+})
+
+test('Q1 F1-R direct selector rejects forged snapshots before denied sources serialize', () => {
+  const snapshot = compileOutcomeContextBootstrap(input())
+  const forged = { ...snapshot, primary_destination: 'thread-id', current_gate_ref: 'GATES_PHASE3_HISTORICAL.md', current_handoff_ref: 'docs/raw-conversation.md' }
+  assert.throws(() => selectOutcomeBootstrapContext(forged, { role_skill: 'mango-implementation-engineer', expansions: [] }))
+  for (const value of [
+    { ...snapshot, primary_destination: 'thread-id' },
+    { ...snapshot, next_action: '123e4567-e89b-42d3-a456-426614174000' },
+    { ...snapshot, ready_frontier: [digest('a')] },
+    { ...snapshot, acceptance_gap: { ...snapshot.acceptance_gap, hidden: 'docs/raw-conversation.md' } },
+  ]) assert.throws(() => selectOutcomeBootstrapContext(value, { role_skill: 'mango-implementation-engineer', expansions: [] }))
+})
+
+test('Q1 F1-R direct selector rejects accessors Proxies symbols and hidden descriptors before traps', () => {
+  const snapshot = compileOutcomeContextBootstrap(input()); let traps = 0
+  const accessor = { ...snapshot }; Object.defineProperty(accessor, 'current_gate_ref', { enumerable: true, get() { traps += 1; return 'GATES_PHASE3_HISTORICAL.md' } })
+  const proxy = new Proxy(snapshot, { get() { traps += 1 }, ownKeys() { traps += 1 } })
+  const symbol = { ...snapshot, [Symbol('hidden')]: 'docs/raw-conversation.md' }
+  const hidden = { ...snapshot }; Object.defineProperty(hidden, 'hidden', { value: 'docs/raw-conversation.md' })
+  for (const value of [accessor, proxy, symbol, hidden]) assert.throws(() => selectOutcomeBootstrapContext(value, { role_skill: 'mango-implementation-engineer', expansions: [] }))
+  assert.equal(traps, 0)
+})
+
+test('Q1 F1-R compiler snapshot preserves selector semantic output', () => {
+  const snapshot = compileOutcomeContextBootstrap(input())
+  const selected = selectOutcomeBootstrapContext(snapshot, { role_skill: 'mango-implementation-engineer', expansions: [] })
+  assert.deepEqual(selected.loaded_sources, ['AGENTS.md', 'active-bootstrap-snapshot', input().current_gate_ref, input().current_handoff_ref, 'skill:karpathy-guidelines', 'skill:unlazy', 'skill:mango-implementation-engineer'])
+  assert.equal(selected.expansion_count, 0)
 })
