@@ -97,6 +97,56 @@ export function coherentCandidateIdentity(value) {
   return createHash('sha256').update(canonical).digest('hex')
 }
 
+class CompiledOutcomeV2Snapshot {
+  constructor({ graph, projection, sourceRevision, candidateIdentity, observedAt }) {
+    this.schema_version = 2; this.graph = graph; this.projection = projection; this.source_revision = sourceRevision; this.candidate_identity = candidateIdentity; this.observed_at = observedAt
+    Object.freeze(this)
+  }
+}
+
+export function compileOutcomeV2Snapshot(value) {
+  rejectProxyTree(value)
+  exactKeys(value, ['v1_package', 'source_revision', 'observed_at', 'candidate'])
+  const graph = translateV1Package(value.v1_package)
+  const candidateIdentity = coherentCandidateIdentity(value.candidate)
+  const projection = projectOutcomeV2({ graph, source_revision: value.source_revision, observed_at: value.observed_at })
+  return new CompiledOutcomeV2Snapshot({ graph, projection, sourceRevision: value.source_revision, candidateIdentity, observedAt: value.observed_at })
+}
+
+export function startOutcomeV2FromSnapshot(snapshot, value) {
+  if (isProxy(snapshot)) throw new Error('proxy_forbidden')
+  rejectProxyTree(value)
+  if (!(snapshot instanceof CompiledOutcomeV2Snapshot) || !Object.isFrozen(snapshot)) throw new Error('invalid_compiled_snapshot')
+  exactKeys(value, ['expected_source_revision', 'candidate_identity', 'observed_at', 'authority_state', 'work_items', 'attempts', 'leases', 'mission_envelope'])
+  if (value.expected_source_revision !== snapshot.source_revision) return frozen({ outcome: 'cold_compile_required', reason: 'source_revision_drift', automatic_retry_count: 0 })
+  if (value.candidate_identity !== snapshot.candidate_identity) return frozen({ outcome: 'cold_compile_required', reason: 'candidate_identity_drift', automatic_retry_count: 0 })
+  const now = Date.parse(value.observed_at); if (!Number.isFinite(now)) throw new Error('invalid_observed_at')
+  if (value.authority_state !== 'active') return frozen({ outcome: 'decision_required', cherry_action: 'renew_mission_envelope', automatic_retry_count: 0 })
+  const envelope = value.mission_envelope
+  if (envelope !== null && (!ownRecord(envelope) || !Number.isFinite(Date.parse(envelope.expires_at)) || Date.parse(envelope.expires_at) <= now)) return frozen({ outcome: 'decision_required', cherry_action: 'renew_mission_envelope', automatic_retry_count: 0 })
+  const attempts = array(value.attempts, 'invalid_attempts')
+  for (const attempt of attempts) exactKeys(attempt, ['id', 'work_id', 'fingerprint', 'state', 'automatic_retry_count'])
+  if (attempts.some((attempt) => attempt.automatic_retry_count !== 0)) throw new Error('automatic_retry_forbidden')
+  if (attempts.some((attempt) => attempt.state === 'delivery_unknown')) return frozen({ outcome: 'decision_required', cherry_action: 'resolve_delivery_unknown', automatic_retry_count: 0 })
+  const activeFingerprints = new Set(attempts.filter((attempt) => !['blocked', 'failed', 'transition_committed', 'transition_rejected'].includes(attempt.state)).map((attempt) => attempt.fingerprint))
+  const leaseKeys = new Set()
+  for (const lease of array(value.leases, 'invalid_leases')) {
+    exactKeys(lease, ['work_id', 'key', 'expires_at'])
+    if (Date.parse(lease.expires_at) > now) { if (leaseKeys.has(lease.key)) return frozen({ outcome: 'decision_required', cherry_action: 'resolve_blocker', automatic_retry_count: 0 }); leaseKeys.add(lease.key) }
+  }
+  const ready = new Set(snapshot.projection.ready_frontier); const seen = new Set(); let selected = null; let zeroDeltaCount = 0
+  for (const item of array(value.work_items, 'invalid_work_items')) {
+    exactKeys(item, ['id', 'milestone_id', 'fingerprint', 'acceptance_gap_delta', 'uncertainty_delta', 'blocker_delta', 'user_value_delta', 'reversible', 'cost'])
+    if (seen.has(item.fingerprint)) return frozen({ outcome: 'decision_required', cherry_action: 'resolve_blocker', automatic_retry_count: 0 })
+    seen.add(item.fingerprint)
+    const hasDelta = [item.acceptance_gap_delta, item.uncertainty_delta, item.blocker_delta, item.user_value_delta].some((delta) => delta > 0)
+    if (!hasDelta) { zeroDeltaCount += 1; continue }
+    if (!selected && ready.has(item.milestone_id) && !activeFingerprints.has(item.fingerprint)) selected = item
+  }
+  if (!selected) return frozen({ outcome: 'decision_required', cherry_action: zeroDeltaCount ? 'review_no_outcome_delta' : 'resolve_blocker', automatic_retry_count: 0 })
+  return frozen({ outcome: 'started', state: 'start_validated', work_id: selected.id, fingerprint: selected.fingerprint, automatic_retry_count: 0 })
+}
+
 export function projectOutcomeV2(value) {
   rejectProxyTree(value)
   const { graph: input, source_revision, expected_source_revision = source_revision, observed_at, work_items = [], attempts = [], mission_envelope = null, leases = [], verification_history = [] } = value
@@ -128,7 +178,7 @@ export function applyOutcomeModelV2Pilot(value, options = {}) {
   rejectProxyTree(value); rejectProxyTree(options)
   const { environment = process.env, source_revision, observed_at = value.observedAt } = options
   if (environment.OUTCOME_MODEL_V2_ENABLED !== '1') return value
-  const projects = array(value.projects, 'invalid_package_collection').map((project) => ({ project_id: project.project.id, graph: translateV1Package(project), projection: projectOutcomeV2({ graph: translateV1Package(project), source_revision, observed_at }) }))
+  const projects = array(value.projects, 'invalid_package_collection').map((project) => { const graph = translateV1Package(project); return { project_id: project.project.id, graph, projection: projectOutcomeV2({ graph, source_revision, observed_at }) } })
   return { ...value, modelV2: { schemaVersion: 2, authority: 'projection_only', projects } }
 }
 

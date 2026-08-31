@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict'
 import test from 'node:test'
-import { applyOutcomeModelV2Pilot, coherentCandidateIdentity, createCodexRuntimeAdapter, projectOutcomeV2, translateV1Package, validateOutcomeGraph } from './outcome-model-v2.mjs'
+import { applyOutcomeModelV2Pilot, coherentCandidateIdentity, compileOutcomeV2Snapshot, createCodexRuntimeAdapter, projectOutcomeV2, startOutcomeV2FromSnapshot, translateV1Package, validateOutcomeGraph } from './outcome-model-v2.mjs'
 
 const source = 'a'.repeat(40)
 const graph = () => ({ schema_version: 2, project: { id: 'outcome', name: 'OUTCOME', terminal_outcome: 'One current outcome' }, destinations: [{ id: 'destination-one', project_id: 'outcome', title: 'One', outcome: 'Done', depends_on: [], primary: true }], milestones: [{ id: 'milestone-one', destination_id: 'destination-one', title: 'Pilot', expected_user_delta: 'One projection', depends_on: [], predicate_ids: ['predicate-one'] }], acceptance_predicates: [{ id: 'predicate-one', milestone_id: 'milestone-one', description: 'Evidence exists', check: 'test', expect: 'pass', authority: 'predicate-policy' }], evidence_claims: [] })
@@ -92,4 +92,23 @@ test('D1 rejects every accepted Proxy before any trap or adapter callback execut
   const adapter = createCodexRuntimeAdapter({ selectNext() { callbacks += 1 }, start() { callbacks += 1 }, transition() { callbacks += 1 }, projectPublic() { callbacks += 1 } })
   for (const invoke of [() => adapter.select(proxied([])), () => adapter.select([{ command: proxied({}) }]), () => adapter.startValidated(proxied({})), () => adapter.recordObserved(proxied({})), () => adapter.recordEvidenceEvaluation(proxied({}))]) assert.throws(invoke, /proxy_forbidden/)
   assert.equal(traps, 0); assert.equal(callbacks, 0)
+})
+
+test('S1 explicit immutable compile snapshot separates cold validation from hot start', () => {
+  const candidate = { source_tree: source, dependency_lock: 'b'.repeat(40), config_class: 'default-off', predicate_ids: ['predicate-one'] }
+  const snapshot = compileOutcomeV2Snapshot({ v1_package: v1(), source_revision: source, observed_at: '2026-08-31T00:00:00.000Z', candidate })
+  assert.equal(Object.isFrozen(snapshot), true); assert.equal(Object.isFrozen(snapshot.graph), true); assert.equal(snapshot.candidate_identity, coherentCandidateIdentity(candidate))
+  const item = { id: 'work-one', milestone_id: 'milestone-one', fingerprint: 'same', acceptance_gap_delta: 1, uncertainty_delta: 0, blocker_delta: 0, user_value_delta: 1, reversible: true, cost: 1 }
+  const input = { expected_source_revision: source, candidate_identity: snapshot.candidate_identity, observed_at: '2026-08-31T00:00:00.000Z', authority_state: 'active', work_items: [item], attempts: [], leases: [], mission_envelope: null }
+  assert.deepEqual(startOutcomeV2FromSnapshot(snapshot, input), { outcome: 'started', state: 'start_validated', work_id: 'work-one', fingerprint: 'same', automatic_retry_count: 0 })
+  assert.equal(startOutcomeV2FromSnapshot(snapshot, { ...input, expected_source_revision: 'c'.repeat(40) }).reason, 'source_revision_drift')
+  assert.equal(startOutcomeV2FromSnapshot(snapshot, { ...input, candidate_identity: 'd'.repeat(64) }).reason, 'candidate_identity_drift')
+  assert.equal(startOutcomeV2FromSnapshot(snapshot, { ...input, attempts: [{ id: 'attempt-one', work_id: 'work-one', fingerprint: 'same', state: 'delivery_unknown', automatic_retry_count: 0 }] }).cherry_action, 'resolve_delivery_unknown')
+  assert.throws(() => startOutcomeV2FromSnapshot(snapshot, { ...input, attempts: [{ id: 'attempt-one', work_id: 'work-one', fingerprint: 'same', state: 'delivery_unknown', automatic_retry_count: 1 }] }), /automatic_retry_forbidden/)
+})
+
+test('S1 compile and hot start reject Proxy inputs before traps', () => {
+  let traps = 0; const proxy = new Proxy(v1(), { get() { traps += 1 }, ownKeys() { traps += 1 }, getOwnPropertyDescriptor() { traps += 1 }, getPrototypeOf() { traps += 1 } })
+  assert.throws(() => compileOutcomeV2Snapshot({ v1_package: proxy, source_revision: source, observed_at: '2026-08-31T00:00:00.000Z', candidate: { source_tree: source, dependency_lock: 'b'.repeat(40), config_class: 'default-off', predicate_ids: ['predicate-one'] } }), /proxy_forbidden/)
+  assert.equal(traps, 0)
 })
