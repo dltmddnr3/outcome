@@ -1,8 +1,19 @@
 import { doctorRegistry, loadRegistry, publicRegistryProjection } from './outcome-session-registry-persistence.mjs'
 import { runSessionControl } from './outcome-session-control.mjs'
+import { types } from 'node:util'
 
 const SHA256 = /^[a-f0-9]{64}$/
+const REQUEST_KEYS = ['actorClass', 'continuityReady', 'expectedVersion', 'handoffSha256', 'projectId', 'publicAlias', 'reasonClass', 'registryPath', 'role', 'started'].sort()
 const safeHold = (reason, mutationCount = 0) => ({ outcome: 'safe_hold', reason, mutation_count: mutationCount, automatic_retry_count: 0 })
+
+function materializeRequest(input) {
+  try {
+    if (!input || typeof input !== 'object' || Array.isArray(input) || types.isProxy(input) || Object.getPrototypeOf(input) !== Object.prototype) return null
+    const descriptors = Object.getOwnPropertyDescriptors(input)
+    if (Object.keys(descriptors).sort().join(',') !== REQUEST_KEYS.join(',') || Object.values(descriptors).some((descriptor) => !Object.hasOwn(descriptor, 'value'))) return null
+    return Object.fromEntries(REQUEST_KEYS.map((key) => [key, descriptors[key].value]))
+  } catch { return null }
+}
 
 export function createProtectedSelfBindingAdapter({ environment = process.env, control = runSessionControl, doctor = doctorRegistry } = {}) {
   let invoked = false
@@ -10,22 +21,23 @@ export function createProtectedSelfBindingAdapter({ environment = process.env, c
     replaceOnce(input) {
       if (invoked) return safeHold('duplicate_invocation')
       invoked = true
-      if (!input || typeof input !== 'object' || Array.isArray(input) || Object.keys(input).sort().join(',') !== ['actorClass', 'continuityReady', 'expectedVersion', 'handoffSha256', 'projectId', 'publicAlias', 'reasonClass', 'registryPath', 'role', 'started'].sort().join(',')) return safeHold('invalid_request')
+      const request = materializeRequest(input)
+      if (!request) return safeHold('invalid_request')
       const locator = environment?.CODEX_THREAD_ID
       if (typeof locator !== 'string' || !locator || locator.length > 512 || /[\u0000-\u001f\u007f]/.test(locator)) return safeHold('self_context_unavailable')
-      if (input.started !== true || input.continuityReady !== true || !SHA256.test(input.handoffSha256 ?? '') || !Number.isSafeInteger(input.expectedVersion) || input.expectedVersion < 1) return safeHold('continuity_unverified')
+      if (request.started !== true || request.continuityReady !== true || !SHA256.test(request.handoffSha256 ?? '') || !Number.isSafeInteger(request.expectedVersion) || request.expectedVersion < 1) return safeHold('continuity_unverified')
       let before
       try {
-        const registry = loadRegistry(input.registryPath)
-        before = publicRegistryProjection(registry, input.projectId).find((row) => row.role === input.role)
+        const registry = loadRegistry(request.registryPath)
+        before = publicRegistryProjection(registry, request.projectId).find((row) => row.role === request.role)
       } catch { return safeHold('registry_unavailable') }
-      if (!before || before.binding_version !== input.expectedVersion || !['active', 'idle', 'stale', 'rotating', 'blocked'].includes(before.status)) return safeHold('binding_version_conflict')
+      if (!before || before.binding_version !== request.expectedVersion || !['active', 'idle', 'stale', 'rotating', 'blocked'].includes(before.status)) return safeHold('binding_version_conflict')
       try {
-        control({ ...input, action: 'replace', privateInput: { locator } })
+        control({ ...request, action: 'replace', routingFreeze: true, handoffVerified: true, privateInput: { locator } })
       } catch {
-        return reconcile(input, before, doctor)
+        return reconcile(request, before, doctor)
       }
-      return reconcile(input, before, doctor)
+      return reconcile(request, before, doctor)
     },
   })
 }

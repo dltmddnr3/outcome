@@ -52,7 +52,7 @@ Status: **SELECTIVE CONTEXT PRE-CONSUME VALIDATION CORRECTION CANDIDATE READY ·
 - [ ] O2: One safe same-role session replacement uses only the content-addressed snapshot, current Gate, active work and next action; successor readiness is observed before predecessor archival.
   CHECK: pending rotation receipt
   EXPECT: continuity ready; raw-history replay `0`; predecessor recoverable
-  EVIDENCE: pending
+  EVIDENCE: Pending operational rotation. Builder correction candidate evidence: the protected adapter now derives Planner-only control prerequisites from its already validated readiness and handoff inputs without adding caller-controlled keys. RED reproduced missing derived flags and hostile-input control reachability (`3/5` pass, `2/5` fail); GREEN focused control-plane regression `30/30`, full regression `500/500`, security `54/54`, and production build passed in an isolated exact-source checkout. See `docs/OUTCOME_MODEL_V2_PLANNER_PROTECTED_SELF_BINDING_ROTATION_FLAGS_CORRECTION_BUILDER_RECEIPT.md`. This does not close O2 or authorize a real CAS.
 
 - [ ] A1: Separate fresh Release Audit validates the coherent implementation and operational evidence without inferring Preview, Production, release or Phase transition.
   CHECK: pending fresh Audit receipt
