@@ -85,6 +85,18 @@ describe('account workspace presentation contract', () => {
     expect(html).not.toContain('Current Projection')
   })
 
+  it('실제 Model v2 server envelope는 v1 current hierarchy 없이도 기존 shell과 Current Projection을 렌더링한다', () => {
+    const dashboard = { ...deploymentFixture, projects: deploymentFixture.projects.map((item) => item.project.id === 'outcome' ? { ...item, phases: [], current: null } : item), build: { repository: 'test/repo', ref: 'test', commit: null, tree: null, asset: null, runtimeNowPinned: false } } as unknown as OutcomeDashboardData
+    const projects = [{ project: { id: 'outcome', name: 'OUTCOME' }, modelV2: modelV2('outcome', 'OUTCOME') }]
+    const html = renderToStaticMarkup(<AccountWorkspace state="ready" workspace={{ projects, dashboard } as unknown as typeof readyWorkspace & { dashboard: OutcomeDashboardData }} />)
+    expect(html).toContain('oc-global-nav')
+    expect(html).toContain('oc-project-switcher')
+    expect(html).toContain('Current Projection')
+    expect(html).toContain('OUTCOME Destination')
+    expect(html).toContain('v1 호환 정보 없음')
+    expect(html).not.toContain('OUTCOME 원본 묶음을 검증하고 있습니다')
+  })
+
   it('login은 실제 OAuth가 아닌 주입 어댑터 전환을 명시하고 ready에는 로그아웃이 있다', () => {
     const login = renderToStaticMarkup(<AccountWorkspace state="login" onLogin={async () => {}} />)
     expect(login).toContain('실제 OAuth 연결 아님')

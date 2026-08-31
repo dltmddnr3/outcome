@@ -43,6 +43,7 @@ export function AccountWorkspace({ state = 'unavailable', workspace, ownerVerifi
   const projects = workspace?.projects ?? []
   const [selection, setSelection] = useState<PrivateSelection | null>(null)
   const [busy, setBusy] = useState<LoginProvider | 'logout' | null>(null)
+  if (state === 'ready' && workspace?.dashboard) return <OutcomeDashboard initialData={workspace.dashboard} privateProjects={projects} onUnauthorized={() => undefined} onLogout={onLogout} />
   const project = projects.find((item) => item.project.id === selection?.projectId) ?? projects[0] ?? null
   const safeSelection = project && selection?.projectId === project.project.id ? selection : project ? initialSelection(project) : null
   const phase = project?.phases.find((item) => item.id === safeSelection?.phaseId) ?? project?.phases[0] ?? null
@@ -63,7 +64,6 @@ export function AccountWorkspace({ state = 'unavailable', workspace, ownerVerifi
       {sessionPresent && onLogout && <button className="account-workspace__loading-cancel" type="button" data-private-logout="true" onClick={() => void transition('logout', onLogout)}>로그인 취소</button>}
     </section>
   </main>
-  if (state === 'ready' && workspace?.dashboard) return <OutcomeDashboard initialData={workspace.dashboard} privateProjects={projects} onUnauthorized={() => undefined} onLogout={onLogout} />
   return <main className="account-workspace" data-account-state={state} data-completion-authority="false">
     <header className="account-workspace__header">
       <div><span className="account-workspace__eyebrow">OUTCOME · 비공개</span><h1>Cherry 전용 비공개 워크스페이스</h1></div>
