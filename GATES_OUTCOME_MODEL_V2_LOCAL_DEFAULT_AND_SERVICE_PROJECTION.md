@@ -2,7 +2,7 @@
 
 Outcome: Model v2 is the verified local default with selective context, then becomes the user-facing private workspace projection without deployment or release authority.
 
-Status: **A5 PASSED · C1 CHERRY ACCEPTANCE READY · DEPLOYMENT/PRODUCTION/RELEASE EXCLUDED**
+Status: **MODEL V2 13/13 CHERRY ACCEPTED · ACTIVATION/DEPLOYMENT/PRODUCTION/RELEASE/PHASE TRANSITION UNPERFORMED**
 
 - [x] D1: Product meaning, selective-context boundary, information architecture, ownership and rollback are fixed in one contract.
   CHECK: rg -q "Selective context contract" docs/OUTCOME_MODEL_V2_LOCAL_DEFAULT_AND_SERVICE_PROJECTION_CONTRACT.md && rg -q "Service information architecture" docs/OUTCOME_MODEL_V2_LOCAL_DEFAULT_AND_SERVICE_PROJECTION_CONTRACT.md && rg -q "Current Projection is the only source" docs/OUTCOME_MODEL_V2_LOCAL_DEFAULT_AND_SERVICE_PROJECTION_CONTRACT.md && echo D1_PASS
@@ -44,5 +44,5 @@ Status: **A5 PASSED · C1 CHERRY ACCEPTANCE READY · DEPLOYMENT/PRODUCTION/RELEA
 - [x] A5: Separate fresh Release Audit validates the coherent local-default plus service-projection candidate, rollback, privacy and scope without inferring deployment or release.
   EVIDENCE: Role-skill correction commit `1ad8dd432ab4cf17e1692d66ece584ac7b595d82`; Builder receipt carrier `16985e1f49aac6851cdcec6c3ccf965d0198c357`, SHA-256 `446839539ec45b259b2c3e5af0682f8086b9923e8fd1d4162e951064d51b9dcd`; fresh independent `PASS_RELEASE_AUDIT_ONLY` carrier `f05d1bbb28de75bb1ecf5506a514709739cb0771`, report SHA-256 `a027970b8f768cfad2afc093b137a3b23d7a88aedfcf33b321c2b355bc43605b`. Audit reproduced two byte-identical final canaries; exact nine-source manifest; A5 Release Audit authority with sole role-specific `skill:lime-release-auditor`; unrelated role skills `0`; drift, missing-input and wrong-role probes fail closed; focused `88/88`, frontend `99/99`, account/projection `48/48`, server `392/392`, production build `1,654` modules and built-browser regression passed. Runtime/provider/environment/deploy/Production/release/acceptance/push/external mutation, retry, resend/replay and false completion were `0`. This closes only A5 evidence; C1, Cherry acceptance, activation, deployment, Production, release and Phase transition remain separate and unclaimed.
 
-- [ ] C1: Cherry accepts the exact local product candidate; deployment, Production, release and Phase transition remain separate decisions.
-  EVIDENCE: pending
+- [x] C1: Cherry accepts the exact local product candidate; deployment, Production, release and Phase transition remain separate decisions.
+  EVIDENCE: Cherry authority statement observed in the active OUTCOME Planner conversation on `2026-08-31` Asia/Seoul: `Model v2 C1 수용 승인 — 활성화·배포·Production·릴리즈·Phase 전환은 별도 결정`. Exact accepted evidence source is A5 promotion carrier `e61d3597699927152384f5c364112b85fa784ef6`, receipt SHA-256 `377a2d032d3c1c08bd5e58b7942f9e7e44a1d9688f80d8fafe1f55aa0ba9e376`, over underlying product/test candidate `28db58fd5018dc4094c9cbbf764d0e86e83cbea4`. This closes only Model v2 C1 acceptance; activation, deployment, Production, release and Phase transition remain separate and unperformed.
