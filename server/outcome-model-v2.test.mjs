@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict'
 import test from 'node:test'
-import { applyOutcomeModelV2Pilot, coherentCandidateIdentity, compileOutcomeV2Snapshot, createCodexRuntimeAdapter, projectOutcomeV2, startOutcomeV2FromSnapshot, translateV1Package, validateOutcomeGraph } from './outcome-model-v2.mjs'
+import { applyOutcomeModelV2Pilot, coherentCandidateIdentity, compileOutcomeSelectiveContextPlan, compileOutcomeV2Snapshot, consumeOutcomeSelectiveContextPlan, createCodexRuntimeAdapter, projectOutcomeV2, startOutcomeV2FromSnapshot, translateV1Package, validateOutcomeGraph } from './outcome-model-v2.mjs'
 
 const source = 'a'.repeat(40)
 const graph = () => ({ schema_version: 2, project: { id: 'outcome', name: 'OUTCOME', terminal_outcome: 'One current outcome' }, destinations: [{ id: 'destination-one', project_id: 'outcome', title: 'One', outcome: 'Done', depends_on: [], primary: true }], milestones: [{ id: 'milestone-one', destination_id: 'destination-one', title: 'Pilot', expected_user_delta: 'One projection', depends_on: [], predicate_ids: ['predicate-one'] }], acceptance_predicates: [{ id: 'predicate-one', milestone_id: 'milestone-one', description: 'Evidence exists', check: 'test', expect: 'pass', authority: 'predicate-policy' }], evidence_claims: [] })
@@ -65,6 +65,51 @@ test('A1 unset configuration defaults to v2 explicit zero rolls back exact v1 an
   for (const flag of ['', 'true', '01', ' 1', '1 ']) assert.throws(() => applyOutcomeModelV2Pilot(collection, { environment: { OUTCOME_MODEL_V2_ENABLED: flag }, source_revision: source }), /invalid_model_v2_configuration/)
   const enabled = applyOutcomeModelV2Pilot(collection, { environment: { OUTCOME_MODEL_V2_ENABLED: '1' }, source_revision: source })
   assert.equal(enabled.modelV2.authority, 'projection_only'); assert.equal(Object.hasOwn(collection, 'modelV2'), false)
+})
+
+test('B1-B6 selective context plan is content addressed and consumed only by a capable local adapter', () => {
+  const digest = (character) => character.repeat(64)
+  const sources = {
+    agents: { source_ref: 'AGENTS.md', source_digest: digest('a') },
+    active_snapshot: { source_ref: 'active-bootstrap-snapshot', source_digest: digest('b') },
+    current_gate: { source_ref: 'GATES_OUTCOME_MODEL_V2_SELECTIVE_CONTEXT_LOCAL_ACTIVATION.md', source_digest: digest('c') },
+    current_handoff: { source_ref: 'current-builder-checkpoint', source_digest: digest('d') },
+  }
+  const base = { environment: {}, work_id: 'selective-context-activation', work_type: 'builder', role_skill: 'mango-implementation-engineer', sources, available_source_digests: { ...Object.fromEntries(Object.values(sources).map((row) => [row.source_ref, row.source_digest])), 'docs/OUTCOME_CONTRACT.md': digest('e') }, expansion_allowlist: [{ source_ref: 'docs/OUTCOME_CONTRACT.md', source_digest: digest('e') }], expansions: [{ source_ref: 'docs/OUTCOME_CONTRACT.md', source_digest: digest('e'), reason: 'acceptance-contract', work_id: 'selective-context-activation' }] }
+  const plan = compileOutcomeSelectiveContextPlan(base)
+  assert.equal(plan.schema_version, 2); assert.equal(plan.authority, 'projection_only'); assert.equal(plan.outcome, 'ready')
+  assert.deepEqual(plan.loaded_sources.map((row) => row.source_ref), ['AGENTS.md', 'active-bootstrap-snapshot', 'GATES_OUTCOME_MODEL_V2_SELECTIVE_CONTEXT_LOCAL_ACTIVATION.md', 'current-builder-checkpoint', 'skill:karpathy-guidelines', 'skill:unlazy', 'skill:mango-implementation-engineer', 'docs/OUTCOME_CONTRACT.md'])
+  let consumed = 0
+  const adapter = createCodexRuntimeAdapter({ selectNext(value) { return value }, start(value) { return value }, transition(value) { return value }, projectPublic() { return { authority: 'projection_only' } }, selectiveContextCapability: 'content-addressed-plan-v1', consumeContextPlan(value) { consumed += 1; return { accepted: value.outcome === 'ready' } } })
+  const receipt = consumeOutcomeSelectiveContextPlan(adapter, plan)
+  assert.equal(consumed, 1); assert.equal(receipt.outcome, 'locally_consumed'); assert.equal(receipt.safety.execution_started_count, 0)
+  const serialized = JSON.stringify(receipt)
+  for (const pattern of [/\/Users\/|\/private\/tmp\//, /(?:thread|session|task|turn)[_-]?id/i, /credential|password|secret|token/i, /raw[_-]?(?:prompt|result)/i, /dispatch_authority|release_authority|canonical_transition_authority/i]) assert.doesNotMatch(serialized, pattern)
+  assert.deepEqual(receipt, consumeOutcomeSelectiveContextPlan(adapter, plan)); assert.equal(consumed, 2)
+  const unsupported = consumeOutcomeSelectiveContextPlan(createCodexRuntimeAdapter({ selectNext(value) { return value }, start(value) { return value }, transition(value) { return value }, projectPublic() { return { authority: 'projection_only' } } }), plan)
+  assert.equal(unsupported.outcome, 'safe_hold'); assert.equal(unsupported.reason, 'unsupported_adapter_capability'); assert.equal(consumed, 2)
+})
+
+test('B3-B5 role selection no-role rollback and negative controls are deterministic', () => {
+  const digest = (character) => character.repeat(64)
+  const sources = { agents: { source_ref: 'AGENTS.md', source_digest: digest('a') }, active_snapshot: { source_ref: 'active-bootstrap-snapshot', source_digest: digest('b') }, current_gate: { source_ref: 'GATES_OUTCOME_MODEL_V2_SELECTIVE_CONTEXT_LOCAL_ACTIVATION.md', source_digest: digest('c') }, current_handoff: null }
+  const available = Object.fromEntries(Object.values(sources).filter(Boolean).map((row) => [row.source_ref, row.source_digest]))
+  const make = (work_type, role_skill) => ({ environment: {}, work_id: 'bounded-work', work_type, role_skill, sources, available_source_digests: available, expansion_allowlist: [], expansions: [] })
+  for (const [workType, skill] of Object.entries({ planner: 'berry-product-partner', builder: 'mango-implementation-engineer', ux_product_qa: 'lime-independent-qa', release_audit: 'lime-release-auditor' })) {
+    const plan = compileOutcomeSelectiveContextPlan(make(workType, skill))
+    assert.equal(plan.loaded_sources.filter((row) => row.source_ref.startsWith('skill:')).length, 3)
+    assert.equal(plan.loaded_sources.at(-1).source_ref, `skill:${skill}`)
+  }
+  const noRole = compileOutcomeSelectiveContextPlan(make('no_role', null))
+  assert.equal(noRole.loaded_sources.filter((row) => row.source_ref.startsWith('skill:')).length, 2)
+  assert.equal(compileOutcomeSelectiveContextPlan(make('unknown', null)).reason, 'unknown_work_type')
+  assert.equal(compileOutcomeSelectiveContextPlan(make('builder', 'lime-independent-qa')).reason, 'wrong_role_skill')
+  assert.equal(compileOutcomeSelectiveContextPlan({ ...make('builder', 'mango-implementation-engineer'), available_source_digests: { ...available, 'AGENTS.md': digest('f') } }).reason, 'source_digest_drift')
+  assert.equal(compileOutcomeSelectiveContextPlan({ ...make('builder', 'mango-implementation-engineer'), sources: { ...sources, agents: {} } }).reason, 'source_input_missing')
+  const rollbackInput = make('builder', 'mango-implementation-engineer'); rollbackInput.environment = { OUTCOME_MODEL_V2_ENABLED: '0' }
+  assert.deepEqual(compileOutcomeSelectiveContextPlan(rollbackInput), { schema_version: 1, outcome: 'v1_rollback', original_value_required: true })
+  const duplicate = { source_ref: 'docs/OUTCOME_CONTRACT.md', source_digest: digest('d'), reason: 'acceptance-contract', work_id: 'bounded-work' }
+  assert.throws(() => compileOutcomeSelectiveContextPlan({ ...make('builder', 'mango-implementation-engineer'), available_source_digests: { ...available, 'docs/OUTCOME_CONTRACT.md': digest('d') }, expansion_allowlist: [{ source_ref: duplicate.source_ref, source_digest: duplicate.source_digest }], expansions: [duplicate, duplicate] }), /duplicate_expansion/)
 })
 
 test('S2 S4 duplicate and zero-delta work allocate nothing and request an exact decision', () => {

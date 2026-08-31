@@ -1,7 +1,7 @@
 import { createHash } from 'node:crypto'
 import { readFileSync } from 'node:fs'
 import { resolve } from 'node:path'
-import { projectOutcomeV2, validateOutcomeGraph } from '../server/outcome-model-v2.mjs'
+import { compileOutcomeSelectiveContextPlan, consumeOutcomeSelectiveContextPlan, createCodexRuntimeAdapter, projectOutcomeV2, validateOutcomeGraph } from '../server/outcome-model-v2.mjs'
 import { validateOutcomeSourceManifest } from '../server/outcome-context-bootstrap.mjs'
 
 const finalProductCandidate = '28db58fd5018dc4094c9cbbf764d0e86e83cbea4'
@@ -12,12 +12,14 @@ const sources = Object.freeze({
   'qa-receipt': 'docs/OUTCOME_MODEL_V2_SERVICE_PROJECTION_Q2_PUBLIC_MILESTONE_LABEL_CORRECTION_FRESH_REQA_RECEIPT.md',
   'promotion-receipt': 'docs/OUTCOME_MODEL_V2_SERVICE_PROJECTION_Q2_EVIDENCE_PROMOTION_RECEIPT.md',
   'failed-audit': 'docs/OUTCOME_MODEL_V2_A5_COHERENT_CANDIDATE_FRESH_RELEASE_AUDIT_RECEIPT.md',
+  'activation-gate': 'GATES_OUTCOME_MODEL_V2_SELECTIVE_CONTEXT_LOCAL_ACTIVATION.md',
 })
 const pinnedDigests = Object.freeze({
   agents: 'cbda193480670fdbc0dfd5aa1cbcae2a945418ba8b670246997d3ba44f39cb93', contract: 'c25e8f3920018aeca4bb219c8f9a678fa21700f3d4ebfe0d6c66a5481d20a442', map: 'da2b8c47bce8522d36f6e70ca5c5dc940988df6f8cf2b773b8e13a68e1bf60d3',
-  'slice-contract': 'b7c0f31cec46dc658b950b28a65dff02ee21867a67f72a3e61428651de2ae657', gate: '659fb65fafce7403a89b126ae91c9ef81aa6ce73a293b9f9244b9dd5a93ad1c5',
+  'slice-contract': 'b7c0f31cec46dc658b950b28a65dff02ee21867a67f72a3e61428651de2ae657', gate: 'b6c156c60cfca729c261641a96401590f44d9e47845d5ae34dd4a028790e7357',
   'builder-receipt': '80a01e7597941d21b281da26b711005421831670ff4668ce80d2e6302a90acad', 'qa-receipt': '41f80e48b9475f59fabb636768470f87bf9d49cef22544e8b26f558fa0c0e8a3',
   'promotion-receipt': '75cae693bad35f8a7791941eefbd008605162073ee817fa3c7632d73c8b98dfb', 'failed-audit': '9e77063cfbc09517fa5e8376846902075a449205006ff021eff91765c279ba5b',
+  'activation-gate': '261f67b481b0f830973a6225012db9b938fe443caa49d1ab349ca8d4f8258a97',
 })
 const gateOrder = Object.freeze(['D1', 'D2', 'A1', 'A2', 'A3', 'A4', 'Q1', 'B1', 'B2', 'B3', 'Q2', 'A5', 'C1'])
 const commonSkillSources = Object.freeze(['skill:karpathy-guidelines', 'skill:unlazy'])
@@ -47,11 +49,29 @@ else {
       const projection = projectOutcomeV2({ graph, source_revision: candidateIdentity, expected_source_revision: candidateIdentity, observed_at: '2026-08-31T00:00:00.000Z', work_items: [work] })
       const content = { schema_version: 2, candidate_identity: candidateIdentity, final_product_candidate: finalProductCandidate, source_manifest_digest: sourceManifestDigest, source_digests: actualDigests, manifest_sources: Object.values(sources), loaded_sources: ['AGENTS.md', 'active-bootstrap-snapshot', sources.gate, ...commonSkillSources, selectedRoleSkill, sources.contract, sources.map, sources['slice-contract'], sources['builder-receipt'], sources['qa-receipt'], sources['promotion-receipt'], sources['failed-audit']], excluded_source_classes: ['historical_gate_families', 'historical_q1_canary_inputs', 'correction_chains', 'raw_conversation', 'roadmap_2', 'unrelated_skills'], gate_model: { predicate_count: rows.length, closed_count: rows.filter((row) => row.closed).length, ready_predicate: 'A5', locked_predicates: ['C1'] }, projection: { primary_destination: projection.primary_destination, acceptance_gap: { remaining: projection.progress.total - projection.progress.closed, ...projection.progress }, ready_frontier: projection.ready_frontier, active_work: null, next_action: projection.next_action, cherry_action: projection.cherry_action }, outcome: projection.next_action === work.id ? 'next_action_selected' : 'no_eligible_action', safety: { duplicate_execution_count: projection.blockers.duplicate_fingerprints, automatic_retry_count: projection.automatic_retry_count, unauthorized_canonical_transition_count: 0, registry_provider_environment_mutation_count: 0, false_completion_count: 0 } }
       const result = { ...content, snapshot_digest: digest(stable(content)) }
-      if (result.gate_model.closed_count !== 11 || result.projection.acceptance_gap.closed !== 11 || result.projection.acceptance_gap.total !== 13 || result.projection.ready_frontier.join(',') !== milestoneId('A5') || result.projection.next_action !== work.id || result.projection.cherry_action !== null) throw new Error('final_frontier_invalid')
+      if (result.gate_model.closed_count !== 13 || result.projection.acceptance_gap.closed !== 13 || result.projection.acceptance_gap.total !== 13 || result.projection.ready_frontier.length !== 0 || result.projection.next_action !== null || result.projection.cherry_action !== null) throw new Error('accepted_frontier_invalid')
       const loadedRoleSkills = result.loaded_sources.filter((source) => source.startsWith('skill:') && !commonSkillSources.includes(source))
       if (authority('A5') !== 'release-audit' || loadedRoleSkills.length !== 1 || loadedRoleSkills[0] !== selectedRoleSkill) throw new Error('role_skill_coherence_invalid')
       const serialized = JSON.stringify(result); if (/\/Users\/|\.outcome-runtime|docs\/ROADMAP 2\.md|(?:thread|session|task|turn)[_-]?id/i.test(serialized)) throw new Error('public_output_invalid')
-      process.stdout.write(`${JSON.stringify(result, null, 2)}\n`)
+      const selectivePlan = compileOutcomeSelectiveContextPlan({
+        environment: {}, work_id: 'selective-context-activation', work_type: 'builder', role_skill: 'mango-implementation-engineer',
+        sources: {
+          agents: { source_ref: 'AGENTS.md', source_digest: actualDigests.agents },
+          active_snapshot: { source_ref: 'active-bootstrap-snapshot', source_digest: result.snapshot_digest },
+          current_gate: { source_ref: sources['activation-gate'], source_digest: actualDigests['activation-gate'] },
+          current_handoff: null,
+        },
+        available_source_digests: { 'AGENTS.md': actualDigests.agents, 'active-bootstrap-snapshot': result.snapshot_digest, [sources['activation-gate']]: actualDigests['activation-gate'] },
+        expansion_allowlist: [], expansions: [],
+      })
+      let consumedPlanDigest = null
+      const localAdapter = createCodexRuntimeAdapter({
+        selectNext: (value) => value, start: (value) => value, transition: (value) => value, projectPublic: () => ({ authority: 'projection_only' }),
+        selectiveContextCapability: 'content-addressed-plan-v1', consumeContextPlan: (plan) => { consumedPlanDigest = plan.plan_digest; return { accepted: true } },
+      })
+      const selectiveContextReceipt = consumeOutcomeSelectiveContextPlan(localAdapter, selectivePlan)
+      if (selectiveContextReceipt.outcome !== 'locally_consumed' || consumedPlanDigest !== selectivePlan.plan_digest) throw new Error('selective_context_not_consumed')
+      process.stdout.write(`${JSON.stringify({ ...result, selective_context_receipt: selectiveContextReceipt }, null, 2)}\n`)
     }
   }
 }

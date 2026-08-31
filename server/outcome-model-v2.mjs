@@ -184,9 +184,99 @@ export function applyOutcomeModelV2Pilot(value, options = {}) {
   return { ...value, modelV2: { schemaVersion: 2, authority: 'projection_only', projects } }
 }
 
+const SELECTIVE_CONTEXT_ROLES = Object.freeze({
+  planner: 'berry-product-partner',
+  builder: 'mango-implementation-engineer',
+  ux_product_qa: 'lime-independent-qa',
+  release_audit: 'lime-release-auditor',
+  no_role: null,
+})
+const SELECTIVE_CONTEXT_COMMON_SKILLS = Object.freeze(['karpathy-guidelines', 'unlazy'])
+const SELECTIVE_CONTEXT_SOURCE_KEYS = Object.freeze(['agents', 'active_snapshot', 'current_gate', 'current_handoff'])
+const PRIVATE_CONTEXT_REF = /(?:^\/|\.\.|\/Users\/|(?:thread|session|task|turn)[_-]?id|credential|password|secret|token|raw[_-]?(?:prompt|result))/i
+const selectiveContextHold = (reason) => frozen({
+  schema_version: 2,
+  authority: 'projection_only',
+  outcome: 'safe_hold',
+  reason,
+  loaded_sources: frozen([]),
+  skipped_sources: frozen([]),
+  safety: frozen({ execution_started_count: 0, automatic_retry_count: 0, duplicate_execution_count: 0, persistent_setting_mutation_count: 0, registry_provider_environment_mutation_count: 0, unauthorized_canonical_transition_count: 0, false_completion_count: 0 }),
+})
+const contextRef = (value) => {
+  if (typeof value !== 'string' || !value || PRIVATE_CONTEXT_REF.test(value)) throw new Error('invalid_context_source_ref')
+  return value
+}
+const contextDigest = (value) => { if (typeof value !== 'string' || !/^[a-f0-9]{64}$/.test(value)) throw new Error('invalid_context_source_digest'); return value }
+const contextSource = (value) => {
+  exactKeys(value, ['source_ref', 'source_digest'])
+  return frozen({ source_ref: contextRef(value.source_ref), source_digest: contextDigest(value.source_digest) })
+}
+const contextReceipt = (plan, outcome) => frozen({
+  schema_version: 2,
+  authority: 'projection_only',
+  outcome,
+  plan_digest: plan.plan_digest,
+  loaded_sources: plan.loaded_sources,
+  skipped_sources: plan.skipped_sources,
+  expansion_count: plan.expansion_count,
+  safety: plan.safety,
+})
+
+export function compileOutcomeSelectiveContextPlan(value) {
+  rejectProxyTree(value)
+  exactKeys(value, ['environment', 'work_id', 'work_type', 'role_skill', 'sources', 'available_source_digests', 'expansion_allowlist', 'expansions'])
+  record(value.environment, 'invalid_context_environment')
+  const configured = value.environment.OUTCOME_MODEL_V2_ENABLED
+  if (configured === '0') return frozen({ schema_version: 1, outcome: 'v1_rollback', original_value_required: true })
+  if (configured !== undefined && configured !== '1') return selectiveContextHold('invalid_model_v2_configuration')
+  const expectedRoleSkill = SELECTIVE_CONTEXT_ROLES[value.work_type]
+  if (!Object.hasOwn(SELECTIVE_CONTEXT_ROLES, value.work_type)) return selectiveContextHold('unknown_work_type')
+  if (value.role_skill !== expectedRoleSkill) return selectiveContextHold('wrong_role_skill')
+  id(value.work_id, 'invalid_work_id')
+  exactKeys(value.sources, SELECTIVE_CONTEXT_SOURCE_KEYS)
+  const sourceRows = {}
+  for (const key of SELECTIVE_CONTEXT_SOURCE_KEYS) {
+    const row = value.sources[key]
+    if (key === 'current_handoff' && row === null) { sourceRows[key] = null; continue }
+    try { sourceRows[key] = contextSource(row) } catch (error) {
+      if (error.message === 'invalid_shape' || error.message === 'invalid_context_source_digest') return selectiveContextHold('source_input_missing')
+      throw error
+    }
+  }
+  if (sourceRows.agents.source_ref !== 'AGENTS.md' || sourceRows.active_snapshot.source_ref !== 'active-bootstrap-snapshot' || !/^GATES_[A-Z0-9_]+\.md$/.test(sourceRows.current_gate.source_ref)) return selectiveContextHold('unrelated_source_forbidden')
+  record(value.available_source_digests, 'invalid_available_source_digests')
+  for (const row of Object.values(sourceRows).filter(Boolean)) if (value.available_source_digests[row.source_ref] !== row.source_digest) return selectiveContextHold('source_digest_drift')
+  const allowlistRows = array(value.expansion_allowlist, 'invalid_expansion_allowlist').map(contextSource)
+  unique(allowlistRows, 'source_ref', 'duplicate_expansion')
+  const allowlist = new Map(allowlistRows.map((row) => [row.source_ref, row.source_digest]))
+  const expansions = array(value.expansions, 'invalid_expansions').map((row) => {
+    exactKeys(row, ['source_ref', 'source_digest', 'reason', 'work_id'])
+    const source_ref = contextRef(row.source_ref); const source_digest = contextDigest(row.source_digest)
+    if (row.work_id !== value.work_id || !ID.test(row.reason)) throw new Error('invalid_expansion_contract')
+    if (allowlist.get(source_ref) !== source_digest || value.available_source_digests[source_ref] !== source_digest) throw new Error('unrelated_expansion_forbidden')
+    return frozen({ source_ref, source_digest, reason: row.reason })
+  })
+  unique(expansions, 'source_ref', 'duplicate_expansion')
+  const loaded = [sourceRows.agents, sourceRows.active_snapshot, sourceRows.current_gate, sourceRows.current_handoff, ...SELECTIVE_CONTEXT_COMMON_SKILLS.map((skill) => ({ source_ref: `skill:${skill}`, source_digest: null })), ...(expectedRoleSkill ? [{ source_ref: `skill:${expectedRoleSkill}`, source_digest: null }] : []), ...expansions.map(({ source_ref, source_digest }) => ({ source_ref, source_digest }))].filter(Boolean).map(frozen)
+  const skipped = allowlistRows.filter((row) => !expansions.some((candidate) => candidate.source_ref === row.source_ref))
+  const content = { schema_version: 2, authority: 'projection_only', outcome: 'ready', work_type: value.work_type, loaded_sources: frozen(loaded), skipped_sources: frozen(skipped), expansion_count: expansions.length, expansion_reasons: frozen(expansions.map(({ reason }) => reason)), safety: selectiveContextHold('unused').safety }
+  return frozen({ ...content, plan_digest: createHash('sha256').update(JSON.stringify(content)).digest('hex') })
+}
+
+export function consumeOutcomeSelectiveContextPlan(adapter, plan) {
+  rejectProxyTree(adapter); rejectProxyTree(plan)
+  if (!plan || plan.outcome !== 'ready' || plan.schema_version !== 2 || plan.authority !== 'projection_only') return plan
+  if (!adapter || adapter.selectiveContextCapability !== 'content-addressed-plan-v1' || typeof adapter.consumeContextPlan !== 'function') return selectiveContextHold('unsupported_adapter_capability')
+  const result = adapter.consumeContextPlan(plan)
+  if (!ownRecord(result) || Object.keys(result).length !== 1 || result.accepted !== true) return selectiveContextHold('adapter_context_rejected')
+  return contextReceipt(plan, 'locally_consumed')
+}
+
 export function createCodexRuntimeAdapter(controlPlane) {
   if (isProxy(controlPlane)) throw new Error('proxy_forbidden')
   if (!controlPlane || typeof controlPlane.selectNext !== 'function' || typeof controlPlane.start !== 'function' || typeof controlPlane.transition !== 'function' || typeof controlPlane.projectPublic !== 'function') throw new Error('invalid_control_plane')
   const guarded = (callback, value) => { rejectProxyTree(value); return callback(value) }
-  return frozen({ select: (work) => guarded(controlPlane.selectNext.bind(controlPlane), work), startValidated: (command) => guarded(controlPlane.start.bind(controlPlane), command), recordObserved: (event) => guarded(controlPlane.transition.bind(controlPlane), event), recordEvidenceEvaluation: (event) => guarded(controlPlane.transition.bind(controlPlane), event), projectRuntime: () => controlPlane.projectPublic(), canCommitCanonicalTransition: false })
+  const supportsSelectiveContext = controlPlane.selectiveContextCapability === 'content-addressed-plan-v1' && typeof controlPlane.consumeContextPlan === 'function'
+  return frozen({ select: (work) => guarded(controlPlane.selectNext.bind(controlPlane), work), startValidated: (command) => guarded(controlPlane.start.bind(controlPlane), command), recordObserved: (event) => guarded(controlPlane.transition.bind(controlPlane), event), recordEvidenceEvaluation: (event) => guarded(controlPlane.transition.bind(controlPlane), event), projectRuntime: () => controlPlane.projectPublic(), selectiveContextCapability: supportsSelectiveContext ? controlPlane.selectiveContextCapability : null, consumeContextPlan: supportsSelectiveContext ? (plan) => guarded(controlPlane.consumeContextPlan.bind(controlPlane), plan) : null, canCommitCanonicalTransition: false })
 }
