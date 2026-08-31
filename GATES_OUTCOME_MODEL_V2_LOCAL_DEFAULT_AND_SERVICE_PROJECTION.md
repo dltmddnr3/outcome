@@ -2,7 +2,7 @@
 
 Outcome: Model v2 is the verified local default with selective context, then becomes the user-facing private workspace projection without deployment or release authority.
 
-Status: **Q2 PASSED · A5 RELEASE AUDIT READY · DEPLOYMENT/PRODUCTION/RELEASE EXCLUDED**
+Status: **A5 PASSED · C1 CHERRY ACCEPTANCE READY · DEPLOYMENT/PRODUCTION/RELEASE EXCLUDED**
 
 - [x] D1: Product meaning, selective-context boundary, information architecture, ownership and rollback are fixed in one contract.
   CHECK: rg -q "Selective context contract" docs/OUTCOME_MODEL_V2_LOCAL_DEFAULT_AND_SERVICE_PROJECTION_CONTRACT.md && rg -q "Service information architecture" docs/OUTCOME_MODEL_V2_LOCAL_DEFAULT_AND_SERVICE_PROJECTION_CONTRACT.md && rg -q "Current Projection is the only source" docs/OUTCOME_MODEL_V2_LOCAL_DEFAULT_AND_SERVICE_PROJECTION_CONTRACT.md && echo D1_PASS
@@ -41,8 +41,8 @@ Status: **Q2 PASSED · A5 RELEASE AUDIT READY · DEPLOYMENT/PRODUCTION/RELEASE E
 - [x] Q2: Fresh independent UX & Product QA validates the five-question 30-second task, responsive layout, accessibility, failure states and privacy on the immutable Slice B candidate.
   EVIDENCE: Corrected product/test candidate `28db58fd5018dc4094c9cbbf764d0e86e83cbea4`; Builder receipt carrier `4d4c19c79e1815e174caa9a64b663648f43ccdc5`, SHA-256 `80a01e7597941d21b281da26b711005421831670ff4668ce80d2e6302a90acad`; fresh independent QA PASS carrier `a2e61c5c9d5e76a530302bbd57fec54a64264775`, report SHA-256 `41f80e48b9475f59fabb636768470f87bf9d49cef22544e8b26f558fa0c0e8a3`. Hostile identifier, digest, numeric, markup and private milestone labels were omitted; approved human labels remained exact; Proxy traps `0`, private serialization `0`, invented replacements `0`. Projection precedes conversation in DOM, screen-reader and keyboard order; desktop remains conversation-left/projection-right and mobile Projection-first. Focused `16/16`, full frontend `99/99`, account/projection `48/48`, production build `1,654` modules and three-viewport browser checks passed; hostile API/markup/visible/accessibility survival, overflow, browser/runtime errors, product/Gate/registry/provider/runtime/environment/deploy/release/acceptance/push/external mutation and false completion were all `0`.
 
-- [ ] A5: Separate fresh Release Audit validates the coherent local-default plus service-projection candidate, rollback, privacy and scope without inferring deployment or release.
-  EVIDENCE: pending
+- [x] A5: Separate fresh Release Audit validates the coherent local-default plus service-projection candidate, rollback, privacy and scope without inferring deployment or release.
+  EVIDENCE: Role-skill correction commit `1ad8dd432ab4cf17e1692d66ece584ac7b595d82`; Builder receipt carrier `16985e1f49aac6851cdcec6c3ccf965d0198c357`, SHA-256 `446839539ec45b259b2c3e5af0682f8086b9923e8fd1d4162e951064d51b9dcd`; fresh independent `PASS_RELEASE_AUDIT_ONLY` carrier `f05d1bbb28de75bb1ecf5506a514709739cb0771`, report SHA-256 `a027970b8f768cfad2afc093b137a3b23d7a88aedfcf33b321c2b355bc43605b`. Audit reproduced two byte-identical final canaries; exact nine-source manifest; A5 Release Audit authority with sole role-specific `skill:lime-release-auditor`; unrelated role skills `0`; drift, missing-input and wrong-role probes fail closed; focused `88/88`, frontend `99/99`, account/projection `48/48`, server `392/392`, production build `1,654` modules and built-browser regression passed. Runtime/provider/environment/deploy/Production/release/acceptance/push/external mutation, retry, resend/replay and false completion were `0`. This closes only A5 evidence; C1, Cherry acceptance, activation, deployment, Production, release and Phase transition remain separate and unclaimed.
 
 - [ ] C1: Cherry accepts the exact local product candidate; deployment, Production, release and Phase transition remain separate decisions.
   EVIDENCE: pending
