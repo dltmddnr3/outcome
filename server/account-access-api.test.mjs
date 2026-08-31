@@ -29,7 +29,9 @@ test('private config is provider-neutral and secret-free', async () => {
 })
 
 test('private workspace uses server-resolved session and rejects selectors and mutations', async () => {
-  assert.equal((await handlePrivateAccessRequest({ method: 'GET', pathname: '/api/private/workspace', token: 'valid', service })).status, 200)
+  const allowed = await handlePrivateAccessRequest({ method: 'GET', pathname: '/api/private/workspace', token: 'valid', service })
+  assert.equal(allowed.status, 200)
+  assert.deepEqual(allowed.body.workspace.projects.map((project) => [project.project.id, project.modelV2.modelVersion]), [['cherry-note', 2], ['outcome', 2]])
   assert.deepEqual(await handlePrivateAccessRequest({ method: 'GET', pathname: '/api/private/workspace?workspace=forged', token: 'valid', service }), { status: 404, body: { error: 'not_found' } })
   assert.deepEqual(await handlePrivateAccessRequest({ method: 'POST', pathname: '/api/private/workspace', token: 'valid', service }), { status: 405, body: { error: 'read_only' } })
 })
@@ -48,7 +50,9 @@ test('local runtime routes private config and HttpOnly provider session without 
     assert.equal((await fetch(`${base}/api/private/config`)).status, 200)
     const workspace = await fetch(`${base}/api/private/workspace`, { headers: { cookie: '__session=valid' } })
     assert.equal(workspace.status, 200)
-    assert.deepEqual((await workspace.json()).workspace.projects.map((project) => project.project.id), ['cherry-note', 'outcome'])
+    const body = await workspace.json()
+    assert.deepEqual(body.workspace.projects.map((project) => project.project.id), ['cherry-note', 'outcome'])
+    assert.equal(body.workspace.projects.every((project) => project.modelV2.modelVersion === 2), true)
     const mutation = await fetch(`${base}/api/private/workspace`, { method: 'POST' })
     assert.equal(mutation.status, 405)
     assert.deepEqual(await mutation.json(), { error: 'read_only' })

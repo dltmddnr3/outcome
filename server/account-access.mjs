@@ -1,3 +1,5 @@
+import { createAccountModelV2Projection } from './account-model-v2-projection.mjs'
+
 const DAY_MS = 24 * 60 * 60 * 1000
 const PRIVATE_PROJECT_ALLOWLIST = Object.freeze(['cherry-note', 'outcome'])
 export const DEFAULT_PACKAGE_PAYLOAD_LIMIT_BYTES = 524_288
@@ -143,7 +145,11 @@ export function createAccountAccessService({ authProvider, store, ownerSubject, 
       return {
         access: 'private_read_only',
         workspace: { id: workspace.id, role: membership.role },
-        projects: selected.map((project) => clone(project.projection)),
+        projects: selected.map((project) => {
+          const modelV2 = createAccountModelV2Projection(project.projection, { observedAt: new Date(now()).toISOString() })
+          const projection = clone(project.projection)
+          return { ...projection, modelV2 }
+        }),
         ...(dashboard ? { dashboard: clone(dashboard) } : {}),
         session: { expiresAt: new Date(Math.min(identity.expiresAt, now() + 7 * DAY_MS)).toISOString(), revocable: true },
         completionAuthority: false,

@@ -42,6 +42,21 @@ test('owner session resolves membership server-side and returns only Cherry Note
   assert.equal(result.workspace.id, workspace)
   assert.deepEqual(result.projects.map((project) => project.project.id), ['cherry-note', 'outcome'])
   assert.equal(JSON.stringify(result).includes('nol-ax'), false)
+  assert.deepEqual(result.projects.map((project) => [project.project.id, project.modelV2.modelVersion, project.modelV2.state]), [['cherry-note', 2, 'no_active_work'], ['outcome', 2, 'no_active_work']])
+  assert.equal(result.projects.every((project) => project.modelV2.project.id === project.project.id), true)
+})
+
+test('hostile project projection is rejected before traps and exposes no workspace payload', async () => {
+  let traps = 0
+  const projection = new Proxy({}, { get() { traps += 1 }, ownKeys() { traps += 1 }, getOwnPropertyDescriptor() { traps += 1 }, getPrototypeOf() { traps += 1 } })
+  const store = {
+    membershipsForSubject: async () => [{ subject: owner, workspaceId: workspace, role: 'owner-viewer', state: 'active' }],
+    workspace: async () => ({ id: workspace, state: 'active' }),
+    projectsForWorkspace: async () => [{ id: 'outcome', workspaceId: workspace, state: 'active', projection }],
+  }
+  const service = createAccountAccessService({ authProvider: auth(), store, ownerSubject: owner, now })
+  await assert.rejects(() => service.readWorkspace({ token: 'valid' }), /account_model_v2_proxy_forbidden/)
+  assert.equal(traps, 0)
 })
 
 for (const [name, options, request, code] of [

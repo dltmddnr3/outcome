@@ -7,7 +7,9 @@ export type PrivateGate = { id: string; title: string; closed: boolean }
 export type PrivateStage = { id: string; title: string; gate?: { gates?: PrivateGate[] } }
 export type PrivateScope = { id: string; title: string; stages: PrivateStage[] }
 export type PrivatePhase = { id: string; title: string; scopes: PrivateScope[] }
-export type PrivateProjectProjection = { project: { id: string; name: string }; phases: PrivatePhase[]; current: { phaseId: string; scopeId: string; stageId: string } }
+export type PrivateModelV2State = 'loading' | 'stale' | 'conflict' | 'blocked' | 'delivery_unknown' | 'no_active_work' | 'ready'
+export type PrivateModelV2Projection = { schemaVersion: 1; modelVersion: 2; project: { id: string; label: string }; destination: { id: string; label: string } | null; remainingAcceptanceGap: { remaining: number; total: number }; now: { observedAt: string; state: PrivateModelV2State }; readyBoundary: string[]; nextAction: string | null; cherryAction: string | null; state: PrivateModelV2State; events: Array<{ type: string; state: string; observedAt: string; summary: string }> }
+export type PrivateProjectProjection = { project: { id: string; name: string }; phases: PrivatePhase[]; current: { phaseId: string; scopeId: string; stageId: string }; modelV2?: PrivateModelV2Projection }
 export type PrivateWorkspaceView = { viewState?: string; projects?: PrivateProjectProjection[]; dashboard?: OutcomeDashboardData }
 
 async function readJson<T>(response: Response): Promise<T> {
