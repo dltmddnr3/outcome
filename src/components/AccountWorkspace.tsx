@@ -43,7 +43,8 @@ export function AccountWorkspace({ state = 'unavailable', workspace, ownerVerifi
   const projects = workspace?.projects ?? []
   const [selection, setSelection] = useState<PrivateSelection | null>(null)
   const [busy, setBusy] = useState<LoginProvider | 'logout' | null>(null)
-  if (state === 'ready' && workspace?.dashboard) return <OutcomeDashboard initialData={workspace.dashboard} privateProjects={projects} onUnauthorized={() => undefined} onLogout={onLogout} />
+  const modelV2Only = projects.some((item) => item.modelV2 && (!item.current || !Array.isArray(item.phases)))
+  if (state === 'ready' && (workspace?.dashboard || modelV2Only)) return <OutcomeDashboard initialData={workspace?.dashboard} privateProjects={projects} onUnauthorized={() => undefined} onLogout={onLogout} />
   const project = projects.find((item) => item.project.id === selection?.projectId) ?? projects[0] ?? null
   const safeSelection = project && selection?.projectId === project.project.id ? selection : project ? initialSelection(project) : null
   const phase = project?.phases.find((item) => item.id === safeSelection?.phaseId) ?? project?.phases[0] ?? null

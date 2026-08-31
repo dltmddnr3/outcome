@@ -97,6 +97,21 @@ describe('account workspace presentation contract', () => {
     expect(html).not.toContain('OUTCOME 원본 묶음을 검증하고 있습니다')
   })
 
+  it('실제 account service의 project와 modelV2만 있는 envelope도 dashboard 없이 Current Projection을 렌더링한다', () => {
+    const projects = [
+      { project: { id: 'cherry-note', name: 'Cherry Note' }, modelV2: modelV2('cherry-note', 'Cherry Note') },
+      { project: { id: 'outcome', name: 'OUTCOME' }, modelV2: modelV2('outcome', 'OUTCOME') },
+    ]
+    const html = renderToStaticMarkup(<AccountWorkspace state="ready" workspace={{ projects } as unknown as typeof readyWorkspace} />)
+    expect(html).toContain('oc-global-nav')
+    expect(html).toContain('oc-project-switcher')
+    expect(html.match(/data-private-project=/g)).toHaveLength(2)
+    expect(html).toContain('Current Projection')
+    expect(html).toContain('OUTCOME Destination')
+    expect(html).toContain('v1 호환 정보 없음')
+    expect(html).not.toContain('account-workspace__ready')
+  })
+
   it('login은 실제 OAuth가 아닌 주입 어댑터 전환을 명시하고 ready에는 로그아웃이 있다', () => {
     const login = renderToStaticMarkup(<AccountWorkspace state="login" onLogin={async () => {}} />)
     expect(login).toContain('실제 OAuth 연결 아님')
