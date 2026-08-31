@@ -344,7 +344,7 @@ body:has(.account-workspace){min-width:0}
 .oc-new-project small,.oc-management small{color:#929b90;font-size:11px;font-weight:500;white-space:nowrap}
 .oc-new-project:disabled,.oc-management button:disabled,.oc-project-menu:disabled{cursor:not-allowed;opacity:1}
 .oc-project-search{display:grid;grid-template-columns:18px minmax(0,1fr);align-items:center;gap:8px;min-height:44px;padding:0 10px;border:1px solid #303a30;border-radius:7px;background:#0b0f0b;color:#929b90}
-.oc-project-search input{width:100%;min-width:0;border:0;outline:0;background:transparent;color:#e5e9e2;font-size:13px}
+.oc-project-search input{width:100%;min-width:0;min-height:44px;border:0;outline:0;background:transparent;color:#e5e9e2;font-size:13px}
 .oc-project-search input::placeholder{color:#858e84}
 .oc-project-search:focus-within{border-color:#657263;outline:2px solid #adff2f;outline-offset:1px}
 .oc-projects{padding:10px 0 12px;border-bottom:1px solid #303a30}
