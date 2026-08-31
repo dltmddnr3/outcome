@@ -7,6 +7,8 @@ export const ACCOUNT_MODEL_V2_STATES = Object.freeze(['loading', 'stale', 'confl
 const PRIVATE_KEY = /(?:credential|password|secret|token|raw[_-]?(?:prompt|result)|registry|locator|thread|session|turn|provider[_-]?id)/i
 const PRIVATE_VALUE = /(?:^|[\s=:])(?:token|secret|password|credential)\s*=|(?:^|\s)(?:\/Users\/|\/private\/|[A-Za-z]:\\)|raw[_-]?(?:prompt|result)|private[_-]?(?:registry|locator)|\b[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}\b/i
 const PLAIN = Object.getPrototypeOf({})
+const STATE_HINTS = Object.freeze(['loading', 'stale', 'conflict', 'blocked', 'delivery_unknown'])
+const ROOT_KEYS = new Set(['project', 'current', 'phases', 'observedAt', 'bindings', 'connectors', 'errors', 'next', 'now', 'progress', 'sourceFreshness', 'status', ...STATE_HINTS])
 
 const materialize = (value, seen = new WeakSet()) => {
   if (value === null || typeof value !== 'object') {
@@ -47,7 +49,55 @@ const safeText = (value) => {
   return value.trim()
 }
 
-const stateFor = (projection) => {
+const assertKeys = (value, allowed) => {
+  if (Object.keys(value).some((key) => !allowed.has(key))) throw new Error('account_model_v2_unexpected_key')
+}
+
+const validateSourceContract = (source) => {
+  assertKeys(source, ROOT_KEYS)
+  assertKeys(source.project, new Set(['id', 'name', 'outcome', 'acceptanceAuthority']))
+  if (source.current !== undefined) assertKeys(source.current, new Set(['phaseId', 'scopeId', 'stageId']))
+  if (source.next !== undefined && source.next !== null) assertKeys(source.next, new Set(['phaseId', 'scopeId', 'stageId']))
+  if (source.now !== undefined) assertKeys(source.now, new Set(['status', 'activity', 'observedAt', 'source']))
+  if (source.progress !== undefined) assertKeys(source.progress, new Set(['available', 'reason']))
+  if (source.sourceFreshness !== undefined) assertKeys(source.sourceFreshness, new Set(['state', 'observedAt']))
+  for (const binding of source.bindings ?? []) assertKeys(binding, new Set(['role', 'status', 'activity', 'boundAt', 'observedAt', 'freshness', 'historyCount', 'stageId']))
+  if (source.connectors !== undefined) {
+    assertKeys(source.connectors, new Set(['github']))
+    if (source.connectors.github !== undefined) {
+      const github = source.connectors.github
+      assertKeys(github, new Set(['adopted', 'required', 'state', 'repository', 'remoteName', 'defaultBranch', 'completionAuthority', 'localCandidate', 'published', 'checks', 'release']))
+      if (github.localCandidate !== undefined) assertKeys(github.localCandidate, new Set(['state', 'branch', 'ahead', 'behind', 'sync']))
+      if (github.published !== undefined) assertKeys(github.published, new Set(['state', 'repository', 'ref', 'detail']))
+      if (github.checks !== undefined) assertKeys(github.checks, new Set(['state']))
+      if (github.release !== undefined) assertKeys(github.release, new Set(['state']))
+    }
+  }
+  for (const phase of source.phases ?? []) {
+    assertKeys(phase, new Set(['id', 'title', 'purpose', 'scopes', 'completion']))
+    for (const scope of phase.scopes ?? []) {
+      assertKeys(scope, new Set(['id', 'title', 'purpose', 'stages']))
+      for (const stage of scope.stages ?? []) {
+        assertKeys(stage, new Set(['id', 'title', 'purpose', 'dependsOn', 'gate', 'axes', 'expectedDurationMinutes', 'gatePurpose', 'sourceState', 'state']))
+        if (stage.axes !== undefined) assertKeys(stage.axes, new Set(['cherryAcceptance', 'evidence', 'implementation', 'independentQa', 'release', 'test']))
+        if (stage.gate !== undefined) {
+          assertKeys(stage.gate, new Set(['sourceRef', 'gates', 'available', 'closed', 'groups', 'observedAt', 'total']))
+          for (const gate of stage.gate.gates ?? []) assertKeys(gate, new Set(['id', 'title', 'closed', 'evidence', 'groupCode', 'groupLabel', 'proves', 'stageId']))
+          for (const group of stage.gate.groups ?? []) assertKeys(group, new Set(['closed', 'code', 'name', 'sourceName', 'total']))
+        }
+      }
+    }
+  }
+  const requested = STATE_HINTS.filter((key) => {
+    if (source[key] !== undefined && typeof source[key] !== 'boolean') throw new Error('account_model_v2_state_invalid')
+    return source[key] === true
+  })
+  if (requested.length > 1) throw new Error('account_model_v2_state_conflict')
+  return requested[0] ?? null
+}
+
+const stateFor = (projection, requestedState) => {
+  if (requestedState !== null) return requestedState
   if (projection.stale) return 'stale'
   if (projection.conflict) return 'conflict'
   if (projection.delivery_unknown_count > 0) return 'delivery_unknown'
@@ -58,6 +108,7 @@ const stateFor = (projection) => {
 
 export function createAccountModelV2Projection(value, { observedAt } = {}) {
   const source = materialize(value)
+  const requestedState = validateSourceContract(source)
   const graph = translateV1Package(source)
   const canonical = JSON.stringify(source)
   const sourceRevision = createHash('sha256').update(canonical).digest('hex')
@@ -65,7 +116,7 @@ export function createAccountModelV2Projection(value, { observedAt } = {}) {
   if (typeof observed !== 'string' || !Number.isFinite(Date.parse(observed))) throw new Error('account_model_v2_observed_at_invalid')
   const projection = projectOutcomeV2({ graph, source_revision: sourceRevision, observed_at: observed })
   const destination = graph.destinations.find((row) => row.id === projection.primary_destination) ?? null
-  const state = stateFor(projection)
+  const state = stateFor(projection, requestedState)
   return Object.freeze({
     schemaVersion: 1,
     modelVersion: 2,

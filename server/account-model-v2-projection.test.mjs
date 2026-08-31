@@ -30,13 +30,48 @@ test('minimal legacy project fails safe to no active work without client calcula
   assert.deepEqual(projection.remainingAcceptanceGap, { remaining: 0, total: 0 })
 })
 
+test('all seven server-owned states are independently reachable without conflation', () => {
+  const variants = [
+    ['loading', { ...project(), loading: true }],
+    ['stale', { ...project(), stale: true }],
+    ['conflict', { ...project(), conflict: true }],
+    ['blocked', { ...project(), blocked: true }],
+    ['delivery_unknown', { ...project(), delivery_unknown: true }],
+    ['no_active_work', { project: { id: 'outcome', name: 'OUTCOME' } }],
+    ['ready', project()],
+  ]
+  assert.deepEqual(variants.map(([expected, value]) => [expected, createAccountModelV2Projection(value, { observedAt }).state]), variants.map(([expected]) => [expected, expected]))
+})
+
+test('recursive source allowlist rejects every unexpected own data key', () => {
+  const variants = [
+    { ...project(), unexpected: { foo: 'bar' } },
+    { ...project(), project: { ...project().project, unexpected: {} } },
+    { ...project(), current: { ...project().current, unexpected: {} } },
+    { ...project(), phases: [{ ...project().phases[0], unexpected: {} }] },
+    { ...project(), phases: [{ ...project().phases[0], scopes: [{ ...project().phases[0].scopes[0], unexpected: {} }] }] },
+    { ...project(), phases: [{ ...project().phases[0], scopes: [{ ...project().phases[0].scopes[0], stages: [{ ...project().phases[0].scopes[0].stages[0], unexpected: {} }] }] }] },
+    { ...project(), phases: [{ ...project().phases[0], scopes: [{ ...project().phases[0].scopes[0], stages: [{ ...project().phases[0].scopes[0].stages[0], gate: { ...project().phases[0].scopes[0].stages[0].gate, unexpected: {} } }] }] }] },
+    { ...project(), phases: [{ ...project().phases[0], scopes: [{ ...project().phases[0].scopes[0], stages: [{ ...project().phases[0].scopes[0].stages[0], gate: { ...project().phases[0].scopes[0].stages[0].gate, gates: [{ ...project().phases[0].scopes[0].stages[0].gate.gates[0], unexpected: {} }] } }] }] }] },
+  ]
+  for (const value of variants) assert.throws(() => createAccountModelV2Projection(value, { observedAt }), /account_model_v2_unexpected_key/)
+})
+
+test('state hints are exact booleans and mutually exclusive', () => {
+  assert.throws(() => createAccountModelV2Projection({ ...project(), stale: 'true' }, { observedAt }), /account_model_v2_state_invalid/)
+  assert.throws(() => createAccountModelV2Projection({ ...project(), stale: true, conflict: true }, { observedAt }), /account_model_v2_state_conflict/)
+})
+
 test('hostile nested input fails closed before traps or private serialization', () => {
   let traps = 0
   const proxy = new Proxy(project(), { get() { traps += 1 }, ownKeys() { traps += 1 }, getOwnPropertyDescriptor() { traps += 1 }, getPrototypeOf() { traps += 1 } })
   assert.throws(() => createAccountModelV2Projection(proxy, { observedAt }), /proxy_forbidden/)
   assert.equal(traps, 0)
+  const cycle = project(); cycle.current.self = cycle
   const variants = [
     { ...project(), raw_prompt: 'safe' },
+    { ...project(), raw_result: 'safe' },
+    { ...project(), registry: {} },
     { ...project(), extra: { locator: 'private' } },
     { ...project(), extra: { path: '/Users/private/result' } },
     { ...project(), extra: { credential: 'value' } },
@@ -45,6 +80,8 @@ test('hostile nested input fails closed before traps or private serialization', 
     { ...project(), extra: Object.defineProperty({}, 'value', { get() { throw new Error('trap') }, enumerable: true }) },
     { ...project(), extra: { [Symbol('private')]: 'value' } },
     { ...project(), phases: Object.defineProperty([], '0', { get() { traps += 1; return {} }, enumerable: true }) },
+    cycle,
+    Object.assign(Object.create({ inherited: true }), project()),
   ]
   for (const value of variants) assert.throws(() => createAccountModelV2Projection(value, { observedAt }), /account_model_v2_/)
   assert.equal(traps, 0)
