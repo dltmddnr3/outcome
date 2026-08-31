@@ -2,7 +2,7 @@
 
 Outcome: Model v2 is the verified local default with selective context, then becomes the user-facing private workspace projection without deployment or release authority.
 
-Status: **SLICE B1 PASSED · B2 READY · DEPLOYMENT/PRODUCTION/RELEASE EXCLUDED**
+Status: **SLICE B2 PASSED · B3 READY · DEPLOYMENT/PRODUCTION/RELEASE EXCLUDED**
 
 - [x] D1: Product meaning, selective-context boundary, information architecture, ownership and rollback are fixed in one contract.
   CHECK: rg -q "Selective context contract" docs/OUTCOME_MODEL_V2_LOCAL_DEFAULT_AND_SERVICE_PROJECTION_CONTRACT.md && rg -q "Service information architecture" docs/OUTCOME_MODEL_V2_LOCAL_DEFAULT_AND_SERVICE_PROJECTION_CONTRACT.md && rg -q "Current Projection is the only source" docs/OUTCOME_MODEL_V2_LOCAL_DEFAULT_AND_SERVICE_PROJECTION_CONTRACT.md && echo D1_PASS
@@ -32,8 +32,8 @@ Status: **SLICE B1 PASSED · B2 READY · DEPLOYMENT/PRODUCTION/RELEASE EXCLUDED*
 - [x] B1: The authorized private workspace consumes one versioned Model v2 server projection and uses Destination, current gap, Now, next boundary and Cherry action as the default information hierarchy.
   EVIDENCE: Builder correction `6442b37089fd3132ba9ee54f3cfe1e79e41028de` and fresh independent re-QA carrier `ce07f96ee77ad1f9c3784884fedb17e552db2928` establish server-owned versioned projection; seven states `7/7`; recursive extra-key rejection `21/21`; hostile rejection `14/14` with trap executions `0`; authorization/isolation `33/33`; Model/package/projection regression `69/69`; frontend Vitest `29/29`; external/runtime/provider/registry/deploy/release/acceptance mutation `0`; false completion `0`. Production build and built-output scan remain residual unknown after one bounded attempt produced no `dist`. Promotion receipt: `docs/OUTCOME_MODEL_V2_SERVICE_PROJECTION_B1_EVIDENCE_PROMOTION_RECEIPT.md`.
 
-- [ ] B2: Desktop and mobile keep v1 hierarchy, role bindings and technical evidence behind disclosure while preserving project switch, authentication and read-only account isolation.
-  EVIDENCE: pending
+- [x] B2: Desktop and mobile keep v1 hierarchy, role bindings and technical evidence behind disclosure while preserving project switch, authentication and read-only account isolation.
+  EVIDENCE: Product candidate `84d9739965a2a8211b703d7ffd6cc6f085678b94` and fresh independent QA PASS carrier `97c4b3dbdd4755ddde116c8a707fcde1aebd7e39`, report SHA-256 `72d7d6c1ea23c4f8ba6fe3613d458d5b2e01609606d7e2723521ed5657a8f58a`, establish the real dashboard-less `{project, modelV2}` account envelope; nonblank desktop/mobile workspace; Current Projection present; private switcher restricted to the two server-authorized projects with hostile unmatched public project excluded; project switching; truthful collapsed compatibility; steady overflow/overlap `0`; minimum control height `44px`; page/runtime errors and private leakage `0`; focused/frontend/dashboard/account Node/account frontend suites `75/75`, `96/96`, `93/93`, `33/33`, `32/32`; production build `1,653` modules. Promotion receipt: `docs/OUTCOME_MODEL_V2_SERVICE_PROJECTION_B2_EVIDENCE_PROMOTION_RECEIPT.md`.
 
 - [ ] B3: Planner conversation renders only observed adapter events and never fabricates streaming, tool activity, completion or progress.
   EVIDENCE: pending
