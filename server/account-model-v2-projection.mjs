@@ -6,6 +6,7 @@ export const ACCOUNT_MODEL_V2_STATES = Object.freeze(['loading', 'stale', 'confl
 
 const PRIVATE_KEY = /(?:credential|password|secret|token|raw[_-]?(?:prompt|result)|registry|locator|thread|session|turn|provider[_-]?id)/i
 const PRIVATE_VALUE = /(?:^|[\s=:])(?:token|secret|password|credential)\s*=|(?:^|\s)(?:\/Users\/|\/private\/|[A-Za-z]:\\)|raw[_-]?(?:prompt|result)|private[_-]?(?:registry|locator)|\b[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}\b/i
+const EVENT_PRIVATE_VALUE = /(?:^|[\s=:])(?:token|secret|password|credential)\s*=|(?:^|[\s=:])(?:registry|provider)[_-]?(?:payload|id|ref)?\s*=|(?:^|[\s=:])(?:\/(?:Users|home|tmp|private)(?:\/|$)|\/var\/folders(?:\/|$)|[A-Za-z]:\\|\\\\[^\\\s]+\\)|raw[_-]?(?:prompt|result)|private[_-]?(?:registry|locator)|\b(?:task|thread|session|turn)[_-][a-z0-9_-]{4,}\b|\b(?:[0-9a-f]{40}|[0-9a-f]{64})\b|\b[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}\b/i
 const PLAIN = Object.getPrototypeOf({})
 const STATE_HINTS = Object.freeze(['loading', 'stale', 'conflict', 'blocked', 'delivery_unknown'])
 const ROOT_KEYS = new Set(['project', 'current', 'phases', 'events', 'observedAt', 'bindings', 'connectors', 'errors', 'next', 'now', 'progress', 'sourceFreshness', 'status', ...STATE_HINTS])
@@ -50,6 +51,7 @@ const safeText = (value) => {
   if (typeof value !== 'string' || !value.trim() || PRIVATE_VALUE.test(value)) throw new Error('account_model_v2_public_text_invalid')
   return value.trim()
 }
+const safeEventSummary = (value) => { const summary = safeText(value); if (EVENT_PRIVATE_VALUE.test(summary)) throw new Error('account_model_v2_event_private_value'); return summary }
 
 const assertKeys = (value, allowed) => {
   if (Object.keys(value).some((key) => !allowed.has(key))) throw new Error('account_model_v2_unexpected_key')
@@ -69,7 +71,7 @@ const validateSourceContract = (source) => {
     if (!EVENT_STATUSES.has(event.status)) throw new Error('account_model_v2_event_status_invalid')
     if (event.status === 'active' && event.type !== 'work_observed') throw new Error('account_model_v2_event_active_invalid')
     if (typeof event.observedAt !== 'string' || !Number.isFinite(Date.parse(event.observedAt))) throw new Error('account_model_v2_event_time_invalid')
-    safeText(event.summary)
+    safeEventSummary(event.summary)
   }
   for (const binding of source.bindings ?? []) assertKeys(binding, new Set(['role', 'status', 'activity', 'boundAt', 'observedAt', 'freshness', 'historyCount', 'stageId']))
   if (source.connectors !== undefined) {
@@ -127,7 +129,14 @@ export function createAccountModelV2Projection(value, { observedAt } = {}) {
   const projection = projectOutcomeV2({ graph, source_revision: sourceRevision, observed_at: observed })
   const destination = graph.destinations.find((row) => row.id === projection.primary_destination) ?? null
   const state = stateFor(projection, requestedState)
-  const events = (source.events ?? []).map((event) => Object.freeze({ type: event.type, summary: safeText(event.summary), observedAt: event.observedAt, status: event.status })).sort((left, right) => left.observedAt.localeCompare(right.observedAt) || left.type.localeCompare(right.type) || left.summary.localeCompare(right.summary))
+  const eventIdentities = new Set()
+  const events = (source.events ?? []).map((event) => {
+    const normalized = Object.freeze({ type: event.type, summary: safeEventSummary(event.summary), observedAt: new Date(event.observedAt).toISOString(), status: event.status })
+    const identity = JSON.stringify(normalized)
+    if (eventIdentities.has(identity)) throw new Error('account_model_v2_event_duplicate')
+    eventIdentities.add(identity)
+    return normalized
+  }).sort((left, right) => Date.parse(left.observedAt) - Date.parse(right.observedAt) || left.type.localeCompare(right.type) || left.summary.localeCompare(right.summary) || left.status.localeCompare(right.status))
   return Object.freeze({
     schemaVersion: 1,
     modelVersion: 2,

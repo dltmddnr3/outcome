@@ -74,6 +74,25 @@ test('Planner events reject proxies accessors private identifiers paths prompts 
   assert.equal(traps, 0)
 })
 
+test('Planner public summaries reject content identifiers named private identifiers and every local path family', () => {
+  const values = [
+    'a'.repeat(40), 'b'.repeat(64), 'thread_private_identifier_123', 'task-private-identifier-123', 'session_private_identifier_123', 'turn-private-identifier-123',
+    '/Users/cherry/result', '/home/cherry/result', '/tmp/private-result', '/private/var/result', '/var/folders/aa/result', 'C:\\Users\\cherry\\result', '\\\\server\\share\\result',
+    'raw_prompt=hidden', 'raw_result=hidden', 'registry_payload=hidden', 'provider_payload=hidden', 'credential=hidden',
+  ]
+  for (const summary of values) assert.throws(() => createAccountModelV2Projection({ ...project(), events: [event({ summary })] }, { observedAt }), /account_model_v2_private_value|account_model_v2_public_text_invalid|account_model_v2_event_private_value/)
+})
+
+test('Planner timestamps normalize to canonical UTC and sort by epoch', () => {
+  const projection = createAccountModelV2Projection({ ...project(), events: [event({ summary: 'actual later', observedAt: '2026-08-30T23:30:00.000Z' }), event({ summary: 'actual earlier', observedAt: '2026-08-31T01:00:00+02:00' })] }, { observedAt })
+  assert.deepEqual(projection.events.map((row) => [row.summary, row.observedAt]), [['actual earlier', '2026-08-30T23:00:00.000Z'], ['actual later', '2026-08-30T23:30:00.000Z']])
+  assert.equal(JSON.stringify(projection), JSON.stringify(createAccountModelV2Projection({ ...project(), events: [event({ summary: 'actual later', observedAt: '2026-08-30T23:30:00.000Z' }), event({ summary: 'actual earlier', observedAt: '2026-08-31T01:00:00+02:00' })] }, { observedAt })))
+})
+
+test('normalized byte-equivalent Planner observations fail closed as duplicates', () => {
+  assert.throws(() => createAccountModelV2Projection({ ...project(), events: [event({ observedAt: '2026-08-31T01:00:00+02:00' }), event({ observedAt: '2026-08-30T23:00:00.000Z' })] }, { observedAt }), /account_model_v2_event_duplicate/)
+})
+
 test('recursive source allowlist rejects every unexpected own data key', () => {
   const variants = [
     { ...project(), unexpected: { foo: 'bar' } },
