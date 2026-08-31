@@ -8,6 +8,7 @@ const project = (id = 'outcome') => ({
   current: { phaseId: 'destination-one' },
   phases: [{ id: 'destination-one', title: 'Destination', purpose: 'Safe outcome', scopes: [{ stages: [{ id: 'milestone-one', title: 'Milestone', purpose: 'User result', dependsOn: [], gate: { sourceRef: 'GATES.md', gates: [{ id: 'B1', title: 'Server projection', closed: false }] } }] }] }],
 })
+const event = (overrides = {}) => ({ type: 'work_observed', summary: 'Planner가 다음 경계를 확인했습니다.', observedAt: '2026-08-31T00:01:00.000Z', status: 'active', ...overrides })
 
 test('authorized project projection is versioned, deterministic and exact-allowlisted', () => {
   const projection = createAccountModelV2Projection(project(), { observedAt })
@@ -41,6 +42,36 @@ test('all seven server-owned states are independently reachable without conflati
     ['ready', project()],
   ]
   assert.deepEqual(variants.map(([expected, value]) => [expected, createAccountModelV2Projection(value, { observedAt }).state]), variants.map(([expected]) => [expected, expected]))
+})
+
+test('observed Planner events are exact-allowlisted and deterministically chronological', () => {
+  const projection = createAccountModelV2Projection({ ...project(), events: [event(), event({ type: 'result_observed', summary: '검증 결과가 관측됐습니다.', observedAt: '2026-08-31T00:00:30.000Z', status: 'observed' })] }, { observedAt })
+  assert.deepEqual(projection.events, [
+    { type: 'result_observed', summary: '검증 결과가 관측됐습니다.', observedAt: '2026-08-31T00:00:30.000Z', status: 'observed' },
+    event(),
+  ])
+  assert.deepEqual(createAccountModelV2Projection(project(), { observedAt }).events, [])
+})
+
+test('terminal Planner events remain explicit and never become active or completed', () => {
+  const statuses = ['blocked', 'delivery_unknown', 'failed', 'rejected', 'safe_hold']
+  const projection = createAccountModelV2Projection({ ...project(), events: statuses.map((status, index) => event({ type: 'result_observed', summary: `${status} 상태가 관측됐습니다.`, observedAt: `2026-08-31T00:0${index + 1}:00.000Z`, status })) }, { observedAt })
+  assert.deepEqual(projection.events.map((row) => row.status), statuses)
+  assert.equal(projection.events.some((row) => ['active', 'completed'].includes(row.status)), false)
+})
+
+test('Planner event schema rejects invalid type status timestamp active inference and extra keys', () => {
+  for (const value of [
+    event({ type: 'tool_call' }), event({ status: 'completed' }), event({ observedAt: 'not-a-date' }), event({ type: 'result_observed', status: 'active' }), { ...event(), extra: true },
+  ]) assert.throws(() => createAccountModelV2Projection({ ...project(), events: [value] }, { observedAt }), /account_model_v2_event|account_model_v2_unexpected_key/)
+})
+
+test('Planner events reject proxies accessors private identifiers paths prompts results and nested values before traps', () => {
+  let traps = 0
+  const proxy = new Proxy(event(), { get() { traps += 1 }, ownKeys() { traps += 1 }, getOwnPropertyDescriptor() { traps += 1 }, getPrototypeOf() { traps += 1 } })
+  const values = [proxy, Object.defineProperty({}, 'type', { get() { traps += 1 }, enumerable: true }), event({ summary: '/Users/private/result' }), event({ summary: 'raw_prompt=hidden' }), event({ summary: 'raw_result=hidden' }), event({ summary: 'task e38a17e5-7c5c-4a13-b3cf-ce8557dea226' }), { ...event(), detail: { token: 'secret' } }]
+  for (const value of values) assert.throws(() => createAccountModelV2Projection({ ...project(), events: [value] }, { observedAt }), /account_model_v2_/)
+  assert.equal(traps, 0)
 })
 
 test('recursive source allowlist rejects every unexpected own data key', () => {

@@ -93,6 +93,8 @@ describe('account workspace presentation contract', () => {
     expect(html).toContain('oc-project-switcher')
     expect(html).toContain('Current Projection')
     expect(html).toContain('OUTCOME Destination')
+    expect(html).toContain('Planner conversation')
+    expect(html).toContain('아직 관측된 Planner 작업 이벤트가 없습니다')
     expect(html).toContain('v1 호환 정보 없음')
     expect(html).not.toContain('OUTCOME 원본 묶음을 검증하고 있습니다')
   })

@@ -32,7 +32,7 @@ describe('Current Projection presentation contract', () => {
   })
 
   it('omits Cherry action when null and never renders events or extra private fields', () => {
-    const hostile = { ...projection({ cherryAction: null }), events: [{ type: 'tool', state: 'running', observedAt: 'now', summary: 'fake tool activity' }], privateLocator: 'private-task-locator', rawPrompt: 'secret prompt' } as PrivateModelV2Projection
+    const hostile = { ...projection({ cherryAction: null }), events: [{ type: 'tool', state: 'running', observedAt: 'now', summary: 'fake tool activity' }], privateLocator: 'private-task-locator', rawPrompt: 'secret prompt' } as unknown as PrivateModelV2Projection
     const html = renderToStaticMarkup(<CurrentProjection projection={hostile} />)
     for (const hidden of ['Cherry action', 'fake tool activity', 'private-task-locator', 'secret prompt']) expect(html).not.toContain(hidden)
   })
