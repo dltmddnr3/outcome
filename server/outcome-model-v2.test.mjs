@@ -112,6 +112,38 @@ test('B3-B5 role selection no-role rollback and negative controls are determinis
   assert.throws(() => compileOutcomeSelectiveContextPlan({ ...make('builder', 'mango-implementation-engineer'), available_source_digests: { ...available, 'docs/OUTCOME_CONTRACT.md': digest('d') }, expansion_allowlist: [{ source_ref: duplicate.source_ref, source_digest: duplicate.source_digest }], expansions: [duplicate, duplicate] }), /duplicate_expansion/)
 })
 
+test('QA correction rejects hostile source refs before callback and projects no refs into public receipts', () => {
+  const digest = 'a'.repeat(64)
+  const sources = { agents: { source_ref: 'AGENTS.md', source_digest: digest }, active_snapshot: { source_ref: 'active-bootstrap-snapshot', source_digest: digest }, current_gate: { source_ref: 'GATES_OUTCOME_MODEL_V2_SELECTIVE_CONTEXT_LOCAL_ACTIVATION.md', source_digest: digest }, current_handoff: null }
+  const hostileRefs = ['thread-private-marker', 'registry-locator-ref', 'provider-payload-ref', 'TASK_ID_private', 'Session-Id-private', 'turn.id.private', '<THREAD_ID>', 'REGISTRY_REF', 'Locator_Ref', '.outcome-runtime/private', 'Provider_Payload', 'vercel-response', 'credential-ref', 'PASSWORD_FILE', 'secret-token', 'raw-prompt', 'RAW_RESULT', '/Users/private/source', '/tmp/private-source', 'C:\\Users\\private\\source', 'provider\\payload', '<docs/OUTCOME_CONTRACT.md>', 'docs/THREAD_ID.md']
+  let callbacks = 0
+  const adapter = createCodexRuntimeAdapter({ selectNext: (value) => value, start: (value) => value, transition: (value) => value, projectPublic: () => ({ authority: 'projection_only' }), selectiveContextCapability: 'content-addressed-plan-v1', consumeContextPlan() { callbacks += 1; return { accepted: true } } })
+  for (const source_ref of hostileRefs) {
+    const available_source_digests = { ...Object.fromEntries(Object.values(sources).filter(Boolean).map((row) => [row.source_ref, row.source_digest])), [source_ref]: digest }
+    const expansion = { source_ref, source_digest: digest, reason: 'predicate-evidence', work_id: 'bounded-work' }
+    assert.throws(() => compileOutcomeSelectiveContextPlan({ environment: {}, work_id: 'bounded-work', work_type: 'builder', role_skill: 'mango-implementation-engineer', sources, available_source_digests, expansion_allowlist: [{ source_ref, source_digest: digest }], expansions: [expansion] }), /invalid_context_source_ref/)
+  }
+  assert.equal(callbacks, 0)
+  const validRef = 'docs/OUTCOME_CONTRACT.md'
+  const available_source_digests = { ...Object.fromEntries(Object.values(sources).filter(Boolean).map((row) => [row.source_ref, row.source_digest])), [validRef]: digest }
+  const plan = compileOutcomeSelectiveContextPlan({ environment: {}, work_id: 'bounded-work', work_type: 'builder', role_skill: 'mango-implementation-engineer', sources, available_source_digests, expansion_allowlist: [{ source_ref: validRef, source_digest: digest }], expansions: [{ source_ref: validRef, source_digest: digest, reason: 'predicate-evidence', work_id: 'bounded-work' }] })
+  const receipt = consumeOutcomeSelectiveContextPlan(adapter, plan)
+  assert.equal(callbacks, 1)
+  assert.deepEqual(receipt.loaded_sources.map((row) => Object.keys(row).sort()), receipt.loaded_sources.map(() => ['content_addressed', 'source_class']))
+  assert.doesNotMatch(JSON.stringify(receipt), /source_ref|AGENTS\.md|OUTCOME_CONTRACT|mango-implementation-engineer/)
+})
+
+test('QA correction rejects Proxy and accessor refs with zero traps and callbacks', () => {
+  let traps = 0
+  const digest = 'a'.repeat(64)
+  const base = { environment: {}, work_id: 'bounded-work', work_type: 'builder', role_skill: 'mango-implementation-engineer', sources: { agents: { source_ref: 'AGENTS.md', source_digest: digest }, active_snapshot: { source_ref: 'active-bootstrap-snapshot', source_digest: digest }, current_gate: { source_ref: 'GATES_OUTCOME_MODEL_V2_SELECTIVE_CONTEXT_LOCAL_ACTIVATION.md', source_digest: digest }, current_handoff: null }, available_source_digests: { 'AGENTS.md': digest, 'active-bootstrap-snapshot': digest, 'GATES_OUTCOME_MODEL_V2_SELECTIVE_CONTEXT_LOCAL_ACTIVATION.md': digest }, expansion_allowlist: [], expansions: [] }
+  const proxy = new Proxy({ source_ref: 'docs/OUTCOME_CONTRACT.md', source_digest: digest }, { get() { traps += 1 }, ownKeys() { traps += 1 }, getOwnPropertyDescriptor() { traps += 1 }, getPrototypeOf() { traps += 1 } })
+  assert.throws(() => compileOutcomeSelectiveContextPlan({ ...base, expansion_allowlist: [proxy] }), /proxy_forbidden/)
+  const accessor = {}; Object.defineProperty(accessor, 'source_ref', { enumerable: true, get() { traps += 1; return 'docs/OUTCOME_CONTRACT.md' } }); Object.defineProperty(accessor, 'source_digest', { enumerable: true, value: digest })
+  assert.throws(() => compileOutcomeSelectiveContextPlan({ ...base, expansion_allowlist: [accessor] }), /accessor_forbidden/)
+  assert.equal(traps, 0)
+})
+
 test('S2 S4 duplicate and zero-delta work allocate nothing and request an exact decision', () => {
   const zero = { id: 'work-zero', milestone_id: 'milestone-one', fingerprint: 'zero', acceptance_gap_delta: 0, uncertainty_delta: 0, blocker_delta: 0, user_value_delta: 0, reversible: true, cost: 0 }
   const projection = projectOutcomeV2({ graph: graph(), source_revision: source, observed_at: '2026-08-31T00:00:00.000Z', work_items: [zero] })

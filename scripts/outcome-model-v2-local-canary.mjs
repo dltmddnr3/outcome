@@ -19,7 +19,7 @@ const pinnedDigests = Object.freeze({
   'slice-contract': 'b7c0f31cec46dc658b950b28a65dff02ee21867a67f72a3e61428651de2ae657', gate: 'b6c156c60cfca729c261641a96401590f44d9e47845d5ae34dd4a028790e7357',
   'builder-receipt': '80a01e7597941d21b281da26b711005421831670ff4668ce80d2e6302a90acad', 'qa-receipt': '41f80e48b9475f59fabb636768470f87bf9d49cef22544e8b26f558fa0c0e8a3',
   'promotion-receipt': '75cae693bad35f8a7791941eefbd008605162073ee817fa3c7632d73c8b98dfb', 'failed-audit': '9e77063cfbc09517fa5e8376846902075a449205006ff021eff91765c279ba5b',
-  'activation-gate': '261f67b481b0f830973a6225012db9b938fe443caa49d1ab349ca8d4f8258a97',
+  'activation-gate': '8e34bcc7487a7e210fb27a6d2a75e68157dfc8bbc47530969276090ff7ab38b8',
 })
 const gateOrder = Object.freeze(['D1', 'D2', 'A1', 'A2', 'A3', 'A4', 'Q1', 'B1', 'B2', 'B3', 'Q2', 'A5', 'C1'])
 const commonSkillSources = Object.freeze(['skill:karpathy-guidelines', 'skill:unlazy'])

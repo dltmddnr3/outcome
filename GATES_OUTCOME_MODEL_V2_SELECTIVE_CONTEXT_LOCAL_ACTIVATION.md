@@ -2,7 +2,7 @@
 
 Outcome: The exact Cherry-accepted Model v2 carrier becomes the verified local session-bootstrap default, loading only the current snapshot, Gate, handoff and proportional skills; unsupported enforcement, source drift and role mismatch fail closed. Preview, Production, release and Phase transition are excluded.
 
-Status: **SELECTIVE CONTEXT LOCAL ACTIVATION CANDIDATE READY · BUILDER ONLY · PREVIEW/PRODUCTION/RELEASE/PHASE EXCLUDED**
+Status: **SELECTIVE CONTEXT PUBLIC RECEIPT PRIVACY CORRECTION CANDIDATE READY · BUILDER ONLY · FRESH RE-QA REQUIRED**
 
 - [x] D1: Exact accepted source and authority boundary are fixed.
   CHECK: git cat-file -e d726e200a9500658ae1fee5781d1d908a6b1a522^{commit} && git show d726e200a9500658ae1fee5781d1d908a6b1a522:GATES_OUTCOME_MODEL_V2_LOCAL_DEFAULT_AND_SERVICE_PROJECTION.md | rg -q 'MODEL V2 13/13 CHERRY ACCEPTED' && echo D1_PASS
@@ -35,14 +35,14 @@ Status: **SELECTIVE CONTEXT LOCAL ACTIVATION CANDIDATE READY · BUILDER ONLY · 
   EVIDENCE: Expansion requires exact allowlist digest, reason and matching work ID. Duplicate and unrelated expansions are denied; drift, missing input and unsupported adapter capability stop before callback with retry, fallback and false completion 0.
 
 - [x] B6: The local adapter emits a public-safe loaded/skipped-source receipt and never exposes physical task/session identifiers, locators, local paths, raw prompts/results, credentials or canonical-transition authority.
-  CHECK: node --test --test-name-pattern='selective context plan' server/outcome-model-v2.test.mjs && node scripts/outcome-model-v2-local-canary.mjs
+  CHECK: node --test --test-name-pattern='selective context plan|QA correction' server/outcome-model-v2.test.mjs && node scripts/outcome-model-v2-local-canary.mjs
   EXPECT: private survival `0`; authority remains projection-only
-  EVIDENCE: Receipt serialization negative-controls private identifier classes, locators, local paths, credentials, raw prompt/result and transition-authority vocabulary. Loaded/skipped records are content-addressed; execution-start, mutation and false-completion counters are 0.
+  EVIDENCE: Failed QA carrier `78f089fbd9fd32b1b00bde43dd354e21a1d2ff0f` proved three hostile source-ref classes survived the original receipt. Correction RED reproduced the exact verbatim survival. GREEN uses exact positive source allowlists before adapter callback and projects loaded/skipped rows only as finite `source_class` plus `content_addressed`; 23 identifier, registry/locator, provider payload, credential, raw carrier, POSIX/Windows path, mixed separator/casing and markup variants have compile/callback/receipt survival 0. Proxy/accessor traps execute 0; execution-start, mutation and false-completion counters remain 0.
 
 - [ ] Q1: Fresh independent UX & Product QA reproduces default activation, rollback, all four role manifests, on-demand expansion, privacy and fail-closed negative controls on the exact immutable candidate.
   CHECK: pending fresh QA receipt
   EXPECT: `PASS_UX_PRODUCT_QA_ONLY`
-  EVIDENCE: pending
+  EVIDENCE: Prior candidate verdict is preserved append-only as `FAIL_UX_PRODUCT_QA_ONLY`; fresh re-QA of the corrected immutable candidate is mandatory.
 
 - [ ] O1: Existing bound role tasks receive one non-mutating canary handoff each and observed turns prove the compact context contract without duplicate dispatch or claiming unobservable reads.
   CHECK: pending operational canary receipts

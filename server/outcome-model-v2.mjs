@@ -21,7 +21,10 @@ const rejectProxyTree = (value, seen = new WeakSet()) => {
   if (isProxy(value)) throw new Error('proxy_forbidden')
   if (seen.has(value)) return value
   seen.add(value)
-  for (const descriptor of Object.values(Object.getOwnPropertyDescriptors(value))) if (Object.hasOwn(descriptor, 'value')) rejectProxyTree(descriptor.value, seen)
+  for (const descriptor of Object.values(Object.getOwnPropertyDescriptors(value))) {
+    if (!Object.hasOwn(descriptor, 'value')) throw new Error('accessor_forbidden')
+    rejectProxyTree(descriptor.value, seen)
+  }
   return value
 }
 const acyclic = (rows, code) => {
@@ -193,7 +196,15 @@ const SELECTIVE_CONTEXT_ROLES = Object.freeze({
 })
 const SELECTIVE_CONTEXT_COMMON_SKILLS = Object.freeze(['karpathy-guidelines', 'unlazy'])
 const SELECTIVE_CONTEXT_SOURCE_KEYS = Object.freeze(['agents', 'active_snapshot', 'current_gate', 'current_handoff'])
-const PRIVATE_CONTEXT_REF = /(?:^\/|\.\.|\/Users\/|(?:thread|session|task|turn)[_-]?id|credential|password|secret|token|raw[_-]?(?:prompt|result))/i
+const SELECTIVE_CONTEXT_HANDOFF_REFS = new Set(['current-planner-checkpoint', 'current-builder-checkpoint', 'current-ux-product-qa-checkpoint', 'current-release-audit-checkpoint'])
+const SELECTIVE_CONTEXT_SKILLS = new Set([...SELECTIVE_CONTEXT_COMMON_SKILLS, ...Object.values(SELECTIVE_CONTEXT_ROLES).filter(Boolean)])
+const SELECTIVE_CONTEXT_DOCUMENT_REFS = new Set([
+  'docs/OUTCOME_CONTRACT.md',
+  'docs/OUTCOME_MAP.md',
+  'docs/OUTCOME_MODEL_V2_LOCAL_DEFAULT_AND_SERVICE_PROJECTION_CONTRACT.md',
+  'docs/OUTCOME_MODEL_V2_LOCAL_DEFAULT_CONTEXT_CANARY_FRESH_QA_RECEIPT.md',
+  'docs/OUTCOME_MODEL_V2_LOCAL_DEFAULT_CONTEXT_CANARY_MANIFEST_RECOMPILE_FRESH_REQA_RECEIPT.md',
+])
 const selectiveContextHold = (reason) => frozen({
   schema_version: 2,
   authority: 'projection_only',
@@ -203,10 +214,16 @@ const selectiveContextHold = (reason) => frozen({
   skipped_sources: frozen([]),
   safety: frozen({ execution_started_count: 0, automatic_retry_count: 0, duplicate_execution_count: 0, persistent_setting_mutation_count: 0, registry_provider_environment_mutation_count: 0, unauthorized_canonical_transition_count: 0, false_completion_count: 0 }),
 })
-const contextRef = (value) => {
-  if (typeof value !== 'string' || !value || PRIVATE_CONTEXT_REF.test(value)) throw new Error('invalid_context_source_ref')
-  return value
+const contextSourceClass = (value) => {
+  if (value === 'AGENTS.md') return 'project_instructions'
+  if (value === 'active-bootstrap-snapshot') return 'active_snapshot'
+  if (value === 'GATES_OUTCOME_MODEL_V2_SELECTIVE_CONTEXT_LOCAL_ACTIVATION.md') return 'current_gate'
+  if (SELECTIVE_CONTEXT_HANDOFF_REFS.has(value)) return 'current_handoff'
+  if (SELECTIVE_CONTEXT_DOCUMENT_REFS.has(value)) return 'approved_document'
+  if (value.startsWith('skill:') && SELECTIVE_CONTEXT_SKILLS.has(value.slice(6))) return SELECTIVE_CONTEXT_COMMON_SKILLS.includes(value.slice(6)) ? 'common_skill' : 'role_skill'
+  throw new Error('invalid_context_source_ref')
 }
+const contextRef = (value) => { if (typeof value !== 'string') throw new Error('invalid_context_source_ref'); contextSourceClass(value); return value }
 const contextDigest = (value) => { if (typeof value !== 'string' || !/^[a-f0-9]{64}$/.test(value)) throw new Error('invalid_context_source_digest'); return value }
 const contextSource = (value) => {
   exactKeys(value, ['source_ref', 'source_digest'])
@@ -217,8 +234,8 @@ const contextReceipt = (plan, outcome) => frozen({
   authority: 'projection_only',
   outcome,
   plan_digest: plan.plan_digest,
-  loaded_sources: plan.loaded_sources,
-  skipped_sources: plan.skipped_sources,
+  loaded_sources: frozen(plan.loaded_sources.map((row) => frozen({ source_class: contextSourceClass(row.source_ref), content_addressed: row.source_digest !== null }))),
+  skipped_sources: frozen(plan.skipped_sources.map((row) => frozen({ source_class: contextSourceClass(row.source_ref), content_addressed: row.source_digest !== null }))),
   expansion_count: plan.expansion_count,
   safety: plan.safety,
 })
