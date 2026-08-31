@@ -177,7 +177,9 @@ export function projectOutcomeV2(value) {
 export function applyOutcomeModelV2Pilot(value, options = {}) {
   rejectProxyTree(value); rejectProxyTree(options)
   const { environment = process.env, source_revision, observed_at = value.observedAt } = options
-  if (environment.OUTCOME_MODEL_V2_ENABLED !== '1') return value
+  const configured = environment.OUTCOME_MODEL_V2_ENABLED
+  if (configured === '0') return value
+  if (configured !== undefined && configured !== '1') throw new Error('invalid_model_v2_configuration')
   const projects = array(value.projects, 'invalid_package_collection').map((project) => { const graph = translateV1Package(project); return { project_id: project.project.id, graph, projection: projectOutcomeV2({ graph, source_revision, observed_at }) } })
   return { ...value, modelV2: { schemaVersion: 2, authority: 'projection_only', projects } }
 }

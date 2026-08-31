@@ -1,4 +1,5 @@
 import { existsSync, readFileSync, statSync, writeFileSync } from 'node:fs'
+import { createHash } from 'node:crypto'
 import { execFileSync } from 'node:child_process'
 import { basename, dirname, isAbsolute, join, resolve } from 'node:path'
 import { fileURLToPath } from 'node:url'
@@ -332,7 +333,8 @@ export function collectOutcomePackages({ bindingRegistry = [], now = new Date(),
   const resolvedEnvironment = environment ?? process.env
   const definitions = loadProjectRegistry({ environment: resolvedEnvironment, repositoryRoot })
   const value = { schemaVersion: 2, observedAt: now.toISOString(), projects: definitions.map((definition) => buildPackageModel({ ...definition, bindingRegistry, now })) }
-  return applyOutcomeModelV2Pilot(value, { environment: resolvedEnvironment, source_revision: resolvedEnvironment.OUTCOME_MODEL_V2_SOURCE_REVISION, observed_at: value.observedAt })
+  const sourceRevision = resolvedEnvironment.OUTCOME_MODEL_V2_SOURCE_REVISION ?? createHash('sha256').update(JSON.stringify(definitions.map(({ root, contractFile, mapFile }) => [safeRead(resolve(root, contractFile)), safeRead(resolve(root, mapFile))]))).digest('hex')
+  return applyOutcomeModelV2Pilot(value, { environment: resolvedEnvironment, source_revision: sourceRevision, observed_at: value.observedAt })
 }
 
 export function projectPublicPackages(value) {

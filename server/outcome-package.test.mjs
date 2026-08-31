@@ -62,9 +62,19 @@ test('project registry default config preserves Cherry Note and OUTCOME through 
 test('project registry collects three isolated Package identities through one loader', () => {
   const value = registryFixture(); const collected = collectOutcomePackages({ environment: { OUTCOME_PROJECT_REGISTRY: value.registryPath }, repositoryRoot: value.repositoryRoot })
   assert.deepEqual(collected.projects.map((project) => project.project.id), ['alpha', 'beta', 'gamma'])
+  assert.equal(collected.modelV2.schemaVersion, 2); assert.equal(collected.modelV2.authority, 'projection_only')
   assert.equal(collected.projects.every((project) => project.progress.available === false && project.connectors.github.completionAuthority === false), true)
   const absolute = JSON.parse(readFileSync(value.registryPath, 'utf8')); absolute.projects[0].root = join(value.repositoryRoot, 'alpha'); writeFileSync(value.registryPath, JSON.stringify(absolute))
   assert.deepEqual(collectOutcomePackages({ environment: { OUTCOME_PROJECT_REGISTRY: value.registryPath }, repositoryRoot: value.repositoryRoot }).projects.map((project) => project.project.id), ['alpha', 'beta', 'gamma'])
+})
+
+test('A1 package collector defaults to v2 and explicit zero preserves exact v1 collection bytes', () => {
+  const value = registryFixture(['alpha'])
+  const environment = { OUTCOME_PROJECT_REGISTRY: value.registryPath }
+  const defaulted = collectOutcomePackages({ environment, repositoryRoot: value.repositoryRoot, now: new Date('2026-08-31T00:00:00.000Z') })
+  const rolledBack = collectOutcomePackages({ environment: { ...environment, OUTCOME_MODEL_V2_ENABLED: '0' }, repositoryRoot: value.repositoryRoot, now: new Date('2026-08-31T00:00:00.000Z') })
+  assert.equal(defaulted.modelV2.schemaVersion, 2); assert.equal(Object.hasOwn(rolledBack, 'modelV2'), false)
+  assert.deepEqual(defaulted.projects, rolledBack.projects); assert.equal(JSON.stringify(defaulted.projects), JSON.stringify(rolledBack.projects))
 })
 
 test('registry rejects empty malformed schema duplicate entries project IDs absolute documents and traversal', () => {

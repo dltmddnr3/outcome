@@ -55,10 +55,14 @@ test('P7 candidate identity and verification trigger ignore no-semantic-delta hi
   assert.deepEqual(projection.verification_required, [identity])
 })
 
-test('P8 default-off returns the exact v1 object and enabled mode is projection-only', () => {
+test('A1 unset configuration defaults to v2 explicit zero rolls back exact v1 and invalid values fail closed', () => {
   const project = v1(); const collection = { schemaVersion: 2, observedAt: project.observedAt, projects: [project] }
   const bytes = JSON.stringify(collection)
-  for (const flag of [undefined, 'true', '01', ' 1', '1 ']) { const environment = flag === undefined ? {} : { OUTCOME_MODEL_V2_ENABLED: flag }; assert.equal(applyOutcomeModelV2Pilot(collection, { environment }), collection); assert.equal(JSON.stringify(collection), bytes) }
+  const defaulted = applyOutcomeModelV2Pilot(collection, { environment: {}, source_revision: source })
+  assert.equal(defaulted.modelV2.authority, 'projection_only'); assert.equal(Object.hasOwn(collection, 'modelV2'), false)
+  assert.equal(applyOutcomeModelV2Pilot(collection, { environment: { OUTCOME_MODEL_V2_ENABLED: '0' }, source_revision: source }), collection)
+  assert.equal(JSON.stringify(collection), bytes)
+  for (const flag of ['', 'true', '01', ' 1', '1 ']) assert.throws(() => applyOutcomeModelV2Pilot(collection, { environment: { OUTCOME_MODEL_V2_ENABLED: flag }, source_revision: source }), /invalid_model_v2_configuration/)
   const enabled = applyOutcomeModelV2Pilot(collection, { environment: { OUTCOME_MODEL_V2_ENABLED: '1' }, source_revision: source })
   assert.equal(enabled.modelV2.authority, 'projection_only'); assert.equal(Object.hasOwn(collection, 'modelV2'), false)
 })
