@@ -20,8 +20,8 @@ export function CurrentProjection({ projection }: { projection: PrivateModelV2Pr
       <article data-projection-field="destination"><small>Destination</small><h3>{projection.destination?.label ?? '정의된 Destination 없음'}</h3></article>
       <article data-projection-field="gap"><small>남은 완료 조건</small><strong>{projection.remainingAcceptanceGap.remaining} / {projection.remainingAcceptanceGap.total}</strong></article>
       <article data-projection-field="now"><small>Now</small><strong>{stateCopy[projection.now.state]}</strong><span>{projection.now.observedAt}</span></article>
-      <article data-projection-field="boundary"><small>다음 경계</small>{projection.readyBoundary.length ? <ul>{projection.readyBoundary.map((boundary) => <li key={boundary}>{boundary}</li>)}</ul> : <p>준비된 경계 없음</p>}{projection.nextAction && <p className="current-projection__next-action">{projection.nextAction}</p>}</article>
-      {projection.cherryAction !== null && <article data-projection-field="cherry-action"><small>Cherry action</small><strong>{projection.cherryAction}</strong></article>}
+      <article data-projection-field="boundary"><small>다음 경계</small>{projection.readyBoundaryLabels.length ? <ul>{projection.readyBoundaryLabels.map((label) => <li key={label}>{label}</li>)}</ul> : <p>준비된 경계 없음</p>}{projection.nextActionLabel && <p className="current-projection__next-action">{projection.nextActionLabel}</p>}</article>
+      {projection.cherryActionLabel !== null && <article data-projection-field="cherry-action"><small>Cherry action</small><strong>{projection.cherryActionLabel}</strong></article>}
     </div>
   </section>
 }

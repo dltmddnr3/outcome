@@ -12,6 +12,16 @@ const STATE_HINTS = Object.freeze(['loading', 'stale', 'conflict', 'blocked', 'd
 const ROOT_KEYS = new Set(['project', 'current', 'phases', 'events', 'observedAt', 'bindings', 'connectors', 'errors', 'next', 'now', 'progress', 'sourceFreshness', 'status', ...STATE_HINTS])
 const EVENT_TYPES = new Set(['work_observed', 'result_observed', 'boundary_observed'])
 const EVENT_STATUSES = new Set(['observed', 'active', 'blocked', 'delivery_unknown', 'failed', 'rejected', 'safe_hold'])
+const NEXT_ACTION_LABELS = Object.freeze({
+  'verify-coherent-slice': '일관된 Q2 화면을 독립 검증한다',
+  'work-q1-independent-qa': 'Q1 결과를 독립 검증한다',
+})
+const CHERRY_ACTION_LABELS = Object.freeze({
+  renew_mission_envelope: '작업 권한 범위를 다시 승인한다',
+  resolve_source_revision: '최신 원본 기준을 선택한다',
+  review_no_outcome_delta: '사용자 결과 변화가 없는 작업을 검토한다',
+  resolve_blocker: '차단 원인의 해결 방향을 결정한다',
+})
 
 const materialize = (value, seen = new WeakSet()) => {
   if (value === null || typeof value !== 'object') {
@@ -47,11 +57,19 @@ const materialize = (value, seen = new WeakSet()) => {
 }
 
 const safeId = (value) => typeof value === 'string' && /^[a-z0-9]+(?:-[a-z0-9]+)*$/.test(value) ? value : null
+const safeActionCode = (value) => typeof value === 'string' && /^[a-z0-9]+(?:[_-][a-z0-9]+)*$/.test(value) ? value : null
 const safeText = (value) => {
   if (typeof value !== 'string' || !value.trim() || PRIVATE_VALUE.test(value)) throw new Error('account_model_v2_public_text_invalid')
   return value.trim()
 }
 const safeEventSummary = (value) => { const summary = safeText(value); if (EVENT_PRIVATE_VALUE.test(summary)) throw new Error('account_model_v2_event_private_value'); return summary }
+const closedLabel = (labels, value) => {
+  const key = safeActionCode(value)
+  return key && Object.hasOwn(labels, key) ? labels[key] : null
+}
+
+export const accountModelV2NextActionLabel = (value) => closedLabel(NEXT_ACTION_LABELS, value)
+export const accountModelV2CherryActionLabel = (value) => closedLabel(CHERRY_ACTION_LABELS, value)
 
 const assertKeys = (value, allowed) => {
   if (Object.keys(value).some((key) => !allowed.has(key))) throw new Error('account_model_v2_unexpected_key')
@@ -144,9 +162,12 @@ export function createAccountModelV2Projection(value, { observedAt } = {}) {
     destination: destination ? Object.freeze({ id: destination.id, label: safeText(destination.title) }) : null,
     remainingAcceptanceGap: Object.freeze({ remaining: projection.progress.total - projection.progress.closed, total: projection.progress.total }),
     now: Object.freeze({ observedAt: projection.observed_at, state }),
-    readyBoundary: Object.freeze([...projection.ready_frontier]),
-    nextAction: safeId(projection.next_action),
-    cherryAction: safeId(projection.cherry_action),
+    readyBoundaryLabels: Object.freeze(projection.ready_frontier.flatMap((id) => {
+      const milestone = graph.milestones.find((row) => row.id === id)
+      return milestone ? [safeText(milestone.title)] : []
+    })),
+    nextActionLabel: accountModelV2NextActionLabel(projection.next_action),
+    cherryActionLabel: accountModelV2CherryActionLabel(projection.cherry_action),
     state,
     events: Object.freeze(events),
   })

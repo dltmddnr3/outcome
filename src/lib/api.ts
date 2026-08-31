@@ -9,7 +9,7 @@ export type PrivateScope = { id: string; title: string; stages: PrivateStage[] }
 export type PrivatePhase = { id: string; title: string; scopes: PrivateScope[] }
 export type PrivateModelV2State = 'loading' | 'stale' | 'conflict' | 'blocked' | 'delivery_unknown' | 'no_active_work' | 'ready'
 export type PrivateModelV2Event = { type: 'work_observed' | 'result_observed' | 'boundary_observed'; summary: string; observedAt: string; status: 'observed' | 'active' | 'blocked' | 'delivery_unknown' | 'failed' | 'rejected' | 'safe_hold' }
-export type PrivateModelV2Projection = { schemaVersion: 1; modelVersion: 2; project: { id: string; label: string }; destination: { id: string; label: string } | null; remainingAcceptanceGap: { remaining: number; total: number }; now: { observedAt: string; state: PrivateModelV2State }; readyBoundary: string[]; nextAction: string | null; cherryAction: string | null; state: PrivateModelV2State; events: PrivateModelV2Event[] }
+export type PrivateModelV2Projection = { schemaVersion: 1; modelVersion: 2; project: { id: string; label: string }; destination: { id: string; label: string } | null; remainingAcceptanceGap: { remaining: number; total: number }; now: { observedAt: string; state: PrivateModelV2State }; readyBoundaryLabels: string[]; nextActionLabel: string | null; cherryActionLabel: string | null; state: PrivateModelV2State; events: PrivateModelV2Event[] }
 export type PrivateProjectProjection = { project: { id: string; name: string }; phases: PrivatePhase[]; current: { phaseId: string; scopeId: string; stageId: string }; modelV2?: PrivateModelV2Projection }
 export type PrivateWorkspaceView = { viewState?: string; projects?: PrivateProjectProjection[]; dashboard?: OutcomeDashboardData }
 

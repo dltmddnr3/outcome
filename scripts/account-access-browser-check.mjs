@@ -114,7 +114,7 @@ try {
     }
   }
 
-  for (const viewport of [{ name: 'macbook-ready', width: 1440, height: 900 }, { name: 'mobile-ready', width: 390, height: 844 }, { name: 'phone-ready', width: 375, height: 812 }]) {
+  for (const viewport of [{ name: 'macbook-ready', width: 1440, height: 900 }, { name: 'mobile-ready', width: 390, height: 844 }, { name: 'narrow-ready', width: 320, height: 720 }]) {
     const context = await browser.newContext({ viewport, reducedMotion: 'reduce' })
     const page = await context.newPage()
     await page.goto(`${base}/workspace`)
@@ -123,8 +123,18 @@ try {
     await page.locator('.account-workspace__loading').waitFor()
     await page.locator('.oc-dashboard').waitFor()
     if (await page.locator('[data-private-project]').count() !== 2) throw new Error(`${viewport.name} project controls missing`)
-    const shell = await page.evaluate(() => ({ sidebar: Boolean(document.querySelector('.oc-global-nav')), journey: Boolean(document.querySelector('.oc-outcome-map')), current: document.querySelectorAll('[aria-current=step]').length, overflow: document.documentElement.scrollWidth - document.documentElement.clientWidth }))
-    if (!shell.sidebar || !shell.journey || shell.current < 3 || shell.overflow !== 0) throw new Error(`${viewport.name} existing shell failed ${JSON.stringify(shell)}`)
+    const shell = await page.evaluate(() => {
+      const projection = document.querySelector('.current-projection'); const conversation = document.querySelector('.planner-conversation')
+      const projectionBox = projection?.getBoundingClientRect(); const conversationBox = conversation?.getBoundingClientRect()
+      return { sidebar: Boolean(document.querySelector('.oc-global-nav')), journey: Boolean(document.querySelector('.oc-outcome-map')), current: document.querySelectorAll('[aria-current=step]').length, overflow: document.documentElement.scrollWidth - document.documentElement.clientWidth, semanticProjectionFirst: Boolean(projection && conversation && (projection.compareDocumentPosition(conversation) & Node.DOCUMENT_POSITION_FOLLOWING)), visualProjectionFirst: innerWidth <= 760 ? Boolean(projectionBox && conversationBox && projectionBox.top < conversationBox.top) : Boolean(projectionBox && conversationBox && conversationBox.left < projectionBox.left), rawActionSlugVisible: ['q2-independent-qa', 'verify-coherent-slice', 'resolve-blocker', 'resolve_blocker'].some((value) => document.body.innerText.includes(value)) }
+    })
+    if (!shell.sidebar || !shell.journey || shell.current < 3 || shell.overflow !== 0 || !shell.semanticProjectionFirst || !shell.visualProjectionFirst || shell.rawActionSlugVisible) throw new Error(`${viewport.name} existing shell failed ${JSON.stringify(shell)}`)
+    if (viewport.width === 1440) {
+      await page.setViewportSize({ width: 720, height: 900 })
+      const zoom = await page.evaluate(() => ({ overflow: document.documentElement.scrollWidth - document.documentElement.clientWidth, semanticProjectionFirst: Boolean(document.querySelector('.current-projection')?.compareDocumentPosition(document.querySelector('.planner-conversation')) & Node.DOCUMENT_POSITION_FOLLOWING) }))
+      if (zoom.overflow !== 0 || !zoom.semanticProjectionFirst) throw new Error(`${viewport.name} ready 200% reflow failed ${JSON.stringify(zoom)}`)
+      await page.setViewportSize({ width: 1440, height: 900 })
+    }
     if (viewport.width <= 390) {
       await page.locator('.oc-outcome-map').evaluate((element) => element.scrollIntoView({ block: 'start' }))
       await page.evaluate(() => window.scrollBy(0, 320))

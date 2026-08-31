@@ -5,7 +5,7 @@ import deploymentFixture from '../../snapshot/outcome-package-source.json'
 import type { OutcomeDashboardData } from './OutcomeDashboard'
 
 const render = (state: keyof typeof accountWorkspaceStateCopy) => renderToStaticMarkup(<AccountWorkspace state={state} />)
-const modelV2 = (id: string, label: string) => ({ schemaVersion: 1 as const, modelVersion: 2 as const, project: { id, label }, destination: { id: `${id}-destination`, label: `${label} Destination` }, remainingAcceptanceGap: { remaining: 2, total: 5 }, now: { observedAt: '2026-08-31T08:00:00.000Z', state: 'ready' as const }, readyBoundary: [`${label} next boundary`], nextAction: `${label} next action`, cherryAction: `${label} Cherry action`, state: 'ready' as const, events: [] })
+const modelV2 = (id: string, label: string) => ({ schemaVersion: 1 as const, modelVersion: 2 as const, project: { id, label }, destination: { id: `${id}-destination`, label: `${label} Destination` }, remainingAcceptanceGap: { remaining: 2, total: 5 }, now: { observedAt: '2026-08-31T08:00:00.000Z', state: 'ready' as const }, readyBoundaryLabels: [`${label} next boundary`], nextActionLabel: `${label} next action`, cherryActionLabel: `${label} Cherry action`, state: 'ready' as const, events: [] })
 const readyWorkspace = { projects: [
   { project: { id: 'cherry-note', name: 'Cherry Note' }, phases: [{ id: 'cherry-phase', title: '체리 단계', scopes: [{ id: 'cherry-scope', title: '체리 범위', stages: [{ id: 'cherry-current', title: '체리 현재', gate: { gates: [{ id: 'C1', title: '체리 완료 조건', closed: false }] } }, { id: 'cherry-selected', title: '체리 선택', gate: { gates: [{ id: 'C2', title: '선택 완료 조건', closed: true }] } }] }] }], current: { phaseId: 'cherry-phase', scopeId: 'cherry-scope', stageId: 'cherry-current' }, modelV2: modelV2('cherry-note', 'Cherry Note') },
   { project: { id: 'outcome', name: 'OUTCOME' }, phases: [{ id: 'outcome-phase', title: '아웃컴 단계', scopes: [{ id: 'outcome-scope', title: '아웃컴 범위', stages: [{ id: 'outcome-current', title: '아웃컴 현재', gate: { gates: [{ id: 'O1', title: '아웃컴 완료 조건', closed: false }] } }] }] }], current: { phaseId: 'outcome-phase', scopeId: 'outcome-scope', stageId: 'outcome-current' }, modelV2: modelV2('outcome', 'OUTCOME') },
@@ -94,6 +94,7 @@ describe('account workspace presentation contract', () => {
     expect(html).toContain('Current Projection')
     expect(html).toContain('OUTCOME Destination')
     expect(html).toContain('Planner conversation')
+    expect(html.indexOf('Current Projection')).toBeLessThan(html.indexOf('Planner conversation'))
     expect(html).toContain('아직 관측된 Planner 작업 이벤트가 없습니다')
     expect(html).toContain('v1 호환 정보 없음')
     expect(html).not.toContain('OUTCOME 원본 묶음을 검증하고 있습니다')

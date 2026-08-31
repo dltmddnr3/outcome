@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict'
 import test from 'node:test'
-import { ACCOUNT_MODEL_V2_STATES, createAccountModelV2Projection } from './account-model-v2-projection.mjs'
+import { ACCOUNT_MODEL_V2_STATES, accountModelV2CherryActionLabel, accountModelV2NextActionLabel, createAccountModelV2Projection } from './account-model-v2-projection.mjs'
 
 const observedAt = '2026-08-31T00:00:00.000Z'
 const project = (id = 'outcome') => ({
@@ -12,22 +12,33 @@ const event = (overrides = {}) => ({ type: 'work_observed', summary: 'Planner가
 
 test('authorized project projection is versioned, deterministic and exact-allowlisted', () => {
   const projection = createAccountModelV2Projection(project(), { observedAt })
-  assert.deepEqual(Object.keys(projection), ['schemaVersion', 'modelVersion', 'project', 'destination', 'remainingAcceptanceGap', 'now', 'readyBoundary', 'nextAction', 'cherryAction', 'state', 'events'])
+  assert.deepEqual(Object.keys(projection), ['schemaVersion', 'modelVersion', 'project', 'destination', 'remainingAcceptanceGap', 'now', 'readyBoundaryLabels', 'nextActionLabel', 'cherryActionLabel', 'state', 'events'])
   assert.deepEqual(projection.project, { id: 'outcome', label: 'OUTCOME' })
   assert.deepEqual(projection.destination, { id: 'destination-one', label: 'Destination' })
   assert.deepEqual(projection.remainingAcceptanceGap, { remaining: 1, total: 1 })
   assert.deepEqual(projection.now, { observedAt, state: 'ready' })
-  assert.deepEqual(projection.readyBoundary, ['milestone-one'])
+  assert.deepEqual(projection.readyBoundaryLabels, ['Milestone'])
+  assert.equal(projection.nextActionLabel, null)
+  assert.equal(projection.cherryActionLabel, '차단 원인의 해결 방향을 결정한다')
   assert.equal(projection.modelVersion, 2)
   assert.equal(JSON.stringify(projection), JSON.stringify(createAccountModelV2Projection(project(), { observedAt })))
   assert.deepEqual(ACCOUNT_MODEL_V2_STATES, ['loading', 'stale', 'conflict', 'blocked', 'delivery_unknown', 'no_active_work', 'ready'])
+})
+
+test('server-owned action labels are closed, Korean, and omit unknown values', () => {
+  assert.equal(accountModelV2NextActionLabel('verify-coherent-slice'), '일관된 Q2 화면을 독립 검증한다')
+  assert.equal(accountModelV2CherryActionLabel('resolve_blocker'), '차단 원인의 해결 방향을 결정한다')
+  for (const value of ['unknown-action', '검증한다', null, undefined]) {
+    assert.equal(accountModelV2NextActionLabel(value), null)
+    assert.equal(accountModelV2CherryActionLabel(value), null)
+  }
 })
 
 test('minimal legacy project fails safe to no active work without client calculation', () => {
   const projection = createAccountModelV2Projection({ project: { id: 'outcome', name: 'OUTCOME' } }, { observedAt })
   assert.equal(projection.state, 'no_active_work')
   assert.equal(projection.destination, null)
-  assert.deepEqual(projection.readyBoundary, [])
+  assert.deepEqual(projection.readyBoundaryLabels, [])
   assert.deepEqual(projection.remainingAcceptanceGap, { remaining: 0, total: 0 })
 })
 
