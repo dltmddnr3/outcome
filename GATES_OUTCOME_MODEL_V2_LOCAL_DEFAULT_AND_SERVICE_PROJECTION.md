@@ -2,7 +2,7 @@
 
 Outcome: Model v2 is the verified local default with selective context, then becomes the user-facing private workspace projection without deployment or release authority.
 
-Status: **SLICE B2 PASSED · B3 READY · DEPLOYMENT/PRODUCTION/RELEASE EXCLUDED**
+Status: **SLICE B3 PASSED · Q2 READY · DEPLOYMENT/PRODUCTION/RELEASE EXCLUDED**
 
 - [x] D1: Product meaning, selective-context boundary, information architecture, ownership and rollback are fixed in one contract.
   CHECK: rg -q "Selective context contract" docs/OUTCOME_MODEL_V2_LOCAL_DEFAULT_AND_SERVICE_PROJECTION_CONTRACT.md && rg -q "Service information architecture" docs/OUTCOME_MODEL_V2_LOCAL_DEFAULT_AND_SERVICE_PROJECTION_CONTRACT.md && rg -q "Current Projection is the only source" docs/OUTCOME_MODEL_V2_LOCAL_DEFAULT_AND_SERVICE_PROJECTION_CONTRACT.md && echo D1_PASS
@@ -35,8 +35,8 @@ Status: **SLICE B2 PASSED · B3 READY · DEPLOYMENT/PRODUCTION/RELEASE EXCLUDED*
 - [x] B2: Desktop and mobile keep v1 hierarchy, role bindings and technical evidence behind disclosure while preserving project switch, authentication and read-only account isolation.
   EVIDENCE: Product candidate `84d9739965a2a8211b703d7ffd6cc6f085678b94` and fresh independent QA PASS carrier `97c4b3dbdd4755ddde116c8a707fcde1aebd7e39`, report SHA-256 `72d7d6c1ea23c4f8ba6fe3613d458d5b2e01609606d7e2723521ed5657a8f58a`, establish the real dashboard-less `{project, modelV2}` account envelope; nonblank desktop/mobile workspace; Current Projection present; private switcher restricted to the two server-authorized projects with hostile unmatched public project excluded; project switching; truthful collapsed compatibility; steady overflow/overlap `0`; minimum control height `44px`; page/runtime errors and private leakage `0`; focused/frontend/dashboard/account Node/account frontend suites `75/75`, `96/96`, `93/93`, `33/33`, `32/32`; production build `1,653` modules. Promotion receipt: `docs/OUTCOME_MODEL_V2_SERVICE_PROJECTION_B2_EVIDENCE_PROMOTION_RECEIPT.md`.
 
-- [ ] B3: Planner conversation renders only observed adapter events and never fabricates streaming, tool activity, completion or progress.
-  EVIDENCE: pending
+- [x] B3: Planner conversation renders only observed adapter events and never fabricates streaming, tool activity, completion or progress.
+  EVIDENCE: Corrected product `1ab53276e8dc75b6b25089888bf5a29d47a5d7bd` and fresh independent re-QA PASS carrier `5fa7477c5092d347b9f887c391da4369ce4fee51`, report SHA-256 `220b8dcfc41283aa2726a91bab25e40637db4820578e9b82e0779a65c676363b`, establish the exact four-field observed-event schema; active only from observed active work; terminal, delivery-unknown and blocked states non-running and non-completed; truthful empty state; no composer, streaming, tool activity, progress or synthetic messages; private hostile classes `21/21` fail closed with markup survival `0`; offset timestamps normalized to canonical UTC and epoch ordered; normalized duplicates fail closed and render `0`; frontend `99/99`; account/projection `46/46`; production build PASS; desktop/mobile overflow `0`, minimum control `44px`, page errors `0`. Promotion receipt: `docs/OUTCOME_MODEL_V2_SERVICE_PROJECTION_B3_EVIDENCE_PROMOTION_RECEIPT.md`.
 
 - [ ] Q2: Fresh independent UX & Product QA validates the five-question 30-second task, responsive layout, accessibility, failure states and privacy on the immutable Slice B candidate.
   EVIDENCE: pending
