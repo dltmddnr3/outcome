@@ -239,6 +239,50 @@ const contextReceipt = (plan, outcome) => frozen({
   expansion_count: plan.expansion_count,
   safety: plan.safety,
 })
+const exactPlanRecord = (value, keys, code = 'invalid_selective_context_plan') => {
+  if (!ownRecord(value) || Object.getOwnPropertySymbols(value).length) throw new Error(code)
+  const descriptors = Object.getOwnPropertyDescriptors(value)
+  const actual = Object.getOwnPropertyNames(value).sort(); const expected = [...keys].sort()
+  if (actual.length !== expected.length || actual.some((key, index) => key !== expected[index]) || Object.values(descriptors).some((descriptor) => descriptor.enumerable !== true)) throw new Error(code)
+  return value
+}
+const exactPlanArray = (value) => {
+  if (!Array.isArray(value) || Object.getOwnPropertySymbols(value).length) throw new Error('invalid_selective_context_plan')
+  const descriptors = Object.getOwnPropertyDescriptors(value); const expected = new Set(['length', ...Array.from({ length: value.length }, (_, index) => String(index))])
+  if (Reflect.ownKeys(descriptors).some((key) => typeof key !== 'string' || !expected.has(key)) || Array.from({ length: value.length }, (_, index) => descriptors[index]).some((descriptor) => !descriptor || !Object.hasOwn(descriptor, 'value') || descriptor.enumerable !== true)) throw new Error('invalid_selective_context_plan')
+  return value
+}
+const validatePlanSourceRow = (value) => {
+  exactPlanRecord(value, ['source_ref', 'source_digest'])
+  const source_ref = contextRef(value.source_ref); const sourceClass = contextSourceClass(source_ref)
+  const source_digest = value.source_digest === null && (sourceClass === 'common_skill' || sourceClass === 'role_skill') ? null : contextDigest(value.source_digest)
+  return frozen({ source_ref, source_digest })
+}
+const validateOutcomeSelectiveContextPlan = (plan) => {
+  rejectProxyTree(plan)
+  exactPlanRecord(plan, ['schema_version', 'authority', 'outcome', 'work_type', 'loaded_sources', 'skipped_sources', 'expansion_count', 'expansion_reasons', 'safety', 'plan_digest'])
+  if (plan.schema_version !== 2 || plan.authority !== 'projection_only' || plan.outcome !== 'ready' || !Object.hasOwn(SELECTIVE_CONTEXT_ROLES, plan.work_type)) throw new Error('invalid_selective_context_plan')
+  const loaded_sources = frozen(exactPlanArray(plan.loaded_sources).map(validatePlanSourceRow)); const skipped_sources = frozen(exactPlanArray(plan.skipped_sources).map(validatePlanSourceRow))
+  unique(loaded_sources, 'source_ref', 'invalid_selective_context_plan'); unique(skipped_sources, 'source_ref', 'invalid_selective_context_plan')
+  if (skipped_sources.some((row) => contextSourceClass(row.source_ref) !== 'approved_document' || loaded_sources.some((loaded) => loaded.source_ref === row.source_ref))) throw new Error('invalid_selective_context_plan')
+  const expectedRoleSkill = SELECTIVE_CONTEXT_ROLES[plan.work_type]; let cursor = 0
+  for (const expected of ['AGENTS.md', 'active-bootstrap-snapshot', 'GATES_OUTCOME_MODEL_V2_SELECTIVE_CONTEXT_LOCAL_ACTIVATION.md']) if (loaded_sources[cursor++]?.source_ref !== expected) throw new Error('invalid_selective_context_plan')
+  if (loaded_sources[cursor] && contextSourceClass(loaded_sources[cursor].source_ref) === 'current_handoff') cursor += 1
+  for (const skill of SELECTIVE_CONTEXT_COMMON_SKILLS) if (loaded_sources[cursor++]?.source_ref !== `skill:${skill}`) throw new Error('invalid_selective_context_plan')
+  if (expectedRoleSkill && loaded_sources[cursor++]?.source_ref !== `skill:${expectedRoleSkill}`) throw new Error('invalid_selective_context_plan')
+  const expansionRows = loaded_sources.slice(cursor)
+  if (expansionRows.some((row) => contextSourceClass(row.source_ref) !== 'approved_document')) throw new Error('invalid_selective_context_plan')
+  if (!Number.isSafeInteger(plan.expansion_count) || plan.expansion_count < 0 || plan.expansion_count !== expansionRows.length) throw new Error('invalid_selective_context_plan')
+  const expansion_reasons = frozen(exactPlanArray(plan.expansion_reasons).map((reason) => id(reason, 'invalid_selective_context_plan')))
+  if (expansion_reasons.length !== plan.expansion_count) throw new Error('invalid_selective_context_plan')
+  exactPlanRecord(plan.safety, ['execution_started_count', 'automatic_retry_count', 'duplicate_execution_count', 'persistent_setting_mutation_count', 'registry_provider_environment_mutation_count', 'unauthorized_canonical_transition_count', 'false_completion_count'])
+  if (Object.values(plan.safety).some((value) => value !== 0)) throw new Error('invalid_selective_context_plan')
+  const safety = frozen({ ...plan.safety })
+  const content = { schema_version: 2, authority: 'projection_only', outcome: 'ready', work_type: plan.work_type, loaded_sources, skipped_sources, expansion_count: plan.expansion_count, expansion_reasons, safety }
+  const plan_digest = createHash('sha256').update(JSON.stringify(content)).digest('hex')
+  if (plan.plan_digest !== plan_digest) throw new Error('selective_context_plan_digest_mismatch')
+  return frozen({ ...content, plan_digest })
+}
 
 export function compileOutcomeSelectiveContextPlan(value) {
   rejectProxyTree(value)
@@ -283,11 +327,11 @@ export function compileOutcomeSelectiveContextPlan(value) {
 
 export function consumeOutcomeSelectiveContextPlan(adapter, plan) {
   rejectProxyTree(adapter); rejectProxyTree(plan)
-  if (!plan || plan.outcome !== 'ready' || plan.schema_version !== 2 || plan.authority !== 'projection_only') return plan
+  const validatedPlan = validateOutcomeSelectiveContextPlan(plan)
   if (!adapter || adapter.selectiveContextCapability !== 'content-addressed-plan-v1' || typeof adapter.consumeContextPlan !== 'function') return selectiveContextHold('unsupported_adapter_capability')
-  const result = adapter.consumeContextPlan(plan)
+  const result = adapter.consumeContextPlan(validatedPlan)
   if (!ownRecord(result) || Object.keys(result).length !== 1 || result.accepted !== true) return selectiveContextHold('adapter_context_rejected')
-  return contextReceipt(plan, 'locally_consumed')
+  return contextReceipt(validatedPlan, 'locally_consumed')
 }
 
 export function createCodexRuntimeAdapter(controlPlane) {

@@ -144,6 +144,45 @@ test('QA correction rejects Proxy and accessor refs with zero traps and callback
   assert.equal(traps, 0)
 })
 
+test('re-QA RED forged ready plan is rejected before adapter callback', () => {
+  const digest = 'a'.repeat(64)
+  const sources = { agents: { source_ref: 'AGENTS.md', source_digest: digest }, active_snapshot: { source_ref: 'active-bootstrap-snapshot', source_digest: digest }, current_gate: { source_ref: 'GATES_OUTCOME_MODEL_V2_SELECTIVE_CONTEXT_LOCAL_ACTIVATION.md', source_digest: digest }, current_handoff: null }
+  const available_source_digests = Object.fromEntries(Object.values(sources).filter(Boolean).map((row) => [row.source_ref, row.source_digest]))
+  const valid = compileOutcomeSelectiveContextPlan({ environment: {}, work_id: 'bounded-work', work_type: 'builder', role_skill: 'mango-implementation-engineer', sources, available_source_digests, expansion_allowlist: [], expansions: [] })
+  const forged = structuredClone(valid)
+  forged.loaded_sources[0].source_ref = 'thread-private-marker'
+  forged.plan_digest = 'f'.repeat(64)
+  let callbacks = 0
+  const adapter = createCodexRuntimeAdapter({ selectNext: (value) => value, start: (value) => value, transition: (value) => value, projectPublic: () => ({ authority: 'projection_only' }), selectiveContextCapability: 'content-addressed-plan-v1', consumeContextPlan() { callbacks += 1; return { accepted: true } } })
+  assert.throws(() => consumeOutcomeSelectiveContextPlan(adapter, forged), /invalid_context_source_ref/)
+  assert.equal(callbacks, 0)
+})
+
+test('pre-consume validation rejects hostile direct plans before traps callbacks or receipts', () => {
+  const digest = 'a'.repeat(64)
+  const sources = { agents: { source_ref: 'AGENTS.md', source_digest: digest }, active_snapshot: { source_ref: 'active-bootstrap-snapshot', source_digest: digest }, current_gate: { source_ref: 'GATES_OUTCOME_MODEL_V2_SELECTIVE_CONTEXT_LOCAL_ACTIVATION.md', source_digest: digest }, current_handoff: null }
+  const available_source_digests = Object.fromEntries(Object.values(sources).filter(Boolean).map((row) => [row.source_ref, row.source_digest]))
+  const valid = compileOutcomeSelectiveContextPlan({ environment: {}, work_id: 'bounded-work', work_type: 'builder', role_skill: 'mango-implementation-engineer', sources, available_source_digests, expansion_allowlist: [], expansions: [] })
+  let callbacks = 0; let traps = 0; let receipts = 0
+  const adapter = createCodexRuntimeAdapter({ selectNext: (value) => value, start: (value) => value, transition: (value) => value, projectPublic: () => ({ authority: 'projection_only' }), selectiveContextCapability: 'content-addressed-plan-v1', consumeContextPlan() { callbacks += 1; return { accepted: true } } })
+  const privateRef = structuredClone(valid); privateRef.loaded_sources[0].source_ref = 'thread-private-marker'
+  const digestMismatch = structuredClone(valid); digestMismatch.loaded_sources[1].source_digest = 'b'.repeat(64)
+  const roleMismatch = structuredClone(valid); roleMismatch.work_type = 'planner'
+  const missingKey = structuredClone(valid); delete missingKey.safety
+  const extraKey = structuredClone(valid); extraKey.caller_authority = 'ready'
+  const decoratedRow = structuredClone(valid); Object.defineProperty(decoratedRow.loaded_sources[0], 'hidden', { value: true })
+  for (const forged of [privateRef, digestMismatch, roleMismatch, missingKey, extraKey, decoratedRow]) {
+    assert.throws(() => { const receipt = consumeOutcomeSelectiveContextPlan(adapter, forged); receipts += receipt ? 1 : 0 }, /invalid_|mismatch/)
+  }
+  const accessor = structuredClone(valid); Object.defineProperty(accessor.loaded_sources[0], 'source_ref', { enumerable: true, get() { traps += 1; return 'AGENTS.md' } })
+  assert.throws(() => consumeOutcomeSelectiveContextPlan(adapter, accessor), /accessor_forbidden/)
+  const proxy = new Proxy(structuredClone(valid), { get() { traps += 1 }, ownKeys() { traps += 1 }, getOwnPropertyDescriptor() { traps += 1 }, getPrototypeOf() { traps += 1 } })
+  assert.throws(() => consumeOutcomeSelectiveContextPlan(adapter, proxy), /proxy_forbidden/)
+  assert.equal(callbacks, 0); assert.equal(traps, 0); assert.equal(receipts, 0)
+  const receipt = consumeOutcomeSelectiveContextPlan(adapter, valid)
+  assert.equal(callbacks, 1); assert.equal(receipt.outcome, 'locally_consumed'); assert.doesNotMatch(JSON.stringify(receipt), /source_ref|AGENTS\.md|mango-implementation-engineer/)
+})
+
 test('S2 S4 duplicate and zero-delta work allocate nothing and request an exact decision', () => {
   const zero = { id: 'work-zero', milestone_id: 'milestone-one', fingerprint: 'zero', acceptance_gap_delta: 0, uncertainty_delta: 0, blocker_delta: 0, user_value_delta: 0, reversible: true, cost: 0 }
   const projection = projectOutcomeV2({ graph: graph(), source_revision: source, observed_at: '2026-08-31T00:00:00.000Z', work_items: [zero] })
