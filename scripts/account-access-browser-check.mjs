@@ -2,6 +2,7 @@ import { once } from 'node:events'
 import { mkdirSync, readFileSync, readdirSync } from 'node:fs'
 import { chromium } from '@playwright/test'
 import { createAccountAccessService, createInMemoryAccountStore } from '../server/account-access.mjs'
+import { createAccountModelV2Projection } from '../server/account-model-v2-projection.mjs'
 import { createOutcomeServer } from '../server/index.mjs'
 
 const builtBrowser = readdirSync('dist/assets').filter((name) => name.endsWith('.js')).map((name) => readFileSync(`dist/assets/${name}`, 'utf8')).join('\n')
@@ -16,6 +17,9 @@ if (builtBrowser.includes('/api/private/auth/callback') || builtBrowser.includes
 const now = () => Date.parse('2026-08-25T00:00:00.000Z')
 const readyDashboard = { ...JSON.parse(readFileSync('snapshot/outcome-package-source.json', 'utf8')), build: { repository: 'test/repo', ref: 'test', commit: null, tree: null, asset: null, runtimeNowPinned: false } }
 const readyProjects = readyDashboard.projects
+const hostileMilestoneSlug = 'q2-independent-qa'
+const hostileProjection = createAccountModelV2Projection({ project: { id: 'outcome', name: 'OUTCOME', outcome: 'One safe outcome' }, current: { phaseId: 'destination-one' }, phases: [{ id: 'destination-one', title: 'Destination', purpose: 'Safe outcome', scopes: [{ stages: [{ id: 'milestone-one', title: hostileMilestoneSlug, purpose: 'User result', dependsOn: [], gate: { sourceRef: 'GATES.md', gates: [{ id: 'B1', title: 'Server projection', closed: false }] } }] }] }] }, { observedAt: '2026-08-31T00:00:00.000Z' })
+if (JSON.stringify(hostileProjection).includes(hostileMilestoneSlug) || hostileProjection.readyBoundaryLabels.length !== 0) throw new Error('hostile milestone slug survived API projection')
 const memoryStore = createInMemoryAccountStore({ workspaces: [{ id: 'workspace', state: 'active' }], memberships: [{ subject: 'owner', workspaceId: 'workspace', role: 'owner-viewer', state: 'active' }], projects: readyProjects.map((projection) => ({ id: projection.project.id, workspaceId: 'workspace', state: 'active', projection })) })
 const store = { ...memoryStore, workspaceProjection: (workspaceId) => workspaceId === 'workspace' ? structuredClone(readyDashboard) : null }
 const accountAccess = createAccountAccessService({ now, ownerSubject: 'owner', store, authProvider: { verify: async (token) => token === 'valid' ? { subject: 'owner', issuedAt: now(), expiresAt: now() + 60_000, linkedProviders: ['google', 'email_code'] } : null } })
@@ -126,9 +130,9 @@ try {
     const shell = await page.evaluate(() => {
       const projection = document.querySelector('.current-projection'); const conversation = document.querySelector('.planner-conversation')
       const projectionBox = projection?.getBoundingClientRect(); const conversationBox = conversation?.getBoundingClientRect()
-      return { sidebar: Boolean(document.querySelector('.oc-global-nav')), journey: Boolean(document.querySelector('.oc-outcome-map')), current: document.querySelectorAll('[aria-current=step]').length, overflow: document.documentElement.scrollWidth - document.documentElement.clientWidth, semanticProjectionFirst: Boolean(projection && conversation && (projection.compareDocumentPosition(conversation) & Node.DOCUMENT_POSITION_FOLLOWING)), visualProjectionFirst: innerWidth <= 760 ? Boolean(projectionBox && conversationBox && projectionBox.top < conversationBox.top) : Boolean(projectionBox && conversationBox && conversationBox.left < projectionBox.left), rawActionSlugVisible: ['q2-independent-qa', 'verify-coherent-slice', 'resolve-blocker', 'resolve_blocker'].some((value) => document.body.innerText.includes(value)) }
+      return { sidebar: Boolean(document.querySelector('.oc-global-nav')), journey: Boolean(document.querySelector('.oc-outcome-map')), current: document.querySelectorAll('[aria-current=step]').length, overflow: document.documentElement.scrollWidth - document.documentElement.clientWidth, approvedBoundaryLabels: [...document.querySelectorAll('[data-projection-field=boundary] li')].map((item) => item.textContent?.trim()).filter(Boolean), semanticProjectionFirst: Boolean(projection && conversation && (projection.compareDocumentPosition(conversation) & Node.DOCUMENT_POSITION_FOLLOWING)), visualProjectionFirst: innerWidth <= 760 ? Boolean(projectionBox && conversationBox && projectionBox.top < conversationBox.top) : Boolean(projectionBox && conversationBox && conversationBox.left < projectionBox.left), rawActionSlugVisible: ['q2-independent-qa', 'verify-coherent-slice', 'resolve-blocker', 'resolve_blocker'].some((value) => document.body.innerText.includes(value)) }
     })
-    if (!shell.sidebar || !shell.journey || shell.current < 3 || shell.overflow !== 0 || !shell.semanticProjectionFirst || !shell.visualProjectionFirst || shell.rawActionSlugVisible) throw new Error(`${viewport.name} existing shell failed ${JSON.stringify(shell)}`)
+    if (!shell.sidebar || !shell.journey || shell.current < 3 || shell.overflow !== 0 || shell.approvedBoundaryLabels.length === 0 || !shell.semanticProjectionFirst || !shell.visualProjectionFirst || shell.rawActionSlugVisible) throw new Error(`${viewport.name} existing shell failed ${JSON.stringify(shell)}`)
     if (viewport.width === 1440) {
       await page.setViewportSize({ width: 720, height: 900 })
       const zoom = await page.evaluate(() => ({ overflow: document.documentElement.scrollWidth - document.documentElement.clientWidth, semanticProjectionFirst: Boolean(document.querySelector('.current-projection')?.compareDocumentPosition(document.querySelector('.planner-conversation')) & Node.DOCUMENT_POSITION_FOLLOWING) }))
@@ -161,6 +165,22 @@ try {
     const logout = page.locator('[data-private-logout=true]'); if (await logout.evaluate((element) => element.getBoundingClientRect().height) < 44) throw new Error(`${viewport.name} logout touch target`)
     if (viewport.width <= 390) await page.locator('.oc-nav-trigger').click()
     await logout.click(); await page.locator('[data-state-code="login"]').waitFor()
+    await context.close()
+  }
+
+  {
+    const context = await browser.newContext({ viewport: { width: 390, height: 844 }, reducedMotion: 'reduce' })
+    const page = await context.newPage()
+    let browserErrors = 0
+    page.on('pageerror', () => { browserErrors += 1 })
+    page.on('console', (message) => { if (message.type() === 'error') browserErrors += 1 })
+    await page.route('**/api/private/config', (route) => route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ enabled: true, access: 'private_read_only', providers: [], sessionMaximumDays: 7, completionAuthority: false }) }))
+    const hostileProjects = readyProjects.map((project) => project.project.id === 'outcome' ? { ...project, modelV2: hostileProjection } : project)
+    await page.route('**/api/private/workspace', (route) => route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ workspace: { viewState: 'ready', projects: hostileProjects, dashboard: readyDashboard } }) }))
+    await page.goto(`${base}/workspace`)
+    await page.locator('.current-projection').waitFor()
+    const hostile = await page.evaluate((slug) => ({ apiFieldCount: document.querySelectorAll('[data-projection-field=boundary] li').length, markup: document.documentElement.outerHTML.includes(slug), visible: document.body.innerText.includes(slug), accessibility: document.body.textContent.includes(slug), overflow: document.documentElement.scrollWidth - document.documentElement.clientWidth }), hostileMilestoneSlug)
+    if (hostile.apiFieldCount !== 0 || hostile.markup || hostile.visible || hostile.accessibility || hostile.overflow !== 0 || browserErrors !== 0) throw new Error(`hostile milestone built boundary failed ${JSON.stringify({ ...hostile, browserErrors })}`)
     await context.close()
   }
 

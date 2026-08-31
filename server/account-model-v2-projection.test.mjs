@@ -34,6 +34,21 @@ test('server-owned action labels are closed, Korean, and omit unknown values', (
   }
 })
 
+test('milestone display labels omit schema-valid slugs without replacing approved human titles', () => {
+  const approved = createAccountModelV2Projection(project(), { observedAt })
+  const hostileSource = project()
+  hostileSource.phases[0].scopes[0].stages[0].title = 'q2-independent-qa'
+  const hostile = createAccountModelV2Projection(hostileSource, { observedAt })
+  assert.deepEqual(approved.readyBoundaryLabels, ['Milestone'])
+  assert.deepEqual(hostile.readyBoundaryLabels, [])
+  assert.equal(JSON.stringify(hostile).includes('q2-independent-qa'), false)
+  for (const title of ['milestone_one', 'a'.repeat(40), '<script>alert</script>', '12345', 'x']) {
+    const source = project()
+    source.phases[0].scopes[0].stages[0].title = title
+    assert.deepEqual(createAccountModelV2Projection(source, { observedAt }).readyBoundaryLabels, [])
+  }
+})
+
 test('minimal legacy project fails safe to no active work without client calculation', () => {
   const projection = createAccountModelV2Projection({ project: { id: 'outcome', name: 'OUTCOME' } }, { observedAt })
   assert.equal(projection.state, 'no_active_work')

@@ -62,6 +62,11 @@ const safeText = (value) => {
   if (typeof value !== 'string' || !value.trim() || PRIVATE_VALUE.test(value)) throw new Error('account_model_v2_public_text_invalid')
   return value.trim()
 }
+const publicMilestoneLabel = (value) => {
+  const label = safeText(value)
+  if (label.length < 2 || label.length > 120 || !/\p{L}/u.test(label) || !/^[\p{L}\p{N}][\p{L}\p{N} .,&()·:/'’+–—-]*$/u.test(label) || /^[a-z0-9]+(?:[_-][a-z0-9]+)*$/.test(label)) return null
+  return label
+}
 const safeEventSummary = (value) => { const summary = safeText(value); if (EVENT_PRIVATE_VALUE.test(summary)) throw new Error('account_model_v2_event_private_value'); return summary }
 const closedLabel = (labels, value) => {
   const key = safeActionCode(value)
@@ -164,7 +169,8 @@ export function createAccountModelV2Projection(value, { observedAt } = {}) {
     now: Object.freeze({ observedAt: projection.observed_at, state }),
     readyBoundaryLabels: Object.freeze(projection.ready_frontier.flatMap((id) => {
       const milestone = graph.milestones.find((row) => row.id === id)
-      return milestone ? [safeText(milestone.title)] : []
+      const label = milestone ? publicMilestoneLabel(milestone.title) : null
+      return label ? [label] : []
     })),
     nextActionLabel: accountModelV2NextActionLabel(projection.next_action),
     cherryActionLabel: accountModelV2CherryActionLabel(projection.cherry_action),
