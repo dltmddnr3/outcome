@@ -3,7 +3,7 @@ import { readFileSync } from 'node:fs'
 import { projectOutcomeV2, validateOutcomeGraph } from '../server/outcome-model-v2.mjs'
 import { compileCurrentGateFrontier, compileOutcomeContextBootstrap, selectOutcomeBootstrapContext, validateOutcomeContextBootstrap, validateOutcomeSourceManifest } from '../server/outcome-context-bootstrap.mjs'
 
-const sourceRevision = '155c5d152aa4f7833a8d600c12a5c3d58506f543'
+const sourceRevision = 'b11c09832b601f12cff68c465ae78efc8ddbe758'
 const sources = {
   agents: 'AGENTS.md',
   contract: 'docs/OUTCOME_CONTRACT.md',
@@ -11,15 +11,19 @@ const sources = {
   'slice-contract': 'docs/OUTCOME_MODEL_V2_LOCAL_DEFAULT_AND_SERVICE_PROJECTION_CONTRACT.md',
   gate: 'GATES_OUTCOME_MODEL_V2_LOCAL_DEFAULT_AND_SERVICE_PROJECTION.md',
   handoff: 'docs/OUTCOME_MODEL_V2_LOCAL_DEFAULT_CONTEXT_CANARY_QA_CORRECTION_BUILDER_HANDOFF.md',
+  'manifest-handoff': 'docs/OUTCOME_MODEL_V2_LOCAL_DEFAULT_CONTEXT_CANARY_MANIFEST_RECOMPILE_BUILDER_HANDOFF.md',
   'qa-receipt': 'docs/OUTCOME_MODEL_V2_LOCAL_DEFAULT_CONTEXT_CANARY_FRESH_QA_RECEIPT.md',
+  'reqa-receipt': 'docs/OUTCOME_MODEL_V2_LOCAL_DEFAULT_CONTEXT_CANARY_FRESH_REQA_RECEIPT.md',
 }
 const pinnedDigests = Object.freeze({
   agents: 'cbda193480670fdbc0dfd5aa1cbcae2a945418ba8b670246997d3ba44f39cb93',
   contract: '36860ad7e0103170c6f1be3eaa25a221b873ccf1b46b668f0d684c385412851f',
-  gate: 'f4a6d8d24e552c5dccb8d2d4cdefcef322e3bb6274633132ee9c60da3df9fd2d',
+  gate: '098c48bef05b2219b68acd2c308309b04bd91ca82a1eeb7ba80552a7caca7b0d',
   handoff: 'd7212441f5bb488941b6a42c0c6e0b6a195187479e61b051e715b537f7a4fd61',
+  'manifest-handoff': 'cc5a84a2e24838a1b589fa8b99d7a582081a65a1a639151d0e5fda6a795a7fa1',
   map: '10bfe76927a044f87612666b1976ff34b145bd8f5b471dff676f32716396bc94',
   'qa-receipt': 'bbc13889eb1c0af9a51d545d2daae7bf1b2c1d5a935e01eee3f347775388f9f5',
+  'reqa-receipt': '0218a4c5b345ae5f32da4b59d9ea144f51b2253186c38cbd3be90c68c90a839a',
   'slice-contract': 'b7c0f31cec46dc658b950b28a65dff02ee21867a67f72a3e61428651de2ae657',
 })
 const sourceBytes = Object.fromEntries(Object.entries(sources).map(([key, path]) => [key, readFileSync(path)]))
@@ -62,6 +66,7 @@ if (manifestValidation.outcome !== 'ready') {
     schema_version: 1,
     source_revision: sourceRevision,
     source_manifest_digest: createHash('sha256').update(JSON.stringify(pinnedDigests)).digest('hex'),
+    manifest_sources: Object.values(sources),
     snapshot_digest: snapshot.snapshot_digest,
     loaded_sources: context.loaded_sources,
     excluded_source_classes: context.excluded_source_classes,

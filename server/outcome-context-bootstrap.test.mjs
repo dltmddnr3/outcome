@@ -76,9 +76,9 @@ test('Q1 F1 private identifier classes fail in every projectable identifier fiel
 })
 
 test('Q1 F2 pinned source Gate and evidence drift require cold compile with no retry', () => {
-  const expected = { agents: digest('a'), gate: digest('b'), 'qa-receipt': digest('c') }
+  const expected = { agents: digest('a'), contract: digest('b'), map: digest('c'), 'slice-contract': digest('d'), gate: digest('e'), handoff: digest('f'), 'manifest-handoff': digest('1'), 'qa-receipt': digest('2'), 'reqa-receipt': digest('3') }
   assert.deepEqual(validateOutcomeSourceManifest(expected, expected), { outcome: 'ready', automatic_retry_count: 0 })
-  for (const key of ['agents', 'gate', 'qa-receipt']) assert.deepEqual(validateOutcomeSourceManifest({ ...expected, [key]: digest('d') }, expected), { outcome: 'cold_compile_required', reason: 'source_digest_drift', automatic_retry_count: 0 })
+  for (const key of Object.keys(expected)) assert.deepEqual(validateOutcomeSourceManifest({ ...expected, [key]: digest('9') }, expected), { outcome: 'cold_compile_required', reason: 'source_digest_drift', automatic_retry_count: 0 })
 })
 
 test('Q1 F2 complete current Gate keeps Q1 ready until independent QA evidence passes', () => {
