@@ -2,7 +2,7 @@
 
 Outcome: Model v2 is the verified local default with selective context, then becomes the user-facing private workspace projection without deployment or release authority.
 
-Status: **SLICE B3 PASSED · Q2 READY · DEPLOYMENT/PRODUCTION/RELEASE EXCLUDED**
+Status: **Q2 PASSED · A5 RELEASE AUDIT READY · DEPLOYMENT/PRODUCTION/RELEASE EXCLUDED**
 
 - [x] D1: Product meaning, selective-context boundary, information architecture, ownership and rollback are fixed in one contract.
   CHECK: rg -q "Selective context contract" docs/OUTCOME_MODEL_V2_LOCAL_DEFAULT_AND_SERVICE_PROJECTION_CONTRACT.md && rg -q "Service information architecture" docs/OUTCOME_MODEL_V2_LOCAL_DEFAULT_AND_SERVICE_PROJECTION_CONTRACT.md && rg -q "Current Projection is the only source" docs/OUTCOME_MODEL_V2_LOCAL_DEFAULT_AND_SERVICE_PROJECTION_CONTRACT.md && echo D1_PASS
@@ -38,8 +38,8 @@ Status: **SLICE B3 PASSED · Q2 READY · DEPLOYMENT/PRODUCTION/RELEASE EXCLUDED*
 - [x] B3: Planner conversation renders only observed adapter events and never fabricates streaming, tool activity, completion or progress.
   EVIDENCE: Corrected product `1ab53276e8dc75b6b25089888bf5a29d47a5d7bd` and fresh independent re-QA PASS carrier `5fa7477c5092d347b9f887c391da4369ce4fee51`, report SHA-256 `220b8dcfc41283aa2726a91bab25e40637db4820578e9b82e0779a65c676363b`, establish the exact four-field observed-event schema; active only from observed active work; terminal, delivery-unknown and blocked states non-running and non-completed; truthful empty state; no composer, streaming, tool activity, progress or synthetic messages; private hostile classes `21/21` fail closed with markup survival `0`; offset timestamps normalized to canonical UTC and epoch ordered; normalized duplicates fail closed and render `0`; frontend `99/99`; account/projection `46/46`; production build PASS; desktop/mobile overflow `0`, minimum control `44px`, page errors `0`. Promotion receipt: `docs/OUTCOME_MODEL_V2_SERVICE_PROJECTION_B3_EVIDENCE_PROMOTION_RECEIPT.md`.
 
-- [ ] Q2: Fresh independent UX & Product QA validates the five-question 30-second task, responsive layout, accessibility, failure states and privacy on the immutable Slice B candidate.
-  EVIDENCE: pending
+- [x] Q2: Fresh independent UX & Product QA validates the five-question 30-second task, responsive layout, accessibility, failure states and privacy on the immutable Slice B candidate.
+  EVIDENCE: Corrected product/test candidate `28db58fd5018dc4094c9cbbf764d0e86e83cbea4`; Builder receipt carrier `4d4c19c79e1815e174caa9a64b663648f43ccdc5`, SHA-256 `80a01e7597941d21b281da26b711005421831670ff4668ce80d2e6302a90acad`; fresh independent QA PASS carrier `a2e61c5c9d5e76a530302bbd57fec54a64264775`, report SHA-256 `41f80e48b9475f59fabb636768470f87bf9d49cef22544e8b26f558fa0c0e8a3`. Hostile identifier, digest, numeric, markup and private milestone labels were omitted; approved human labels remained exact; Proxy traps `0`, private serialization `0`, invented replacements `0`. Projection precedes conversation in DOM, screen-reader and keyboard order; desktop remains conversation-left/projection-right and mobile Projection-first. Focused `16/16`, full frontend `99/99`, account/projection `48/48`, production build `1,654` modules and three-viewport browser checks passed; hostile API/markup/visible/accessibility survival, overflow, browser/runtime errors, product/Gate/registry/provider/runtime/environment/deploy/release/acceptance/push/external mutation and false completion were all `0`.
 
 - [ ] A5: Separate fresh Release Audit validates the coherent local-default plus service-projection candidate, rollback, privacy and scope without inferring deployment or release.
   EVIDENCE: pending
