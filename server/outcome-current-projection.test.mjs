@@ -1,6 +1,7 @@
 import assert from 'node:assert/strict'
 import { execFileSync, spawnSync } from 'node:child_process'
-import { appendFileSync, cpSync, mkdtempSync, readFileSync, rmSync, unlinkSync } from 'node:fs'
+import { createHash } from 'node:crypto'
+import { appendFileSync, cpSync, mkdtempSync, readFileSync, rmSync, statSync, symlinkSync, unlinkSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { test } from 'node:test'
@@ -12,6 +13,7 @@ import {
 } from './outcome-current-projection.mjs'
 
 const root = new URL('../', import.meta.url)
+const sha256 = (value) => createHash('sha256').update(value).digest('hex')
 const sourceBytes = () => Object.fromEntries(Object.entries(CURRENT_PROJECTION_SOURCES).map(([sourceClass, row]) => [sourceClass, readFileSync(new URL(row.source_ref, root))]))
 const input = () => outcomeCurrentProjectionInput(sourceBytes())
 const attempt = (state = 'delivery_unknown') => ({ id: 'attempt-one', work_id: 'work-o1-selective-context-dogfood', fingerprint: input().work_items[0].fingerprint, state, automatic_retry_count: 0 })
@@ -136,16 +138,52 @@ test('O1 canary rejects snapshot whitespace drift and missing snapshot before co
   try {
     cpSync(new URL('../', import.meta.url), fixture, { recursive: true })
     const snapshot = join(fixture, 'snapshot/outcome-model-v2-current.json')
+    const snapshotBytes = readFileSync(snapshot)
     appendFileSync(snapshot, ' ')
     const driftRun = spawnSync(process.execPath, ['scripts/outcome-model-v2-local-canary.mjs', '--source-root', fixture], { encoding: 'utf8' })
     assert.equal(driftRun.status, 2)
     const drift = JSON.parse(driftRun.stdout)
     assert.equal(drift.outcome, 'cold_compile_required'); assert.equal(drift.reason, 'source_digest_drift'); assert.equal(drift.automatic_retry_count, 0); assert.equal(drift.safety.duplicate_execution_count, 0); assert.equal(Object.hasOwn(drift, 'local_consumption_count'), false)
-    cpSync(new URL('../snapshot/outcome-model-v2-current.json', import.meta.url), snapshot)
+    writeFileSync(snapshot, snapshotBytes)
     unlinkSync(snapshot)
     const missingRun = spawnSync(process.execPath, ['scripts/outcome-model-v2-local-canary.mjs', '--source-root', fixture], { encoding: 'utf8' })
     assert.equal(missingRun.status, 2)
     const missing = JSON.parse(missingRun.stdout)
     assert.equal(missing.outcome, 'cold_compile_required'); assert.equal(missing.reason, 'source_input_missing'); assert.equal(missing.automatic_retry_count, 0); assert.equal(Object.hasOwn(missing, 'local_consumption_count'), false)
+    symlinkSync(join(fixture, 'AGENTS.md'), snapshot)
+    const symlinkRun = spawnSync(process.execPath, ['scripts/outcome-model-v2-local-canary.mjs', '--source-root', fixture], { encoding: 'utf8' })
+    assert.equal(symlinkRun.status, 2)
+    const symlink = JSON.parse(symlinkRun.stdout)
+    assert.equal(symlink.outcome, 'cold_compile_required'); assert.equal(symlink.reason, 'source_input_invalid'); assert.equal(Object.hasOwn(symlink, 'local_consumption_count'), false)
+    const extraRun = spawnSync(process.execPath, ['scripts/outcome-model-v2-local-canary.mjs', '--source-root', fixture, '--extra'], { encoding: 'utf8' })
+    assert.equal(extraRun.status, 2); assert.equal(JSON.parse(extraRun.stdout).reason, 'invalid_source_root')
+  } finally { rmSync(fixture, { recursive: true, force: true }) }
+})
+
+test('O1 default canary binds one HEAD tree and ignores dirty Contract and Map overlays', () => {
+  const fixture = mkdtempSync(join(tmpdir(), 'outcome-o1-head-'))
+  try {
+    execFileSync('git', ['clone', '--quiet', '--no-checkout', new URL('../', import.meta.url).pathname, fixture])
+    execFileSync('git', ['-C', fixture, 'checkout', '--quiet', '--detach', 'HEAD'])
+    writeFileSync(join(fixture, 'scripts/outcome-model-v2-local-canary.mjs'), readFileSync(new URL('../scripts/outcome-model-v2-local-canary.mjs', import.meta.url)))
+    const contract = join(fixture, 'docs/OUTCOME_CONTRACT.md'); const map = join(fixture, 'docs/OUTCOME_MAP.md')
+    appendFileSync(contract, '\nHEAD-bound hostile Contract overlay\n'); appendFileSync(map, '\nHEAD-bound hostile Map overlay\n')
+    const before = { contract: sha256(readFileSync(contract)), map: sha256(readFileSync(map)), contractMode: statSync(contract).mode, mapMode: statSync(map).mode }
+    const result = JSON.parse(execFileSync(process.execPath, ['scripts/outcome-model-v2-local-canary.mjs'], { cwd: fixture, encoding: 'utf8' }))
+    const after = { contract: sha256(readFileSync(contract)), map: sha256(readFileSync(map)), contractMode: statSync(contract).mode, mapMode: statSync(map).mode }
+    assert.deepEqual(after, before)
+    assert.equal(result.outcome, 'o1_local_dogfood_probe_consumed'); assert.equal(result.local_consumption_count, 1); assert.equal(result.plan_digest, '3fc48b99b0b6bd560bc2b28a182cedcbfd266b8b3fdb96a685fa972fa159031a'); assert.equal(result.safety.duplicate_execution_count, 0)
+  } finally { rmSync(fixture, { recursive: true, force: true }) }
+})
+
+test('O1 default canary fails closed when its repository has no resolvable HEAD', () => {
+  const fixture = mkdtempSync(join(tmpdir(), 'outcome-o1-no-head-'))
+  try {
+    cpSync(new URL('../', import.meta.url), fixture, { recursive: true })
+    unlinkSync(join(fixture, '.git'))
+    const run = spawnSync(process.execPath, ['scripts/outcome-model-v2-local-canary.mjs'], { cwd: fixture, encoding: 'utf8' })
+    assert.equal(run.status, 2)
+    const result = JSON.parse(run.stdout)
+    assert.equal(result.outcome, 'cold_compile_required'); assert.equal(result.reason, 'canonical_source_unavailable'); assert.equal(result.automatic_retry_count, 0); assert.equal(Object.hasOwn(result, 'local_consumption_count'), false)
   } finally { rmSync(fixture, { recursive: true, force: true }) }
 })

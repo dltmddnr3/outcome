@@ -1,6 +1,8 @@
 import { createHash } from 'node:crypto'
-import { readFileSync } from 'node:fs'
-import { resolve } from 'node:path'
+import { execFileSync } from 'node:child_process'
+import { lstatSync, readFileSync, realpathSync } from 'node:fs'
+import { dirname, isAbsolute, relative, resolve, sep } from 'node:path'
+import { fileURLToPath } from 'node:url'
 import { compileOutcomeSelectiveContextPlan, consumeOutcomeSelectiveContextPlan, createCodexRuntimeAdapter } from '../server/outcome-model-v2.mjs'
 import { validateOutcomeSourceManifest } from '../server/outcome-context-bootstrap.mjs'
 
@@ -27,13 +29,44 @@ const skippedSourceClasses = Object.freeze(['historical_gate_families', 'histori
 const stable = (value) => Array.isArray(value) ? `[${value.map(stable).join(',')}]` : value && typeof value === 'object' ? `{${Object.keys(value).sort().map((key) => `${JSON.stringify(key)}:${stable(value[key])}`).join(',')}}` : JSON.stringify(value)
 const digest = (value) => createHash('sha256').update(value).digest('hex')
 const failClosed = (reason) => { process.stdout.write(`${JSON.stringify({ schema_version: 2, outcome: 'cold_compile_required', reason, automatic_retry_count: 0, safety: { duplicate_execution_count: 0, unauthorized_canonical_transition_count: 0, registry_provider_environment_mutation_count: 0, false_completion_count: 0 } }, null, 2)}\n`); process.exitCode = 2 }
+const sourcePaths = Object.values(sources)
+const sourcePathValid = (path) => typeof path === 'string' && !isAbsolute(path) && path.split('/').every((part) => part && part !== '.' && part !== '..')
+const sourceSetValid = sourcePaths.every(sourcePathValid) && new Set(sourcePaths).size === sourcePaths.length
+const loadHeadSources = () => {
+  if (!sourceSetValid) throw new Error('canonical_source_unavailable')
+  const scriptRoot = resolve(dirname(fileURLToPath(import.meta.url)), '..')
+  const git = (args) => execFileSync('git', ['-C', scriptRoot, ...args], { maxBuffer: 16 * 1024 * 1024 })
+  const repositoryRoot = realpathSync(git(['rev-parse', '--show-toplevel']).toString().trim())
+  if (repositoryRoot !== realpathSync(scriptRoot)) throw new Error('canonical_source_unavailable')
+  const tree = git(['rev-parse', '--verify', 'HEAD^{tree}']).toString().trim()
+  if (!/^[a-f0-9]{40,64}$/.test(tree) || git(['cat-file', '-t', tree]).toString().trim() !== 'tree') throw new Error('canonical_source_unavailable')
+  return Object.fromEntries(Object.entries(sources).map(([key, path]) => {
+    const rows = git(['ls-tree', '-z', tree, '--', path]).toString().split('\0').filter(Boolean)
+    if (rows.length !== 1) throw new Error('canonical_source_unavailable')
+    const tab = rows[0].indexOf('\t'); const [mode, type, object] = rows[0].slice(0, tab).split(' ')
+    if (tab < 0 || rows[0].slice(tab + 1) !== path || type !== 'blob' || !['100644', '100755'].includes(mode) || !/^[a-f0-9]{40,64}$/.test(object)) throw new Error('canonical_source_unavailable')
+    return [key, git(['cat-file', 'blob', object])]
+  }))
+}
+const loadFixtureSources = (fixtureRoot) => {
+  if (!sourceSetValid) throw new Error('source_input_invalid')
+  const requestedRoot = resolve(fixtureRoot); const rootStat = lstatSync(requestedRoot)
+  if (!rootStat.isDirectory() || rootStat.isSymbolicLink()) throw new Error('source_input_invalid')
+  const canonicalRoot = realpathSync(requestedRoot)
+  return Object.fromEntries(Object.entries(sources).map(([key, path]) => {
+    const target = resolve(canonicalRoot, path); const fromRoot = relative(canonicalRoot, target)
+    if (!fromRoot || fromRoot.startsWith(`..${sep}`) || fromRoot === '..' || isAbsolute(fromRoot)) throw new Error('source_input_invalid')
+    const stat = lstatSync(target)
+    if (!stat.isFile() || stat.isSymbolicLink() || realpathSync(target) !== target) throw new Error('source_input_invalid')
+    return [key, readFileSync(target)]
+  }))
+}
 
 const args = process.argv.slice(2)
 if (args.length !== 0 && (args.length !== 2 || args[0] !== '--source-root' || !args[1])) failClosed('invalid_source_root')
 else {
-  const sourceRoot = resolve(args[1] ?? '.')
   let sourceBytes
-  try { sourceBytes = Object.fromEntries(Object.entries(sources).map(([key, path]) => [key, readFileSync(resolve(sourceRoot, path))])) } catch { failClosed('source_input_missing') }
+  try { sourceBytes = args.length ? loadFixtureSources(args[1]) : loadHeadSources() } catch (error) { failClosed(args.length ? error.code === 'ENOENT' ? 'source_input_missing' : 'source_input_invalid' : 'canonical_source_unavailable') }
   if (sourceBytes) {
     const actualDigests = Object.fromEntries(Object.entries(sourceBytes).map(([key, bytes]) => [key, digest(bytes)]))
     const manifestValidation = validateOutcomeSourceManifest(actualDigests, pinnedDigests)
