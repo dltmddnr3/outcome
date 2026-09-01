@@ -1,6 +1,8 @@
 import assert from 'node:assert/strict'
-import { execFileSync } from 'node:child_process'
-import { readFileSync } from 'node:fs'
+import { execFileSync, spawnSync } from 'node:child_process'
+import { appendFileSync, cpSync, mkdtempSync, readFileSync, rmSync, unlinkSync } from 'node:fs'
+import { tmpdir } from 'node:os'
+import { join } from 'node:path'
 import { test } from 'node:test'
 import {
   CURRENT_PROJECTION_SOURCES,
@@ -127,4 +129,23 @@ test('O1 isolated canary consumes the compiled snapshot exactly once and remains
   ])
   const serialized = JSON.stringify(result)
   for (const pattern of [/\/Users\//, /(?:thread|session|task|turn)[_-]?id/i, /credential|password|secret|token/i, /raw[_-]?(?:prompt|result)/i, /source_ref|locator_ref|registry_payload/i]) assert.doesNotMatch(serialized, pattern)
+})
+
+test('O1 canary rejects snapshot whitespace drift and missing snapshot before consumption', () => {
+  const fixture = mkdtempSync(join(tmpdir(), 'outcome-o1-canary-'))
+  try {
+    cpSync(new URL('../', import.meta.url), fixture, { recursive: true })
+    const snapshot = join(fixture, 'snapshot/outcome-model-v2-current.json')
+    appendFileSync(snapshot, ' ')
+    const driftRun = spawnSync(process.execPath, ['scripts/outcome-model-v2-local-canary.mjs', '--source-root', fixture], { encoding: 'utf8' })
+    assert.equal(driftRun.status, 2)
+    const drift = JSON.parse(driftRun.stdout)
+    assert.equal(drift.outcome, 'cold_compile_required'); assert.equal(drift.reason, 'source_digest_drift'); assert.equal(drift.automatic_retry_count, 0); assert.equal(drift.safety.duplicate_execution_count, 0); assert.equal(Object.hasOwn(drift, 'local_consumption_count'), false)
+    cpSync(new URL('../snapshot/outcome-model-v2-current.json', import.meta.url), snapshot)
+    unlinkSync(snapshot)
+    const missingRun = spawnSync(process.execPath, ['scripts/outcome-model-v2-local-canary.mjs', '--source-root', fixture], { encoding: 'utf8' })
+    assert.equal(missingRun.status, 2)
+    const missing = JSON.parse(missingRun.stdout)
+    assert.equal(missing.outcome, 'cold_compile_required'); assert.equal(missing.reason, 'source_input_missing'); assert.equal(missing.automatic_retry_count, 0); assert.equal(Object.hasOwn(missing, 'local_consumption_count'), false)
+  } finally { rmSync(fixture, { recursive: true, force: true }) }
 })

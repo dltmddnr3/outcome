@@ -13,6 +13,7 @@ const sources = Object.freeze({
   'promotion-receipt': 'docs/OUTCOME_MODEL_V2_SERVICE_PROJECTION_Q2_EVIDENCE_PROMOTION_RECEIPT.md',
   'failed-audit': 'docs/OUTCOME_MODEL_V2_A5_COHERENT_CANDIDATE_FRESH_RELEASE_AUDIT_RECEIPT.md',
   'activation-gate': 'GATES_OUTCOME_MODEL_V2_SELECTIVE_CONTEXT_LOCAL_ACTIVATION.md',
+  snapshot: 'snapshot/outcome-model-v2-current.json',
 })
 const pinnedDigests = Object.freeze({
   agents: 'cbda193480670fdbc0dfd5aa1cbcae2a945418ba8b670246997d3ba44f39cb93', contract: 'c25e8f3920018aeca4bb219c8f9a678fa21700f3d4ebfe0d6c66a5481d20a442', map: 'da2b8c47bce8522d36f6e70ca5c5dc940988df6f8cf2b773b8e13a68e1bf60d3',
@@ -20,8 +21,8 @@ const pinnedDigests = Object.freeze({
   'builder-receipt': '80a01e7597941d21b281da26b711005421831670ff4668ce80d2e6302a90acad', 'qa-receipt': '41f80e48b9475f59fabb636768470f87bf9d49cef22544e8b26f558fa0c0e8a3',
   'promotion-receipt': '75cae693bad35f8a7791941eefbd008605162073ee817fa3c7632d73c8b98dfb', 'failed-audit': '9e77063cfbc09517fa5e8376846902075a449205006ff021eff91765c279ba5b',
   'activation-gate': '50987cbba74c275ce5143c26d4ecb20c2fad377dfea2b7f50b75c621a989628f',
+  snapshot: '7da833943f17138e6d86bf6763bff4fb9212c3f53c15124d6f8c9e721a3bf295',
 })
-const snapshotSource = 'snapshot/outcome-model-v2-current.json'
 const skippedSourceClasses = Object.freeze(['historical_gate_families', 'historical_q1_canary_inputs', 'correction_chains', 'raw_conversation', 'roadmap_2', 'unrelated_skills'])
 const stable = (value) => Array.isArray(value) ? `[${value.map(stable).join(',')}]` : value && typeof value === 'object' ? `{${Object.keys(value).sort().map((key) => `${JSON.stringify(key)}:${stable(value[key])}`).join(',')}}` : JSON.stringify(value)
 const digest = (value) => createHash('sha256').update(value).digest('hex')
@@ -31,19 +32,20 @@ const args = process.argv.slice(2)
 if (args.length !== 0 && (args.length !== 2 || args[0] !== '--source-root' || !args[1])) failClosed('invalid_source_root')
 else {
   const sourceRoot = resolve(args[1] ?? '.')
-  let sourceBytes; let snapshotBytes
-  try { sourceBytes = Object.fromEntries(Object.entries(sources).map(([key, path]) => [key, readFileSync(resolve(sourceRoot, path))])); snapshotBytes = readFileSync(resolve(sourceRoot, snapshotSource)) } catch { failClosed('source_input_missing') }
+  let sourceBytes
+  try { sourceBytes = Object.fromEntries(Object.entries(sources).map(([key, path]) => [key, readFileSync(resolve(sourceRoot, path))])) } catch { failClosed('source_input_missing') }
   if (sourceBytes) {
     const actualDigests = Object.fromEntries(Object.entries(sourceBytes).map(([key, bytes]) => [key, digest(bytes)]))
     const manifestValidation = validateOutcomeSourceManifest(actualDigests, pinnedDigests)
     if (manifestValidation.outcome !== 'ready') failClosed(manifestValidation.reason)
     else {
       canary: {
+      const snapshotBytes = sourceBytes.snapshot
       let snapshot
       try { snapshot = JSON.parse(snapshotBytes) } catch { snapshot = null }
       if (snapshot?.outcome !== 'current_projection' || snapshot.candidate_commit !== finalProductCandidate || snapshot.current?.acceptance_gap?.closed !== 7 || snapshot.current?.acceptance_gap?.total !== 8 || snapshot.current?.ready_frontier?.length !== 1 || snapshot.current.ready_frontier[0] !== 'milestone-o1' || snapshot.current.next_action !== 'work-o1-selective-context-dogfood' || snapshot.current.cherry_action !== null || snapshot.current.active_work !== null || snapshot.rollback?.available !== true || Object.values(snapshot.safety ?? {}).some((value) => value !== 0)) failClosed('snapshot_projection_invalid')
       if (process.exitCode) break canary
-      const snapshotDigest = digest(snapshotBytes)
+      const snapshotDigest = pinnedDigests.snapshot
       const selectivePlan = compileOutcomeSelectiveContextPlan({
         environment: {}, work_id: snapshot.current.next_action, work_type: 'builder', role_skill: 'mango-implementation-engineer',
         sources: {

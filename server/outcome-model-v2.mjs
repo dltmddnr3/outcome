@@ -239,6 +239,16 @@ const contextReceipt = (plan, outcome) => frozen({
   expansion_count: plan.expansion_count,
   safety: plan.safety,
 })
+const duplicateContextPlanHold = () => frozen({
+  schema_version: 2,
+  authority: 'projection_only',
+  outcome: 'safe_hold',
+  reason: 'duplicate_context_plan',
+  loaded_sources: frozen([]),
+  skipped_sources: frozen([]),
+  safety: frozen({ execution_started_count: 0, automatic_retry_count: 0, duplicate_execution_count: 1, persistent_setting_mutation_count: 0, registry_provider_environment_mutation_count: 0, unauthorized_canonical_transition_count: 0, false_completion_count: 0 }),
+})
+const consumedContextPlanDigests = new WeakMap()
 const exactPlanRecord = (value, keys, code = 'invalid_selective_context_plan') => {
   if (!ownRecord(value) || Object.getOwnPropertySymbols(value).length) throw new Error(code)
   const descriptors = Object.getOwnPropertyDescriptors(value)
@@ -329,8 +339,12 @@ export function consumeOutcomeSelectiveContextPlan(adapter, plan) {
   rejectProxyTree(adapter); rejectProxyTree(plan)
   const validatedPlan = validateOutcomeSelectiveContextPlan(plan)
   if (!adapter || adapter.selectiveContextCapability !== 'content-addressed-plan-v1' || typeof adapter.consumeContextPlan !== 'function') return selectiveContextHold('unsupported_adapter_capability')
+  let consumedDigests = consumedContextPlanDigests.get(adapter)
+  if (!consumedDigests) { consumedDigests = new Set(); consumedContextPlanDigests.set(adapter, consumedDigests) }
+  if (consumedDigests.has(validatedPlan.plan_digest)) return duplicateContextPlanHold()
   const result = adapter.consumeContextPlan(validatedPlan)
   if (!ownRecord(result) || Object.keys(result).length !== 1 || result.accepted !== true) return selectiveContextHold('adapter_context_rejected')
+  consumedDigests.add(validatedPlan.plan_digest)
   return contextReceipt(validatedPlan, 'locally_consumed')
 }
 

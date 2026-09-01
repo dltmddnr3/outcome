@@ -85,9 +85,14 @@ test('B1-B6 selective context plan is content addressed and consumed only by a c
   assert.equal(consumed, 1); assert.equal(receipt.outcome, 'locally_consumed'); assert.equal(receipt.safety.execution_started_count, 0)
   const serialized = JSON.stringify(receipt)
   for (const pattern of [/\/Users\/|\/private\/tmp\//, /(?:thread|session|task|turn)[_-]?id/i, /credential|password|secret|token/i, /raw[_-]?(?:prompt|result)/i, /dispatch_authority|release_authority|canonical_transition_authority/i]) assert.doesNotMatch(serialized, pattern)
-  assert.deepEqual(receipt, consumeOutcomeSelectiveContextPlan(adapter, plan)); assert.equal(consumed, 2)
+  const duplicate = consumeOutcomeSelectiveContextPlan(adapter, plan)
+  assert.equal(duplicate.outcome, 'safe_hold'); assert.equal(duplicate.reason, 'duplicate_context_plan'); assert.equal(duplicate.safety.duplicate_execution_count, 1); assert.equal(consumed, 1)
+  assert.deepEqual(duplicate.safety, { execution_started_count: 0, automatic_retry_count: 0, duplicate_execution_count: 1, persistent_setting_mutation_count: 0, registry_provider_environment_mutation_count: 0, unauthorized_canonical_transition_count: 0, false_completion_count: 0 })
+  let independentConsumed = 0
+  const independentAdapter = createCodexRuntimeAdapter({ selectNext(value) { return value }, start(value) { return value }, transition(value) { return value }, projectPublic() { return { authority: 'projection_only' } }, selectiveContextCapability: 'content-addressed-plan-v1', consumeContextPlan() { independentConsumed += 1; return { accepted: true } } })
+  assert.equal(consumeOutcomeSelectiveContextPlan(independentAdapter, plan).outcome, 'locally_consumed'); assert.equal(independentConsumed, 1)
   const unsupported = consumeOutcomeSelectiveContextPlan(createCodexRuntimeAdapter({ selectNext(value) { return value }, start(value) { return value }, transition(value) { return value }, projectPublic() { return { authority: 'projection_only' } } }), plan)
-  assert.equal(unsupported.outcome, 'safe_hold'); assert.equal(unsupported.reason, 'unsupported_adapter_capability'); assert.equal(consumed, 2)
+  assert.equal(unsupported.outcome, 'safe_hold'); assert.equal(unsupported.reason, 'unsupported_adapter_capability'); assert.equal(consumed, 1)
 })
 
 test('B3-B5 role selection no-role rollback and negative controls are deterministic', () => {
