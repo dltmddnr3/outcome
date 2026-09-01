@@ -2,7 +2,7 @@
 
 Outcome: The exact Cherry-accepted local-only Model v2 source is anchored as a durable canonical-package candidate, produces one deterministic Current Projection from current canonical inputs, and is proven reversible without changing Preview, Production, deployment or release state.
 
-Status: **C1 CHERRY ACCEPTED · DIRTY-AWARE ACTIVE ROOT CUTOVER AUTHORIZED · CUTOVER EVIDENCE PENDING**
+Status: **C1 CHERRY ACCEPTED · R1-R2 PRESERVE-THEN-REPLACE CORRECTION AUTHORIZED · CUTOVER EVIDENCE PENDING**
 
 - [x] D1: Planner pins the accepted source, current canonical base, dirty-state boundary, expected user delta and stop conditions.
   CHECK: test "$(git rev-parse HEAD)" = 517f436150b684a2f7d72f6144bfa848af397bb4 && git merge-base --is-ancestor 517f436150b684a2f7d72f6144bfa848af397bb4 a40ee664e194c21554b0497382d499296cb2c52b && test "$(git show -s --format=%T a40ee664e194c21554b0497382d499296cb2c52b)" = 6dcf343769ff08c6fd507de12baf3b0bbdb9c43b && echo D1_PASS
@@ -38,6 +38,16 @@ Status: **C1 CHERRY ACCEPTED · DIRTY-AWARE ACTIVE ROOT CUTOVER AUTHORIZED · CU
   CHECK: exact candidate and audit carriers are named in an immutable acceptance receipt.
   EXPECT: candidate acceptance only; active-root cutover remains a separate dirty-aware Builder operation.
   EVIDENCE: Cherry replied exact `승인` on 2026-09-01 KST after receiving the immutable result: Audit carrier `66a8a79447e07140e4cf976c51dcf83a0c79e783`, `PASS_RELEASE_AUDIT_ONLY`, deterministic projection artifact SHA-256 `3c91151af4694292d5a94ede1d39c29d6ab176510acb984e258519a094125ead`, regressions `102/102`, and active-root mutation count zero. Authority accepts this exact canonical-package candidate and permits one separate dirty-aware Builder cutover handoff; it does not authorize unsafe conflict resolution, Preview, Production, deployment, release, external activation or Phase completion.
+
+- [ ] R1: Builder preserves the two nonidentical pre-cutover root Gate files byte-for-byte as content-addressed supporting history and creates one immutable correction carrier above the C1 carrier.
+  CHECK: the correction receipt proves archived paths equal root SHA-256 `1e91fb8117b17a4a58ce9e5f005cc4d3b834c25e9df3340e97d471fa9f1c2f85` and `854274ad793daa8403219af8f05ff6d8b84b3ac845da70d244aa7826dc39bb05`, while canonical target paths equal audited SHA-256 `b6c156c60cfca729c261641a96401590f44d9e47845d5ae34dd4a028790e7357` and `50987cbba74c275ce5143c26d4ecb20c2fad377dfea2b7f50b75c621a989628f`.
+  EXPECT: both prior files remain recoverable in Git supporting history; no evidence is deleted or rewritten.
+  EVIDENCE: pending.
+
+- [ ] R2: Builder fast-forwards the active root to the correction/receipt carrier after replacing only the two explicitly approved stale canonical Gate paths and preserving every unrelated dirty byte, mode and index state.
+  CHECK: active branch/HEAD equals the final receipt carrier; pre/post unrelated manifest digests match; archive copies equal pre-cutover bytes; canonical paths equal audited target bytes; merge/rebase/cherry-pick/temp residue and unintended staged paths are zero.
+  EXPECT: `CUTOVER_COMPLETE`; Preview, Production, dogfood, deployment, release, external activation and Phase transition remain excluded.
+  EVIDENCE: pending.
 
 - [ ] O1: The accepted candidate performs one real OUTCOME selective-context dogfood selection from current repository inputs.
   CHECK: exact loaded/skipped sources, projected next action, source digest and safety counters are recorded; automatic retry, duplicate execution, unauthorized transition and false completion remain zero.
