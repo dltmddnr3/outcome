@@ -2,7 +2,7 @@
 
 Outcome: The exact Cherry-accepted Model v2 carrier becomes the verified local session-bootstrap default, loading only the current snapshot, Gate, handoff and proportional skills; unsupported enforcement, source drift and role mismatch fail closed. Preview, Production, release and Phase transition are excluded.
 
-Status: **A1 RELEASE AUDIT PASSED · C1 CHERRY ACCEPTANCE REQUIRED**
+Status: **LOCAL-ONLY MODEL V2 SELECTIVE-CONTEXT CHERRY ACCEPTED · GATE COMPLETE**
 
 - [x] D1: Exact accepted source and authority boundary are fixed.
   CHECK: git cat-file -e d726e200a9500658ae1fee5781d1d908a6b1a522^{commit} && git show d726e200a9500658ae1fee5781d1d908a6b1a522:GATES_OUTCOME_MODEL_V2_LOCAL_DEFAULT_AND_SERVICE_PROJECTION.md | rg -q 'MODEL V2 13/13 CHERRY ACCEPTED' && echo D1_PASS
@@ -59,10 +59,10 @@ Status: **A1 RELEASE AUDIT PASSED · C1 CHERRY ACCEPTANCE REQUIRED**
   EXPECT: `PASS_RELEASE_AUDIT_ONLY`
   EVIDENCE: Fresh Release Audit v22 returned `PASS_RELEASE_AUDIT_ONLY` for exact subject/tree/parent `a5703600eefa974836f71b4ac267970a47ec2091` / `1700a3e7900bbf30cfc0eeb5fb8fb241e4253170` / `4fbe7fcc891f122c253fda21862e40490e74011b`. It reproduced the prior B6 RED, verified corrected B6 `5/5` and B1 `19/19`, required `locally_consumed` with projection-only authority, privacy survival and all safety counters `0`, matched the immutable activation-Gate input, confirmed disposable cleanup and implementation/runtime/adapter/test delta `0`, and reported no findings. This closes A1 only; C1 and all Preview, Production, deployment, release and Phase decisions remain open.
 
-- [ ] C1: Cherry accepts the exact locally activated selective-context result; Preview, Production, release and Phase transition remain separate decisions.
-  CHECK: manual authority
+- [x] C1: Cherry accepts the exact locally activated selective-context result; Preview, Production, release and Phase transition remain separate decisions.
+  CHECK: verify exact bounded Cherry authority in `docs/OUTCOME_MODEL_V2_LOCAL_ACTIVATION_C1_CHERRY_ACCEPTANCE_RECEIPT.md`
   EXPECT: exact bounded Cherry acceptance
-  EVIDENCE: pending
+  EVIDENCE: Cherry responded exactly `승인` for decision subject/tree/parent `9107817e31e4d566086fa1f3a16cf0374848a5e7` / `b3a861e4c4d5ee489045d30aa9ffee3d6f3281e1` / `48e4dc251a296637b24158bc6f966536f0534604`, accepting it for C1 as the local-only Model v2 selective-context result. The accepted subject already contains the exact independent A1 `PASS_RELEASE_AUDIT_ONLY` promotion. Preview, Production, deployment, release, Phase transition, provider/runtime/environment mutation and broader product activation remain excluded future decisions.
 
 ## Stop conditions
 
