@@ -2,7 +2,7 @@
 
 Outcome: The exact Cherry-accepted Model v2 carrier becomes the verified local session-bootstrap default, loading only the current snapshot, Gate, handoff and proportional skills; unsupported enforcement, source drift and role mismatch fail closed. Preview, Production, release and Phase transition are excluded.
 
-Status: **SELECTIVE CONTEXT PRE-CONSUME VALIDATION CORRECTION CANDIDATE READY · BUILDER ONLY · FRESH RE-QA REQUIRED**
+Status: **Q1/O1/O2 EVIDENCE PROMOTED · BUILDER ONLY · FRESH A1 RELEASE RE-AUDIT REQUIRED**
 
 - [x] D1: Exact accepted source and authority boundary are fixed.
   CHECK: git cat-file -e d726e200a9500658ae1fee5781d1d908a6b1a522^{commit} && git show d726e200a9500658ae1fee5781d1d908a6b1a522:GATES_OUTCOME_MODEL_V2_LOCAL_DEFAULT_AND_SERVICE_PROJECTION.md | rg -q 'MODEL V2 13/13 CHERRY ACCEPTED' && echo D1_PASS
@@ -10,7 +10,7 @@ Status: **SELECTIVE CONTEXT PRE-CONSUME VALIDATION CORRECTION CANDIDATE READY ·
   EVIDENCE: Accepted carrier `d726e200a9500658ae1fee5781d1d908a6b1a522`; Cherry instructed `추천 실행 순서대로 진행해줘`. This authorizes local activation work only, not Preview, Production, release or Phase transition.
 
 - [x] B1: Local startup uses the accepted Model v2 selective-context bootstrap with no opt-in flag and no persistent/shared environment mutation.
-  CHECK: node --test server/outcome-model-v2.test.mjs && node scripts/outcome-model-v2-local-canary.mjs
+  CHECK: task_root="$(mktemp -d)" && git archive 7ec07d48958b95c780d03f0ade376b9faf5a66de | tar -x -C "$task_root" && git show 66cf3cb6dedf4d7de91a1910f357af647f48bbfa:GATES_OUTCOME_MODEL_V2_SELECTIVE_CONTEXT_LOCAL_ACTIVATION.md > "$task_root/GATES_OUTCOME_MODEL_V2_SELECTIVE_CONTEXT_LOCAL_ACTIVATION.md" && { check_status=0; (cd "$task_root" && node --test server/outcome-model-v2.test.mjs && node scripts/outcome-model-v2-local-canary.mjs) || check_status=$?; node -e 'require("node:fs").rmSync(process.argv[1], { recursive: true, force: true })' "$task_root"; exit "$check_status"; }
   EXPECT: default schema `2`, authority `projection_only`, persistent mutation `0`
   EVIDENCE: RED first failed because `compileOutcomeSelectiveContextPlan` was absent. GREEN defaults to schema 2 and projection-only authority, and the canary proves the snapshot plan is accepted by the capability-bound local adapter without setting shared or persistent environment state.
 
@@ -41,7 +41,7 @@ Status: **SELECTIVE CONTEXT PRE-CONSUME VALIDATION CORRECTION CANDIDATE READY ·
 
 - [x] Q1: Fresh independent UX & Product QA reproduces default activation, rollback, all four role manifests, on-demand expansion, privacy and fail-closed negative controls on the exact immutable candidate.
   CHECK: verify the pinned fresh re-QA verdict and SHA-256 in `docs/OUTCOME_MODEL_V2_LOCAL_ACTIVATION_EVIDENCE_PROMOTION_BUILDER_RECEIPT.md`
-  EXPECT: `PASS_UX_PRODUCT_QA_ONLY`
+  EXPECT: `PASS_SELECTIVE_CONTEXT_PRECONSUME_VALIDATION_REQA_ONLY`
   EVIDENCE: Both prior candidate verdicts remain preserved as `FAIL_UX_PRODUCT_QA_ONLY`. The later fresh selective-context pre-consume re-QA terminal receipt is pinned at SHA-256 `5312466d07b46a7f0c50a15a48f3cd23cdbeb0099bd8af4af411b3d1445c7353`; it reproduced fail-closed hostile-input behavior before callback and the valid compiled path with callback exactly `1`, verdict `PASS_SELECTIVE_CONTEXT_PRECONSUME_VALIDATION_REQA_ONLY`. This closes Q1 only for the local selective-context candidate and grants no Audit, activation, deployment, release, Phase or acceptance authority.
 
 - [x] O1: Existing bound role tasks receive one non-mutating canary handoff each and observed turns prove the compact context contract without duplicate dispatch or claiming unobservable reads.
