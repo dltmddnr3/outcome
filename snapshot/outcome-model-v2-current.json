@@ -1,0 +1,73 @@
+{
+  "schema_version": 2,
+  "authority": "projection_only",
+  "outcome": "current_projection",
+  "candidate_commit": "a40ee664e194c21554b0497382d499296cb2c52b",
+  "source_manifest_digest": "9b9165936dcd3ead2a632d31479671e6872620558cc21747b6bed0d72e6c6718",
+  "source_manifest": [
+    {
+      "source_class": "acceptance",
+      "source_digest": "eefc0c06ddeb7eea1c135d4f97a97d630da445c1967efdc091885c25a1f89cf8"
+    },
+    {
+      "source_class": "accepted_gate",
+      "source_digest": "50987cbba74c275ce5143c26d4ecb20c2fad377dfea2b7f50b75c621a989628f"
+    },
+    {
+      "source_class": "agents",
+      "source_digest": "cbda193480670fdbc0dfd5aa1cbcae2a945418ba8b670246997d3ba44f39cb93"
+    },
+    {
+      "source_class": "contract",
+      "source_digest": "c25e8f3920018aeca4bb219c8f9a678fa21700f3d4ebfe0d6c66a5481d20a442"
+    },
+    {
+      "source_class": "current_gate",
+      "source_digest": "5f55db737076632db4f4e1f831cca560e5f9c2db5f84d93317539fc4aff3b022"
+    },
+    {
+      "source_class": "current_handoff",
+      "source_digest": "38d80b50cebfe719faa6961d170e13323f9dfcd05e027010b0a5986341ca9aa6"
+    },
+    {
+      "source_class": "model",
+      "source_digest": "0a708464b3b83393b8b25f23e0f1364bc976844caa0cb079426967b1932073cb"
+    }
+  ],
+  "project": {
+    "id": "outcome",
+    "name": "OUTCOME"
+  },
+  "current": {
+    "primary_destination": "destination-model-v2-canonical-package",
+    "acceptance_gap": {
+      "remaining": 7,
+      "closed": 1,
+      "total": 8
+    },
+    "ready_frontier": [
+      "milestone-b1"
+    ],
+    "active_work": null,
+    "next_action": "work-canonical-package-candidate",
+    "cherry_action": null
+  },
+  "state": {
+    "stale": false,
+    "conflict": false,
+    "delivery_unknown_count": 0
+  },
+  "rollback": {
+    "available": true,
+    "mode": "v1_compatible",
+    "persistent_state_changed": false
+  },
+  "safety": {
+    "automatic_retry_count": 0,
+    "duplicate_execution_count": 0,
+    "unauthorized_canonical_transition_count": 0,
+    "registry_provider_environment_mutation_count": 0,
+    "false_completion_count": 0
+  },
+  "projection_digest": "e0bb5a27f7ce91b825e0918b615c28b06912218ff69f4bbf039ec709cb59b21b"
+}

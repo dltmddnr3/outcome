@@ -22,6 +22,7 @@
     "test:client-env-boundary": "node scripts/check-client-env-boundary.mjs",
     "test:stable-host": "node --test server/stable-host.test.mjs",
     "test:stable-browser": "node scripts/stable-host-browser-check.mjs",
+    "generate:current-projection": "node scripts/generate-outcome-current-projection.mjs",
     "test:redaction": "node --test --test-name-pattern='redacts|public mode removes' server/index.test.mjs",
     "test:browser": "node --test scripts/browser-assertions.test.mjs && node scripts/browser-check.mjs",
     "test:portfolio-browser": "node scripts/portfolio-browser-check.mjs",
