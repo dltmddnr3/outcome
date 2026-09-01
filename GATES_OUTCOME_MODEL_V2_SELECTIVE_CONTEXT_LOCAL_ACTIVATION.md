@@ -39,20 +39,20 @@ Status: **SELECTIVE CONTEXT PRE-CONSUME VALIDATION CORRECTION CANDIDATE READY ·
   EXPECT: private survival `0`; authority remains projection-only
   EVIDENCE: Failed QA carrier `78f089fbd9fd32b1b00bde43dd354e21a1d2ff0f` proved three hostile source-ref classes survived the original receipt. First correction used positive source allowlists and finite public source-class projection. Failed re-QA carrier `6f77c6abef3c9f41ee6be9304b9d122ee4aae7b1` then proved a caller-forged ready plan reached the adapter once before receipt rejection. Pre-consume correction RED reproduced callback 1. GREEN deeply snapshots exact plan/nested shapes, validates source grammar and role/work ordering, requires zero finite safety counters, recomputes the canonical digest, and only then calls the adapter with the validated frozen plan. Direct invalid-ref, digest, role/work, missing/extra/decorated, Proxy and accessor plans have callback/trap/receipt survival 0. The prior 23-class privacy matrix remains green; execution-start, mutation and false-completion counters remain 0.
 
-- [ ] Q1: Fresh independent UX & Product QA reproduces default activation, rollback, all four role manifests, on-demand expansion, privacy and fail-closed negative controls on the exact immutable candidate.
-  CHECK: pending fresh QA receipt
+- [x] Q1: Fresh independent UX & Product QA reproduces default activation, rollback, all four role manifests, on-demand expansion, privacy and fail-closed negative controls on the exact immutable candidate.
+  CHECK: verify the pinned fresh re-QA verdict and SHA-256 in `docs/OUTCOME_MODEL_V2_LOCAL_ACTIVATION_EVIDENCE_PROMOTION_BUILDER_RECEIPT.md`
   EXPECT: `PASS_UX_PRODUCT_QA_ONLY`
-  EVIDENCE: Both prior candidate verdicts are preserved append-only as `FAIL_UX_PRODUCT_QA_ONLY`; fresh re-QA of the pre-consume corrected immutable candidate is mandatory.
+  EVIDENCE: Both prior candidate verdicts remain preserved as `FAIL_UX_PRODUCT_QA_ONLY`. The later fresh selective-context pre-consume re-QA terminal receipt is pinned at SHA-256 `5312466d07b46a7f0c50a15a48f3cd23cdbeb0099bd8af4af411b3d1445c7353`; it reproduced fail-closed hostile-input behavior before callback and the valid compiled path with callback exactly `1`, verdict `PASS_SELECTIVE_CONTEXT_PRECONSUME_VALIDATION_REQA_ONLY`. This closes Q1 only for the local selective-context candidate and grants no Audit, activation, deployment, release, Phase or acceptance authority.
 
-- [ ] O1: Existing bound role tasks receive one non-mutating canary handoff each and observed turns prove the compact context contract without duplicate dispatch or claiming unobservable reads.
-  CHECK: pending operational canary receipts
+- [x] O1: Existing bound role tasks receive one non-mutating canary handoff each and observed turns prove the compact context contract without duplicate dispatch or claiming unobservable reads.
+  CHECK: verify all four role rows and their callback/receipt and safety counters in `docs/OUTCOME_MODEL_V2_LOCAL_ACTIVATION_EVIDENCE_PROMOTION_BUILDER_RECEIPT.md`
   EXPECT: four singular bindings; new turns observed; duplicate/replay `0`; unsupported observation held explicitly
-  EVIDENCE: pending
+  EVIDENCE: Builder, UX & Product QA and Release Audit terminal receipts are pinned respectively at SHA-256 `056abc1b072117fc69e635dcd51208f9ba49cab851dab19996004fd3e542fdcf`, `b9c3bea741d15b8bc4aaf405f19ff8eb756ce223a7cd323b918877db0d961154` and `7675339a19c553f480ce71779a515f294f2d5daf797f5815d5cbca37d95dea1d`. The compact Planner observation is pinned by plan digest `c875c14405396fba078cb1a4e7b44ab04f62f12d8e66b1a4069ccf9a8534f89e`. Every role loaded the seven allowlisted source classes, callback/receipt was `1/1`, and duplicate/replay, persistent-setting, registry/provider/environment, unauthorized-transition and false-completion counters were `0`.
 
-- [ ] O2: One safe same-role session replacement uses only the content-addressed snapshot, current Gate, active work and next action; successor readiness is observed before predecessor archival.
-  CHECK: pending rotation receipt
+- [x] O2: One safe same-role session replacement uses only the content-addressed snapshot, current Gate, active work and next action; successor readiness is observed before predecessor archival.
+  CHECK: verify corrected CAS and recoverable archive readbacks in `docs/OUTCOME_MODEL_V2_LOCAL_ACTIVATION_EVIDENCE_PROMOTION_BUILDER_RECEIPT.md`
   EXPECT: continuity ready; raw-history replay `0`; predecessor recoverable
-  EVIDENCE: Pending operational rotation. Builder correction candidate evidence: the protected adapter now derives Planner-only control prerequisites from its already validated readiness and handoff inputs without adding caller-controlled keys. RED reproduced missing derived flags and hostile-input control reachability (`3/5` pass, `2/5` fail); GREEN focused control-plane regression `30/30`, full regression `500/500`, security `54/54`, and production build passed in an isolated exact-source checkout. See `docs/OUTCOME_MODEL_V2_PLANNER_PROTECTED_SELF_BINDING_ROTATION_FLAGS_CORRECTION_BUILDER_RECEIPT.md`. This does not close O2 or authorize a real CAS.
+  EVIDENCE: The corrected protected self-binding CAS invoked/mutated/retried `1/1/0` and read back registry revision `104`, mode `0600`, doctor clean, lock clear, successor active at version/history `3/3` with protected self-match `1`, predecessor version `2` replaced and recoverable, other project/role changes `0`, and private-output/false-completion hits `0/0`. The predecessor was recoverably archived only after successor readiness and this readback; the successor remained singular, loadable and unarchived. Raw-history replay and archive retry were `0`.
 
 - [ ] A1: Separate fresh Release Audit validates the coherent implementation and operational evidence without inferring Preview, Production, release or Phase transition.
   CHECK: pending fresh Audit receipt
