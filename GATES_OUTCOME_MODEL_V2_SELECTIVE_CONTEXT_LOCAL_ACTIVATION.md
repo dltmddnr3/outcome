@@ -2,7 +2,7 @@
 
 Outcome: The exact Cherry-accepted Model v2 carrier becomes the verified local session-bootstrap default, loading only the current snapshot, Gate, handoff and proportional skills; unsupported enforcement, source drift and role mismatch fail closed. Preview, Production, release and Phase transition are excluded.
 
-Status: **Q1/O1/O2 EVIDENCE PROMOTED · BUILDER ONLY · FRESH A1 RELEASE RE-AUDIT REQUIRED**
+Status: **A1 RELEASE AUDIT PASSED · C1 CHERRY ACCEPTANCE REQUIRED**
 
 - [x] D1: Exact accepted source and authority boundary are fixed.
   CHECK: git cat-file -e d726e200a9500658ae1fee5781d1d908a6b1a522^{commit} && git show d726e200a9500658ae1fee5781d1d908a6b1a522:GATES_OUTCOME_MODEL_V2_LOCAL_DEFAULT_AND_SERVICE_PROJECTION.md | rg -q 'MODEL V2 13/13 CHERRY ACCEPTED' && echo D1_PASS
@@ -54,10 +54,10 @@ Status: **Q1/O1/O2 EVIDENCE PROMOTED · BUILDER ONLY · FRESH A1 RELEASE RE-AUDI
   EXPECT: continuity ready; raw-history replay `0`; predecessor recoverable
   EVIDENCE: The corrected protected self-binding CAS invoked/mutated/retried `1/1/0` and read back registry revision `104`, mode `0600`, doctor clean, lock clear, successor active at version/history `3/3` with protected self-match `1`, predecessor version `2` replaced and recoverable, other project/role changes `0`, and private-output/false-completion hits `0/0`. The predecessor was recoverably archived only after successor readiness and this readback; the successor remained singular, loadable and unarchived. Raw-history replay and archive retry were `0`.
 
-- [ ] A1: Separate fresh Release Audit validates the coherent implementation and operational evidence without inferring Preview, Production, release or Phase transition.
-  CHECK: pending fresh Audit receipt
+- [x] A1: Separate fresh Release Audit validates the coherent implementation and operational evidence without inferring Preview, Production, release or Phase transition.
+  CHECK: verify the exact subject and fresh Audit terminal in `docs/OUTCOME_MODEL_V2_LOCAL_ACTIVATION_A1_PASS_PROMOTION_BUILDER_RECEIPT.md`
   EXPECT: `PASS_RELEASE_AUDIT_ONLY`
-  EVIDENCE: pending
+  EVIDENCE: Fresh Release Audit v22 returned `PASS_RELEASE_AUDIT_ONLY` for exact subject/tree/parent `a5703600eefa974836f71b4ac267970a47ec2091` / `1700a3e7900bbf30cfc0eeb5fb8fb241e4253170` / `4fbe7fcc891f122c253fda21862e40490e74011b`. It reproduced the prior B6 RED, verified corrected B6 `5/5` and B1 `19/19`, required `locally_consumed` with projection-only authority, privacy survival and all safety counters `0`, matched the immutable activation-Gate input, confirmed disposable cleanup and implementation/runtime/adapter/test delta `0`, and reported no findings. This closes A1 only; C1 and all Preview, Production, deployment, release and Phase decisions remain open.
 
 - [ ] C1: Cherry accepts the exact locally activated selective-context result; Preview, Production, release and Phase transition remain separate decisions.
   CHECK: manual authority
