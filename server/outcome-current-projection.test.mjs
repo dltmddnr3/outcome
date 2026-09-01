@@ -1,4 +1,5 @@
 import assert from 'node:assert/strict'
+import { execFileSync } from 'node:child_process'
 import { readFileSync } from 'node:fs'
 import { test } from 'node:test'
 import {
@@ -11,9 +12,9 @@ import {
 const root = new URL('../', import.meta.url)
 const sourceBytes = () => Object.fromEntries(Object.entries(CURRENT_PROJECTION_SOURCES).map(([sourceClass, row]) => [sourceClass, readFileSync(new URL(row.source_ref, root))]))
 const input = () => outcomeCurrentProjectionInput(sourceBytes())
-const attempt = (state = 'delivery_unknown') => ({ id: 'attempt-one', work_id: 'work-canonical-package-candidate', fingerprint: 'canonical-package-promotion', state, automatic_retry_count: 0 })
+const attempt = (state = 'delivery_unknown') => ({ id: 'attempt-one', work_id: 'work-o1-selective-context-dogfood', fingerprint: input().work_items[0].fingerprint, state, automatic_retry_count: 0 })
 
-test('B1-B2 current projection is deterministic and answers the canonical five questions', () => {
+test('O1 current projection is deterministic and selects the source-addressed dogfood work', () => {
   const first = compileOutcomeCurrentProjection(input())
   const second = compileOutcomeCurrentProjection(input())
   assert.deepEqual(first, second)
@@ -21,14 +22,15 @@ test('B1-B2 current projection is deterministic and answers the canonical five q
   assert.equal(first.authority, 'projection_only')
   assert.deepEqual(first.current, {
     primary_destination: 'destination-model-v2-canonical-package',
-    acceptance_gap: { remaining: 7, closed: 1, total: 8 },
-    ready_frontier: ['milestone-b1'],
+    acceptance_gap: { remaining: 1, closed: 7, total: 8 },
+    ready_frontier: ['milestone-o1'],
     active_work: null,
-    next_action: 'work-canonical-package-candidate',
+    next_action: 'work-o1-selective-context-dogfood',
     cherry_action: null,
   })
   assert.deepEqual(first.state, { stale: false, conflict: false, delivery_unknown_count: 0 })
   assert.match(first.projection_digest, /^[a-f0-9]{64}$/)
+  assert.match(input().work_items[0].fingerprint, /^[a-f0-9]{64}$/)
   assert.equal(Object.isFrozen(first), true)
 })
 
@@ -47,7 +49,13 @@ test('B2 source digest drift fails closed without retry or partial projection', 
   }
 })
 
-test('B2 stale conflict delivery-unknown and active-work states remain explicit and fail closed', () => {
+test('O1 milestone mismatch stale conflict delivery-unknown and active-work states remain explicit and fail closed', () => {
+  const mismatch = input(); mismatch.work_items = [{ ...mismatch.work_items[0], milestone_id: 'milestone-b1' }]
+  const mismatchProjection = compileOutcomeCurrentProjection(mismatch)
+  assert.deepEqual(mismatchProjection.current.ready_frontier, ['milestone-o1'])
+  assert.equal(mismatchProjection.current.next_action, null)
+  assert.equal(mismatchProjection.current.cherry_action, 'resolve_blocker')
+
   const stale = input(); stale.expected_source_revision = 'b'.repeat(40)
   const staleProjection = compileOutcomeCurrentProjection(stale)
   assert.equal(staleProjection.state.stale, true)
@@ -70,7 +78,7 @@ test('B2 stale conflict delivery-unknown and active-work states remain explicit 
 
   const active = input(); active.attempts = [attempt('started')]
   const activeProjection = compileOutcomeCurrentProjection(active)
-  assert.deepEqual(activeProjection.current.active_work, { work_id: 'work-canonical-package-candidate', state: 'started' })
+  assert.deepEqual(activeProjection.current.active_work, { work_id: 'work-o1-selective-context-dogfood', state: 'started' })
   assert.equal(activeProjection.current.next_action, null)
 })
 
@@ -101,4 +109,22 @@ test('B3 explicit rollback returns exact v1-compatible local result', () => {
     persistent_state_changed: false,
     automatic_retry_count: 0,
   })
+})
+
+test('O1 isolated canary consumes the compiled snapshot exactly once and remains public-safe', () => {
+  const result = JSON.parse(execFileSync(process.execPath, ['scripts/outcome-model-v2-local-canary.mjs', '--source-root', new URL('../', import.meta.url).pathname], { encoding: 'utf8' }))
+  assert.equal(result.outcome, 'o1_local_dogfood_probe_consumed')
+  assert.equal(result.projected_next_action, 'work-o1-selective-context-dogfood')
+  assert.equal(result.selective_context_receipt.outcome, 'locally_consumed')
+  assert.equal(result.local_consumption_count, 1)
+  assert.equal(result.safety.execution_started_count, 0)
+  assert.equal(result.safety.automatic_retry_count, 0)
+  assert.equal(result.safety.false_completion_count, 0)
+  assert.deepEqual(result.loaded_sources.map((row) => Object.keys(row).sort()), result.loaded_sources.map(() => ['content_addressed', 'source_class']))
+  assert.deepEqual(result.loaded_sources.map((row) => [row.source_class, row.content_addressed]), [
+    ['project_instructions', true], ['active_snapshot', true], ['current_gate', true],
+    ['common_skill', false], ['common_skill', false], ['role_skill', false],
+  ])
+  const serialized = JSON.stringify(result)
+  for (const pattern of [/\/Users\//, /(?:thread|session|task|turn)[_-]?id/i, /credential|password|secret|token/i, /raw[_-]?(?:prompt|result)/i, /source_ref|locator_ref|registry_payload/i]) assert.doesNotMatch(serialized, pattern)
 })

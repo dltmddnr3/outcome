@@ -6,7 +6,8 @@ import { validateOutcomeSourceManifest } from './outcome-context-bootstrap.mjs'
 const SHA256 = /^[a-f0-9]{64}$/
 const PLAIN = Object.getPrototypeOf({})
 const PREDICATES = Object.freeze(['D1', 'B1', 'B2', 'B3', 'Q1', 'A1', 'C1', 'O1'])
-const SOURCE_REVISION = 'a40ee664e194c21554b0497382d499296cb2c52b'
+const SOURCE_REVISION = '28db58fd5018dc4094c9cbbf764d0e86e83cbea4'
+const CANONICAL_HEAD = '75e449de24b01e56df7b896cd2b89e849df17efe'
 const OBSERVED_AT = '2026-09-01T00:00:00.000Z'
 export const CURRENT_PROJECTION_SOURCES = Object.freeze({
   agents: Object.freeze({ source_ref: 'AGENTS.md', source_digest: 'cbda193480670fdbc0dfd5aa1cbcae2a945418ba8b670246997d3ba44f39cb93' }),
@@ -14,7 +15,7 @@ export const CURRENT_PROJECTION_SOURCES = Object.freeze({
   model: Object.freeze({ source_ref: 'docs/OUTCOME_MODEL_V2.md', source_digest: '0a708464b3b83393b8b25f23e0f1364bc976844caa0cb079426967b1932073cb' }),
   accepted_gate: Object.freeze({ source_ref: 'GATES_OUTCOME_MODEL_V2_SELECTIVE_CONTEXT_LOCAL_ACTIVATION.md', source_digest: '50987cbba74c275ce5143c26d4ecb20c2fad377dfea2b7f50b75c621a989628f' }),
   acceptance: Object.freeze({ source_ref: 'docs/OUTCOME_MODEL_V2_LOCAL_ACTIVATION_C1_CHERRY_ACCEPTANCE_RECEIPT.md', source_digest: 'eefc0c06ddeb7eea1c135d4f97a97d630da445c1967efdc091885c25a1f89cf8' }),
-  current_gate: Object.freeze({ source_ref: 'GATES_OUTCOME_MODEL_V2_CANONICAL_PACKAGE_PROMOTION_20260901.md', source_digest: '5f55db737076632db4f4e1f831cca560e5f9c2db5f84d93317539fc4aff3b022' }),
+  current_gate: Object.freeze({ source_ref: 'GATES_OUTCOME_MODEL_V2_CANONICAL_PACKAGE_PROMOTION_20260901.md', source_digest: '87b43ff38fa397d4832894960274d31715b68078c47166281612d7fadf29140c' }),
   current_handoff: Object.freeze({ source_ref: 'docs/OUTCOME_MODEL_V2_CANONICAL_PACKAGE_PROMOTION_BUILDER_HANDOFF_20260901.md', source_digest: '38d80b50cebfe719faa6961d170e13323f9dfcd05e027010b0a5986341ca9aa6' }),
 })
 
@@ -62,7 +63,7 @@ const graphFromGate = (rows) => validateOutcomeGraph({
   acceptance_predicates: rows.map((row) => ({ id: `predicate-${row.id.toLowerCase()}`, milestone_id: `milestone-${row.id.toLowerCase()}`, description: row.title, check: null, expect: row.closed ? 'evidence-closed' : 'pending', authority: authority(row.id) })),
   evidence_claims: rows.filter((row) => row.closed).map((row) => ({ id: `claim-${row.id.toLowerCase()}`, predicate_id: `predicate-${row.id.toLowerCase()}`, source_ref: CURRENT_PROJECTION_SOURCES.current_gate.source_ref, producer: authority(row.id), freshness: 'source-pinned', reproducible: true })),
 })
-const work = Object.freeze({ id: 'work-canonical-package-candidate', milestone_id: 'milestone-b1', fingerprint: 'canonical-package-promotion', acceptance_gap_delta: 1, uncertainty_delta: 1, blocker_delta: 0, user_value_delta: 1, reversible: true, cost: 1 })
+const work = Object.freeze({ id: 'work-o1-selective-context-dogfood', milestone_id: 'milestone-o1', fingerprint: digest(stable({ accepted_product_candidate: SOURCE_REVISION, canonical_head: CANONICAL_HEAD, expected_source_manifest: expectedDigests() })), acceptance_gap_delta: 1, uncertainty_delta: 1, blocker_delta: 0, user_value_delta: 1, reversible: true, cost: 1 })
 const publicProjection = (projection, attempts) => {
   const active = attempts.find((row) => !['delivery_unknown', 'blocked', 'failed', 'transition_committed', 'transition_rejected'].includes(row.state)) ?? null
   return {

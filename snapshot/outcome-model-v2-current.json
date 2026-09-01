@@ -2,8 +2,8 @@
   "schema_version": 2,
   "authority": "projection_only",
   "outcome": "current_projection",
-  "candidate_commit": "a40ee664e194c21554b0497382d499296cb2c52b",
-  "source_manifest_digest": "9b9165936dcd3ead2a632d31479671e6872620558cc21747b6bed0d72e6c6718",
+  "candidate_commit": "28db58fd5018dc4094c9cbbf764d0e86e83cbea4",
+  "source_manifest_digest": "b54ffd4e5c6bc4912d589993ab50db208494390bc8c36f80a65264f4a416993c",
   "source_manifest": [
     {
       "source_class": "acceptance",
@@ -23,7 +23,7 @@
     },
     {
       "source_class": "current_gate",
-      "source_digest": "5f55db737076632db4f4e1f831cca560e5f9c2db5f84d93317539fc4aff3b022"
+      "source_digest": "87b43ff38fa397d4832894960274d31715b68078c47166281612d7fadf29140c"
     },
     {
       "source_class": "current_handoff",
@@ -41,15 +41,15 @@
   "current": {
     "primary_destination": "destination-model-v2-canonical-package",
     "acceptance_gap": {
-      "remaining": 7,
-      "closed": 1,
+      "remaining": 1,
+      "closed": 7,
       "total": 8
     },
     "ready_frontier": [
-      "milestone-b1"
+      "milestone-o1"
     ],
     "active_work": null,
-    "next_action": "work-canonical-package-candidate",
+    "next_action": "work-o1-selective-context-dogfood",
     "cherry_action": null
   },
   "state": {
@@ -69,5 +69,5 @@
     "registry_provider_environment_mutation_count": 0,
     "false_completion_count": 0
   },
-  "projection_digest": "e0bb5a27f7ce91b825e0918b615c28b06912218ff69f4bbf039ec709cb59b21b"
+  "projection_digest": "ba9cd29d81081c04bea7a8193e87b2f96cf70a86ba28402a0eb2c1b3daa523ea"
 }

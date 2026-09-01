@@ -1,7 +1,7 @@
 import { createHash } from 'node:crypto'
 import { readFileSync } from 'node:fs'
 import { resolve } from 'node:path'
-import { compileOutcomeSelectiveContextPlan, consumeOutcomeSelectiveContextPlan, createCodexRuntimeAdapter, projectOutcomeV2, validateOutcomeGraph } from '../server/outcome-model-v2.mjs'
+import { compileOutcomeSelectiveContextPlan, consumeOutcomeSelectiveContextPlan, createCodexRuntimeAdapter } from '../server/outcome-model-v2.mjs'
 import { validateOutcomeSourceManifest } from '../server/outcome-context-bootstrap.mjs'
 
 const finalProductCandidate = '28db58fd5018dc4094c9cbbf764d0e86e83cbea4'
@@ -19,10 +19,10 @@ const pinnedDigests = Object.freeze({
   'slice-contract': 'b7c0f31cec46dc658b950b28a65dff02ee21867a67f72a3e61428651de2ae657', gate: 'b6c156c60cfca729c261641a96401590f44d9e47845d5ae34dd4a028790e7357',
   'builder-receipt': '80a01e7597941d21b281da26b711005421831670ff4668ce80d2e6302a90acad', 'qa-receipt': '41f80e48b9475f59fabb636768470f87bf9d49cef22544e8b26f558fa0c0e8a3',
   'promotion-receipt': '75cae693bad35f8a7791941eefbd008605162073ee817fa3c7632d73c8b98dfb', 'failed-audit': '9e77063cfbc09517fa5e8376846902075a449205006ff021eff91765c279ba5b',
-  'activation-gate': '3432c69edc63f40547454090fbc0e4c381ec4addde6e7d68100a25e28b8b4c34',
+  'activation-gate': '50987cbba74c275ce5143c26d4ecb20c2fad377dfea2b7f50b75c621a989628f',
 })
-const gateOrder = Object.freeze(['D1', 'D2', 'A1', 'A2', 'A3', 'A4', 'Q1', 'B1', 'B2', 'B3', 'Q2', 'A5', 'C1'])
-const commonSkillSources = Object.freeze(['skill:karpathy-guidelines', 'skill:unlazy'])
+const snapshotSource = 'snapshot/outcome-model-v2-current.json'
+const skippedSourceClasses = Object.freeze(['historical_gate_families', 'historical_q1_canary_inputs', 'correction_chains', 'raw_conversation', 'roadmap_2', 'unrelated_skills'])
 const stable = (value) => Array.isArray(value) ? `[${value.map(stable).join(',')}]` : value && typeof value === 'object' ? `{${Object.keys(value).sort().map((key) => `${JSON.stringify(key)}:${stable(value[key])}`).join(',')}}` : JSON.stringify(value)
 const digest = (value) => createHash('sha256').update(value).digest('hex')
 const failClosed = (reason) => { process.stdout.write(`${JSON.stringify({ schema_version: 2, outcome: 'cold_compile_required', reason, automatic_retry_count: 0, safety: { duplicate_execution_count: 0, unauthorized_canonical_transition_count: 0, registry_provider_environment_mutation_count: 0, false_completion_count: 0 } }, null, 2)}\n`); process.exitCode = 2 }
@@ -31,37 +31,28 @@ const args = process.argv.slice(2)
 if (args.length !== 0 && (args.length !== 2 || args[0] !== '--source-root' || !args[1])) failClosed('invalid_source_root')
 else {
   const sourceRoot = resolve(args[1] ?? '.')
-  let sourceBytes
-  try { sourceBytes = Object.fromEntries(Object.entries(sources).map(([key, path]) => [key, readFileSync(resolve(sourceRoot, path))])) } catch { failClosed('source_input_missing') }
+  let sourceBytes; let snapshotBytes
+  try { sourceBytes = Object.fromEntries(Object.entries(sources).map(([key, path]) => [key, readFileSync(resolve(sourceRoot, path))])); snapshotBytes = readFileSync(resolve(sourceRoot, snapshotSource)) } catch { failClosed('source_input_missing') }
   if (sourceBytes) {
     const actualDigests = Object.fromEntries(Object.entries(sourceBytes).map(([key, bytes]) => [key, digest(bytes)]))
     const manifestValidation = validateOutcomeSourceManifest(actualDigests, pinnedDigests)
     if (manifestValidation.outcome !== 'ready') failClosed(manifestValidation.reason)
     else {
-      const rows = [...sourceBytes.gate.toString('utf8').matchAll(/^- \[([ x])\] (D1|D2|A[1-5]|B[1-3]|Q[1-2]|C1):\s*(.+)$/gm)].map((match) => ({ id: match[2], closed: match[1] === 'x', title: match[3] }))
-      if (rows.length !== gateOrder.length || rows.some((row, index) => row.id !== gateOrder[index])) throw new Error('current_gate_shape_invalid')
-      const authority = (id) => id.startsWith('Q') ? 'independent-qa' : id === 'A5' ? 'release-audit' : id === 'C1' ? 'cherry' : id.startsWith('D') ? 'planner' : 'builder'
-      const selectedRoleSkill = authority('A5') === 'release-audit' ? 'skill:lime-release-auditor' : null
-      const milestoneId = (id) => `outcome-milestone-${id.toLowerCase()}`; const predicateId = (id) => `predicate-${id.toLowerCase()}`
-      const graph = validateOutcomeGraph({ schema_version: 2, project: { id: 'outcome', name: 'OUTCOME', terminal_outcome: 'Model v2 local default and service projection' }, destinations: [{ id: 'destination-model-v2-service', project_id: 'outcome', title: 'Model v2 service', outcome: 'Outcome projection is the local default', depends_on: [], primary: true }], milestones: rows.map((row, index) => ({ id: milestoneId(row.id), destination_id: 'destination-model-v2-service', title: row.id, expected_user_delta: row.title, depends_on: index === 0 ? [] : [milestoneId(rows[index - 1].id)], predicate_ids: [predicateId(row.id)] })), acceptance_predicates: rows.map((row) => ({ id: predicateId(row.id), milestone_id: milestoneId(row.id), description: row.title, check: null, expect: 'evidence_closed', authority: authority(row.id) })), evidence_claims: rows.filter((row) => row.closed).map((row) => ({ id: `claim-${row.id.toLowerCase()}`, predicate_id: predicateId(row.id), source_ref: sources.gate, producer: authority(row.id), freshness: 'source-pinned', reproducible: true })) })
-      const sourceManifestDigest = digest(stable(pinnedDigests)); const candidateIdentity = digest(stable({ final_product_candidate: finalProductCandidate, source_manifest_digest: sourceManifestDigest }))
-      const work = { id: 'work-a5-release-audit', milestone_id: milestoneId('A5'), fingerprint: candidateIdentity, acceptance_gap_delta: 1, uncertainty_delta: 1, blocker_delta: 0, user_value_delta: 1, reversible: true, cost: 1 }
-      const projection = projectOutcomeV2({ graph, source_revision: candidateIdentity, expected_source_revision: candidateIdentity, observed_at: '2026-08-31T00:00:00.000Z', work_items: [work] })
-      const content = { schema_version: 2, candidate_identity: candidateIdentity, final_product_candidate: finalProductCandidate, source_manifest_digest: sourceManifestDigest, source_digests: actualDigests, manifest_sources: Object.values(sources), loaded_sources: ['AGENTS.md', 'active-bootstrap-snapshot', sources.gate, ...commonSkillSources, selectedRoleSkill, sources.contract, sources.map, sources['slice-contract'], sources['builder-receipt'], sources['qa-receipt'], sources['promotion-receipt'], sources['failed-audit']], excluded_source_classes: ['historical_gate_families', 'historical_q1_canary_inputs', 'correction_chains', 'raw_conversation', 'roadmap_2', 'unrelated_skills'], gate_model: { predicate_count: rows.length, closed_count: rows.filter((row) => row.closed).length, ready_predicate: 'A5', locked_predicates: ['C1'] }, projection: { primary_destination: projection.primary_destination, acceptance_gap: { remaining: projection.progress.total - projection.progress.closed, ...projection.progress }, ready_frontier: projection.ready_frontier, active_work: null, next_action: projection.next_action, cherry_action: projection.cherry_action }, outcome: projection.next_action === work.id ? 'next_action_selected' : 'no_eligible_action', safety: { duplicate_execution_count: projection.blockers.duplicate_fingerprints, automatic_retry_count: projection.automatic_retry_count, unauthorized_canonical_transition_count: 0, registry_provider_environment_mutation_count: 0, false_completion_count: 0 } }
-      const result = { ...content, snapshot_digest: digest(stable(content)) }
-      if (result.gate_model.closed_count !== 13 || result.projection.acceptance_gap.closed !== 13 || result.projection.acceptance_gap.total !== 13 || result.projection.ready_frontier.length !== 0 || result.projection.next_action !== null || result.projection.cherry_action !== null) throw new Error('accepted_frontier_invalid')
-      const loadedRoleSkills = result.loaded_sources.filter((source) => source.startsWith('skill:') && !commonSkillSources.includes(source))
-      if (authority('A5') !== 'release-audit' || loadedRoleSkills.length !== 1 || loadedRoleSkills[0] !== selectedRoleSkill) throw new Error('role_skill_coherence_invalid')
-      const serialized = JSON.stringify(result); if (/\/Users\/|\.outcome-runtime|docs\/ROADMAP 2\.md|(?:thread|session|task|turn)[_-]?id/i.test(serialized)) throw new Error('public_output_invalid')
+      canary: {
+      let snapshot
+      try { snapshot = JSON.parse(snapshotBytes) } catch { snapshot = null }
+      if (snapshot?.outcome !== 'current_projection' || snapshot.candidate_commit !== finalProductCandidate || snapshot.current?.acceptance_gap?.closed !== 7 || snapshot.current?.acceptance_gap?.total !== 8 || snapshot.current?.ready_frontier?.length !== 1 || snapshot.current.ready_frontier[0] !== 'milestone-o1' || snapshot.current.next_action !== 'work-o1-selective-context-dogfood' || snapshot.current.cherry_action !== null || snapshot.current.active_work !== null || snapshot.rollback?.available !== true || Object.values(snapshot.safety ?? {}).some((value) => value !== 0)) failClosed('snapshot_projection_invalid')
+      if (process.exitCode) break canary
+      const snapshotDigest = digest(snapshotBytes)
       const selectivePlan = compileOutcomeSelectiveContextPlan({
-        environment: {}, work_id: 'selective-context-activation', work_type: 'builder', role_skill: 'mango-implementation-engineer',
+        environment: {}, work_id: snapshot.current.next_action, work_type: 'builder', role_skill: 'mango-implementation-engineer',
         sources: {
           agents: { source_ref: 'AGENTS.md', source_digest: actualDigests.agents },
-          active_snapshot: { source_ref: 'active-bootstrap-snapshot', source_digest: result.snapshot_digest },
+          active_snapshot: { source_ref: 'active-bootstrap-snapshot', source_digest: snapshotDigest },
           current_gate: { source_ref: sources['activation-gate'], source_digest: actualDigests['activation-gate'] },
           current_handoff: null,
         },
-        available_source_digests: { 'AGENTS.md': actualDigests.agents, 'active-bootstrap-snapshot': result.snapshot_digest, [sources['activation-gate']]: actualDigests['activation-gate'] },
+        available_source_digests: { 'AGENTS.md': actualDigests.agents, 'active-bootstrap-snapshot': snapshotDigest, [sources['activation-gate']]: actualDigests['activation-gate'] },
         expansion_allowlist: [], expansions: [],
       })
       let consumedPlanDigest = null
@@ -71,7 +62,10 @@ else {
       })
       const selectiveContextReceipt = consumeOutcomeSelectiveContextPlan(localAdapter, selectivePlan)
       if (selectiveContextReceipt.outcome !== 'locally_consumed' || consumedPlanDigest !== selectivePlan.plan_digest) throw new Error('selective_context_not_consumed')
-      process.stdout.write(`${JSON.stringify({ ...result, selective_context_receipt: selectiveContextReceipt }, null, 2)}\n`)
+      const result = { schema_version: 2, outcome: 'o1_local_dogfood_probe_consumed', final_product_candidate: finalProductCandidate, projection_digest: snapshot.projection_digest, source_manifest_digest: snapshot.source_manifest_digest, selector_source_manifest_digest: digest(stable(pinnedDigests)), snapshot_digest: snapshotDigest, plan_digest: selectivePlan.plan_digest, projected_next_action: snapshot.current.next_action, loaded_sources: selectiveContextReceipt.loaded_sources, skipped_sources: skippedSourceClasses.map((source_class) => ({ source_class, content_addressed: false })), local_consumption_count: 1, selective_context_receipt: selectiveContextReceipt, safety: { execution_started_count: selectiveContextReceipt.safety.execution_started_count, automatic_retry_count: selectiveContextReceipt.safety.automatic_retry_count, duplicate_execution_count: selectiveContextReceipt.safety.duplicate_execution_count, persistent_setting_mutation_count: 0, registry_provider_environment_mutation_count: 0, unauthorized_canonical_transition_count: selectiveContextReceipt.safety.unauthorized_canonical_transition_count, false_completion_count: 0 } }
+      const serialized = JSON.stringify(result); if (/\/Users\/|\.outcome-runtime|docs\/ROADMAP 2\.md|(?:thread|session|task|turn)[_-]?id|credential|password|secret|token|raw[_-]?(?:prompt|result)|source_ref|locator_ref|registry_payload/i.test(serialized)) throw new Error('public_output_invalid')
+      process.stdout.write(`${JSON.stringify(result, null, 2)}\n`)
+      }
     }
   }
 }
