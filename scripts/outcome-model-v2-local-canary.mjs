@@ -3,7 +3,6 @@ import { execFileSync } from 'node:child_process'
 import { lstatSync, readFileSync, realpathSync } from 'node:fs'
 import { dirname, isAbsolute, relative, resolve, sep } from 'node:path'
 import { fileURLToPath } from 'node:url'
-import { compileOutcomeSelectiveContextPlan, consumeOutcomeSelectiveContextPlan, createCodexRuntimeAdapter } from '../server/outcome-model-v2.mjs'
 import { validateOutcomeSourceManifest } from '../server/outcome-context-bootstrap.mjs'
 
 const finalProductCandidate = '28db58fd5018dc4094c9cbbf764d0e86e83cbea4'
@@ -23,10 +22,8 @@ const pinnedDigests = Object.freeze({
   'builder-receipt': '80a01e7597941d21b281da26b711005421831670ff4668ce80d2e6302a90acad', 'qa-receipt': '41f80e48b9475f59fabb636768470f87bf9d49cef22544e8b26f558fa0c0e8a3',
   'promotion-receipt': '75cae693bad35f8a7791941eefbd008605162073ee817fa3c7632d73c8b98dfb', 'failed-audit': '9e77063cfbc09517fa5e8376846902075a449205006ff021eff91765c279ba5b',
   'activation-gate': '50987cbba74c275ce5143c26d4ecb20c2fad377dfea2b7f50b75c621a989628f',
-  snapshot: '7da833943f17138e6d86bf6763bff4fb9212c3f53c15124d6f8c9e721a3bf295',
+  snapshot: '8981ec71e586822b1f498e1f82e6539930a9841b88b36759db0dd42e34da7302',
 })
-const skippedSourceClasses = Object.freeze(['historical_gate_families', 'historical_q1_canary_inputs', 'correction_chains', 'raw_conversation', 'roadmap_2', 'unrelated_skills'])
-const stable = (value) => Array.isArray(value) ? `[${value.map(stable).join(',')}]` : value && typeof value === 'object' ? `{${Object.keys(value).sort().map((key) => `${JSON.stringify(key)}:${stable(value[key])}`).join(',')}}` : JSON.stringify(value)
 const digest = (value) => createHash('sha256').update(value).digest('hex')
 const failClosed = (reason) => { process.stdout.write(`${JSON.stringify({ schema_version: 2, outcome: 'cold_compile_required', reason, automatic_retry_count: 0, safety: { duplicate_execution_count: 0, unauthorized_canonical_transition_count: 0, registry_provider_environment_mutation_count: 0, false_completion_count: 0 } }, null, 2)}\n`); process.exitCode = 2 }
 const sourcePaths = Object.values(sources)
@@ -76,30 +73,9 @@ else {
       const snapshotBytes = sourceBytes.snapshot
       let snapshot
       try { snapshot = JSON.parse(snapshotBytes) } catch { snapshot = null }
-      if (snapshot?.outcome !== 'current_projection' || snapshot.candidate_commit !== finalProductCandidate || snapshot.current?.acceptance_gap?.closed !== 7 || snapshot.current?.acceptance_gap?.total !== 8 || snapshot.current?.ready_frontier?.length !== 1 || snapshot.current.ready_frontier[0] !== 'milestone-o1' || snapshot.current.next_action !== 'work-o1-selective-context-dogfood' || snapshot.current.cherry_action !== null || snapshot.current.active_work !== null || snapshot.rollback?.available !== true || Object.values(snapshot.safety ?? {}).some((value) => value !== 0)) failClosed('snapshot_projection_invalid')
+      if (snapshot?.outcome !== 'current_projection' || snapshot.candidate_commit !== finalProductCandidate || snapshot.current?.acceptance_gap?.closed !== 8 || snapshot.current?.acceptance_gap?.total !== 8 || snapshot.current?.acceptance_gap?.remaining !== 0 || snapshot.current?.ready_frontier?.length !== 0 || snapshot.current.next_action !== null || snapshot.current.cherry_action !== null || snapshot.current.active_work !== null || snapshot.rollback?.available !== true || Object.values(snapshot.safety ?? {}).some((value) => value !== 0)) failClosed('snapshot_projection_invalid')
       if (process.exitCode) break canary
-      const snapshotDigest = pinnedDigests.snapshot
-      const selectivePlan = compileOutcomeSelectiveContextPlan({
-        environment: {}, work_id: snapshot.current.next_action, work_type: 'builder', role_skill: 'mango-implementation-engineer',
-        sources: {
-          agents: { source_ref: 'AGENTS.md', source_digest: actualDigests.agents },
-          active_snapshot: { source_ref: 'active-bootstrap-snapshot', source_digest: snapshotDigest },
-          current_gate: { source_ref: sources['activation-gate'], source_digest: actualDigests['activation-gate'] },
-          current_handoff: null,
-        },
-        available_source_digests: { 'AGENTS.md': actualDigests.agents, 'active-bootstrap-snapshot': snapshotDigest, [sources['activation-gate']]: actualDigests['activation-gate'] },
-        expansion_allowlist: [], expansions: [],
-      })
-      let consumedPlanDigest = null
-      const localAdapter = createCodexRuntimeAdapter({
-        selectNext: (value) => value, start: (value) => value, transition: (value) => value, projectPublic: () => ({ authority: 'projection_only' }),
-        selectiveContextCapability: 'content-addressed-plan-v1', consumeContextPlan: (plan) => { consumedPlanDigest = plan.plan_digest; return { accepted: true } },
-      })
-      const selectiveContextReceipt = consumeOutcomeSelectiveContextPlan(localAdapter, selectivePlan)
-      if (selectiveContextReceipt.outcome !== 'locally_consumed' || consumedPlanDigest !== selectivePlan.plan_digest) throw new Error('selective_context_not_consumed')
-      const result = { schema_version: 2, outcome: 'o1_local_dogfood_probe_consumed', final_product_candidate: finalProductCandidate, projection_digest: snapshot.projection_digest, source_manifest_digest: snapshot.source_manifest_digest, selector_source_manifest_digest: digest(stable(pinnedDigests)), snapshot_digest: snapshotDigest, plan_digest: selectivePlan.plan_digest, projected_next_action: snapshot.current.next_action, loaded_sources: selectiveContextReceipt.loaded_sources, skipped_sources: skippedSourceClasses.map((source_class) => ({ source_class, content_addressed: false })), local_consumption_count: 1, selective_context_receipt: selectiveContextReceipt, safety: { execution_started_count: selectiveContextReceipt.safety.execution_started_count, automatic_retry_count: selectiveContextReceipt.safety.automatic_retry_count, duplicate_execution_count: selectiveContextReceipt.safety.duplicate_execution_count, persistent_setting_mutation_count: 0, registry_provider_environment_mutation_count: 0, unauthorized_canonical_transition_count: selectiveContextReceipt.safety.unauthorized_canonical_transition_count, false_completion_count: 0 } }
-      const serialized = JSON.stringify(result); if (/\/Users\/|\.outcome-runtime|docs\/ROADMAP 2\.md|(?:thread|session|task|turn)[_-]?id|credential|password|secret|token|raw[_-]?(?:prompt|result)|source_ref|locator_ref|registry_payload/i.test(serialized)) throw new Error('public_output_invalid')
-      process.stdout.write(`${JSON.stringify(result, null, 2)}\n`)
+      failClosed('o1_evidence_closed')
       }
     }
   }

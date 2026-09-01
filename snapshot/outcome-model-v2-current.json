@@ -3,7 +3,7 @@
   "authority": "projection_only",
   "outcome": "current_projection",
   "candidate_commit": "28db58fd5018dc4094c9cbbf764d0e86e83cbea4",
-  "source_manifest_digest": "b54ffd4e5c6bc4912d589993ab50db208494390bc8c36f80a65264f4a416993c",
+  "source_manifest_digest": "116891317cc283aab7b55c7c141b4b716e7f18cad3d44c0b413cca8b6f00b92e",
   "source_manifest": [
     {
       "source_class": "acceptance",
@@ -23,7 +23,7 @@
     },
     {
       "source_class": "current_gate",
-      "source_digest": "87b43ff38fa397d4832894960274d31715b68078c47166281612d7fadf29140c"
+      "source_digest": "92856644c48e0dbe8b77fc08b26fbb8acf288a5c45b80b3f4f815faceb9e3d27"
     },
     {
       "source_class": "current_handoff",
@@ -41,15 +41,13 @@
   "current": {
     "primary_destination": "destination-model-v2-canonical-package",
     "acceptance_gap": {
-      "remaining": 1,
-      "closed": 7,
+      "remaining": 0,
+      "closed": 8,
       "total": 8
     },
-    "ready_frontier": [
-      "milestone-o1"
-    ],
+    "ready_frontier": [],
     "active_work": null,
-    "next_action": "work-o1-selective-context-dogfood",
+    "next_action": null,
     "cherry_action": null
   },
   "state": {
@@ -69,5 +67,5 @@
     "registry_provider_environment_mutation_count": 0,
     "false_completion_count": 0
   },
-  "projection_digest": "ba9cd29d81081c04bea7a8193e87b2f96cf70a86ba28402a0eb2c1b3daa523ea"
+  "projection_digest": "42a848598f330d60c3a4ca83f3f057dbe9648209d3176207e9fbeb82fd8439c0"
 }

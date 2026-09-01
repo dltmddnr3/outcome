@@ -18,7 +18,7 @@ const sourceBytes = () => Object.fromEntries(Object.entries(CURRENT_PROJECTION_S
 const input = () => outcomeCurrentProjectionInput(sourceBytes())
 const attempt = (state = 'delivery_unknown') => ({ id: 'attempt-one', work_id: 'work-o1-selective-context-dogfood', fingerprint: input().work_items[0].fingerprint, state, automatic_retry_count: 0 })
 
-test('O1 current projection is deterministic and selects the source-addressed dogfood work', () => {
+test('O1 current projection is deterministic and terminal after evidence closure', () => {
   const first = compileOutcomeCurrentProjection(input())
   const second = compileOutcomeCurrentProjection(input())
   assert.deepEqual(first, second)
@@ -26,10 +26,10 @@ test('O1 current projection is deterministic and selects the source-addressed do
   assert.equal(first.authority, 'projection_only')
   assert.deepEqual(first.current, {
     primary_destination: 'destination-model-v2-canonical-package',
-    acceptance_gap: { remaining: 1, closed: 7, total: 8 },
-    ready_frontier: ['milestone-o1'],
+    acceptance_gap: { remaining: 0, closed: 8, total: 8 },
+    ready_frontier: [],
     active_work: null,
-    next_action: 'work-o1-selective-context-dogfood',
+    next_action: null,
     cherry_action: null,
   })
   assert.deepEqual(first.state, { stale: false, conflict: false, delivery_unknown_count: 0 })
@@ -56,9 +56,9 @@ test('B2 source digest drift fails closed without retry or partial projection', 
 test('O1 milestone mismatch stale conflict delivery-unknown and active-work states remain explicit and fail closed', () => {
   const mismatch = input(); mismatch.work_items = [{ ...mismatch.work_items[0], milestone_id: 'milestone-b1' }]
   const mismatchProjection = compileOutcomeCurrentProjection(mismatch)
-  assert.deepEqual(mismatchProjection.current.ready_frontier, ['milestone-o1'])
+  assert.deepEqual(mismatchProjection.current.ready_frontier, [])
   assert.equal(mismatchProjection.current.next_action, null)
-  assert.equal(mismatchProjection.current.cherry_action, 'resolve_blocker')
+  assert.equal(mismatchProjection.current.cherry_action, null)
 
   const stale = input(); stale.expected_source_revision = 'b'.repeat(40)
   const staleProjection = compileOutcomeCurrentProjection(stale)
@@ -71,7 +71,7 @@ test('O1 milestone mismatch stale conflict delivery-unknown and active-work stat
   const conflictProjection = compileOutcomeCurrentProjection(conflict)
   assert.equal(conflictProjection.state.conflict, true)
   assert.equal(conflictProjection.current.next_action, null)
-  assert.equal(conflictProjection.current.cherry_action, 'resolve_blocker')
+  assert.equal(conflictProjection.current.cherry_action, null)
   assert.equal(conflictProjection.safety.duplicate_execution_count, 1)
 
   const unknown = input(); unknown.attempts = [attempt()]
@@ -115,20 +115,17 @@ test('B3 explicit rollback returns exact v1-compatible local result', () => {
   })
 })
 
-test('O1 isolated canary consumes the compiled snapshot exactly once and remains public-safe', () => {
-  const result = JSON.parse(execFileSync(process.execPath, ['scripts/outcome-model-v2-local-canary.mjs', '--source-root', new URL('../', import.meta.url).pathname], { encoding: 'utf8' }))
-  assert.equal(result.outcome, 'o1_local_dogfood_probe_consumed')
-  assert.equal(result.projected_next_action, 'work-o1-selective-context-dogfood')
-  assert.equal(result.selective_context_receipt.outcome, 'locally_consumed')
-  assert.equal(result.local_consumption_count, 1)
-  assert.equal(result.safety.execution_started_count, 0)
-  assert.equal(result.safety.automatic_retry_count, 0)
+test('O1 terminal canary fails closed without a second consumption or callback', () => {
+  const run = spawnSync(process.execPath, ['scripts/outcome-model-v2-local-canary.mjs', '--source-root', new URL('../', import.meta.url).pathname], { encoding: 'utf8' })
+  assert.equal(run.status, 2)
+  const result = JSON.parse(run.stdout)
+  assert.equal(result.outcome, 'cold_compile_required')
+  assert.equal(result.reason, 'o1_evidence_closed')
+  assert.equal(Object.hasOwn(result, 'local_consumption_count'), false)
+  assert.equal(Object.hasOwn(result, 'selective_context_receipt'), false)
+  assert.equal(result.automatic_retry_count, 0)
+  assert.equal(result.safety.duplicate_execution_count, 0)
   assert.equal(result.safety.false_completion_count, 0)
-  assert.deepEqual(result.loaded_sources.map((row) => Object.keys(row).sort()), result.loaded_sources.map(() => ['content_addressed', 'source_class']))
-  assert.deepEqual(result.loaded_sources.map((row) => [row.source_class, row.content_addressed]), [
-    ['project_instructions', true], ['active_snapshot', true], ['current_gate', true],
-    ['common_skill', false], ['common_skill', false], ['role_skill', false],
-  ])
   const serialized = JSON.stringify(result)
   for (const pattern of [/\/Users\//, /(?:thread|session|task|turn)[_-]?id/i, /credential|password|secret|token/i, /raw[_-]?(?:prompt|result)/i, /source_ref|locator_ref|registry_payload/i]) assert.doesNotMatch(serialized, pattern)
 })
@@ -166,13 +163,18 @@ test('O1 default canary binds one HEAD tree and ignores dirty Contract and Map o
     execFileSync('git', ['clone', '--quiet', '--no-checkout', new URL('../', import.meta.url).pathname, fixture])
     execFileSync('git', ['-C', fixture, 'checkout', '--quiet', '--detach', 'HEAD'])
     writeFileSync(join(fixture, 'scripts/outcome-model-v2-local-canary.mjs'), readFileSync(new URL('../scripts/outcome-model-v2-local-canary.mjs', import.meta.url)))
+    writeFileSync(join(fixture, 'snapshot/outcome-model-v2-current.json'), readFileSync(new URL('../snapshot/outcome-model-v2-current.json', import.meta.url)))
+    execFileSync('git', ['-C', fixture, 'add', 'snapshot/outcome-model-v2-current.json'])
+    execFileSync('git', ['-C', fixture, '-c', 'user.name=OUTCOME Test', '-c', 'user.email=outcome-test.invalid', 'commit', '--quiet', '--allow-empty', '-m', 'Materialize terminal snapshot'])
     const contract = join(fixture, 'docs/OUTCOME_CONTRACT.md'); const map = join(fixture, 'docs/OUTCOME_MAP.md')
     appendFileSync(contract, '\nHEAD-bound hostile Contract overlay\n'); appendFileSync(map, '\nHEAD-bound hostile Map overlay\n')
     const before = { contract: sha256(readFileSync(contract)), map: sha256(readFileSync(map)), contractMode: statSync(contract).mode, mapMode: statSync(map).mode }
-    const result = JSON.parse(execFileSync(process.execPath, ['scripts/outcome-model-v2-local-canary.mjs'], { cwd: fixture, encoding: 'utf8' }))
+    const run = spawnSync(process.execPath, ['scripts/outcome-model-v2-local-canary.mjs'], { cwd: fixture, encoding: 'utf8' })
+    assert.equal(run.status, 2)
+    const result = JSON.parse(run.stdout)
     const after = { contract: sha256(readFileSync(contract)), map: sha256(readFileSync(map)), contractMode: statSync(contract).mode, mapMode: statSync(map).mode }
     assert.deepEqual(after, before)
-    assert.equal(result.outcome, 'o1_local_dogfood_probe_consumed'); assert.equal(result.local_consumption_count, 1); assert.equal(result.plan_digest, '3fc48b99b0b6bd560bc2b28a182cedcbfd266b8b3fdb96a685fa972fa159031a'); assert.equal(result.safety.duplicate_execution_count, 0)
+    assert.equal(result.outcome, 'cold_compile_required'); assert.equal(result.reason, 'o1_evidence_closed'); assert.equal(Object.hasOwn(result, 'local_consumption_count'), false); assert.equal(result.safety.duplicate_execution_count, 0)
   } finally { rmSync(fixture, { recursive: true, force: true }) }
 })
 

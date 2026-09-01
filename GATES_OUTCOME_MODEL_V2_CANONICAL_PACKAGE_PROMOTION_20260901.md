@@ -2,7 +2,7 @@
 
 Outcome: The exact Cherry-accepted local-only Model v2 source is anchored as a durable canonical-package candidate, produces one deterministic Current Projection from current canonical inputs, and is proven reversible without changing Preview, Production, deployment or release state.
 
-Status: **R1-R2 CUTOVER COMPLETE · O1 DOGFOOD PENDING**
+Status: **LOCAL CANONICAL PACKAGE AND O1 DOGFOOD COMPLETE · PHASE 3 AND EXTERNAL RUNTIME OPEN**
 
 - [x] D1: Planner pins the accepted source, current canonical base, dirty-state boundary, expected user delta and stop conditions.
   CHECK: test "$(git rev-parse HEAD)" = 517f436150b684a2f7d72f6144bfa848af397bb4 && git merge-base --is-ancestor 517f436150b684a2f7d72f6144bfa848af397bb4 a40ee664e194c21554b0497382d499296cb2c52b && test "$(git show -s --format=%T a40ee664e194c21554b0497382d499296cb2c52b)" = 6dcf343769ff08c6fd507de12baf3b0bbdb9c43b && echo D1_PASS
@@ -49,10 +49,10 @@ Status: **R1-R2 CUTOVER COMPLETE · O1 DOGFOOD PENDING**
   EXPECT: `CUTOVER_COMPLETE`; Preview, Production, dogfood, deployment, release, external activation and Phase transition remain excluded.
   EVIDENCE: final receipt carrier `4e8f155852595effed4c054904fb03ac8f386fff`, tree `e54c403c6b7c54b8eff064f28744fb5c2f8b22f6`, parent exact correction carrier `69e395b0fdc2c9624cba321035173166b3471ac0`; cutover receipt SHA-256 `3c43d955217a0f32c2ab9a66f613af3977e94455d312078f3e17c2ba8b87731d`. The active root performed exactly two linear fast-forwards, first to the correction carrier and then to the receipt carrier. Ten quarantine-induced redundant mode-0600 conflict copies appeared after the cutover; Cherry explicitly approved the fixed cleanup with `승인`, and `CLEANUP_COMPLETE` deleted exactly those ten after eight canonical-equal and two supporting-history-equal hash checks. Post-cleanup readback restored the unrelated dirty manifest to exactly 396 entries / SHA-256 `94026362dc61e27549a8b9ed9fb620d3751a734b353978d0d875148b4df3f48f`, transition/dirty intersection `0/87`, staged entries `0`, Git-operation residue `0`, and protected Builder v18 self-match `1`. Unauthorized transition, automatic retry, false completion, registry, provider, database, credential, environment, Preview, Production, deployment, release, dogfood, external activation and Phase-transition mutation counts were all zero.
 
-- [ ] O1: The accepted candidate performs one real OUTCOME selective-context dogfood selection from current repository inputs.
+- [x] O1: The accepted candidate performs one real OUTCOME selective-context dogfood selection from current repository inputs.
   CHECK: exact loaded/skipped sources, projected next action, source digest and safety counters are recorded; automatic retry, duplicate execution, unauthorized transition and false completion remain zero.
   EXPECT: dogfood evidence may update the projection and Phase 3 residual assessment only; it cannot activate external runtime or close Phase 3 by itself.
-  EVIDENCE: pending.
+  EVIDENCE: after fresh QA and separate Release Audit PASS, the active root fast-forwarded once from accepted carrier `5ac7960771f228d76956c0dc236907176d9748df` to audited HEAD-bound carrier `46256105d8457e505de08094c5cd997fb731c053`. The committed default canary then ran exactly once with Model v2 explicitly enabled and returned exit `0`, `o1_local_dogfood_probe_consumed`, consumption/callback/receipt `1/1/1`, projection/source/selector/snapshot/plan digests `ba9cd29d81081c04bea7a8193e87b2f96cf70a86ba28402a0eb2c1b3daa523ea` / `b54ffd4e5c6bc4912d589993ab50db208494390bc8c36f80a65264f4a416993c` / `a5e39938e12bd15dd1c24576070ca70842309cee643ec2b7c7ed024e1f255361` / `7da833943f17138e6d86bf6763bff4fb9212c3f53c15124d6f8c9e721a3bf295` / `3fc48b99b0b6bd560bc2b28a182cedcbfd266b8b3fdb96a685fa972fa159031a`, loaded/skipped classes `6/6`, and privacy hits `0`. Duplicate, retry, execution-started, persistent-setting, registry/provider/environment, unauthorized-transition and false-completion counters were all zero. The unrelated dirty manifest remained exactly `396` / `94026362dc61e27549a8b9ed9fb620d3751a734b353978d0d875148b4df3f48f`; user-owned Contract/Map bytes and modes were unchanged. This closes only local O1 dogfood. Phase 3, Preview, Production, external activation, deployment and release remain open and excluded.
 
 ## Stop conditions
 

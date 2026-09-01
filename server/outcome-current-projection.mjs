@@ -15,7 +15,7 @@ export const CURRENT_PROJECTION_SOURCES = Object.freeze({
   model: Object.freeze({ source_ref: 'docs/OUTCOME_MODEL_V2.md', source_digest: '0a708464b3b83393b8b25f23e0f1364bc976844caa0cb079426967b1932073cb' }),
   accepted_gate: Object.freeze({ source_ref: 'GATES_OUTCOME_MODEL_V2_SELECTIVE_CONTEXT_LOCAL_ACTIVATION.md', source_digest: '50987cbba74c275ce5143c26d4ecb20c2fad377dfea2b7f50b75c621a989628f' }),
   acceptance: Object.freeze({ source_ref: 'docs/OUTCOME_MODEL_V2_LOCAL_ACTIVATION_C1_CHERRY_ACCEPTANCE_RECEIPT.md', source_digest: 'eefc0c06ddeb7eea1c135d4f97a97d630da445c1967efdc091885c25a1f89cf8' }),
-  current_gate: Object.freeze({ source_ref: 'GATES_OUTCOME_MODEL_V2_CANONICAL_PACKAGE_PROMOTION_20260901.md', source_digest: '87b43ff38fa397d4832894960274d31715b68078c47166281612d7fadf29140c' }),
+  current_gate: Object.freeze({ source_ref: 'GATES_OUTCOME_MODEL_V2_CANONICAL_PACKAGE_PROMOTION_20260901.md', source_digest: '92856644c48e0dbe8b77fc08b26fbb8acf288a5c45b80b3f4f815faceb9e3d27' }),
   current_handoff: Object.freeze({ source_ref: 'docs/OUTCOME_MODEL_V2_CANONICAL_PACKAGE_PROMOTION_BUILDER_HANDOFF_20260901.md', source_digest: '38d80b50cebfe719faa6961d170e13323f9dfcd05e027010b0a5986341ca9aa6' }),
 })
 
