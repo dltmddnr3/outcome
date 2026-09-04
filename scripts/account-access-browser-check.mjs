@@ -18,7 +18,8 @@ const now = () => Date.parse('2026-08-25T00:00:00.000Z')
 const readyDashboard = { ...JSON.parse(readFileSync('snapshot/outcome-package-source.json', 'utf8')), build: { repository: 'test/repo', ref: 'test', commit: null, tree: null, asset: null, runtimeNowPinned: false } }
 const readyProjects = readyDashboard.projects
 const hostileMilestoneSlug = 'q2-independent-qa'
-const hostileProjection = createAccountModelV2Projection({ project: { id: 'outcome', name: 'OUTCOME', outcome: 'One safe outcome' }, current: { phaseId: 'destination-one' }, phases: [{ id: 'destination-one', title: 'Destination', purpose: 'Safe outcome', scopes: [{ stages: [{ id: 'milestone-one', title: hostileMilestoneSlug, purpose: 'User result', dependsOn: [], gate: { sourceRef: 'GATES.md', gates: [{ id: 'B1', title: 'Server projection', closed: false }] } }] }] }] }, { observedAt: '2026-08-31T00:00:00.000Z' })
+const roleEvents = ['planner', 'builder', 'ux_product_qa', 'release_audit'].map((role, index) => ({ id: `event-${role.replaceAll('_', '-')}-1`, sequence: index + 1, role, type: 'work_observed', summary: `${role} public observation`, observedAt: `2026-08-31T00:0${index + 1}:00.000Z`, status: 'observed' }))
+const hostileProjection = createAccountModelV2Projection({ project: { id: 'outcome', name: 'OUTCOME', outcome: 'One safe outcome' }, current: { phaseId: 'destination-one' }, phases: [{ id: 'destination-one', title: 'Destination', purpose: 'Safe outcome', scopes: [{ stages: [{ id: 'milestone-one', title: hostileMilestoneSlug, purpose: 'User result', dependsOn: [], gate: { sourceRef: 'GATES.md', gates: [{ id: 'B1', title: 'Server projection', closed: false }] } }] }] }], events: roleEvents }, { observedAt: '2026-08-31T00:00:00.000Z' })
 if (JSON.stringify(hostileProjection).includes(hostileMilestoneSlug) || hostileProjection.readyBoundaryLabels.length !== 0) throw new Error('hostile milestone slug survived API projection')
 const memoryStore = createInMemoryAccountStore({ workspaces: [{ id: 'workspace', state: 'active' }], memberships: [{ subject: 'owner', workspaceId: 'workspace', role: 'owner-viewer', state: 'active' }], projects: readyProjects.map((projection) => ({ id: projection.project.id, workspaceId: 'workspace', state: 'active', projection })) })
 const store = { ...memoryStore, workspaceProjection: (workspaceId) => workspaceId === 'workspace' ? structuredClone(readyDashboard) : null }
@@ -179,6 +180,12 @@ try {
     await page.route('**/api/private/workspace', (route) => route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ workspace: { viewState: 'ready', projects: hostileProjects, dashboard: readyDashboard } }) }))
     await page.goto(`${base}/workspace`)
     await page.locator('.current-projection').waitFor()
+    for (const [index, label] of ['Planner', 'Builder', 'UX & Product QA', 'Release Audit'].entries()) {
+      await page.getByRole('button', { name: label, exact: true }).click()
+      const event = page.locator(`[data-event-id="${roleEvents[index].id}"]`)
+      if (await event.count() !== 1 || await event.getAttribute('data-event-sequence') !== String(index + 1) || await event.getAttribute('data-event-role') !== roleEvents[index].role) throw new Error(`role lens ${label} lost stable projected identity`)
+    }
+    if (!await page.locator('[data-event-role="release_audit"] small', { hasText: '완료 판정 권한 없음' }).count()) throw new Error('release audit lens gained completion authority')
     const hostile = await page.evaluate((slug) => ({ apiFieldCount: document.querySelectorAll('[data-projection-field=boundary] li').length, markup: document.documentElement.outerHTML.includes(slug), visible: document.body.innerText.includes(slug), accessibility: document.body.textContent.includes(slug), overflow: document.documentElement.scrollWidth - document.documentElement.clientWidth }), hostileMilestoneSlug)
     if (hostile.apiFieldCount !== 0 || hostile.markup || hostile.visible || hostile.accessibility || hostile.overflow !== 0 || browserErrors !== 0) throw new Error(`hostile milestone built boundary failed ${JSON.stringify({ ...hostile, browserErrors })}`)
     await context.close()

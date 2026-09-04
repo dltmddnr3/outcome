@@ -8,7 +8,7 @@ const project = (id = 'outcome') => ({
   current: { phaseId: 'destination-one' },
   phases: [{ id: 'destination-one', title: 'Destination', purpose: 'Safe outcome', scopes: [{ stages: [{ id: 'milestone-one', title: 'Milestone', purpose: 'User result', dependsOn: [], gate: { sourceRef: 'GATES.md', gates: [{ id: 'B1', title: 'Server projection', closed: false }] } }] }] }],
 })
-const event = (overrides = {}) => ({ type: 'work_observed', summary: 'Planner가 다음 경계를 확인했습니다.', observedAt: '2026-08-31T00:01:00.000Z', status: 'active', ...overrides })
+const event = (overrides = {}) => ({ id: 'event-planner-1', sequence: 1, role: 'planner', type: 'work_observed', summary: 'Planner가 다음 경계를 확인했습니다.', observedAt: '2026-08-31T00:01:00.000Z', status: 'active', ...overrides })
 
 test('authorized project projection is versioned, deterministic and exact-allowlisted', () => {
   const projection = createAccountModelV2Projection(project(), { observedAt })
@@ -70,20 +70,48 @@ test('all seven server-owned states are independently reachable without conflati
   assert.deepEqual(variants.map(([expected, value]) => [expected, createAccountModelV2Projection(value, { observedAt }).state]), variants.map(([expected]) => [expected, expected]))
 })
 
-test('observed Planner events are exact-allowlisted and deterministically chronological', () => {
-  const projection = createAccountModelV2Projection({ ...project(), events: [event(), event({ type: 'result_observed', summary: '검증 결과가 관측됐습니다.', observedAt: '2026-08-31T00:00:30.000Z', status: 'observed' })] }, { observedAt })
+test('observed role events are exact-allowlisted and deterministically sequence ordered', () => {
+  const projection = createAccountModelV2Projection({ ...project(), events: [event({ sequence: 2 }), event({ id: 'event-audit-1', sequence: 1, role: 'release_audit', type: 'result_observed', summary: '검증 결과가 관측됐습니다.', observedAt: '2026-08-31T00:00:30.000Z', status: 'observed' })] }, { observedAt })
   assert.deepEqual(projection.events, [
-    { type: 'result_observed', summary: '검증 결과가 관측됐습니다.', observedAt: '2026-08-31T00:00:30.000Z', status: 'observed' },
-    event(),
+    { id: 'event-audit-1', sequence: 1, role: 'release_audit', type: 'result_observed', summary: '검증 결과가 관측됐습니다.', observedAt: '2026-08-31T00:00:30.000Z', status: 'observed', completionAuthority: false },
+    { ...event({ sequence: 2 }), completionAuthority: false },
   ])
   assert.deepEqual(createAccountModelV2Projection(project(), { observedAt }).events, [])
 })
 
 test('terminal Planner events remain explicit and never become active or completed', () => {
   const statuses = ['blocked', 'delivery_unknown', 'failed', 'rejected', 'safe_hold']
-  const projection = createAccountModelV2Projection({ ...project(), events: statuses.map((status, index) => event({ type: 'result_observed', summary: `${status} 상태가 관측됐습니다.`, observedAt: `2026-08-31T00:0${index + 1}:00.000Z`, status })) }, { observedAt })
+  const projection = createAccountModelV2Projection({ ...project(), events: statuses.map((status, index) => event({ id: `event-terminal-${index + 1}`, sequence: index + 1, type: 'result_observed', summary: `${status} 상태가 관측됐습니다.`, observedAt: `2026-08-31T00:0${index + 1}:00.000Z`, status })) }, { observedAt })
   assert.deepEqual(projection.events.map((row) => row.status), statuses)
   assert.equal(projection.events.some((row) => ['active', 'completed'].includes(row.status)), false)
+})
+
+test('role event projection preserves exact allowed roles stable public identity sequence and server authority', () => {
+  const roles = ['planner', 'builder', 'ux_product_qa', 'release_audit']
+  const sourceEvents = roles.map((role, index) => event({ id: `event-role-${index + 1}`, sequence: roles.length - index, role, status: 'observed' }))
+  const projection = createAccountModelV2Projection({ ...project(), events: sourceEvents }, { observedAt })
+  assert.deepEqual(projection.events.map(({ id, sequence, role, completionAuthority }) => ({ id, sequence, role, completionAuthority })), [
+    { id: 'event-role-4', sequence: 1, role: 'release_audit', completionAuthority: false },
+    { id: 'event-role-3', sequence: 2, role: 'ux_product_qa', completionAuthority: false },
+    { id: 'event-role-2', sequence: 3, role: 'builder', completionAuthority: false },
+    { id: 'event-role-1', sequence: 4, role: 'planner', completionAuthority: false },
+  ])
+})
+
+test('role event identity fails closed on missing unknown duplicate unstable and caller-owned authority', () => {
+  const missing = (key) => { const value = event(); delete value[key]; return value }
+  for (const value of [missing('id'), missing('sequence'), missing('role'), event({ role: 'operator' }), event({ id: 'unstable' }), event({ id: 'a'.repeat(40) }), event({ sequence: 0 }), event({ sequence: 1.5 }), event({ completionAuthority: true })]) {
+    assert.throws(() => createAccountModelV2Projection({ ...project(), events: [value] }, { observedAt }), /account_model_v2_event|account_model_v2_unexpected_key/)
+  }
+  for (const events of [[event(), event({ role: 'builder' })], [event(), event({ id: 'event-builder-2', role: 'builder' })]]) {
+    assert.throws(() => createAccountModelV2Projection({ ...project(), events }, { observedAt }), /account_model_v2_event_(?:id|sequence)_duplicate/)
+  }
+})
+
+test('role event identity and summaries reject private locators credentials paths and provider identifiers', () => {
+  for (const value of [event({ locator_ref: 'hidden' }), event({ provider_id: 'hidden' }), event({ credential: 'hidden' }), event({ id: '/Users/private/event' }), event({ id: 'event-64988a70f677b7ae162dd595235e35359373c34c' }), event({ summary: 'provider_id=hidden' })]) {
+    assert.throws(() => createAccountModelV2Projection({ ...project(), events: [value] }, { observedAt }), /account_model_v2_/)
+  }
 })
 
 test('Planner event schema rejects invalid type status timestamp active inference and extra keys', () => {
@@ -109,14 +137,15 @@ test('Planner public summaries reject content identifiers named private identifi
   for (const summary of values) assert.throws(() => createAccountModelV2Projection({ ...project(), events: [event({ summary })] }, { observedAt }), /account_model_v2_private_value|account_model_v2_public_text_invalid|account_model_v2_event_private_value/)
 })
 
-test('Planner timestamps normalize to canonical UTC and sort by epoch', () => {
-  const projection = createAccountModelV2Projection({ ...project(), events: [event({ summary: 'actual later', observedAt: '2026-08-30T23:30:00.000Z' }), event({ summary: 'actual earlier', observedAt: '2026-08-31T01:00:00+02:00' })] }, { observedAt })
+test('role event timestamps normalize to canonical UTC while sequence owns order', () => {
+  const sourceEvents = [event({ id: 'event-later-1', sequence: 2, summary: 'actual later', observedAt: '2026-08-30T23:30:00.000Z' }), event({ id: 'event-earlier-1', sequence: 1, summary: 'actual earlier', observedAt: '2026-08-31T01:00:00+02:00' })]
+  const projection = createAccountModelV2Projection({ ...project(), events: sourceEvents }, { observedAt })
   assert.deepEqual(projection.events.map((row) => [row.summary, row.observedAt]), [['actual earlier', '2026-08-30T23:00:00.000Z'], ['actual later', '2026-08-30T23:30:00.000Z']])
-  assert.equal(JSON.stringify(projection), JSON.stringify(createAccountModelV2Projection({ ...project(), events: [event({ summary: 'actual later', observedAt: '2026-08-30T23:30:00.000Z' }), event({ summary: 'actual earlier', observedAt: '2026-08-31T01:00:00+02:00' })] }, { observedAt })))
+  assert.equal(JSON.stringify(projection), JSON.stringify(createAccountModelV2Projection({ ...project(), events: sourceEvents }, { observedAt })))
 })
 
-test('normalized byte-equivalent Planner observations fail closed as duplicates', () => {
-  assert.throws(() => createAccountModelV2Projection({ ...project(), events: [event({ observedAt: '2026-08-31T01:00:00+02:00' }), event({ observedAt: '2026-08-30T23:00:00.000Z' })] }, { observedAt }), /account_model_v2_event_duplicate/)
+test('duplicate role event identities fail closed even when timestamps normalize equally', () => {
+  assert.throws(() => createAccountModelV2Projection({ ...project(), events: [event({ observedAt: '2026-08-31T01:00:00+02:00' }), event({ observedAt: '2026-08-30T23:00:00.000Z' })] }, { observedAt }), /account_model_v2_event_(?:id|sequence)_duplicate/)
 })
 
 test('recursive source allowlist rejects every unexpected own data key', () => {

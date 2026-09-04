@@ -12,6 +12,7 @@ const STATE_HINTS = Object.freeze(['loading', 'stale', 'conflict', 'blocked', 'd
 const ROOT_KEYS = new Set(['project', 'current', 'phases', 'events', 'observedAt', 'bindings', 'connectors', 'errors', 'next', 'now', 'progress', 'sourceFreshness', 'status', ...STATE_HINTS])
 const EVENT_TYPES = new Set(['work_observed', 'result_observed', 'boundary_observed'])
 const EVENT_STATUSES = new Set(['observed', 'active', 'blocked', 'delivery_unknown', 'failed', 'rejected', 'safe_hold'])
+const EVENT_ROLES = new Set(['planner', 'builder', 'ux_product_qa', 'release_audit'])
 const NEXT_ACTION_LABELS = Object.freeze({
   'verify-coherent-slice': '일관된 Q2 화면을 독립 검증한다',
   'work-q1-independent-qa': 'Q1 결과를 독립 검증한다',
@@ -68,6 +69,7 @@ const publicMilestoneLabel = (value) => {
   return label
 }
 const safeEventSummary = (value) => { const summary = safeText(value); if (EVENT_PRIVATE_VALUE.test(summary)) throw new Error('account_model_v2_event_private_value'); return summary }
+const safeEventId = (value) => typeof value === 'string' && value.length <= 80 && /^[a-z][a-z0-9]*(?:-[a-z0-9]+){1,7}$/.test(value) && !EVENT_PRIVATE_VALUE.test(value) ? value : null
 const closedLabel = (labels, value) => {
   const key = safeActionCode(value)
   return key && Object.hasOwn(labels, key) ? labels[key] : null
@@ -89,7 +91,10 @@ const validateSourceContract = (source) => {
   if (source.progress !== undefined) assertKeys(source.progress, new Set(['available', 'reason']))
   if (source.sourceFreshness !== undefined) assertKeys(source.sourceFreshness, new Set(['state', 'observedAt']))
   for (const event of source.events ?? []) {
-    assertKeys(event, new Set(['type', 'summary', 'observedAt', 'status']))
+    assertKeys(event, new Set(['id', 'sequence', 'role', 'type', 'summary', 'observedAt', 'status']))
+    if (!safeEventId(event.id)) throw new Error('account_model_v2_event_id_invalid')
+    if (!Number.isSafeInteger(event.sequence) || event.sequence < 1) throw new Error('account_model_v2_event_sequence_invalid')
+    if (!EVENT_ROLES.has(event.role)) throw new Error('account_model_v2_event_role_invalid')
     if (!EVENT_TYPES.has(event.type)) throw new Error('account_model_v2_event_type_invalid')
     if (!EVENT_STATUSES.has(event.status)) throw new Error('account_model_v2_event_status_invalid')
     if (event.status === 'active' && event.type !== 'work_observed') throw new Error('account_model_v2_event_active_invalid')
@@ -152,14 +157,16 @@ export function createAccountModelV2Projection(value, { observedAt } = {}) {
   const projection = projectOutcomeV2({ graph, source_revision: sourceRevision, observed_at: observed })
   const destination = graph.destinations.find((row) => row.id === projection.primary_destination) ?? null
   const state = stateFor(projection, requestedState)
-  const eventIdentities = new Set()
+  const eventIds = new Set()
+  const eventSequences = new Set()
   const events = (source.events ?? []).map((event) => {
-    const normalized = Object.freeze({ type: event.type, summary: safeEventSummary(event.summary), observedAt: new Date(event.observedAt).toISOString(), status: event.status })
-    const identity = JSON.stringify(normalized)
-    if (eventIdentities.has(identity)) throw new Error('account_model_v2_event_duplicate')
-    eventIdentities.add(identity)
+    if (eventIds.has(event.id)) throw new Error('account_model_v2_event_id_duplicate')
+    if (eventSequences.has(event.sequence)) throw new Error('account_model_v2_event_sequence_duplicate')
+    eventIds.add(event.id)
+    eventSequences.add(event.sequence)
+    const normalized = Object.freeze({ id: event.id, sequence: event.sequence, role: event.role, type: event.type, summary: safeEventSummary(event.summary), observedAt: new Date(event.observedAt).toISOString(), status: event.status, completionAuthority: false })
     return normalized
-  }).sort((left, right) => Date.parse(left.observedAt) - Date.parse(right.observedAt) || left.type.localeCompare(right.type) || left.summary.localeCompare(right.summary) || left.status.localeCompare(right.status))
+  }).sort((left, right) => left.sequence - right.sequence)
   return Object.freeze({
     schemaVersion: 1,
     modelVersion: 2,

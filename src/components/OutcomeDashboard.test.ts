@@ -9,6 +9,24 @@ const github = (overrides: Partial<GithubConnector> = {}): GithubConnector => ({
 const project = (id: string, title: string): PackageProject => ({ status: 'valid', errors: [], observedAt: null, project: { id, name: title, outcome: `${title} outcome`, acceptanceAuthority: 'Cherry' }, connectors: { github: github() }, phases: [{ id: `${id}-phase`, title: 'Phase', purpose: 'Phase purpose', completion: null, scopes: [{ id: `${id}-scope`, title: 'Scope', purpose: 'Scope purpose', stages: [stage({ id: `${id}-stage` })] }] }], current: { phaseId: `${id}-phase`, scopeId: `${id}-scope`, stageId: `${id}-stage` }, next: null, bindings: [], now: { status: 'unbound', activity: null, observedAt: null, source: 'runtime_registry' }, progress: { available: false, reason: 'no_cross_stage_aggregate' } })
 
 describe('OUTCOME Package dashboard', () => {
+  it('renders every server-projected role in its real dashboard lens without inventing identity or authority', async () => {
+    // @ts-expect-error The server projection is an ESM JavaScript boundary exercised end to end here.
+    const { createAccountModelV2Projection } = await import('../../server/account-model-v2-projection.mjs')
+    const initialData = { schemaVersion: 2 as const, observedAt: '2026-09-04T00:00:00.000Z', build: { repository: 'OUTCOME', ref: 'main', commit: null, tree: null, asset: null, runtimeNowPinned: false as const }, projects: [project('outcome', 'OUTCOME')] }
+    const roles = ['planner', 'builder', 'ux_product_qa', 'release_audit'] as const
+    const events = roles.map((role, index) => ({ id: `event-${role.replaceAll('_', '-')}-1`, sequence: index + 1, role, type: 'work_observed' as const, summary: `${role} public observation`, observedAt: `2026-09-04T00:0${index + 1}:00.000Z`, status: 'observed' as const }))
+    const modelV2 = createAccountModelV2Projection({ project: { id: 'outcome', name: 'OUTCOME', outcome: 'One safe outcome' }, current: { phaseId: 'outcome-phase' }, phases: [{ id: 'outcome-phase', title: 'Destination', purpose: 'Safe outcome', scopes: [{ stages: [{ id: 'outcome-stage', title: 'Milestone', purpose: 'User result', dependsOn: [], gate: { sourceRef: 'GATES.md', gates: [{ id: 'D3', title: 'Role chat', closed: false }] } }] }] }], events }, { observedAt: initialData.observedAt })
+    const privateProjects = [{ project: { id: 'outcome', name: 'OUTCOME' }, phases: [], current: { phaseId: 'outcome-phase', scopeId: 'outcome-scope', stageId: 'outcome-stage' }, modelV2 }]
+    const labels = ['Planner', 'Builder', 'UX & Product QA', 'Release Audit'] as const
+    for (const [index, initialFilter] of labels.entries()) {
+      const markup = renderToStaticMarkup(createElement(OutcomeDashboard, { onUnauthorized: () => undefined, initialData, privateProjects, nonProductionRoleChatFixture: { state: 'ready', plannerBound: true, initialFilter, onSend: () => undefined } }))
+      expect(markup).toContain(`data-event-id="${events[index].id}"`)
+      expect(markup).toContain(`data-event-sequence="${events[index].sequence}"`)
+      expect(markup).toContain(`data-event-role="${roles[index]}"`)
+      expect(markup).not.toContain('planner-conversation__empty')
+      if (roles[index] === 'release_audit') expect(markup).toContain('완료 판정 권한 없음')
+    }
+  })
   it('integrates one explicit default-off Planner fixture adapter without production leakage', () => {
     const initialData = { schemaVersion: 2 as const, observedAt: '2026-09-04T00:00:00.000Z', build: { repository: 'OUTCOME', ref: 'main', commit: null, tree: null, asset: null, runtimeNowPinned: false as const }, projects: [project('outcome', 'OUTCOME')] }
     const absent = renderToStaticMarkup(createElement(OutcomeDashboard, { onUnauthorized: () => undefined, initialData }))

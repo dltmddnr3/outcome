@@ -6,7 +6,6 @@ export const roleChatFixtureStates = ['ready', 'streaming', 'tool-running', 'wai
 export type RoleChatFilter = (typeof roleChatFilters)[number]
 export type RoleChatFixtureState = (typeof roleChatFixtureStates)[number]
 type Role = 'planner' | 'builder' | 'ux_product_qa' | 'release_audit'
-type RoleChatEvent = PrivateModelV2Event & { id?: string; sequence?: number; role?: Role; completionAuthority?: false }
 
 const typeCopy: Record<PrivateModelV2Event['type'], string> = { work_observed: '작업 관측', result_observed: '결과 관측', boundary_observed: '경계 관측' }
 const statusCopy: Record<PrivateModelV2Event['status'], string> = { observed: '관측됨', active: '관측된 작업 진행', blocked: '차단됨', delivery_unknown: '전달 상태 확인 불가', failed: '실패', rejected: '거부됨', safe_hold: '안전 보류' }
@@ -23,10 +22,10 @@ const fixturePresentation: Record<RoleChatFixtureState, { label: string; detail:
   delivery_unknown: { label: '전달 상태 확인 불가', detail: '전달 근거를 확인하기 전에는 자동 재전송하지 않습니다.', writable: false },
 }
 
-export function PlannerConversation({ events, plannerBound = false, onSend, fixtureState, initialFilter = '전체' }: { events: RoleChatEvent[]; plannerBound?: boolean; onSend?: (message: string) => void; fixtureState?: RoleChatFixtureState; initialFilter?: RoleChatFilter }) {
+export function PlannerConversation({ events, plannerBound = false, onSend, fixtureState, initialFilter = '전체' }: { events: PrivateModelV2Event[]; plannerBound?: boolean; onSend?: (message: string) => void; fixtureState?: RoleChatFixtureState; initialFilter?: RoleChatFilter }) {
   const [filter, setFilter] = useState<RoleChatFilter>(initialFilter)
   const [draft, setDraft] = useState('')
-  const ordered = events.map((event, index) => ({ ...event, id: event.id ?? `${event.observedAt}-${event.type}-${index}`, sequence: event.sequence ?? index, role: event.role ?? 'planner' as Role })).sort((a, b) => a.sequence - b.sequence)
+  const ordered = [...events].sort((a, b) => a.sequence - b.sequence)
   const selectedRole = filterRole[filter]
   const visible = selectedRole ? ordered.filter((event) => event.role === selectedRole) : ordered
   const fixture = fixtureState ? fixturePresentation[fixtureState] : null

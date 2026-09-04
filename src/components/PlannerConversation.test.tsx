@@ -11,7 +11,7 @@ describe('Planner conversation observed-event contract', () => {
   })
 
   it('renders only supplied event type summary timestamp and status', () => {
-    const events = [{ type: 'work_observed' as const, summary: 'Planner가 경계를 확인했습니다.', observedAt: '2026-08-31T00:01:00.000Z', status: 'active' as const }, { type: 'result_observed' as const, summary: '전달 근거가 확인되지 않았습니다.', observedAt: '2026-08-31T00:02:00.000Z', status: 'delivery_unknown' as const }]
+    const events = [{ id: 'event-planner-1', sequence: 1, role: 'planner' as const, completionAuthority: false as const, type: 'work_observed' as const, summary: 'Planner가 경계를 확인했습니다.', observedAt: '2026-08-31T00:01:00.000Z', status: 'active' as const }, { id: 'event-planner-2', sequence: 2, role: 'planner' as const, completionAuthority: false as const, type: 'result_observed' as const, summary: '전달 근거가 확인되지 않았습니다.', observedAt: '2026-08-31T00:02:00.000Z', status: 'delivery_unknown' as const }]
     const html = renderToStaticMarkup(<PlannerConversation events={events} />)
     for (const value of ['Planner가 경계를 확인했습니다.', '전달 근거가 확인되지 않았습니다.', '2026-08-31T00:01:00.000Z', '관측된 작업 진행', '전달 상태 확인 불가']) expect(html).toContain(value)
     expect(html).toContain('data-event-status="active"')
@@ -21,7 +21,7 @@ describe('Planner conversation observed-event contract', () => {
 
   it('keeps every terminal state non-running', () => {
     const statuses = ['blocked', 'delivery_unknown', 'failed', 'rejected', 'safe_hold'] as const
-    const html = renderToStaticMarkup(<PlannerConversation events={statuses.map((status, index) => ({ type: 'result_observed', summary: `${status} 관측`, observedAt: `2026-08-31T00:0${index + 1}:00.000Z`, status }))} />)
+    const html = renderToStaticMarkup(<PlannerConversation events={statuses.map((status, index) => ({ id: `event-terminal-${index + 1}`, sequence: index + 1, role: 'planner', completionAuthority: false as const, type: 'result_observed', summary: `${status} 관측`, observedAt: `2026-08-31T00:0${index + 1}:00.000Z`, status }))} />)
     for (const status of statuses) expect(html).toContain(`data-event-status="${status}"`)
     expect(html).not.toContain('data-event-status="active"')
     expect(html).not.toContain('완료')
@@ -30,10 +30,10 @@ describe('Planner conversation observed-event contract', () => {
 
 describe('Phase 4 role chat D3 contract', () => {
   const events = [
-    { id: 'evt-2', sequence: 2, role: 'builder' as const, type: 'work_observed' as const, summary: '구현 관측', observedAt: '2026-09-04T00:02:00.000Z', status: 'active' as const },
-    { id: 'evt-1', sequence: 1, role: 'planner' as const, type: 'boundary_observed' as const, summary: '범위 확인', observedAt: '2026-09-04T00:01:00.000Z', status: 'observed' as const },
-    { id: 'evt-3', sequence: 3, role: 'release_audit' as const, type: 'result_observed' as const, summary: '감사 관측', observedAt: '2026-09-04T00:03:00.000Z', status: 'safe_hold' as const, completionAuthority: false as const },
-    { id: 'evt-4', sequence: 4, role: 'ux_product_qa' as const, type: 'result_observed' as const, summary: '제품 QA 관측', observedAt: '2026-09-04T00:04:00.000Z', status: 'observed' as const },
+    { id: 'event-builder-2', sequence: 2, role: 'builder' as const, completionAuthority: false as const, type: 'work_observed' as const, summary: '구현 관측', observedAt: '2026-09-04T00:02:00.000Z', status: 'active' as const },
+    { id: 'event-planner-1', sequence: 1, role: 'planner' as const, completionAuthority: false as const, type: 'boundary_observed' as const, summary: '범위 확인', observedAt: '2026-09-04T00:01:00.000Z', status: 'observed' as const },
+    { id: 'event-audit-3', sequence: 3, role: 'release_audit' as const, type: 'result_observed' as const, summary: '감사 관측', observedAt: '2026-09-04T00:03:00.000Z', status: 'safe_hold' as const, completionAuthority: false as const },
+    { id: 'event-qa-4', sequence: 4, role: 'ux_product_qa' as const, completionAuthority: false as const, type: 'result_observed' as const, summary: '제품 QA 관측', observedAt: '2026-09-04T00:04:00.000Z', status: 'observed' as const },
   ]
 
   it('keeps one ordered event dataset behind the exact five read-only lenses', () => {
@@ -41,8 +41,8 @@ describe('Phase 4 role chat D3 contract', () => {
     const controls = html.match(/<nav class="planner-conversation__filters"[\s\S]*?<\/nav>/)?.[0].match(/<button[^>]*>(.*?)<\/button>/g)?.map((button) => button.replace(/<[^>]+>/g, '').replace('&amp;', '&'))
     expect(controls).toEqual(roleChatFilters)
     expect(controls).toHaveLength(5)
-    expect(html.indexOf('evt-1')).toBeLessThan(html.indexOf('evt-2'))
-    expect(html.indexOf('evt-2')).toBeLessThan(html.indexOf('evt-3'))
+    expect(html.indexOf('event-planner-1')).toBeLessThan(html.indexOf('event-builder-2'))
+    expect(html.indexOf('event-builder-2')).toBeLessThan(html.indexOf('event-audit-3'))
     expect(html).toContain('완료 판정 권한 없음')
     expect(html).toContain('세션 활동은 진행률이 아닙니다')
   })
