@@ -119,6 +119,40 @@ try {
     }
   }
 
+  {
+    const context = await browser.newContext({ viewport: { width: 390, height: 844 }, reducedMotion: 'reduce' })
+    const page = await context.newPage()
+    let browserErrors = 0
+    page.on('pageerror', () => { browserErrors += 1 })
+    page.on('console', (message) => { if (message.type() === 'error') browserErrors += 1 })
+    await page.route('**/api/private/config', (route) => route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ enabled: true, access: 'private_read_only', providers: [], sessionMaximumDays: 7, completionAuthority: false }) }))
+    const hostileProjects = readyProjects.map((project) => project.project.id === 'outcome' ? { ...project, modelV2: hostileProjection } : project)
+    await page.route('**/api/private/workspace', (route) => route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ workspace: { viewState: 'ready', projects: hostileProjects, dashboard: readyDashboard } }) }))
+    await page.goto(`${base}/workspace`)
+    await page.locator('.current-projection').waitFor()
+    for (const [index, label] of ['Planner', 'Builder', 'UX & Product QA', 'Release Audit'].entries()) {
+      await page.getByRole('button', { name: label, exact: true }).click()
+      const event = page.locator(`[data-event-id="${roleEvents[index].id}"]`)
+      if (await event.count() !== 1 || await event.getAttribute('data-event-sequence') !== String(index + 1) || await event.getAttribute('data-event-role') !== roleEvents[index].role || await page.locator('[data-non-progress-boundary="true"]').count() !== 1) throw new Error(`role lens ${label} lost stable projected identity or non-progress boundary`)
+    }
+    if (!await page.locator('[data-event-role="release_audit"] small', { hasText: '완료 판정 권한 없음' }).count()) throw new Error('release audit lens gained completion authority')
+    const visual = await page.evaluate(() => {
+      const node = document.querySelector('.oc-map-column button[role=option]>i.complete')
+      const nodeStyle = node ? getComputedStyle(node) : null
+      const markerStyle = node ? getComputedStyle(node, '::after') : null
+      const rail = document.querySelector('.oc-project-progress-track')
+      const colors = ['', 'current', 'complete'].map((className) => { const element = document.createElement('i'); element.className = className; rail?.append(element); const color = getComputedStyle(element).backgroundColor; element.remove(); return color })
+      const rgb = (value) => (value.match(/[\d.]+/g) ?? []).slice(0, 3).map(Number)
+      const luminance = (value) => { const channels = rgb(value).map((channel) => { const normalized = channel / 255; return normalized <= .04045 ? normalized / 12.92 : ((normalized + .055) / 1.055) ** 2.4 }); return .2126 * channels[0] + .7152 * channels[1] + .0722 * channels[2] }
+      const contrast = (left, right) => { const values = [luminance(left), luminance(right)].sort((a, b) => b - a); return (values[0] + .05) / (values[1] + .05) }
+      return { node: nodeStyle && markerStyle ? { width: nodeStyle.width, height: nodeStyle.height, background: nodeStyle.backgroundColor, image: nodeStyle.backgroundImage, shadow: nodeStyle.boxShadow, markerWidth: markerStyle.width, markerHeight: markerStyle.height, markerBackground: markerStyle.backgroundColor } : null, colors, contrasts: [contrast(colors[0], colors[1]), contrast(colors[1], colors[2])] }
+    })
+    if (!visual.node || visual.node.width !== '22px' || visual.node.height !== '22px' || visual.node.background !== 'rgb(21, 26, 21)' || visual.node.image !== 'none' || visual.node.shadow !== 'none' || visual.node.markerWidth !== '7px' || visual.node.markerHeight !== '7px' || visual.node.markerBackground !== 'rgb(173, 255, 47)' || visual.contrasts.some((value) => value < 3)) throw new Error(`role chat visual contract failed ${JSON.stringify(visual)}`)
+    const hostile = await page.evaluate((slug) => ({ apiFieldCount: document.querySelectorAll('[data-projection-field=boundary] li').length, markup: document.documentElement.outerHTML.includes(slug), visible: document.body.innerText.includes(slug), accessibility: document.body.textContent.includes(slug), overflow: document.documentElement.scrollWidth - document.documentElement.clientWidth }), hostileMilestoneSlug)
+    if (hostile.apiFieldCount !== 0 || hostile.markup || hostile.visible || hostile.accessibility || hostile.overflow !== 0 || browserErrors !== 0) throw new Error(`hostile milestone built boundary failed ${JSON.stringify({ ...hostile, browserErrors })}`)
+    await context.close()
+  }
+
   for (const viewport of [{ name: 'macbook-ready', width: 1440, height: 900 }, { name: 'mobile-ready', width: 390, height: 844 }, { name: 'narrow-ready', width: 320, height: 720 }]) {
     const context = await browser.newContext({ viewport, reducedMotion: 'reduce' })
     const page = await context.newPage()
@@ -166,28 +200,6 @@ try {
     const logout = page.locator('[data-private-logout=true]'); if (await logout.evaluate((element) => element.getBoundingClientRect().height) < 44) throw new Error(`${viewport.name} logout touch target`)
     if (viewport.width <= 390) await page.locator('.oc-nav-trigger').click()
     await logout.click(); await page.locator('[data-state-code="login"]').waitFor()
-    await context.close()
-  }
-
-  {
-    const context = await browser.newContext({ viewport: { width: 390, height: 844 }, reducedMotion: 'reduce' })
-    const page = await context.newPage()
-    let browserErrors = 0
-    page.on('pageerror', () => { browserErrors += 1 })
-    page.on('console', (message) => { if (message.type() === 'error') browserErrors += 1 })
-    await page.route('**/api/private/config', (route) => route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ enabled: true, access: 'private_read_only', providers: [], sessionMaximumDays: 7, completionAuthority: false }) }))
-    const hostileProjects = readyProjects.map((project) => project.project.id === 'outcome' ? { ...project, modelV2: hostileProjection } : project)
-    await page.route('**/api/private/workspace', (route) => route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ workspace: { viewState: 'ready', projects: hostileProjects, dashboard: readyDashboard } }) }))
-    await page.goto(`${base}/workspace`)
-    await page.locator('.current-projection').waitFor()
-    for (const [index, label] of ['Planner', 'Builder', 'UX & Product QA', 'Release Audit'].entries()) {
-      await page.getByRole('button', { name: label, exact: true }).click()
-      const event = page.locator(`[data-event-id="${roleEvents[index].id}"]`)
-      if (await event.count() !== 1 || await event.getAttribute('data-event-sequence') !== String(index + 1) || await event.getAttribute('data-event-role') !== roleEvents[index].role) throw new Error(`role lens ${label} lost stable projected identity`)
-    }
-    if (!await page.locator('[data-event-role="release_audit"] small', { hasText: '완료 판정 권한 없음' }).count()) throw new Error('release audit lens gained completion authority')
-    const hostile = await page.evaluate((slug) => ({ apiFieldCount: document.querySelectorAll('[data-projection-field=boundary] li').length, markup: document.documentElement.outerHTML.includes(slug), visible: document.body.innerText.includes(slug), accessibility: document.body.textContent.includes(slug), overflow: document.documentElement.scrollWidth - document.documentElement.clientWidth }), hostileMilestoneSlug)
-    if (hostile.apiFieldCount !== 0 || hostile.markup || hostile.visible || hostile.accessibility || hostile.overflow !== 0 || browserErrors !== 0) throw new Error(`hostile milestone built boundary failed ${JSON.stringify({ ...hostile, browserErrors })}`)
     await context.close()
   }
 

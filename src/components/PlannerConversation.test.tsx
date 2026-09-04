@@ -7,7 +7,7 @@ describe('Planner conversation observed-event contract', () => {
     const html = renderToStaticMarkup(<PlannerConversation events={[]} />)
     expect(html).toContain('아직 관측된 Planner 작업 이벤트가 없습니다')
     expect(html).toContain('data-observed-events="0"')
-    for (const token of ['typing', 'streaming', 'tool call', 'progress', '완료됨', '전송']) expect(html).not.toContain(token)
+    for (const token of ['typing', 'streaming', 'tool call', '완료됨', '전송']) expect(html).not.toContain(token)
   })
 
   it('renders only supplied event type summary timestamp and status', () => {
@@ -54,6 +54,16 @@ describe('Phase 4 role chat D3 contract', () => {
       const roles = [...html.matchAll(/data-event-role="([^"]+)"/g)].map((match) => match[1])
       expect(roles).toEqual(expectedRoles[filter])
       expect((html.match(/data-planner-composer="true"/g) ?? []).length).toBe(filter === '전체' || filter === 'Planner' ? 1 : 0)
+      expect(html.match(/세션 활동은 진행률이 아닙니다/g)).toHaveLength(1)
+    }
+  })
+
+  it('keeps the non-progress boundary once at section level for every empty lens', () => {
+    for (const filter of roleChatFilters) {
+      const html = renderToStaticMarkup(<PlannerConversation events={[]} initialFilter={filter} />)
+      expect(html.match(/data-non-progress-boundary="true"/g)).toHaveLength(1)
+      expect(html.match(/세션 활동은 진행률이 아닙니다/g)).toHaveLength(1)
+      expect(html).toContain('planner-conversation__empty')
     }
   })
 

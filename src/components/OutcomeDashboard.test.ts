@@ -1,14 +1,50 @@
 import { createElement } from 'react'
 import { renderToStaticMarkup } from 'react-dom/server'
 import { describe, expect, it } from 'vitest'
+// @ts-expect-error The test runtime provides this Node built-in; the browser bundle never imports this file.
+import { readFileSync } from 'node:fs'
 import { OutcomeDashboard, axisStateLabel, bindingHeroLabel, bindingObservationLabel, collapsedStageCount, currentHierarchy, defaultHierarchySelection, deriveScopeState, deriveStageRailState, desktopConversationBreakpoint, detailContentPolicy, entityStateLabel, findStage, gateGroupPresentation, gateProgress, githubEvidenceItems, heroGateEvidence, hierarchyIsExploring, hierarchyPlacement, meaningfulGateGroups, mobileHierarchyLevels, mobileWorkspaceTabs, nextStageOptionIndex, nowPresentation, projectHeroModel, resolveHierarchySelection, selectedGateCount, selectedStageContext, selectHierarchyPhase, selectHierarchyScope, selectLiveBinding, selectProject, snapshotPresentation, sourceStateLabel, stageDetailSemantics, structuralPhaseModel, structureStatusLabel, summarizeStage, timingPresentation, workspaceManagementItems, type Binding, type GithubConnector, type PackageProject, type PackageStage } from './OutcomeDashboard'
 import { activityLabelKo, axisLabelKo, gatePresentation, groupPresentation, hierarchyLabels, loginErrorPresentation, phasePresentation, projectOutcomePresentation, roleLabel, stagePresentation } from './outcomeKorean'
 
 const stage = (overrides: Partial<PackageStage> = {}): PackageStage => ({ id: 'stage-one', title: 'Stage One', purpose: 'Verify the result', dependsOn: [], gatePurpose: 'Stage One acceptance checklist', sourceState: 'present', state: 'active', gate: { gates: [{ id: 'G1', title: 'closed', closed: true, groupCode: 'G' }, { id: 'G2', title: 'remaining', closed: false, groupCode: 'G' }], groups: [{ code: 'G', name: '증거', closed: 1, total: 2 }], total: 2, closed: 1, available: true, sourceRef: 'GATES.md' }, axes: { implementation: 'active', test: 'pending', evidence: 'pending', independentQa: 'not_started', cherryAcceptance: 'pending', release: 'not_started' }, ...overrides })
 const github = (overrides: Partial<GithubConnector> = {}): GithubConnector => ({ adopted: true, required: false, state: 'connected', repository: 'owner/repo', remoteName: 'origin', defaultBranch: 'main', completionAuthority: false, localCandidate: { state: 'available', branch: 'main', ahead: 15, behind: 0, sync: 'ahead' }, published: { state: 'connected', repository: 'owner/repo', ref: 'origin/main', detail: 'published' }, checks: { state: 'unknown' }, release: { state: 'unknown' }, ...overrides })
 const project = (id: string, title: string): PackageProject => ({ status: 'valid', errors: [], observedAt: null, project: { id, name: title, outcome: `${title} outcome`, acceptanceAuthority: 'Cherry' }, connectors: { github: github() }, phases: [{ id: `${id}-phase`, title: 'Phase', purpose: 'Phase purpose', completion: null, scopes: [{ id: `${id}-scope`, title: 'Scope', purpose: 'Scope purpose', stages: [stage({ id: `${id}-stage` })] }] }], current: { phaseId: `${id}-phase`, scopeId: `${id}-scope`, stageId: `${id}-stage` }, next: null, bindings: [], now: { status: 'unbound', activity: null, observedAt: null, source: 'runtime_registry' }, progress: { available: false, reason: 'no_cross_stage_aggregate' } })
+const styles = readFileSync(new URL('../styles.css', import.meta.url), 'utf8')
+const declarationsFor = (css: string, selector: string) => css.split('}').flatMap((rule) => { const [selectors, body] = rule.split('{'); return selectors?.split(',').map((value) => value.trim()).includes(selector) ? [body ?? ''] : [] })
+const effectiveProperty = (css: string, selector: string, property: string) => declarationsFor(css, selector).flatMap((body) => [...body.matchAll(new RegExp(`(?:^|;)${property}:([^;]+)`, 'g'))].map((match) => match[1].trim())).at(-1)
+const luminance = (hex: string) => { const channels = hex.match(/[0-9a-f]{2}/gi)!.map((value) => Number.parseInt(value, 16) / 255).map((value) => value <= .04045 ? value / 12.92 : ((value + .055) / 1.055) ** 2.4); return .2126 * channels[0] + .7152 * channels[1] + .0722 * channels[2] }
+const contrast = (left: string, right: string) => { const values = [luminance(left), luminance(right)].sort((a, b) => b - a); return (values[0] + .05) / (values[1] + .05) }
+const visualViolations = (css: string) => [
+  /(?:linear|radial)-gradient/i.test(css) && 'gradient',
+  /\.oc-map-column button\[role=option\]>i\.complete\{[^}]*box-shadow:[^;}]*rgba\(173,255,47/i.test(css) && 'lime-glow',
+  /\.oc-map-column button\[role=option\]>i\.complete\{[^}]*background:(?:#adff2f|var\(--oc-accent\))/i.test(css) && 'lime-container',
+  /\.oc-map-column button\[role=option\]>i\.complete::after\{[^}]*(?:width|height):(?:9|[1-9][0-9])px/i.test(css) && 'oversized-marker',
+].filter(Boolean)
 
 describe('OUTCOME Package dashboard', () => {
+  it('uses a neutral completed map node with one internal point accent no larger than 8px', () => {
+    expect(effectiveProperty(styles, '.oc-map-column button[role=option]>i.complete', 'background')).toBe('#151a15')
+    expect(effectiveProperty(styles, '.oc-map-column button[role=option]>i.complete::after', 'width')).toBe('7px')
+    expect(effectiveProperty(styles, '.oc-map-column button[role=option]>i.complete::after', 'height')).toBe('7px')
+    expect(effectiveProperty(styles, '.oc-map-column button[role=option]>i.complete::after', 'background')).toBe('var(--oc-accent)')
+  })
+
+  it('keeps default current and complete rail states above 3:1 adjacent contrast', () => {
+    const colors = ['.oc-project-progress-track>i', '.oc-project-progress-track>i.current', '.oc-project-progress-track>i.complete'].map((selector) => effectiveProperty(styles, selector, 'background')!)
+    expect(colors).toEqual(['#171918', '#737876', '#f2f4f0'])
+    expect(contrast(colors[0], colors[1])).toBeGreaterThanOrEqual(3)
+    expect(contrast(colors[1], colors[2])).toBeGreaterThanOrEqual(3)
+  })
+
+  it('rejects prohibited shipped gradients glow lime surfaces oversized markers and low contrast non-vacuously', () => {
+    expect(visualViolations(styles)).toEqual([])
+    expect(visualViolations(`${styles}.oc-map-column button[role=option]>i.complete{background:linear-gradient(#000,#fff)}`)).toContain('gradient')
+    expect(visualViolations(`${styles}.oc-map-column button[role=option]>i.complete{box-shadow:0 0 8px rgba(173,255,47,.2)}`)).toContain('lime-glow')
+    expect(visualViolations(`${styles}.oc-map-column button[role=option]>i.complete{background:#adff2f}`)).toContain('lime-container')
+    expect(visualViolations(`${styles}.oc-map-column button[role=option]>i.complete::after{width:9px;height:9px}`)).toContain('oversized-marker')
+    expect(contrast('#555857', '#707372')).toBeLessThan(3)
+    expect(contrast('#707372', '#898c8b')).toBeLessThan(3)
+  })
   it('renders every server-projected role in its real dashboard lens without inventing identity or authority', async () => {
     // @ts-expect-error The server projection is an ESM JavaScript boundary exercised end to end here.
     const { createAccountModelV2Projection } = await import('../../server/account-model-v2-projection.mjs')
