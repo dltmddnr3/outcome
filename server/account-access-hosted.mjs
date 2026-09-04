@@ -1,6 +1,7 @@
 import { AccountAccessError, createAccountAccessService } from './account-access.mjs'
 import { createClerkClient, verifyToken } from '@clerk/backend'
 import { TokenVerificationError, TokenVerificationErrorReason } from '@clerk/backend/errors'
+import { isProxy } from 'node:util/types'
 
 const DAY_MS = 86_400_000
 const ALLOWED_PROJECTS = Object.freeze(['cherry-note', 'outcome'])
@@ -42,11 +43,19 @@ export const HOSTED_DATA_ENV = Object.freeze({
 
 export const HOSTED_PREVIEW_ENV = Object.freeze({ ...HOSTED_IDENTITY_ENV, ...HOSTED_DATA_ENV })
 
-const readBindings = (environment, inventory = HOSTED_PREVIEW_ENV) => Object.fromEntries(Object.entries(inventory).map(([key, name]) => [key, typeof environment?.[name] === 'string' ? environment[name].trim() : '']))
+const readBindings = (environment, inventory = HOSTED_PREVIEW_ENV) => {
+  if (typeof environment !== 'object' || environment === null || isProxy(environment)) return Object.fromEntries(Object.keys(inventory).map((key) => [key, '']))
+  return Object.fromEntries(Object.entries(inventory).map(([key, name]) => {
+    let descriptor
+    try { descriptor = Object.getOwnPropertyDescriptor(environment, name) } catch { return [key, ''] }
+    return [key, descriptor && Object.hasOwn(descriptor, 'value') && typeof descriptor.value === 'string' ? descriptor.value.trim() : '']
+  }))
+}
 const validHttps = (value) => { try { return new URL(value).protocol === 'https:' } catch { return false } }
 
-export function readHostedIdentityConfiguration(environment = {}) {
+export function readHostedIdentityConfiguration(environment = {}, { allowedOrigin } = {}) {
   const value = readBindings(environment, HOSTED_IDENTITY_ENV)
+  if (allowedOrigin !== undefined) value.privateAllowedOrigin = allowedOrigin
   const complete = value.privateSurfaceEnabled === '1'
     && Object.entries(value).every(([key, item]) => key === 'privateSurfaceEnabled' || Boolean(item))
     && validHttps(value.privateAllowedOrigin)
@@ -102,9 +111,10 @@ const clerkIdentity = async ({ client, claims }) => {
   }
 }
 
-export function createClerkBackendGateway({ environment = {}, clerkClientFactory = createClerkClient, tokenVerifier = verifyToken } = {}) {
-  if (!readHostedIdentityConfiguration(environment).enabled || typeof clerkClientFactory !== 'function' || typeof tokenVerifier !== 'function') throw new Error('hosted_identity_configuration_missing')
+export function createClerkBackendGateway({ environment = {}, allowedOrigin, clerkClientFactory = createClerkClient, tokenVerifier = verifyToken } = {}) {
+  if (!readHostedIdentityConfiguration(environment, { allowedOrigin }).enabled || typeof clerkClientFactory !== 'function' || typeof tokenVerifier !== 'function') throw new Error('hosted_identity_configuration_missing')
   const bindings = readBindings(environment, HOSTED_IDENTITY_ENV)
+  if (allowedOrigin !== undefined) bindings.privateAllowedOrigin = allowedOrigin
   const client = clerkClientFactory({ secretKey: bindings.clerkSecretKey, publishableKey: bindings.clerkPublishableKey })
   if (!client?.sessions?.getSession || !client?.sessions?.revokeSession || !client?.sessions?.getSessionList) throw new Error('clerk_runtime_invalid')
   const authenticate = async (token) => {
@@ -204,10 +214,11 @@ export function createSealedPackageStore({ sealedSnapshot, ownerSubject } = {}) 
   })
 }
 
-export function createHostedIdentityRuntime({ environment = {}, sealedSnapshot, clerkClientFactory = createClerkClient, tokenVerifier = verifyToken, now = Date.now } = {}) {
-  if (!readHostedIdentityConfiguration(environment).enabled) return null
+export function createHostedIdentityRuntime({ environment = {}, allowedOrigin, sealedSnapshot, clerkClientFactory = createClerkClient, tokenVerifier = verifyToken, now = Date.now } = {}) {
+  if (!readHostedIdentityConfiguration(environment, { allowedOrigin }).enabled) return null
   const bindings = readBindings(environment, HOSTED_IDENTITY_ENV)
-  const gateway = createClerkBackendGateway({ environment, clerkClientFactory, tokenVerifier })
+  if (allowedOrigin !== undefined) bindings.privateAllowedOrigin = allowedOrigin
+  const gateway = createClerkBackendGateway({ environment, allowedOrigin, clerkClientFactory, tokenVerifier })
   const provider = createClerkHostedAuthProvider({ gateway, ownerSubject: bindings.ownerSubject, now })
   const store = createSealedPackageStore({ sealedSnapshot, ownerSubject: bindings.ownerSubject })
   const service = createAccountAccessService({ authProvider: { verify: provider.verify, signOut: provider.signOut, revokeAll: ({ subject: _subject }) => provider.revokeAll({ operatorAuthorized: true }) }, store, ownerSubject: bindings.ownerSubject, now })

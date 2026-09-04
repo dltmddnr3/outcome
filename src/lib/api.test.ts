@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, it, vi } from 'vitest'
-import { beginPrivateSession, fetchPrivateOwnerSession, fetchPrivateWorkspace, recordPrivateDecision } from './api'
+import { beginPrivateSession, fetchPrivateChatTimeline, fetchPrivateOwnerSession, fetchPrivateWorkspace, recordPrivateDecision, submitPrivatePlannerMessage } from './api'
 
 afterEach(() => vi.unstubAllGlobals())
 
@@ -58,5 +58,20 @@ describe('hosted private session transition', () => {
     expect(init.headers).toMatchObject({ authorization: 'Bearer sdk-issued-session', 'content-type': 'application/json', 'x-outcome-csrf': 'csrf-value', 'if-match': '"revision"' })
     expect(JSON.parse(init.body)).toMatchObject({ projectId: 'outcome', eventId: 'event-builder-blocked', sequence: 7, decision: 'approved', rejectionReason: null })
     expect(JSON.stringify(init)).not.toContain('localStorage')
+  })
+})
+
+describe('private Planner chat client boundary', () => {
+  it('sends only project and message while carrying bearer csrf and a fresh opaque key', async () => {
+    const fetchMock = vi.fn()
+      .mockResolvedValueOnce(new Response(JSON.stringify({ target: { role: 'planner', binding_version: 7 }, events: [], completion_authority: false, csrf: 'csrf-value' }), { status: 200, headers: { 'content-type': 'application/json' } }))
+      .mockResolvedValueOnce(new Response(JSON.stringify({ accepted: true, sequence: 1, event_id: 'event-0000000000000001', dispatch_state: 'invoked', delivery: 'acknowledged', execution_started: false, result_attached: false, evidence_attached: false }), { status: 202, headers: { 'content-type': 'application/json' } }))
+    vi.stubGlobal('fetch', fetchMock)
+    const timeline = await fetchPrivateChatTimeline('outcome', 0, 'sdk-issued-session')
+    await submitPrivatePlannerMessage('outcome', '안녕하세요', timeline.csrf, 'message-0123456789abcdef', 'sdk-issued-session')
+    expect(fetchMock.mock.calls[0][0]).toBe('/api/private/chat/timeline?project_id=outcome&after_sequence=0')
+    const [, init] = fetchMock.mock.calls[1]
+    expect(JSON.parse(String(init.body))).toEqual({ project_id: 'outcome', message: '안녕하세요' })
+    expect(init.headers).toMatchObject({ authorization: 'Bearer sdk-issued-session', 'x-outcome-csrf': 'csrf-value', 'idempotency-key': 'message-0123456789abcdef' })
   })
 })

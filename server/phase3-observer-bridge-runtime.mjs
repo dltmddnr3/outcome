@@ -1,8 +1,8 @@
 import { isProxy } from 'node:util/types'
 
 export const OBSERVER_BRIDGE_RUNTIME_ENV = Object.freeze({
-  projectionEnrollmentEnabled: 'OUTCOME_OBSERVER_BRIDGE_PROJECTION_ENROLLMENT_ENABLED',
-  ingestionEnabled: 'OUTCOME_OBSERVER_BRIDGE_INGESTION_ENABLED',
+  projectionEnrollmentEnabled: 'OUTCOME_OBSERVER_BRIDGE_V2_PROJECTION_ENROLLMENT_ENABLED',
+  ingestionEnabled: 'OUTCOME_OBSERVER_BRIDGE_V2_INGESTION_ENABLED',
 })
 
 const disabledConfiguration = (valid) => Object.freeze({
@@ -38,7 +38,7 @@ function validRuntime(value) {
   if (typeof value !== 'object' || value === null || Array.isArray(value) || isProxy(value)) return null
   let descriptors
   try { descriptors = Object.getOwnPropertyDescriptors(value) } catch { return null }
-  if (Reflect.ownKeys(descriptors).some((key) => typeof key !== 'string' || !['bridge', 'allowedOrigin', 'csrfSecret'].includes(key))) return null
+  if (Reflect.ownKeys(descriptors).some((key) => typeof key !== 'string' || !['bridge', 'admin', 'allowedOrigin', 'csrfSecret'].includes(key))) return null
   if (!['bridge', 'allowedOrigin', 'csrfSecret'].every((key) => Object.hasOwn(descriptors, key) && Object.hasOwn(descriptors[key], 'value'))) return null
   const bridge = descriptors.bridge.value
   if (typeof bridge !== 'object' || bridge === null || Array.isArray(bridge) || isProxy(bridge)) return null
@@ -54,7 +54,16 @@ function validRuntime(value) {
   } catch {
     return null
   }
-  return Object.freeze({ bridge, allowedOrigin, csrfSecret })
+  let admin
+  if (descriptors.admin) {
+    admin = descriptors.admin.value
+    const names = ['registerViewer', 'revokeViewer', 'cleanupExpiredChallenges', 'readiness']
+    if (typeof admin !== 'object' || admin === null || Array.isArray(admin) || isProxy(admin)) return null
+    let adminDescriptors
+    try { adminDescriptors = Object.getOwnPropertyDescriptors(admin) } catch { return null }
+    if (Reflect.ownKeys(adminDescriptors).length !== names.length || names.some((name) => typeof adminDescriptors[name]?.value !== 'function')) return null
+  }
+  return Object.freeze({ bridge, ...(admin ? { admin } : {}), allowedOrigin, csrfSecret })
 }
 
 export function createObserverBridgeRuntimeControl({ environment = {}, runtimeFactory } = {}) {

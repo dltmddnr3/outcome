@@ -4,6 +4,8 @@ import { safeHostedObserverBridgeErrorCode } from './phase3-observer-bridge-host
 const response = (status, body) => ({ status, body })
 const PRIVATE_PREFIX = '/api/private/bridge/'
 const INPUT_FIELDS = new Set(['bridge', 'allowed_origin', 'csrf_secret', 'method', 'path', 'headers', 'rawBody', 'authContext', 'query'])
+const ADMIN_INPUT_FIELDS = new Set(['admin', 'allowed_origin', 'csrf_secret', 'method', 'path', 'headers', 'rawBody', 'token', 'query'])
+const ADMIN_PREFIX = '/api/private/bridge/admin/'
 const FORBIDDEN_KEYS = new Set(['__proto__', 'prototype', 'constructor'])
 const API_ERROR_CODES = new WeakMap()
 const PRIVATE_API_CODES = new Set(['bad_request', 'body_too_large', 'csrf_invalid'])
@@ -212,6 +214,82 @@ function requireJson(headers) {
 
 function requireOwnerBoundary(headers, allowedOrigin, csrfSecret) {
   if (typeof allowedOrigin !== 'string' || typeof csrfSecret !== 'string' || headers.origin !== allowedOrigin || headers['x-outcome-csrf'] !== csrfSecret) apiFail('csrf_invalid')
+}
+
+function dataMethod(value, name) {
+  if (typeof value !== 'object' || value === null || Array.isArray(value) || isProxy(value)) return null
+  let descriptor
+  try { descriptor = Object.getOwnPropertyDescriptor(value, name) } catch { return null }
+  return descriptor && Object.hasOwn(descriptor, 'value') && typeof descriptor.value === 'function' && !isProxy(descriptor.value) ? descriptor.value : null
+}
+
+function finiteAdminResponse(value, allowed, required, statuses) {
+  let output
+  try { output = ownRecord(value, allowed, required, 'unavailable') } catch { throw new Error('bridge_unavailable') }
+  if (Object.hasOwn(output, 'status') && !statuses.has(output.status)) throw new Error('bridge_unavailable')
+  for (const [key, item] of Object.entries(output)) {
+    if (key === 'status') continue
+    if (!Number.isSafeInteger(item) || item < 0) throw new Error('bridge_unavailable')
+  }
+  return { ...output }
+}
+
+const ADMIN_POST = Object.freeze({
+  '/api/private/bridge/admin/viewers/register': Object.freeze({
+    operation: 'registerViewer',
+    fields: new Set(['workspace_id', 'project_id', 'viewer_ref', 'viewer_class', 'idempotency_key', 'expected_schema_revision']),
+    result: new Set(['status', 'revision', 'ledger_revision']),
+    required: new Set(['status', 'revision', 'ledger_revision']),
+    statuses: new Set(['viewer_registered', 'viewer_revoked']),
+  }),
+  '/api/private/bridge/admin/viewers/revoke': Object.freeze({
+    operation: 'revokeViewer',
+    fields: new Set(['workspace_id', 'project_id', 'viewer_ref', 'expected_revision', 'idempotency_key']),
+    result: new Set(['status', 'revision', 'ledger_revision']),
+    required: new Set(['status', 'revision', 'ledger_revision']),
+    statuses: new Set(['viewer_revoked']),
+  }),
+  '/api/private/bridge/admin/challenges/cleanup': Object.freeze({
+    operation: 'cleanupExpiredChallenges',
+    fields: new Set(['project_id', 'before', 'limit']),
+    result: new Set(['status', 'cleared_count']),
+    required: new Set(['status', 'cleared_count']),
+    statuses: new Set(['challenge_cleanup']),
+  }),
+})
+
+export async function handleHostedObserverBridgeAdminRequest(input = {}) {
+  let request
+  try { request = ownRecord(input, ADMIN_INPUT_FIELDS, new Set(['method', 'path'])) } catch (error) { return errorResponse(error) }
+  const method = request.method
+  const path = request.path
+  if (typeof method !== 'string' || typeof path !== 'string') return response(400, { error: 'bad_request' })
+  if (!path.startsWith(ADMIN_PREFIX) || !request.admin) return response(404, { error: 'bridge_unavailable' })
+  try {
+    const headers = jsonHeaders(request.headers)
+    if (path === '/api/private/bridge/admin/readiness') {
+      if (method !== 'GET') return response(405, { error: 'read_only' })
+      const query = ownRecord(materializeJson(request.query ?? {}), new Set(['workspace_id', 'project_id']), new Set(['workspace_id', 'project_id']))
+      const operation = dataMethod(request.admin, 'readiness')
+      if (!operation || typeof request.token !== 'string') throw new Error('bridge_unavailable')
+      const result = await Reflect.apply(operation, request.admin, [{ ...query, token: request.token }])
+      return response(200, finiteAdminResponse(result, new Set(['status', 'active_viewer_count', 'active_viewer_class_count']), new Set(['status', 'active_viewer_count', 'active_viewer_class_count']), new Set(['ready', 'not_ready'])))
+    }
+    const route = ADMIN_POST[path]
+    if (!route) return response(404, { error: 'bridge_unavailable' })
+    if (method !== 'POST') return response(405, { error: 'read_only' })
+    requireJson(headers)
+    requireOwnerBoundary(headers, request.allowed_origin, request.csrf_secret)
+    ownRecord(materializeJson(request.query ?? {}), new Set())
+    const parsed = parseRawJson(request.rawBody, 32_768)
+    const body = ownRecord(parsed.value, route.fields, route.fields)
+    const operation = dataMethod(request.admin, route.operation)
+    if (!operation || typeof request.token !== 'string') throw new Error('bridge_unavailable')
+    const result = await Reflect.apply(operation, request.admin, [{ ...body, token: request.token }])
+    return response(200, finiteAdminResponse(result, route.result, route.required, route.statuses))
+  } catch (error) {
+    return errorResponse(error)
+  }
 }
 
 export async function handleHostedObserverBridgeRequest(input = {}) {

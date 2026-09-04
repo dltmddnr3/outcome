@@ -2,11 +2,24 @@ import { AuthenticateWithRedirectCallback, ClerkProvider, useAuth, useSignIn, us
 import { type FormEvent, useEffect, useRef, useState } from 'react'
 import { fetchPrivateOwnerSession, fetchPrivateWorkspace, type PrivateWorkspaceView } from '../lib/api'
 import { AccountWorkspace, type AccountWorkspaceState } from './AccountWorkspace'
+import { PlannerConversationSession } from './PlannerConversation'
 
 const callbackPaths = new Set(['/workspace/sso-callback', '/workspace/apple-callback'])
 export const hostedGoogleSsoParameters = Object.freeze({ strategy: 'oauth_google' as const, redirectCallbackUrl: '/workspace/sso-callback', redirectUrl: '/workspace' })
-type EmailCodeSignIn = { emailCode: { sendCode: (input: { emailAddress: string }) => Promise<{ error: unknown }> } }
-export async function requestHostedEmailCode(signIn: EmailCodeSignIn | undefined, emailAddress: string) {
+type HostedNavigate = (input: { decorateUrl: (url: string) => string }) => void | Promise<void>
+type HostedFinalizableSignIn = {
+  status: string
+  isTransferable?: boolean
+  finalize: (parameters: { navigate: HostedNavigate }) => Promise<{ error: unknown }>
+}
+type EmailCodeSender = { emailCode: { sendCode: (input: { emailAddress: string }) => Promise<{ error: unknown }> } }
+type EmailCodeSignIn = HostedFinalizableSignIn & {
+  emailCode: {
+    sendCode: (input: { emailAddress: string }) => Promise<{ error: unknown }>
+    verifyCode: (input: { code: string }) => Promise<{ error: unknown }>
+  }
+}
+export async function requestHostedEmailCode(signIn: EmailCodeSender | undefined, emailAddress: string) {
   if (!signIn) return false
   return !(await signIn.emailCode.sendCode({ emailAddress })).error
 }
@@ -42,37 +55,83 @@ export async function confirmHostedOwnerWorkspace(sessionToken: string, storage:
   return value.workspace
 }
 
-type HostedGoogleNavigate = (input: { decorateUrl: (url: string) => string }) => void | Promise<void>
-type HostedGoogleSignIn = {
-  status: string
+type HostedGoogleSignIn = HostedFinalizableSignIn & {
   sso: (parameters: typeof hostedGoogleSsoParameters & { popup: Window }) => Promise<{ error: unknown }>
-  finalize: (parameters: { navigate: HostedGoogleNavigate }) => Promise<{ error: unknown }>
 }
-type HostedGoogleAttempt = 'complete' | 'failed' | 'incomplete' | 'popup_blocked' | 'unavailable' | 'ignored'
+type HostedGoogleAttempt = 'complete' | 'sso_failed' | 'blocked_existing_account' | 'incomplete' | 'session_activation_failed' | 'popup_blocked' | 'unavailable' | 'ignored'
+export type HostedEmailAttempt = 'complete' | 'verification_failed' | 'blocked_existing_account' | 'incomplete' | 'session_activation_failed' | 'unavailable' | 'ignored'
 const openHostedGooglePopup = () => window.open('about:blank', 'outcome-google-auth', 'popup,width=600,height=800')
-const navigateHostedWorkspace: HostedGoogleNavigate = ({ decorateUrl }) => window.location.assign(decorateUrl('/workspace'))
+const navigateHostedWorkspace: HostedNavigate = ({ decorateUrl }) => window.location.assign(decorateUrl('/workspace'))
+const classifyHostedSignIn = (signIn: HostedFinalizableSignIn) => signIn.isTransferable === true ? 'blocked_existing_account' : signIn.status === 'complete' ? 'complete' : 'incomplete'
+async function finalizeHostedSignIn(signIn: HostedFinalizableSignIn, navigate: HostedNavigate) {
+  let navigationCount = 0
+  let finalized
+  try {
+    finalized = await signIn.finalize({
+      navigate: async (destination) => {
+        if (navigationCount !== 0) throw new Error('duplicate_navigation')
+        navigationCount += 1
+        await navigate(destination)
+      },
+    })
+  } catch {
+    return false
+  }
+  return Boolean(finalized && !finalized.error && navigationCount === 1)
+}
 export function hostedGoogleAttemptError(result: HostedGoogleAttempt) {
   if (result === 'unavailable') return '인증 공급자를 불러오지 못했습니다. 다시 시도해 주세요.'
   if (result === 'popup_blocked') return 'Google 로그인 창을 열 수 없습니다. 팝업을 허용한 뒤 다시 시도해 주세요.'
-  if (result === 'failed' || result === 'incomplete') return 'Google 로그인을 완료하지 못했습니다. 다시 시도해 주세요.'
+  if (result === 'sso_failed') return 'Google 로그인을 완료하지 못했습니다. 다시 시도해 주세요.'
+  if (result === 'blocked_existing_account') return '승인된 기존 계정으로만 로그인할 수 있습니다.'
+  if (result === 'incomplete') return '추가 인증이 필요합니다. 로그인을 완료해 주세요.'
+  if (result === 'session_activation_failed') return '인증은 확인되었지만 세션을 활성화하지 못했습니다. 다시 시도해 주세요.'
   return null
 }
-export async function attemptHostedGoogleSignIn(signIn: HostedGoogleSignIn | null | undefined, lock: { current: boolean }, openPopup: () => Window | null = openHostedGooglePopup, navigate: HostedGoogleNavigate = navigateHostedWorkspace): Promise<HostedGoogleAttempt> {
+export function hostedEmailAttemptError(result: HostedEmailAttempt) {
+  if (result === 'unavailable') return '인증 공급자를 불러오지 못했습니다.'
+  if (result === 'verification_failed') return '인증 코드를 확인하지 못했습니다.'
+  if (result === 'blocked_existing_account') return '승인된 기존 계정으로만 로그인할 수 있습니다.'
+  if (result === 'incomplete') return '추가 인증이 필요합니다. 로그인을 완료해 주세요.'
+  if (result === 'session_activation_failed') return '인증은 확인되었지만 세션을 활성화하지 못했습니다. 다시 시도해 주세요.'
+  return null
+}
+export async function attemptHostedEmailCodeVerification(signIn: EmailCodeSignIn | null | undefined, code: string, lock: { current: boolean }, navigate: HostedNavigate = navigateHostedWorkspace, currentSignIn: () => EmailCodeSignIn | null | undefined = () => signIn): Promise<HostedEmailAttempt> {
+  if (lock.current) return 'ignored'
+  if (!signIn) return 'unavailable'
+  lock.current = true
+  try {
+    let verified
+    try { verified = await signIn.emailCode.verifyCode({ code }) } catch { return 'verification_failed' }
+    if (verified.error) return 'verification_failed'
+    const completedSignIn = currentSignIn()
+    if (!completedSignIn) return 'unavailable'
+    const state = classifyHostedSignIn(completedSignIn)
+    if (state !== 'complete') return state
+    return await finalizeHostedSignIn(completedSignIn, navigate) ? 'complete' : 'session_activation_failed'
+  } finally {
+    lock.current = false
+  }
+}
+export async function attemptHostedGoogleSignIn(signIn: HostedGoogleSignIn | null | undefined, lock: { current: boolean }, openPopup: () => Window | null = openHostedGooglePopup, navigate: HostedNavigate = navigateHostedWorkspace, currentSignIn: () => HostedGoogleSignIn | null | undefined = () => signIn): Promise<HostedGoogleAttempt> {
   if (lock.current) return 'ignored'
   if (!signIn) return 'unavailable'
   lock.current = true
   const popup = openPopup()
   if (!popup) { lock.current = false; return 'popup_blocked' }
+  let closePopup = true
   try {
     const result = await signIn.sso({ ...hostedGoogleSsoParameters, popup })
-    if (result.error) return 'failed'
-    if (signIn.status !== 'complete') return 'incomplete'
-    const finalized = await signIn.finalize({ navigate })
-    return finalized.error ? 'failed' : 'complete'
+    if (result.error) return 'sso_failed'
+    const completedSignIn = currentSignIn()
+    if (!completedSignIn) return 'unavailable'
+    const state = classifyHostedSignIn(completedSignIn)
+    if (state !== 'complete') { closePopup = false; return state }
+    return await finalizeHostedSignIn(completedSignIn, navigate) ? 'complete' : 'session_activation_failed'
   } catch {
-    return 'failed'
+    return 'sso_failed'
   } finally {
-    if (!popup.closed) popup.close()
+    if (closePopup && !popup.closed) popup.close()
     lock.current = false
   }
 }
@@ -107,19 +166,23 @@ function HostedWorkspaceBody() {
   const [state, setState] = useState<AccountWorkspaceState>(isLoaded && !isSignedIn ? hostedSignedOutState() : 'loading')
   const [ownerVerified, setOwnerVerified] = useState(false)
   const [workspace, setWorkspace] = useState<PrivateWorkspaceView>()
+  const [sessionToken, setSessionToken] = useState<string>()
   const [email, setEmail] = useState('')
   const [code, setCode] = useState('')
   const [codeSent, setCodeSent] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [googlePending, setGooglePending] = useState(false)
   const googleLock = useRef(false)
+  const emailVerifyLock = useRef(false)
+  const signInRef = useRef(signIn)
+  signInRef.current = signIn
   const googleBusy = googlePending || fetchStatus === 'fetching'
 
   useEffect(() => {
     if (!isLoaded) return
-    if (!isSignedIn) { setOwnerVerified(false); setState(ownerWasReady || hostedSignedOutState() === 'session_expired' ? 'session_expired' : 'login'); setWorkspace(undefined); return }
+    if (!isSignedIn) { setOwnerVerified(false); setSessionToken(undefined); setState(ownerWasReady || hostedSignedOutState() === 'session_expired' ? 'session_expired' : 'login'); setWorkspace(undefined); return }
     void requireHostedSessionToken(getToken)
-      .then((sessionToken) => confirmHostedOwnerWorkspace(sessionToken, undefined, undefined, () => setOwnerVerified(true)))
+      .then((token) => { setSessionToken(token); return confirmHostedOwnerWorkspace(token, undefined, undefined, () => setOwnerVerified(true)) })
       .then((value) => { setOwnerWasReady(true); setWorkspace(value); setState('ready') })
       .catch((reason) => {
         setWorkspace(undefined)
@@ -136,7 +199,7 @@ function HostedWorkspaceBody() {
     if (googleBusy || googleLock.current) return
     setError(null)
     setGooglePending(true)
-    const result = await attemptHostedGoogleSignIn(signIn, googleLock)
+    const result = await attemptHostedGoogleSignIn(signIn, googleLock, openHostedGooglePopup, navigateHostedWorkspace, () => signInRef.current)
     setError(hostedGoogleAttemptError(result))
     setGooglePending(false)
   }
@@ -147,10 +210,8 @@ function HostedWorkspaceBody() {
   }
   const verifyCode = async (event: FormEvent) => {
     event.preventDefault(); setError(null)
-    if (!signIn) { setError('인증 공급자를 불러오지 못했습니다.'); return }
-    const result = await signIn.emailCode.verifyCode({ code })
-    if (result?.error) { setError('인증 코드를 확인하지 못했습니다.'); return }
-    await signIn.finalize({ navigate: ({ decorateUrl }) => window.location.assign(decorateUrl('/workspace')) })
+    const result = await attemptHostedEmailCodeVerification(signIn, code, emailVerifyLock, navigateHostedWorkspace, () => signInRef.current)
+    setError(hostedEmailAttemptError(result))
   }
   const linkApple = async () => {
     const result = await user?.createExternalAccount({ strategy: 'oauth_apple', redirectUrl: '/workspace/apple-callback' })
@@ -161,6 +222,7 @@ function HostedWorkspaceBody() {
     clearHostedOwnerReady()
     setOwnerWasReady(false)
     setOwnerVerified(false)
+    setSessionToken(undefined)
     setWorkspace(undefined)
     setState('login')
     await returnToHostedLogin(signOut)
@@ -176,7 +238,7 @@ function HostedWorkspaceBody() {
     <span className="account-workspace__apple-note">Apple은 소유자 로그인 확인 후 연결</span>
     <p className="account-workspace__adapter-note">Clerk 브라우저 세션 · 회원가입 전환 차단</p>
   </div>
-  return <AccountWorkspace state={state} workspace={workspace} ownerVerified={ownerVerified} sessionPresent={Boolean(isSignedIn)} loginContent={loginContent} onLogout={isSignedIn || ownerWasReady ? returnToLogin : undefined} onAppleLink={ownerVerified ? linkApple : undefined} transitionError={error} />
+  return <PlannerConversationSession.Provider value={{ sessionCredential: sessionToken }}><AccountWorkspace state={state} workspace={workspace} ownerVerified={ownerVerified} sessionPresent={Boolean(isSignedIn)} loginContent={loginContent} onLogout={isSignedIn || ownerWasReady ? returnToLogin : undefined} onAppleLink={ownerVerified ? linkApple : undefined} transitionError={error} /></PlannerConversationSession.Provider>
 }
 
 export function HostedClerkWorkspace({ publishableKey, pathname = window.location.pathname }: { publishableKey: string; pathname?: string }) {

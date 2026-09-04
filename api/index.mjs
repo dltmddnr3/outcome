@@ -3,8 +3,12 @@ import { privateAccessPublicConfig } from '../server/account-access-api.mjs'
 import { handlePrivateAccessRequest } from '../server/account-access-api.mjs'
 import { AccountAccessError } from '../server/account-access.mjs'
 import { HOSTED_IDENTITY_ENV, createHostedIdentityRuntime, readHostedIdentityConfiguration, safeClerkAuthReason } from '../server/account-access-hosted.mjs'
-import { handleHostedObserverBridgeRequest } from '../server/phase3-observer-bridge-api.mjs'
+import { handleHostedObserverBridgeAdminRequest, handleHostedObserverBridgeRequest } from '../server/phase3-observer-bridge-api.mjs'
 import { createObserverBridgeRuntimeControl } from '../server/phase3-observer-bridge-runtime.mjs'
+import { createManagedObserverBridgeRuntimeFactory, readDeploymentPreviewOrigin } from '../server/phase3-observer-bridge-managed-runtime.mjs'
+import { handlePrivateChatRequest } from '../server/outcome-chat-api.mjs'
+import { createOutcomeChatHostedRuntimeFactory } from '../server/outcome-chat-hosted-runtime.mjs'
+import { isProxy } from 'node:util/types'
 
 const result = (status, body) => ({ status, body })
 
@@ -37,6 +41,12 @@ const BRIDGE_PROJECTION_ENROLLMENT_PATHS = new Set([
   '/api/private/bridge/sources/rotate',
 ])
 const BRIDGE_INGESTION_PATHS = new Set(['/api/private/bridge/events'])
+const BRIDGE_ADMIN_PATHS = new Set([
+  '/api/private/bridge/admin/viewers/register',
+  '/api/private/bridge/admin/viewers/revoke',
+  '/api/private/bridge/admin/challenges/cleanup',
+  '/api/private/bridge/admin/readiness',
+])
 const BRIDGE_OWNER_PATHS = new Set([
   '/api/private/bridge/enrollments',
   '/api/private/bridge/sources/revoke',
@@ -70,6 +80,7 @@ const selectedHeaders = (headers, companion = false) => {
   const names = companion ? ['content-type'] : ['content-type', 'origin', 'x-outcome-csrf', 'if-match']
   return Object.fromEntries(names.map((name) => [name, String(header(headers, name))]).filter(([, value]) => value))
 }
+const selectedChatHeaders = (headers) => Object.fromEntries(['content-type','origin','x-outcome-csrf','idempotency-key'].map((name) => [name, String(header(headers,name))]).filter(([,value]) => value))
 const bridgeLocation = (pathname) => {
   try {
     const target = bridgeRequestTarget(pathname)
@@ -117,27 +128,50 @@ const privateSessionDiagnostic = (logger, input, error, configuredOrigin) => {
   const sdkReason = safeClerkAuthReason(error?.sdkReason)
   try { logger?.info?.('outcome_private_session', { authSource: input.authSource, ...tokenState, ...(sdkReason ? { sdkReason } : {}), ...safeError }) } catch {}
 }
+const deploymentIdentityOrigin = (environment) => {
+  if (typeof environment !== 'object' || environment === null || isProxy(environment)) return null
+  let descriptor
+  try { descriptor = Object.getOwnPropertyDescriptor(environment, 'VERCEL_ENV') } catch { return null }
+  if (descriptor === undefined) return undefined
+  if (!Object.hasOwn(descriptor, 'value') || typeof descriptor.value !== 'string') return null
+  if (descriptor.value === 'preview') return readDeploymentPreviewOrigin(environment)
+  return descriptor.value === 'production' || descriptor.value === 'development' ? undefined : null
+}
 
-export function createStableHostRequestHandler({ environment = process.env, runtimeFactory = createHostedIdentityRuntime, bridgeRuntimeFactory, decisionRuntimeFactory, clerkClientFactory, clerkTokenVerifier, logger } = {}) {
-  const configured = readHostedIdentityConfiguration(environment).enabled
-  const configuredOrigin = typeof environment?.[HOSTED_IDENTITY_ENV.privateAllowedOrigin] === 'string' ? environment[HOSTED_IDENTITY_ENV.privateAllowedOrigin].trim() : ''
+export function createStableHostRequestHandler({ environment = process.env, runtimeFactory = createHostedIdentityRuntime, bridgeRuntimeFactory = createManagedObserverBridgeRuntimeFactory({ environment }), chatRuntimeFactory = createOutcomeChatHostedRuntimeFactory({ environment }), decisionRuntimeFactory, clerkClientFactory, clerkTokenVerifier, logger } = {}) {
+  const bridgeControl = createObserverBridgeRuntimeControl({ environment, runtimeFactory: bridgeRuntimeFactory })
+  const previewOrigin = deploymentIdentityOrigin(environment)
+  const identityConfiguration = readHostedIdentityConfiguration(environment, { allowedOrigin: previewOrigin })
+  const configured = identityConfiguration.enabled
+  const configuredOrigin = previewOrigin === undefined ? (() => {
+    try {
+      const descriptor = Object.getOwnPropertyDescriptor(environment, HOSTED_IDENTITY_ENV.privateAllowedOrigin)
+      return descriptor && Object.hasOwn(descriptor, 'value') && typeof descriptor.value === 'string' ? descriptor.value.trim() : ''
+    } catch { return '' }
+  })() : previewOrigin ?? ''
   const validRuntime = (value) => value?.allowedOrigin === configuredOrigin
     && typeof value?.publishableKey === 'string'
     && value.publishableKey.length > 0
     && typeof value?.service?.readWorkspace === 'function'
     && typeof value?.service?.authenticate === 'function'
+    && typeof value?.service?.resolveBridgeAuthority === 'function'
   let runtimePromise
   let decisionRuntimePromise
-  const bridgeControl = createObserverBridgeRuntimeControl({ environment, runtimeFactory: bridgeRuntimeFactory })
+  let chatRuntimePromise
   const selectedRuntime = async () => {
     if (!configured || typeof runtimeFactory !== 'function') return null
-    runtimePromise ??= Promise.resolve().then(() => runtimeFactory({ environment, sealedSnapshot: snapshot, clerkClientFactory, tokenVerifier: clerkTokenVerifier })).then((value) => validRuntime(value) ? value : null).catch(() => null)
+    runtimePromise ??= Promise.resolve().then(() => runtimeFactory({ environment, allowedOrigin: previewOrigin, sealedSnapshot: snapshot, clerkClientFactory, tokenVerifier: clerkTokenVerifier })).then((value) => validRuntime(value) ? value : null).catch(() => null)
     return runtimePromise
   }
   const selectedDecisionRuntime = async (hosted) => {
     if (!hosted || typeof decisionRuntimeFactory !== 'function') return null
     decisionRuntimePromise ??= Promise.resolve().then(() => decisionRuntimeFactory({ environment, identityRuntime: hosted })).then((value) => value?.allowedOrigin === configuredOrigin && typeof value?.csrfSecret === 'string' && value.csrfSecret.length >= 16 && typeof value?.service?.record === 'function' ? value : null).catch(() => null)
     return decisionRuntimePromise
+  }
+  const selectedChatRuntime = async (hosted) => {
+    if (typeof chatRuntimeFactory !== 'function') return null
+    chatRuntimePromise ??= Promise.resolve().then(() => chatRuntimeFactory({ accountRuntime: hosted, allowedOrigin: configuredOrigin })).catch(() => null)
+    return chatRuntimePromise
   }
   return async ({ method = 'GET', pathname = '/', headers = {}, body, origin } = {}) => {
     const bridgeTarget = bridgeRequestTarget(pathname)
@@ -146,18 +180,37 @@ export function createStableHostRequestHandler({ environment = process.env, runt
       const location = bridgeLocation(pathname)
       const projectionEnrollment = BRIDGE_PROJECTION_ENROLLMENT_PATHS.has(location.path)
       const ingestion = BRIDGE_INGESTION_PATHS.has(location.path)
-      if ((!projectionEnrollment && !ingestion)
+      const admin = BRIDGE_ADMIN_PATHS.has(location.path)
+      if ((!projectionEnrollment && !ingestion && !admin)
         || (projectionEnrollment && !bridgeControl.configuration.projectionEnrollmentEnabled)
-        || (ingestion && !bridgeControl.configuration.ingestionEnabled)) return bridgeUnavailable()
+        || (ingestion && !bridgeControl.configuration.ingestionEnabled)
+        || (admin && (!bridgeControl.configuration.projectionEnrollmentEnabled || !bridgeControl.configuration.ingestionEnabled))) return bridgeUnavailable()
       const hosted = await selectedRuntime()
       if (!hosted) return bridgeUnavailable()
       const bridgeRuntime = await bridgeControl.select(hosted)
       if (!bridgeRuntime) return bridgeUnavailable()
       const companion = ['/api/private/bridge/enrollments/complete', '/api/private/bridge/events'].includes(location.path)
+      if (admin) {
+        try {
+          return await handleHostedObserverBridgeAdminRequest({
+            admin: bridgeRuntime.admin,
+            allowed_origin: bridgeRuntime.allowedOrigin,
+            csrf_secret: bridgeRuntime.csrfSecret,
+            method,
+            path: location.path,
+            headers: selectedHeaders(headers),
+            rawBody: body,
+            token: privateSessionToken(headers),
+            query: location.query,
+          })
+        } catch {
+          return result(503, { error: 'bridge_unavailable' })
+        }
+      }
       let authContext = null
       if ((location.path === '/api/private/bridge/projection' && method === 'GET') || (BRIDGE_OWNER_PATHS.has(location.path) && method === 'POST')) {
         try {
-          authContext = await hosted.service.authenticate(privateSessionToken(headers))
+          authContext = await hosted.service.resolveBridgeAuthority({ token: privateSessionToken(headers) })
         } catch (error) {
           return error?.code === 'authentication_unavailable' ? result(503, { error: 'bridge_unavailable' }) : bridgeUnavailable()
         }
@@ -185,7 +238,17 @@ export function createStableHostRequestHandler({ environment = process.env, runt
       return handleStableHostRequest({ method, pathname })
     }
     const hosted = await selectedRuntime()
-    if (!hosted) return handleStableHostRequest({ method, pathname })
+    if (!hosted) return pathname.startsWith('/api/private/chat/') ? result(503, { error: 'chat_unavailable' }) : handleStableHostRequest({ method, pathname })
+    if (pathname.startsWith('/api/private/chat/')) {
+      const chat = await selectedChatRuntime(hosted)
+      if (!chat) return result(503, { error: 'chat_unavailable' })
+      let authority
+      try { authority = await hosted.service.resolveBridgeAuthority({ token: privateSessionToken(headers) }) } catch { return result(503, { error: 'chat_unavailable' }) }
+      if (!authority || authority.workspace_id !== 'account-only-preview' || !Array.isArray(authority.project_ids) || !authority.project_ids.includes('outcome')) return result(503, { error: 'chat_unavailable' })
+      const service = chat.createService(authority.workspace_id)
+      const owner = { authenticated:true,actor:'cherry_owner',allowed_origin:chat.allowedOrigin,csrf:chat.csrfSecret,workspace_id:authority.workspace_id,account_ref:authority.account_ref,project_ids:authority.project_ids }
+      return handlePrivateChatRequest({ method,url:pathname,headers:selectedChatHeaders(headers),rawBody:Buffer.isBuffer(body)?body.toString('utf8'):body,service,owner,rateLimit:chat.rateLimit })
+    }
     if (method === 'GET' && pathname === '/api/private/config') return result(200, { ...privateAccessPublicConfig(true), publishableKey: hosted.publishableKey })
     if (method === 'GET' && pathname === '/api/private/session') {
       const sessionInput = privateSessionInput(headers)
@@ -226,9 +289,11 @@ const hostedRequest = createStableHostRequestHandler({ logger: console })
 const MAXIMUM_STABLE_BRIDGE_BODY_BYTES = 1_048_576
 const rawBridgeBody = async (request, pathname) => {
   const target = bridgeRequestTarget(pathname)
+  const chat = typeof pathname === 'string' && pathname.startsWith('/api/private/chat/')
   const body = request.body
   const decisionCandidate = pathname === '/api/private/decisions'
-  if ((!target.candidate && !decisionCandidate) || (target.candidate && !target.valid) || request.method === 'GET' || typeof body === 'string' || Buffer.isBuffer(body)) return body
+  if ((!target.candidate && !chat && !decisionCandidate) || (target.candidate && !target.valid) || request.method === 'GET' || typeof body === 'string' || Buffer.isBuffer(body)) return body
+  const maximumBytes = chat || decisionCandidate ? 10_000 : MAXIMUM_STABLE_BRIDGE_BODY_BYTES
   const chunks = []
   let bytes = 0
   try {
@@ -239,8 +304,7 @@ const rawBridgeBody = async (request, pathname) => {
       else if (Buffer.isBuffer(chunk)) value = chunk
       else return undefined
       bytes += value.length
-      const maximum = decisionCandidate ? 10_000 : MAXIMUM_STABLE_BRIDGE_BODY_BYTES
-      if (bytes > maximum) return Buffer.alloc(maximum + 1)
+      if (bytes > maximumBytes) return Buffer.alloc(maximumBytes + 1)
       chunks.push(value)
     }
   } catch {

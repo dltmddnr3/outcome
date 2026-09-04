@@ -14,6 +14,9 @@ export type PrivateProjectProjection = { project: { id: string; name: string }; 
 export type PrivateWorkspaceView = { viewState?: string; projects?: PrivateProjectProjection[]; dashboard?: OutcomeDashboardData }
 export type PrivateDecisionReason = 'evidence_insufficient' | 'scope_not_authorized' | 'superseded_by_newer_observation' | 'defer_pending_external_input'
 export type PrivateDecisionReceipt = { decisionState: 'recorded'; decisionId: string; decision: 'approved' | 'rejected'; rejectionReason: PrivateDecisionReason | null; decidedAt: string; decisionActorClass: 'owner'; notice: '기록됨 · 전달은 이 범위 밖'; supersedesId: string | null; completionAuthority: false }
+export type PrivateChatEvent = { event_id: string; sequence: number; observed_at: string; kind: 'user_message'; state: 'queued'; correlation_id: string; payload: { private_content: { text: string } } }
+export type PrivateChatTimeline = { target: { role: 'planner'; binding_version: number }; events: PrivateChatEvent[]; completion_authority: false; csrf: string }
+export type PrivateChatSubmit = { accepted: true; sequence: number; event_id: string; dispatch_state: 'not_invoked' | 'dispatch_intent_recorded' | 'invoked'; delivery: 'acknowledged' | 'delivery_unknown' | 'rejected' | 'failed'; execution_started: false; result_attached: false; evidence_attached: false }
 
 let privateDecisionBinding: { etag: string; csrf: string; bearer?: string } | null = null
 
@@ -63,6 +66,14 @@ export async function fetchPrivateWorkspace(sessionToken?: string): Promise<{ wo
 }
 
 const privateSessionHeaders = (sessionToken?: string) => ({ accept: 'application/json', ...(sessionToken && /^[A-Za-z0-9._~-]+$/.test(sessionToken) ? { authorization: `Bearer ${sessionToken}` } : {}) })
+
+export async function fetchPrivateChatTimeline(projectId: string, afterSequence = 0, sessionToken?: string): Promise<PrivateChatTimeline> {
+  return readJson<PrivateChatTimeline>(await fetch(`/api/private/chat/timeline?project_id=${encodeURIComponent(projectId)}&after_sequence=${afterSequence}`, { credentials: 'same-origin', headers: privateSessionHeaders(sessionToken) }))
+}
+
+export async function submitPrivatePlannerMessage(projectId: string, message: string, csrf: string, idempotencyKey: string, sessionToken?: string): Promise<PrivateChatSubmit> {
+  return readJson<PrivateChatSubmit>(await fetch('/api/private/chat/messages', { method: 'POST', credentials: 'same-origin', headers: { ...privateSessionHeaders(sessionToken), 'content-type': 'application/json', 'x-outcome-csrf': csrf, 'idempotency-key': idempotencyKey }, body: JSON.stringify({ project_id: projectId, message }) }))
+}
 
 export async function fetchPrivateOwnerSession(sessionToken?: string): Promise<{ authenticated: true; owner: true }> {
   return readJson<{ authenticated: true; owner: true }>(await fetch('/api/private/session', { credentials: 'same-origin', headers: privateSessionHeaders(sessionToken) }))

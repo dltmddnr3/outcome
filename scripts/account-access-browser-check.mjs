@@ -123,10 +123,11 @@ try {
   {
     const context = await browser.newContext({ viewport: { width: 390, height: 844 }, reducedMotion: 'reduce' })
     const page = await context.newPage()
-    let browserErrors = 0
-    page.on('pageerror', () => { browserErrors += 1 })
-    page.on('console', (message) => { if (message.type() === 'error') browserErrors += 1 })
+    const browserErrors = []
+    page.on('pageerror', (error) => { browserErrors.push(`pageerror:${error.message}`) })
+    page.on('console', (message) => { if (message.type() === 'error') browserErrors.push(`console:${message.text()}`) })
     await page.route('**/api/private/config', (route) => route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ enabled: true, access: 'private_read_only', providers: [], sessionMaximumDays: 7, completionAuthority: false }) }))
+    await page.route('**/api/private/chat/timeline?*', (route) => route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ target: { role: 'planner', binding_version: 7 }, events: [], completion_authority: false, csrf: 'browser-fixture-csrf' }) }))
     const hostileProjects = readyProjects.map((project) => project.project.id === 'outcome' ? { ...project, modelV2: hostileProjection } : project)
     await page.route('**/api/private/workspace', (route) => route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ workspace: { viewState: 'ready', projects: hostileProjects, dashboard: readyDashboard } }) }))
     await page.goto(`${base}/workspace`)
@@ -153,7 +154,7 @@ try {
     })
     if (!visual.node || visual.node.width !== '22px' || visual.node.height !== '22px' || visual.node.background !== 'rgb(21, 26, 21)' || visual.node.image !== 'none' || visual.node.shadow !== 'none' || visual.node.markerWidth !== '7px' || visual.node.markerHeight !== '7px' || visual.node.markerBackground !== 'rgb(173, 255, 47)' || visual.contrasts.some((value) => value < 3)) throw new Error(`role chat visual contract failed ${JSON.stringify(visual)}`)
     const hostile = await page.evaluate((slug) => ({ apiFieldCount: document.querySelectorAll('[data-projection-field=boundary] li').length, markup: document.documentElement.outerHTML.includes(slug), visible: document.body.innerText.includes(slug), accessibility: document.body.textContent.includes(slug), overflow: document.documentElement.scrollWidth - document.documentElement.clientWidth }), hostileMilestoneSlug)
-    if (hostile.apiFieldCount !== 0 || hostile.markup || hostile.visible || hostile.accessibility || hostile.overflow !== 0 || browserErrors !== 0) throw new Error(`hostile milestone built boundary failed ${JSON.stringify({ ...hostile, browserErrors })}`)
+    if (hostile.apiFieldCount !== 0 || hostile.markup || hostile.visible || hostile.accessibility || hostile.overflow !== 0 || browserErrors.length !== 0) throw new Error(`hostile milestone built boundary failed ${JSON.stringify({ ...hostile, browserErrors })}`)
     await context.close()
   }
 

@@ -10,7 +10,7 @@ vi.mock('@clerk/react', () => ({
   useUser: () => ({ user: null }),
 }))
 
-import { attemptHostedGoogleSignIn, clearHostedOwnerReady, confirmHostedOwnerWorkspace, HostedClerkWorkspace, hostedFailureState, hostedGoogleAttemptError, hostedGoogleSsoParameters, hostedSignedOutState, markHostedOwnerReady, requestHostedEmailCode, requireHostedSessionToken, returnToHostedLogin } from './AccountWorkspaceClerk'
+import { attemptHostedEmailCodeVerification, attemptHostedGoogleSignIn, clearHostedOwnerReady, confirmHostedOwnerWorkspace, HostedClerkWorkspace, hostedEmailAttemptError, hostedFailureState, hostedGoogleAttemptError, hostedGoogleSsoParameters, hostedSignedOutState, markHostedOwnerReady, requestHostedEmailCode, requireHostedSessionToken, returnToHostedLogin } from './AccountWorkspaceClerk'
 
 const tabStorage = () => {
   const values = new Map<string, string>()
@@ -93,7 +93,8 @@ describe('Clerk browser session boundary', () => {
     const navigate = vi.fn()
     const finalize = vi.fn().mockImplementation(async ({ navigate: finalizeNavigate }) => {
       expect(opened).toBe(true)
-      expect(finalizeNavigate).toBe(navigate)
+      await finalizeNavigate({ decorateUrl: (url: string) => `https://preview.invalid${url}` })
+      expect(navigate).toHaveBeenCalledOnce()
       return { error: null }
     })
     const sso = vi.fn().mockImplementation(async (parameters) => {
@@ -105,7 +106,20 @@ describe('Clerk browser session boundary', () => {
     await expect(attemptHostedGoogleSignIn(signIn, lock, () => { opened = true; return popup }, navigate)).resolves.toBe('complete')
     expect(sso).toHaveBeenCalledOnce()
     expect(finalize).toHaveBeenCalledOnce()
+    expect(navigate).toHaveBeenCalledOnce()
     expect(popup.close).toHaveBeenCalledOnce()
+  })
+
+  it('uses the current Clerk resource after SSO instead of the stale hook snapshot', async () => {
+    const popup = { close: vi.fn(), closed: false } as unknown as Window
+    const navigate = vi.fn()
+    const finalize = vi.fn().mockImplementation(async ({ navigate: stage }) => { await stage({ decorateUrl: (url: string) => url }); return { error: null } })
+    const stale = { status: 'needs_first_factor', sso: vi.fn().mockResolvedValue({ error: null }), finalize: vi.fn() }
+    const current = { status: 'complete', sso: stale.sso, finalize }
+    await expect(attemptHostedGoogleSignIn(stale, { current: false }, () => popup, navigate, () => current)).resolves.toBe('complete')
+    expect(stale.finalize).not.toHaveBeenCalled()
+    expect(finalize).toHaveBeenCalledOnce()
+    expect(navigate).toHaveBeenCalledOnce()
   })
 
   it('fails safely for absent, blocked-popup, rejected, thrown, and incomplete Google starts', async () => {
@@ -115,22 +129,121 @@ describe('Clerk browser session boundary', () => {
     await expect(attemptHostedGoogleSignIn(undefined, lock)).resolves.toBe('unavailable')
     await expect(attemptHostedGoogleSignIn(incomplete, lock, () => null)).resolves.toBe('popup_blocked')
     expect(incomplete.sso).not.toHaveBeenCalled()
-    await expect(attemptHostedGoogleSignIn({ ...incomplete, sso: vi.fn().mockResolvedValue({ error: new Error('raw-provider-detail') }) }, lock, () => popup)).resolves.toBe('failed')
-    await expect(attemptHostedGoogleSignIn({ ...incomplete, sso: vi.fn().mockRejectedValue(new Error('raw-provider-secret')) }, lock, () => popup)).resolves.toBe('failed')
+    await expect(attemptHostedGoogleSignIn({ ...incomplete, sso: vi.fn().mockResolvedValue({ error: new Error('raw-provider-detail') }) }, lock, () => popup)).resolves.toBe('sso_failed')
+    await expect(attemptHostedGoogleSignIn({ ...incomplete, sso: vi.fn().mockRejectedValue(new Error('raw-provider-secret')) }, lock, () => popup)).resolves.toBe('sso_failed')
     await expect(attemptHostedGoogleSignIn(incomplete, lock, () => popup)).resolves.toBe('incomplete')
     expect(incomplete.finalize).not.toHaveBeenCalled()
-    expect(popup.close).toHaveBeenCalledTimes(3)
+    expect(popup.close).toHaveBeenCalledTimes(2)
     expect(lock.current).toBe(false)
   })
 
   it('maps popup/mobile fallback and provider failures to bounded Korean copy only', () => {
     expect(hostedGoogleAttemptError('popup_blocked')).toContain('팝업을 허용')
     expect(hostedGoogleAttemptError('unavailable')).toContain('다시 시도')
-    expect(hostedGoogleAttemptError('failed')).toBe('Google 로그인을 완료하지 못했습니다. 다시 시도해 주세요.')
-    expect(hostedGoogleAttemptError('incomplete')).toBe('Google 로그인을 완료하지 못했습니다. 다시 시도해 주세요.')
+    expect(hostedGoogleAttemptError('sso_failed')).toBe('Google 로그인을 완료하지 못했습니다. 다시 시도해 주세요.')
+    expect(hostedGoogleAttemptError('incomplete')).toBe('추가 인증이 필요합니다. 로그인을 완료해 주세요.')
+    expect(hostedGoogleAttemptError('blocked_existing_account')).toContain('기존 계정')
+    expect(hostedGoogleAttemptError('session_activation_failed')).toContain('세션을 활성화')
     expect(hostedGoogleAttemptError('complete')).toBeNull()
     expect(hostedGoogleAttemptError('ignored')).toBeNull()
-    expect(JSON.stringify((['popup_blocked', 'unavailable', 'failed', 'incomplete'] as const).map(hostedGoogleAttemptError))).not.toMatch(/raw-provider|token|cookie|secret/i)
+    expect(JSON.stringify((['popup_blocked', 'unavailable', 'sso_failed', 'blocked_existing_account', 'incomplete', 'session_activation_failed'] as const).map(hostedGoogleAttemptError))).not.toMatch(/raw-provider|token|cookie|secret/i)
+  })
+
+  it('classifies transferable, incomplete, and finalize-failed Google states without navigation', async () => {
+    const popup = { close: vi.fn(), closed: false } as unknown as Window
+    const navigate = vi.fn()
+    const base = { sso: vi.fn().mockResolvedValue({ error: null }), finalize: vi.fn() }
+    await expect(attemptHostedGoogleSignIn({ ...base, status: 'complete', isTransferable: true }, { current: false }, () => popup, navigate)).resolves.toBe('blocked_existing_account')
+    await expect(attemptHostedGoogleSignIn({ ...base, status: 'needs_second_factor' }, { current: false }, () => popup, navigate)).resolves.toBe('incomplete')
+    await expect(attemptHostedGoogleSignIn({ ...base, status: 'needs_client_trust' }, { current: false }, () => popup, navigate)).resolves.toBe('incomplete')
+    const finalizeError = vi.fn().mockResolvedValue({ error: new Error('raw-session-secret') })
+    await expect(attemptHostedGoogleSignIn({ ...base, status: 'complete', finalize: finalizeError }, { current: false }, () => popup, navigate)).resolves.toBe('session_activation_failed')
+    const finalizeThrow = vi.fn().mockRejectedValue(new Error('raw-finalize-secret'))
+    await expect(attemptHostedGoogleSignIn({ ...base, status: 'complete', finalize: finalizeThrow }, { current: false }, () => popup, navigate)).resolves.toBe('session_activation_failed')
+    expect(base.finalize).not.toHaveBeenCalled()
+    expect(finalizeError).toHaveBeenCalledOnce()
+    expect(finalizeThrow).toHaveBeenCalledOnce()
+    expect(navigate).not.toHaveBeenCalled()
+  })
+
+  it('finalizes email only after complete verification and navigates only on a null finalize error', async () => {
+    const lock = { current: false }
+    const navigate = vi.fn()
+    const verifyCode = vi.fn().mockResolvedValue({ error: null })
+    const finalize = vi.fn().mockImplementation(async ({ navigate: stage }) => { await stage({ decorateUrl: (url: string) => `https://preview.invalid${url}` }); return { error: null } })
+    const signIn = { status: 'complete', emailCode: { sendCode: vi.fn(), verifyCode }, finalize }
+    await expect(attemptHostedEmailCodeVerification(signIn, '123456', lock, navigate)).resolves.toBe('complete')
+    expect(verifyCode).toHaveBeenCalledOnce()
+    expect(finalize).toHaveBeenCalledOnce()
+    expect(navigate).toHaveBeenCalledOnce()
+    expect(lock.current).toBe(false)
+  })
+
+  it('uses the current Clerk resource after email verification instead of a stale hook snapshot', async () => {
+    const navigate = vi.fn()
+    const verifyCode = vi.fn().mockResolvedValue({ error: null })
+    const stale = { status: 'needs_first_factor', emailCode: { sendCode: vi.fn(), verifyCode }, finalize: vi.fn() }
+    const current = { status: 'complete', emailCode: stale.emailCode, finalize: vi.fn().mockImplementation(async ({ navigate: stage }) => { await stage({ decorateUrl: (url: string) => url }); return { error: null } }) }
+    await expect(attemptHostedEmailCodeVerification(stale, '123456', { current: false }, navigate, () => current)).resolves.toBe('complete')
+    expect(stale.finalize).not.toHaveBeenCalled()
+    expect(current.finalize).toHaveBeenCalledOnce()
+    expect(navigate).toHaveBeenCalledOnce()
+  })
+
+  it('converges completed auth on token, owner confirmation, workspace, and ready marker exactly once', async () => {
+    const storage = tabStorage()
+    const navigate = vi.fn()
+    const popup = { close: vi.fn(), closed: false } as unknown as Window
+    const stale = { status: 'needs_first_factor', sso: vi.fn().mockResolvedValue({ error: null }), finalize: vi.fn() }
+    const current = { ...stale, status: 'complete', finalize: vi.fn().mockImplementation(async ({ navigate: stage }) => { await stage({ decorateUrl: (url: string) => url }); return { error: null } }) }
+    await expect(attemptHostedGoogleSignIn(stale, { current: false }, () => popup, navigate, () => current)).resolves.toBe('complete')
+    const getToken = vi.fn().mockResolvedValue('opaque-session')
+    const owner = vi.fn().mockResolvedValue({ authenticated: true, owner: true })
+    const workspace = vi.fn().mockResolvedValue({ workspace: { viewState: 'ready' } })
+    const sessionToken = await requireHostedSessionToken(getToken)
+    await expect(confirmHostedOwnerWorkspace(sessionToken, storage, { owner, workspace })).resolves.toEqual({ viewState: 'ready' })
+    expect(current.finalize).toHaveBeenCalledOnce()
+    expect(navigate).toHaveBeenCalledOnce()
+    expect(getToken).toHaveBeenCalledOnce()
+    expect(owner).toHaveBeenCalledOnce()
+    expect(workspace).toHaveBeenCalledOnce()
+    expect(storage.entries()).toEqual([['outcome.owner-ready', '1']])
+  })
+
+  it('keeps email transfer, factor, trust, task, finalize error, and thrown failures distinct and private', async () => {
+    const navigate = vi.fn()
+    const make = (status: string, finalize = vi.fn(), isTransferable = false) => ({ status, isTransferable, emailCode: { sendCode: vi.fn(), verifyCode: vi.fn().mockResolvedValue({ error: null }) }, finalize })
+    const transferable = make('complete', vi.fn(), true)
+    const first = make('needs_first_factor')
+    const second = make('needs_second_factor')
+    const trust = make('needs_client_trust')
+    const task = make('needs_session_task')
+    for (const signIn of [transferable]) await expect(attemptHostedEmailCodeVerification(signIn, '123456', { current: false }, navigate)).resolves.toBe('blocked_existing_account')
+    for (const signIn of [first, second, trust, task]) await expect(attemptHostedEmailCodeVerification(signIn, '123456', { current: false }, navigate)).resolves.toBe('incomplete')
+    const finalizeError = vi.fn().mockResolvedValue({ error: new Error('raw-session-secret') })
+    await expect(attemptHostedEmailCodeVerification(make('complete', finalizeError), '123456', { current: false }, navigate)).resolves.toBe('session_activation_failed')
+    await expect(attemptHostedEmailCodeVerification(make('complete', vi.fn().mockRejectedValue(new Error('raw-finalize-secret'))), '123456', { current: false }, navigate)).resolves.toBe('session_activation_failed')
+    await expect(attemptHostedEmailCodeVerification({ ...make('complete'), emailCode: { sendCode: vi.fn(), verifyCode: vi.fn().mockRejectedValue(new Error('raw-code-secret')) } }, '123456', { current: false }, navigate)).resolves.toBe('verification_failed')
+    expect(transferable.finalize).not.toHaveBeenCalled()
+    for (const signIn of [first, second, trust, task]) expect(signIn.finalize).not.toHaveBeenCalled()
+    expect(navigate).not.toHaveBeenCalled()
+    expect(JSON.stringify((['verification_failed', 'blocked_existing_account', 'incomplete', 'session_activation_failed', 'unavailable'] as const).map(hostedEmailAttemptError))).not.toMatch(/raw-|token|cookie|code-secret|identity|email/i)
+  })
+
+  it('rejects a concurrent duplicate email verification without a second factor or finalize call', async () => {
+    let resolve!: (value: { error: null }) => void
+    const pending = new Promise<{ error: null }>((done) => { resolve = done })
+    const verifyCode = vi.fn(() => pending)
+    const finalize = vi.fn()
+    const signIn = { status: 'complete', emailCode: { sendCode: vi.fn(), verifyCode }, finalize }
+    const lock = { current: false }
+    const first = attemptHostedEmailCodeVerification(signIn, '123456', lock)
+    await expect(attemptHostedEmailCodeVerification(signIn, '123456', lock)).resolves.toBe('ignored')
+    expect(verifyCode).toHaveBeenCalledOnce()
+    resolve({ error: null })
+    await expect(first).resolves.toBe('session_activation_failed')
+    expect(finalize).toHaveBeenCalledOnce()
+    expect(lock.current).toBe(false)
   })
 
   it('keeps one Google start pending and rejects a duplicate click', async () => {
@@ -146,6 +259,7 @@ describe('Clerk browser session boundary', () => {
     expect(lock.current).toBe(true)
     resolve({ error: null })
     await expect(first).resolves.toBe('incomplete')
+    expect(popup.close).not.toHaveBeenCalled()
     expect(lock.current).toBe(false)
   })
 

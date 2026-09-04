@@ -1,13 +1,39 @@
 import { renderToStaticMarkup } from 'react-dom/server'
 import { describe, expect, it } from 'vitest'
-import { PlannerConversation, roleChatFilters, roleChatFixtureStates, type RoleChatFilter, type RoleChatFixtureState } from './PlannerConversation'
+import { PlannerConversation, boundedComposerDraft, createMessageIdempotencyKey, roleChatFilters, roleChatFixtureStates, sensitiveContentHint, validatePrivateTimeline, type RoleChatFilter, type RoleChatFixtureState } from './PlannerConversation'
 
 describe('Planner conversation observed-event contract', () => {
   it('renders a quiet truthful empty state without synthetic activity', () => {
-    const html = renderToStaticMarkup(<PlannerConversation events={[]} />)
+    const html = renderToStaticMarkup(<PlannerConversation events={[]} fixtureState="ready" plannerBound onSend={() => undefined} />)
     expect(html).toContain('아직 관측된 Planner 작업 이벤트가 없습니다')
     expect(html).toContain('data-observed-events="0"')
     for (const token of ['typing', 'streaming', 'tool call', '완료됨', '전송']) expect(html).not.toContain(token)
+  })
+
+  it('renders an authenticated Korean composer with deterministic accessibility boundaries', () => {
+    const html = renderToStaticMarkup(<PlannerConversation events={[]} fixtureState="ready" plannerBound onSend={() => undefined} />)
+    for (const value of ['Planner에게 메시지', '메시지 보내기', '4000', 'aria-live="polite"', 'data-touch-target="44"']) expect(html).toContain(value)
+    expect(html).toContain('textarea'); expect(html).not.toContain('완료됨')
+  })
+
+  it('creates only the finite correlation grammar and flags credential-like client hints', () => {
+    expect(createMessageIdempotencyKey(() => new Uint8Array(8).fill(10))).toBe('message-0a0a0a0a0a0a0a0a')
+    expect(sensitiveContentHint('Bearer abcdefgh')).toBe(true)
+    expect(sensitiveContentHint('GitHub token permissions are under discussion.')).toBe(false)
+  })
+
+  it('rejects decreasing observed timestamps at the client boundary', () => {
+    const event = (event_id: string, sequence: number, observed_at: string) => ({ event_id, sequence, observed_at, kind: 'user_message' as const, state: 'queued' as const, correlation_id: `message-${String(sequence).padStart(16, '0')}`, payload: { private_content: { text: 'ordinary' } } })
+    expect(() => validatePrivateTimeline([event('event-0000000000000001', 1, '2026-09-03T00:00:01.000Z'), event('event-0000000000000002', 2, '2026-09-03T00:00:00.000Z')])).toThrow('timeline_conflict')
+  })
+
+  it('accepts exactly 4000 astral code points and preserves the prior draft at 4001', () => {
+    const valid = '😀'.repeat(4000), invalid = `${valid}😀`
+    expect([...valid]).toHaveLength(4000); expect(valid.length).toBe(8000)
+    expect(boundedComposerDraft('', valid)).toBe(valid)
+    expect(boundedComposerDraft(valid, invalid)).toBe(valid)
+    const html = renderToStaticMarkup(<PlannerConversation events={[]} />)
+    expect(html).not.toContain('maxlength=')
   })
 
   it('renders only supplied event type summary timestamp and status', () => {
@@ -35,6 +61,15 @@ describe('Phase 4 role chat D3 contract', () => {
     { id: 'event-audit-3', sequence: 3, role: 'release_audit' as const, type: 'result_observed' as const, summary: '감사 관측', observedAt: '2026-09-04T00:03:00.000Z', status: 'safe_hold' as const, completionAuthority: false as const },
     { id: 'event-qa-4', sequence: 4, role: 'ux_product_qa' as const, completionAuthority: false as const, type: 'result_observed' as const, summary: '제품 QA 관측', observedAt: '2026-09-04T00:04:00.000Z', status: 'observed' as const },
   ]
+
+  it('keeps a non-empty durable timeline and canonical events visible together', () => {
+    const fixtureTimeline = [{ event_id: 'event-0000000000000001', sequence: 1, observed_at: '2026-09-04T00:05:00.000Z', kind: 'user_message' as const, state: 'queued' as const, correlation_id: 'message-0123456789abcdef', payload: { private_content: { text: '서버에 기록된 메시지' } } }]
+    const html = renderToStaticMarkup(<PlannerConversation events={events} fixtureState="ready" fixtureTimeline={fixtureTimeline} plannerBound onSend={() => undefined} />)
+    expect(html).toContain('서버에 기록된 메시지')
+    expect(html).toContain('event-planner-1')
+    expect(html).toContain('event-builder-2')
+    expect(html).toContain('data-planner-composer="true"')
+  })
 
   it('keeps one ordered event dataset behind the exact five read-only lenses', () => {
     const html = renderToStaticMarkup(<PlannerConversation events={events} />)

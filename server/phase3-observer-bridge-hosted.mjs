@@ -83,6 +83,7 @@ const safeDomainErrorCode = (error) => {
 }
 
 const fail = (code) => { throw new HostedObserverBridgeError(code, HOSTED_ERROR_TOKEN) }
+export const createHostedObserverBridgeError = (code) => new HostedObserverBridgeError(code, HOSTED_ERROR_TOKEN)
 const positiveInteger = (value) => typeof value === 'number' && Number.isSafeInteger(value) && value > 0
 const nonNegativeInteger = (value) => typeof value === 'number' && Number.isSafeInteger(value) && value >= 0
 const safeId = (value) => typeof value === 'string' && SAFE_ID.test(value)

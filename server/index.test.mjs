@@ -57,6 +57,40 @@ test('session endpoint discloses only authentication state', async () => withSer
   const body = await (await fetch(`${base}/api/auth/session`)).json(); assert.deepEqual(body, { authenticated: false, publicReadOnly: false })
 }))
 
+test('private chat routes are default-off without dispatch or persistence', async () => withServer(async (base) => {
+  for (const [method, path] of [['GET', '/api/private/chat/timeline'], ['POST', '/api/private/chat/messages']]) {
+    const response = await fetch(`${base}${path}`, { method }); assert.equal(response.status, 503); assert.deepEqual(await response.json(), { error: 'chat_unavailable' }); assert.equal(response.headers.get('cache-control'), 'no-store')
+  }
+}))
+
+test('injected chat service exposes only timeline and message routes', async () => {
+  const calls = { auth: 0, timeline: 0, submit: 0 }
+  const chatService = {
+    authenticateOwner: async () => { calls.auth += 1; return { authenticated: true, actor: 'cherry_owner', allowed_origin: 'http://outcome.local', csrf: 'csrf-value' } },
+    timeline: async () => { calls.timeline += 1; return { target: { role: 'planner', binding_version: 7 }, events: [], completion_authority: false } },
+    submitPlannerMessage: async () => { calls.submit += 1; return { accepted: true, sequence: 1, event_id: 'event-0000000000000001', dispatch_state: 'invoked', delivery: 'acknowledged', execution_started: false, result_attached: false, evidence_attached: false } },
+  }
+  const server = createOutcomeServer({ password, secret, secureCookies: false, collect: () => dashboard, chatService })
+  server.listen(0, '127.0.0.1'); await once(server, 'listening'); const base = `http://127.0.0.1:${server.address().port}`
+  try {
+    const timeline = await fetch(`${base}/api/private/chat/timeline?project_id=outcome&after_sequence=0`); assert.equal(timeline.status, 200); assert.deepEqual(await timeline.json(), { target: { role: 'planner', binding_version: 7 }, events: [], completion_authority: false, csrf: 'csrf-value' })
+    const sent = await fetch(`${base}/api/private/chat/messages`, { method: 'POST', headers: { 'content-type': 'application/json', origin: 'http://outcome.local', 'x-outcome-csrf': 'csrf-value', 'idempotency-key': 'message-0000000000000001' }, body: JSON.stringify({ project_id: 'outcome', message: '안녕하세요' }) }); assert.equal(sent.status, 202); assert.equal((await sent.json()).delivery, 'acknowledged')
+    assert.deepEqual(calls, { auth: 2, timeline: 1, submit: 1 })
+  } finally { server.close(); await once(server, 'close') }
+})
+
+test('hosted bearer owner token reaches only the injected verifier', async () => {
+  let observed = false
+  const chatService = {
+    authenticateOwner: async ({ token }) => { observed = token === 'sdk-issued-session'; return { authenticated: true, actor: 'cherry_owner', allowed_origin: 'http://outcome.local', csrf: 'csrf-value' } },
+    timeline: async () => ({ target: { role: 'planner', binding_version: 7 }, events: [], completion_authority: false }),
+  }
+  const server = createOutcomeServer({ password, secret, secureCookies: false, collect: () => dashboard, chatService })
+  server.listen(0, '127.0.0.1'); await once(server, 'listening')
+  try { const response = await fetch(`http://127.0.0.1:${server.address().port}/api/private/chat/timeline?project_id=outcome&after_sequence=0`, { headers: { authorization: 'Bearer sdk-issued-session' } }); assert.equal(response.status, 200); assert.equal(observed, true); assert.equal((await response.text()).includes('sdk-issued-session'), false) }
+  finally { server.close(); await once(server, 'close') }
+})
+
 test('public mode serves sanitized dashboard GET without credentials', async () => withPublicServer(() => dashboard, async (base) => {
   const response = await fetch(`${base}/api/dashboard/cherry-note`); assert.equal(response.status, 200)
   assert.equal((await response.json()).dashboard.project.name, 'Cherry Note')

@@ -9,8 +9,9 @@
   "scripts": {
     "dev": "vite --host 127.0.0.1",
     "start": "node server/index.mjs",
+    "chat:consumer:once": "node server/outcome-chat-consumer-runner.mjs",
     "build": "tsc -b && vite build",
-    "build:vercel": "node scripts/validate-vercel-config.mjs && node scripts/validate-stable-snapshot.mjs && tsc -b && vite build && node scripts/finalize-stable-snapshot.mjs && OUTCOME_ASSERT_BUILT=1 node --test server/stable-host.test.mjs",
+    "build:vercel": "node scripts/validate-deployment-source-carrier.mjs && node scripts/validate-vercel-config.mjs && node scripts/validate-stable-snapshot.mjs && tsc -b && vite build && node scripts/finalize-stable-snapshot.mjs && OUTCOME_ASSERT_BUILT=1 node --test server/stable-host.test.mjs",
     "build:isolated": "tsc -b && vite build --outDir .outcome-runtime/candidate-dist --emptyOutDir",
     "test": "vitest run && node --test server/*.test.mjs",
     "test:dashboard": "vitest run src/components",
@@ -38,6 +39,7 @@
     "@clerk/backend": "3.16.12",
     "@clerk/react": "6.14.7",
     "lucide-react": "^0.468.0",
+    "pg": "8.23.0",
     "react": "^19.1.1",
     "react-dom": "^19.1.1",
     "yaml": "^2.9.0"

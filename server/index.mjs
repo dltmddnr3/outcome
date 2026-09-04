@@ -7,19 +7,24 @@ import { fileURLToPath } from 'node:url'
 import { collectCherryNoteDashboard, sanitizeRemotePayload } from './cherry-note-dashboard.mjs'
 import { collectOutcomePackages, loadBindingRegistry, projectPublicPackages } from './outcome-package.mjs'
 import { handlePrivateAccessRequest } from './account-access-api.mjs'
+import { handlePrivateChatRequest } from './outcome-chat-api.mjs'
 import { cleanupPidRecord, writePidRecord } from './runtime-process.mjs'
 
 const projectRoot = resolve(fileURLToPath(new URL('..', import.meta.url)))
 const mime = { '.html': 'text/html; charset=utf-8', '.js': 'text/javascript; charset=utf-8', '.css': 'text/css; charset=utf-8', '.svg': 'image/svg+xml', '.png': 'image/png', '.ico': 'image/x-icon' }
 const json = (response, status, body, headers = {}) => { response.writeHead(status, { 'content-type': 'application/json; charset=utf-8', 'cache-control': 'no-store', ...headers }); response.end(JSON.stringify(body)) }
-const readBody = async (request) => {
+const readRawBody = async (request) => {
   const chunks = []; let size = 0
   for await (const chunk of request) { chunks.push(chunk); size += chunk.length; if (size > 10_000) throw new Error('request_too_large') }
-  const text = Buffer.concat(chunks).toString('utf8')
+  return Buffer.concat(chunks).toString('utf8')
+}
+const readBody = async (request) => {
+  const text = await readRawBody(request)
   return request.headers['content-type']?.startsWith('application/x-www-form-urlencoded') ? Object.fromEntries(new URLSearchParams(text)) : JSON.parse(text || '{}')
 }
 const constantEqual = (left, right) => { const a = Buffer.from(String(left)); const b = Buffer.from(String(right)); return a.length === b.length && timingSafeEqual(a, b) }
 const cookieValue = (request, name) => (request.headers.cookie ?? '').split(';').map((item) => item.trim().split('=')).find(([key]) => key === name)?.[1] ?? ''
+const privateSessionToken = (request) => { const authorization = request.headers.authorization; return typeof authorization === 'string' && /^Bearer [A-Za-z0-9._~-]+$/.test(authorization) ? authorization.slice(7) : cookieValue(request, '__session') }
 const loginHtml = (error = '') => `<!doctype html><html lang="ko"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><meta name="robots" content="noindex,nofollow,noarchive"><title>OUTCOME · 인증</title></head><body><main><h1>OUTCOME</h1><p>비공개 읽기 전용 접근</p><form method="post" action="/api/auth/login"><label for="outcome-password">접근 암호</label><input id="outcome-password" name="password" type="password" autocomplete="current-password" required><button type="submit">OUTCOME 열기</button></form>${error ? '<p role="alert">인증에 실패했습니다.</p>' : ''}</main></body></html>`
 
 export function readBuildReceipt(root = projectRoot) {
@@ -56,6 +61,7 @@ export function createOutcomeServer(options = {}) {
   const decisionRuntime = options.decisionRuntime
   const privateTransitionAdapter = options.privateTransitionAdapter
   const operationsGuard = options.operationsGuard
+  const chatService = options.chatService
   const failures = new Map()
   return createServer(async (request, response) => {
     response.setHeader('x-content-type-options', 'nosniff'); response.setHeader('x-frame-options', 'DENY'); response.setHeader('referrer-policy', 'no-referrer'); response.setHeader('permissions-policy', 'camera=(), microphone=(), geolocation=()')
@@ -70,6 +76,15 @@ export function createOutcomeServer(options = {}) {
       if (!rate.allowed) return json(response, 429, { error: 'rate_limited', retryAfter: rate.retryAfter }, { 'retry-after': String(rate.retryAfter) })
       if (url.pathname === '/api/private/decisions' && request.method === 'POST' && publicReadOnly) return json(response, 405, { error: 'read_only' })
       if (url.pathname === '/api/private/decisions' && request.method === 'POST' && !decisionRuntime) return json(response, 503, { error: 'decision_store_unavailable' })
+      if (url.pathname.startsWith('/api/private/chat/')) {
+        if (!chatService) return json(response, 503, { error: 'chat_unavailable' })
+        let owner = null
+        try { owner = await chatService.authenticateOwner({ token: privateSessionToken(request) }) } catch {}
+        let rawBody = ''
+        if (request.method === 'POST') { try { rawBody = await readRawBody(request) } catch { return json(response, 413, { error: 'request_too_large' }) } }
+        const value = await handlePrivateChatRequest({ method: request.method, url: request.url, headers: request.headers, rawBody, service: chatService, owner })
+        return json(response, value.status, value.body, Object.fromEntries(Object.entries(value.headers).filter(([key]) => key !== 'content-type' && key !== 'cache-control')))
+      }
       if (url.pathname === '/api/private/auth/login' || url.pathname === '/api/private/auth/logout') {
         if (request.method !== 'POST' || !accountAccess || !privateTransitionAdapter) return json(response, 405, { error: 'read_only' })
         const secure = options.secureCookies ?? process.env.NODE_ENV === 'production'

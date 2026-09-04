@@ -1,4 +1,5 @@
 import { createAccountModelV2Projection } from './account-model-v2-projection.mjs'
+import { createHash } from 'node:crypto'
 
 const DAY_MS = 24 * 60 * 60 * 1000
 const PRIVATE_PROJECT_ALLOWLIST = Object.freeze(['cherry-note', 'outcome'])
@@ -114,6 +115,26 @@ export function createAccountAccessService({ authProvider, store, ownerSubject, 
         : { provider, allowed: false, reason: 'provider_not_linked' }
     },
     authenticate,
+    async resolveBridgeAuthority({ token } = {}) {
+      const identity = await authenticate(token)
+      const context = { token, subject: identity.subject }
+      const memberships = await store.membershipsForSubject(identity.subject, context)
+      if (memberships.length !== 1) throw new AccountAccessError(memberships.length > 1 ? 'membership_conflict' : 'membership_inactive', 403)
+      const membership = memberships[0]
+      if (membership.state !== 'active' || membership.role !== 'owner-viewer') throw new AccountAccessError('membership_inactive', 403)
+      const workspace = await store.workspace(membership.workspaceId, context)
+      if (!workspace || workspace.state !== 'active') throw new AccountAccessError('workspace_inactive', 403)
+      const projectIds = (await store.projectsForWorkspace(workspace.id, context))
+        .filter((project) => project.state === 'active' && PRIVATE_PROJECT_ALLOWLIST.includes(project.id))
+        .map((project) => project.id)
+        .sort()
+      if (projectIds.length === 0 || new Set(projectIds).size !== projectIds.length) throw new AccountAccessError('project_access_denied', 403)
+      return Object.freeze({
+        account_ref: createHash('sha256').update('outcome-bridge-account-v1\0').update(identity.subject).digest('hex'),
+        workspace_id: workspace.id,
+        project_ids: Object.freeze(projectIds),
+      })
+    },
     async endSession({ token } = {}) {
       const identity = await authenticate(token)
       if (!authProvider.signOut) throw new AccountAccessError('authentication_unavailable', 503)

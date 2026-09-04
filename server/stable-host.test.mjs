@@ -4,10 +4,11 @@ import { existsSync, readFileSync, writeFileSync } from 'node:fs'
 import test from 'node:test'
 import { createContext, runInContext } from 'node:vm'
 import source from '../snapshot/outcome-package-source.json' with { type: 'json' }
-import { assertFinalizedReceipt, extractBuiltAsset, finalizeDeploymentSnapshot } from '../scripts/finalize-stable-snapshot.mjs'
+import { assertFinalizedReceipt, extractBuiltAsset, finalizeDeploymentSnapshot, normalizeProviderCommit, readValidatedCarrierSource } from '../scripts/finalize-stable-snapshot.mjs'
 import { assertAutoDetectedNodeRuntime } from '../scripts/validate-vercel-config.mjs'
 import { AccountAccessError } from './account-access.mjs'
 import { createHostedObserverBridge, HostedObserverBridgeError } from './phase3-observer-bridge-hosted.mjs'
+import { createOutcomeChatRateLimiter } from './outcome-chat-hosted-runtime.mjs'
 
 if (process.env.OUTCOME_ASSERT_BUILT !== '1') {
   const fixture = finalizeDeploymentSnapshot({ source, commit: '1111111111111111111111111111111111111111', tree: '2222222222222222222222222222222222222222', asset: 'index-test.js' })
@@ -92,19 +93,161 @@ const identityEnvironment = {
 }
 const bridgeEnvironment = (projectionEnrollment = '1', ingestion = '1') => ({
   ...identityEnvironment,
-  OUTCOME_OBSERVER_BRIDGE_PROJECTION_ENROLLMENT_ENABLED: projectionEnrollment,
-  OUTCOME_OBSERVER_BRIDGE_INGESTION_ENABLED: ingestion,
+  VERCEL_ENV: 'preview',
+  VERCEL_URL: 'preview.invalid.vercel.app',
+  OUTCOME_OBSERVER_BRIDGE_V2_PROJECTION_ENROLLMENT_ENABLED: projectionEnrollment,
+  OUTCOME_OBSERVER_BRIDGE_V2_INGESTION_ENABLED: ingestion,
 })
 const accountRuntimeFactory = async () => ({
-  allowedOrigin: 'https://preview.invalid',
+  allowedOrigin: 'https://preview.invalid.vercel.app',
   publishableKey: 'pk_test_boundary',
   service: {
     async authenticate(token) {
       if (token !== 'server-valid') throw new AccountAccessError('authentication_required', 401)
       return Object.freeze({ subject: 'synthetic-owner', issuedAt: 1, expiresAt: 2 })
     },
+    async resolveBridgeAuthority({ token }) {
+      if (token !== 'server-valid') throw new AccountAccessError('authentication_required', 401)
+      return Object.freeze({ account_ref: 'a'.repeat(64), workspace_id: 'workspace_main', project_ids: Object.freeze(['outcome']) })
+    },
     async readWorkspace() {},
   },
+})
+
+test('V2 Preview supplies one deployment-owned origin to the account runtime and ignores the legacy override', async () => {
+  let input
+  const handler = createStableHostRequestHandler({
+    environment: { ...bridgeEnvironment(), OUTCOME_PRIVATE_ALLOWED_ORIGIN: 'https://legacy-attacker.invalid' },
+    runtimeFactory: async (value) => {
+      input = value
+      return { ...(await accountRuntimeFactory()), allowedOrigin: value.allowedOrigin }
+    },
+    bridgeRuntimeFactory: async () => null,
+  })
+  assert.equal((await handler({ method: 'GET', pathname: '/api/private/config' })).status, 200)
+  assert.equal(input.allowedOrigin, 'https://preview.invalid.vercel.app')
+})
+
+test('account identity uses the deployment-owned Preview origin when observer bridge activation is disabled', async () => {
+  let input
+  const handler = createStableHostRequestHandler({
+    environment: { ...identityEnvironment, VERCEL_ENV: 'preview', VERCEL_URL: 'preview.invalid.vercel.app' },
+    runtimeFactory: async (value) => {
+      input = value
+      return { ...(await accountRuntimeFactory()), allowedOrigin: value.allowedOrigin }
+    },
+    bridgeRuntimeFactory: async () => { throw new Error('must not run') },
+  })
+  assert.equal((await handler({ method: 'GET', pathname: '/api/private/config' })).status, 200)
+  assert.equal(input.allowedOrigin, 'https://preview.invalid.vercel.app')
+})
+
+test('hosted private chat GET and POST route through durable service with no-store and no locator surface', async () => {
+  const calls = []
+  const service = {
+    async timeline(value) { calls.push(['timeline', value]); return { target: { role: 'planner', binding_version: 3 }, events: [], completion_authority: false } },
+    async submitPlannerMessage(value) { calls.push(['submit', value]); return { accepted: true, sequence: 1, event_id: 'event-0000000000000001', dispatch_state: 'not_invoked', delivery: 'delivery_unknown', execution_started: false, result_attached: false, evidence_attached: false } },
+  }
+  const handler = createStableHostRequestHandler({
+    environment: { ...identityEnvironment, VERCEL_ENV: 'preview', VERCEL_URL: 'preview.invalid.vercel.app' },
+    runtimeFactory: async () => ({ ...(await accountRuntimeFactory()), service: { ...(await accountRuntimeFactory()).service, async resolveBridgeAuthority({ token }) { if (token !== 'server-valid') throw new AccountAccessError('authentication_required', 401); return { account_ref: 'a'.repeat(64), workspace_id: 'account-only-preview', project_ids: ['outcome'] } } } }),
+    bridgeRuntimeFactory: async () => null,
+    chatRuntimeFactory: async () => ({ allowedOrigin: 'https://preview.invalid.vercel.app', csrfSecret: 'synthetic-csrf-boundary-value-123456', createService: () => service, rateLimit: () => ({ allowed: true }) }),
+  })
+  const common = { authorization: 'Bearer server-valid', origin: 'https://preview.invalid.vercel.app', 'x-outcome-csrf': 'synthetic-csrf-boundary-value-123456' }
+  const timeline = await handler({ method: 'GET', pathname: '/api/private/chat/timeline?project_id=outcome&after_sequence=0', headers: common })
+  assert.equal(timeline.status, 200); assert.equal(timeline.headers['cache-control'], 'no-store')
+  const submit = await handler({ method: 'POST', pathname: '/api/private/chat/messages', headers: { ...common, 'content-type': 'application/json', 'idempotency-key': 'message-0000000000000001' }, body: JSON.stringify({ project_id: 'outcome', message: 'persist me' }) })
+  assert.equal(submit.status, 202); assert.equal(submit.body.dispatch_state, 'not_invoked'); assert.equal(calls.length, 2)
+  assert.equal(JSON.stringify({ timeline, submit, calls }).includes('locator'), false)
+})
+
+test('hosted chat is finite unavailable when identity or durable runtime configuration is incomplete', async () => {
+  for (const handler of [createStableHostRequestHandler({ environment: {} }), createStableHostRequestHandler({ environment: identityEnvironment, runtimeFactory: accountRuntimeFactory, chatRuntimeFactory: async () => null })]) {
+    assert.deepEqual(await handler({ method: 'GET', pathname: '/api/private/chat/timeline?project_id=outcome&after_sequence=0' }), { status: 503, body: { error: 'chat_unavailable' } })
+  }
+})
+
+test('malformed database URL cannot escape stable handler construction', async () => {
+  const environment = { ...identityEnvironment, VERCEL_ENV: 'preview', VERCEL_URL: 'preview.invalid.vercel.app', OUTCOME_CHAT_DURABLE_ENABLED: '1', OUTCOME_CHAT_DATABASE_URL: 'postgresql://outcome_chat_runtime%E0%A4%A:x@db.invalid/outcome?sslmode=verify-full', OUTCOME_CHAT_DATABASE_CA_PEM: '-----BEGIN CERTIFICATE-----\nQUJDREVGR0hJSktMTU5PUFFSU1RVVldYWVo=\n-----END CERTIFICATE-----', OUTCOME_CHAT_CSRF_SECRET: 'synthetic-csrf-boundary-value-123456' }
+  let handler
+  assert.doesNotThrow(() => { handler = createStableHostRequestHandler({ environment, runtimeFactory: accountRuntimeFactory }) })
+  assert.deepEqual(await handler({ method: 'GET', pathname: '/api/private/chat/timeline?project_id=outcome&after_sequence=0' }), { status: 503, body: { error: 'chat_unavailable' } })
+})
+
+test('production chat assembly denies repeated scope without cross-owner interference or raw scope output', async () => {
+  const limiter = createOutcomeChatRateLimiter({ now: () => 0, windowMs: 60_000, timelineLimit: 1, submitLimit: 1, maxEntries: 8 })
+  const service = { async timeline() { return { target: { role: 'planner', binding_version: 3 }, events: [], completion_authority: false } }, async submitPlannerMessage() {} }
+  const handler = createStableHostRequestHandler({
+    environment: { ...identityEnvironment, VERCEL_ENV: 'preview', VERCEL_URL: 'preview.invalid.vercel.app' },
+    runtimeFactory: async () => ({ allowedOrigin: 'https://preview.invalid.vercel.app', publishableKey: 'pk_test_boundary', service: { async readWorkspace() {}, async authenticate() {}, async resolveBridgeAuthority({ token }) { return { account_ref: token === 'owner-b' ? 'b'.repeat(64) : 'a'.repeat(64), workspace_id: 'account-only-preview', project_ids: ['outcome'] } } } }),
+    bridgeRuntimeFactory: async () => null,
+    chatRuntimeFactory: async () => ({ allowedOrigin: 'https://preview.invalid.vercel.app', csrfSecret: 'synthetic-csrf-boundary-value-123456', createService: () => service, rateLimit: limiter.check }),
+  })
+  const read = (token) => handler({ method: 'GET', pathname: '/api/private/chat/timeline?project_id=outcome&after_sequence=0', headers: { authorization: `Bearer ${token}` } })
+  assert.equal((await read('owner-a')).status, 200)
+  const denied = await read('owner-a'); assert.equal(denied.status, 429); assert.equal(denied.headers['retry-after'], '60')
+  assert.equal((await read('owner-b')).status, 200)
+  assert.equal(JSON.stringify(denied).includes('account-only-preview'), false)
+})
+
+test('bridge-disabled Preview sends only the deployment-owned origin to identity verification', async () => {
+  let verifierOptions
+  const now = Math.floor(Date.now() / 1_000)
+  const handler = createStableHostRequestHandler({
+    environment: { ...identityEnvironment, VERCEL_ENV: 'preview', VERCEL_URL: 'preview.invalid.vercel.app' },
+    clerkClientFactory: () => ({
+      sessions: {
+        async getSession() { return { status: 'active', userId: 'synthetic-owner' } },
+        async revokeSession() {},
+        async getSessionList() { return { data: [] } },
+      },
+    }),
+    clerkTokenVerifier: async (_token, options) => {
+      verifierOptions = options
+      return { sub: 'synthetic-owner', sid: 'synthetic-session', iat: now - 1, exp: now + 60 }
+    },
+    bridgeRuntimeFactory: async () => { throw new Error('must not run') },
+  })
+  assert.equal((await handler({ method: 'GET', pathname: '/api/private/session', headers: { authorization: 'Bearer synthetic-token' } })).status, 200)
+  assert.deepEqual(verifierOptions.authorizedParties, ['https://preview.invalid.vercel.app'])
+})
+
+test('account identity origin selection preserves stable environments and fails hostile Preview metadata closed', async () => {
+  for (const vercelEnvironment of [undefined, 'production', 'development']) {
+    let input
+    const environment = { ...identityEnvironment, ...(vercelEnvironment ? { VERCEL_ENV: vercelEnvironment, VERCEL_URL: 'ignored.invalid' } : {}) }
+    const handler = createStableHostRequestHandler({
+      environment,
+      runtimeFactory: async (value) => {
+        input = value
+        return { ...(await accountRuntimeFactory()), allowedOrigin: identityEnvironment.OUTCOME_PRIVATE_ALLOWED_ORIGIN }
+      },
+      bridgeRuntimeFactory: async () => { throw new Error('must not run') },
+    })
+    assert.equal((await handler({ method: 'GET', pathname: '/api/private/config', headers: { host: 'forged.invalid', 'x-forwarded-host': 'forged.invalid', origin: 'https://forged.invalid' } })).body.enabled, true)
+    assert.equal(input.allowedOrigin, undefined)
+  }
+
+  const accessor = { ...identityEnvironment, VERCEL_URL: 'preview.invalid.vercel.app' }
+  Object.defineProperty(accessor, 'VERCEL_ENV', { enumerable: true, get() { throw new Error('must not execute') } })
+  const hostileEnvironments = [
+    { ...identityEnvironment, VERCEL_ENV: 'preview' },
+    { ...identityEnvironment, VERCEL_ENV: 'preview', VERCEL_URL: 'PREVIEW.invalid.vercel.app' },
+    { ...identityEnvironment, VERCEL_ENV: 'unexpected', VERCEL_URL: 'preview.invalid.vercel.app' },
+    accessor,
+    new Proxy({ ...identityEnvironment, VERCEL_ENV: 'preview', VERCEL_URL: 'preview.invalid.vercel.app' }, { getOwnPropertyDescriptor() { throw new Error('must not execute') } }),
+  ]
+  for (const environment of hostileEnvironments) {
+    let calls = 0
+    const handler = createStableHostRequestHandler({
+      environment,
+      runtimeFactory: async () => { calls += 1; return accountRuntimeFactory() },
+      bridgeRuntimeFactory: async () => { throw new Error('must not run') },
+    })
+    assert.equal((await handler({ method: 'GET', pathname: '/api/private/config' })).body.enabled, false)
+    assert.equal(calls, 0)
+  }
 })
 const bridgeStub = (calls, maximumBytes = 32_768) => ({
   maxBodyBytes: maximumBytes,
@@ -113,6 +256,12 @@ const bridgeStub = (calls, maximumBytes = 32_768) => ({
   completeEnrollment(value) { calls.push(['completeEnrollment', value]); return { status: 'source_active' } },
   revokeSource(value) { calls.push(['revokeSource', value]); return { status: 'source_revoked' } },
   ingest(value) { calls.push(['ingest', value]); return { status: 'accepted', ledger_revision: 1 } },
+})
+const adminStub = (calls) => ({
+  registerViewer(value) { calls.push(['registerViewer', value]); return { status: 'viewer_registered', revision: 1, ledger_revision: 1 } },
+  revokeViewer(value) { calls.push(['revokeViewer', value]); return { status: 'viewer_revoked', revision: 2, ledger_revision: 2 } },
+  cleanupExpiredChallenges(value) { calls.push(['cleanupExpiredChallenges', value]); return { status: 'challenge_cleanup', cleared_count: 0 } },
+  readiness(value) { calls.push(['readiness', value]); return { status: 'ready', active_viewer_count: 2, active_viewer_class_count: 2 } },
 })
 const stableBridgeCases = [
   { path: '/api/private/bridge/projection?viewer_ref=viewer_workstation_01&viewer_class=workstation&project_id=outcome', method: 'GET', bridgeMethod: 'read', headers: { authorization: 'Bearer server-valid' } },
@@ -234,10 +383,54 @@ test('newTarget construction matrix is generic for every stable-host endpoint an
   }
   assert.equal(calls, 72)
 })
-const injectedBridgeRequest = ({ calls = [], environment = bridgeEnvironment(), bridge = bridgeStub(calls), bridgeRuntimeFactory } = {}) => createStableHostRequestHandler({
+const injectedBridgeRequest = ({ calls = [], environment = bridgeEnvironment(), bridge = bridgeStub(calls), admin = adminStub(calls), bridgeRuntimeFactory } = {}) => createStableHostRequestHandler({
   environment,
   runtimeFactory: accountRuntimeFactory,
-  bridgeRuntimeFactory: bridgeRuntimeFactory ?? (async () => ({ bridge, allowedOrigin: 'https://preview.invalid', csrfSecret: 'synthetic-csrf-value' })),
+  bridgeRuntimeFactory: bridgeRuntimeFactory ?? (async () => ({ bridge, admin, allowedOrigin: 'https://preview.invalid', csrfSecret: 'synthetic-csrf-value' })),
+})
+
+test('stable host routes only the four private admin operations with cookie or bearer token injection', async () => {
+  const calls = []
+  const requestAdmin = injectedBridgeRequest({ calls })
+  const headers = { 'content-type': 'application/json', origin: 'https://preview.invalid', 'x-outcome-csrf': 'synthetic-csrf-value', authorization: 'Bearer server-valid' }
+  const posts = [
+    ['/api/private/bridge/admin/viewers/register', { workspace_id: 'workspace-main', project_id: 'outcome', viewer_ref: 'viewer_workstation_01', viewer_class: 'workstation', idempotency_key: 'viewer-register-01', expected_schema_revision: 2 }, 'registerViewer'],
+    ['/api/private/bridge/admin/viewers/revoke', { workspace_id: 'workspace-main', project_id: 'outcome', viewer_ref: 'viewer_workstation_01', expected_revision: 1, idempotency_key: 'viewer-revoke-01' }, 'revokeViewer'],
+    ['/api/private/bridge/admin/challenges/cleanup', { project_id: 'outcome', before: '2026-09-02T00:00:00.000Z', limit: 100 }, 'cleanupExpiredChallenges'],
+  ]
+  for (const [pathname, body, operation] of posts) {
+    assert.equal((await requestAdmin({ method: 'POST', pathname, headers, body: JSON.stringify(body) })).status, 200)
+    assert.equal(calls.at(-1)[0], operation)
+    assert.equal(calls.at(-1)[1].token, 'server-valid')
+  }
+  const ready = await requestAdmin({ method: 'GET', pathname: '/api/private/bridge/admin/readiness?workspace_id=workspace-main&project_id=outcome', headers: { cookie: '__session=server-valid' } })
+  assert.deepEqual(ready, { status: 200, body: { status: 'ready', active_viewer_count: 2, active_viewer_class_count: 2 } })
+  assert.equal(calls.at(-1)[0], 'readiness')
+  assert.equal(calls.at(-1)[1].token, 'server-valid')
+})
+
+test('stable host admin routes reject aliases missing runtime and client authority without touching ordinary bridge routes', async () => {
+  const calls = []
+  const requestAdmin = injectedBridgeRequest({ calls })
+  const headers = { 'content-type': 'application/json', origin: 'https://preview.invalid', 'x-outcome-csrf': 'synthetic-csrf-value', authorization: 'Bearer server-valid' }
+  const body = JSON.stringify({ project_id: 'outcome', before: '2026-09-02T00:00:00.000Z', limit: 100 })
+  for (const pathname of [
+    '/api/private/bridge/admin/challenges/cleanup/',
+    '/api/private/bridge/admin/challenges/%63leanup',
+    '/api/private/bridge/admin/challenges/../readiness',
+    '/api/private/bridge/admin/challenges\\cleanup',
+    '/api/private/bridge/admin/challenges/cleanup?project_id=outcome&project_id=other',
+  ]) assert.notEqual((await requestAdmin({ method: 'POST', pathname, headers, body })).status, 200)
+  assert.equal(calls.length, 0)
+  const missing = injectedBridgeRequest({ admin: undefined, bridgeRuntimeFactory: async () => ({ bridge: bridgeStub([]), allowedOrigin: 'https://preview.invalid', csrfSecret: 'synthetic-csrf-value' }) })
+  assert.deepEqual(await missing({ method: 'GET', pathname: '/api/private/bridge/admin/readiness?workspace_id=workspace-main&project_id=outcome', headers: { authorization: 'Bearer server-valid' } }), { status: 404, body: { error: 'bridge_unavailable' } })
+  const ordinaryCalls = []
+  let adminCalls = 0
+  const untouchedAdmin = Object.fromEntries(['registerViewer', 'revokeViewer', 'cleanupExpiredChallenges', 'readiness'].map((name) => [name, () => { adminCalls += 1; throw new Error(`must not invoke ${name}`) }]))
+  const ordinary = injectedBridgeRequest({ calls: ordinaryCalls, admin: untouchedAdmin })
+  assert.equal((await ordinary({ method: 'GET', pathname: '/api/private/bridge/projection?viewer_ref=viewer_workstation_01&viewer_class=workstation&project_id=outcome', headers: { authorization: 'Bearer server-valid' } })).status, 200)
+  assert.equal(ordinaryCalls.at(-1)[0], 'read')
+  assert.equal(adminCalls, 0)
 })
 
 test('raw bridge aliases reject dot separators backslashes controls and invalid percent before authority', async () => {
@@ -316,7 +509,7 @@ test('default disabled bridge routes are finite unavailable and preserve non-bri
 })
 
 test('partial malformed configuration and factory throw reject invalid are cached unavailable', async () => {
-  const partial = { ...identityEnvironment, OUTCOME_OBSERVER_BRIDGE_PROJECTION_ENROLLMENT_ENABLED: '1' }
+  const partial = { ...identityEnvironment, OUTCOME_OBSERVER_BRIDGE_V2_PROJECTION_ENROLLMENT_ENABLED: '1' }
   const malformed = bridgeEnvironment('true', '0')
   for (const environment of [partial, malformed]) {
     let calls = 0
@@ -473,7 +666,7 @@ test('server auth context defeats spoof attempts for owner and viewer routes', a
   })
   assert.deepEqual(projection, { status: 200, body: { projections: [] } })
   assert.equal(calls[0][0], 'read')
-  assert.equal(calls[0][1].auth_context.subject, 'synthetic-owner')
+  assert.deepEqual(calls[0][1].auth_context, { account_ref: 'a'.repeat(64), workspace_id: 'workspace_main', project_ids: ['outcome'] })
   assert.equal(Object.hasOwn(calls[0][1], 'token'), false)
 
   const headers = { 'content-type': 'application/json', origin: 'https://preview.invalid', 'x-outcome-csrf': 'synthetic-csrf-value', authorization: 'Bearer server-valid' }
@@ -482,7 +675,7 @@ test('server auth context defeats spoof attempts for owner and viewer routes', a
   assert.equal(calls.filter(([name]) => name === 'createEnrollment').length, 0)
   const valid = await bridgeRequest({ method: 'POST', pathname: '/api/private/bridge/enrollments', headers, body: Buffer.from('{"workspace_id":"workspace_main"}') })
   assert.equal(valid.status, 201)
-  assert.equal(calls.at(-1)[1].auth_context.subject, 'synthetic-owner')
+  assert.deepEqual(calls.at(-1)[1].auth_context, { account_ref: 'a'.repeat(64), workspace_id: 'workspace_main', project_ids: ['outcome'] })
 })
 
 test('companion ambient authority is removed and never authenticated', async () => {
@@ -700,8 +893,11 @@ test('Vercel config preserves dashboard route fallback and built output contract
     const html = readFileSync(new URL('../dist/index.html', import.meta.url), 'utf8')
     assert.match(html, /\/assets\/index-[A-Za-z0-9_-]+\.js/)
     const git = (...args) => { try { return execFileSync('git', args, { encoding: 'utf8', stdio: ['ignore', 'pipe', 'ignore'] }).trim() } catch { return null } }
-    const commit = process.env.VERCEL_GIT_COMMIT_SHA ?? git('rev-parse', 'HEAD')
-    const tree = process.env.OUTCOME_DEPLOY_TREE ?? (commit ? git('rev-parse', `${commit}^{tree}`) : null)
+    const gitCommit = git('rev-parse', 'HEAD')
+    const providerCommit = normalizeProviderCommit(process.env.VERCEL_GIT_COMMIT_SHA)
+    const carrierSource = !providerCommit && !gitCommit ? readValidatedCarrierSource() : null
+    const commit = providerCommit ?? gitCommit ?? carrierSource?.commit
+    const tree = process.env.OUTCOME_DEPLOY_TREE ?? (providerCommit || gitCommit ? git('rev-parse', `${commit}^{tree}`) : carrierSource?.tree)
     assertFinalizedReceipt(snapshot, { commit, tree, asset: extractBuiltAsset(html) })
   }
 })

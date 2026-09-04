@@ -46,6 +46,16 @@ test('owner session resolves membership server-side and returns only Cherry Note
   assert.equal(result.projects.every((project) => project.modelV2.project.id === project.project.id), true)
 })
 
+test('bridge authority is freshly server-derived, bearer-free and sorted', async () => {
+  const service = createAccountAccessService({ authProvider: auth(), store: baseStore(), ownerSubject: owner, now })
+  const authority = await service.resolveBridgeAuthority({ token: 'valid' })
+  assert.match(authority.account_ref, /^[a-f0-9]{64}$/)
+  assert.equal(authority.workspace_id, workspace)
+  assert.deepEqual(authority.project_ids, ['cherry-note', 'outcome'])
+  assert.equal(JSON.stringify(authority).includes('valid'), false)
+  assert.equal(JSON.stringify(authority).includes(owner), false)
+})
+
 test('hostile project projection is rejected before traps and exposes no workspace payload', async () => {
   let traps = 0
   const projection = new Proxy({}, { get() { traps += 1 }, ownKeys() { traps += 1 }, getOwnPropertyDescriptor() { traps += 1 }, getPrototypeOf() { traps += 1 } })
