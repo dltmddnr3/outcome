@@ -3,8 +3,9 @@ import { renderToStaticMarkup } from 'react-dom/server'
 import { describe, expect, it } from 'vitest'
 // @ts-expect-error The test runtime provides this Node built-in; the browser bundle never imports this file.
 import { readFileSync } from 'node:fs'
-import { OutcomeDashboard, axisStateLabel, bindingHeroLabel, bindingObservationLabel, collapsedStageCount, currentHierarchy, defaultHierarchySelection, deriveScopeState, deriveStageRailState, desktopConversationBreakpoint, detailContentPolicy, entityStateLabel, findStage, gateGroupPresentation, gateProgress, githubEvidenceItems, heroGateEvidence, hierarchyIsExploring, hierarchyPlacement, meaningfulGateGroups, mobileHierarchyLevels, mobileWorkspaceTabs, nextStageOptionIndex, nowPresentation, projectHeroModel, resolveHierarchySelection, selectedGateCount, selectedStageContext, selectHierarchyPhase, selectHierarchyScope, selectLiveBinding, selectProject, snapshotPresentation, sourceStateLabel, stageDetailSemantics, structuralPhaseModel, structureStatusLabel, summarizeStage, timingPresentation, workspaceManagementItems, type Binding, type GithubConnector, type PackageProject, type PackageStage } from './OutcomeDashboard'
+import { ApprovalInbox, OutcomeDashboard, approvalInboxProjection, axisStateLabel, bindingHeroLabel, bindingObservationLabel, collapsedStageCount, currentHierarchy, defaultHierarchySelection, deriveScopeState, deriveStageRailState, desktopConversationBreakpoint, detailContentPolicy, entityStateLabel, findStage, gateGroupPresentation, gateProgress, githubEvidenceItems, heroGateEvidence, hierarchyIsExploring, hierarchyPlacement, meaningfulGateGroups, mobileHierarchyLevels, mobileWorkspaceTabs, nextStageOptionIndex, nowPresentation, projectHeroModel, resolveHierarchySelection, selectedGateCount, selectedStageContext, selectHierarchyPhase, selectHierarchyScope, selectLiveBinding, selectProject, snapshotPresentation, sourceStateLabel, stageDetailSemantics, structuralPhaseModel, structureStatusLabel, summarizeStage, timingPresentation, workspaceManagementItems, type Binding, type GithubConnector, type PackageProject, type PackageStage } from './OutcomeDashboard'
 import { activityLabelKo, axisLabelKo, gatePresentation, groupPresentation, hierarchyLabels, loginErrorPresentation, phasePresentation, projectOutcomePresentation, roleLabel, stagePresentation } from './outcomeKorean'
+import type { PrivateModelV2Projection } from '../lib/api'
 
 const stage = (overrides: Partial<PackageStage> = {}): PackageStage => ({ id: 'stage-one', title: 'Stage One', purpose: 'Verify the result', dependsOn: [], gatePurpose: 'Stage One acceptance checklist', sourceState: 'present', state: 'active', gate: { gates: [{ id: 'G1', title: 'closed', closed: true, groupCode: 'G' }, { id: 'G2', title: 'remaining', closed: false, groupCode: 'G' }], groups: [{ code: 'G', name: '증거', closed: 1, total: 2 }], total: 2, closed: 1, available: true, sourceRef: 'GATES.md' }, axes: { implementation: 'active', test: 'pending', evidence: 'pending', independentQa: 'not_started', cherryAcceptance: 'pending', release: 'not_started' }, ...overrides })
 const github = (overrides: Partial<GithubConnector> = {}): GithubConnector => ({ adopted: true, required: false, state: 'connected', repository: 'owner/repo', remoteName: 'origin', defaultBranch: 'main', completionAuthority: false, localCandidate: { state: 'available', branch: 'main', ahead: 15, behind: 0, sync: 'ahead' }, published: { state: 'connected', repository: 'owner/repo', ref: 'origin/main', detail: 'published' }, checks: { state: 'unknown' }, release: { state: 'unknown' }, ...overrides })
@@ -20,6 +21,7 @@ const visualViolations = (css: string) => [
   /\.oc-map-column button\[role=option\]>i\.complete\{[^}]*background:(?:#adff2f|var\(--oc-accent\))/i.test(css) && 'lime-container',
   /\.oc-map-column button\[role=option\]>i\.complete::after\{[^}]*(?:width|height):(?:9|[1-9][0-9])px/i.test(css) && 'oversized-marker',
 ].filter(Boolean)
+const modelV2 = (overrides: Partial<PrivateModelV2Projection> = {}): PrivateModelV2Projection => ({ schemaVersion: 1, modelVersion: 2, project: { id: 'outcome', label: 'OUTCOME' }, destination: { id: 'destination-one', label: 'Cherry 판단 경계' }, remainingAcceptanceGap: { remaining: 1, total: 4 }, now: { observedAt: '2026-09-04T02:00:00.000Z', state: 'ready' }, readyBoundaryLabels: [], nextActionLabel: null, cherryActionLabel: null, state: 'ready', events: [], ...overrides })
 
 describe('OUTCOME Package dashboard', () => {
   it('uses a neutral completed map node with one internal point accent no larger than 8px', () => {
@@ -44,6 +46,35 @@ describe('OUTCOME Package dashboard', () => {
     expect(visualViolations(`${styles}.oc-map-column button[role=option]>i.complete::after{width:9px;height:9px}`)).toContain('oversized-marker')
     expect(contrast('#555857', '#707372')).toBeLessThan(3)
     expect(contrast('#707372', '#898c8b')).toBeLessThan(3)
+  })
+  it('projects at most one explicit Cherry action without inventing missing evidence or lineage', () => {
+    expect(approvalInboxProjection(modelV2({ cherryActionLabel: '  후보 화면을 확인한다  ', nextActionLabel: 'Builder가 구현한다', readyBoundaryLabels: ['다음 단계'] }))).toEqual([{ kind: 'explicit_cherry_action', requestClass: '명시적 Cherry action', request: '후보 화면을 확인한다', requester: '알 수 없음', authorityTarget: 'Cherry', blockedTarget: 'Cherry 판단 경계', publicPin: '알 수 없음', evidence: '알 수 없음', expiry: '알 수 없음', freshness: '2026-09-04T02:00:00.000Z', lineage: '알 수 없음', immutableHistory: '알 수 없음' }])
+    expect(approvalInboxProjection(modelV2({ cherryActionLabel: '   ', nextActionLabel: 'Cherry가 아닌 다음 행동', readyBoundaryLabels: ['승인처럼 보이는 경계'] }))).toEqual([])
+  })
+  it('projects a blocker only from a blocked model and supplied Planner or Builder blocker evidence', () => {
+    const events: PrivateModelV2Projection['events'] = [
+      { id: 'event-info', sequence: 1, role: 'planner', type: 'work_observed', summary: '일반 관측', observedAt: '2026-09-04T01:00:00.000Z', status: 'active', completionAuthority: false },
+      { id: 'event-qa', sequence: 2, role: 'ux_product_qa', type: 'result_observed', summary: 'QA 실패', observedAt: '2026-09-04T01:10:00.000Z', status: 'failed', completionAuthority: false },
+      { id: 'event-blocker', sequence: 3, role: 'builder', type: 'result_observed', summary: '고정 근거가 없어 안전 보류', observedAt: '2026-09-04T01:20:00.000Z', status: 'safe_hold', completionAuthority: false },
+      { id: 'event-audit', sequence: 4, role: 'release_audit', type: 'result_observed', summary: '감사 거부', observedAt: '2026-09-04T01:30:00.000Z', status: 'rejected', completionAuthority: false },
+    ]
+    expect(approvalInboxProjection(modelV2({ state: 'blocked', now: { observedAt: '2026-09-04T02:00:00.000Z', state: 'blocked' }, events }))).toEqual([{ kind: 'evidence_blocker', requestClass: '근거 기반 차단 확인', request: '고정 근거가 없어 안전 보류', requester: 'Builder', authorityTarget: 'Cherry', blockedTarget: 'Cherry 판단 경계', publicPin: '알 수 없음', evidence: '고정 근거가 없어 안전 보류', expiry: '알 수 없음', freshness: '2026-09-04T01:20:00.000Z', lineage: '알 수 없음', immutableHistory: 'event-blocker · sequence 3' }])
+    for (const state of ['ready', 'stale', 'conflict', 'delivery_unknown', 'no_active_work'] as const) expect(approvalInboxProjection(modelV2({ state, now: { observedAt: '2026-09-04T02:00:00.000Z', state }, events }))).toEqual([])
+    expect(approvalInboxProjection(modelV2({ state: 'blocked', now: { observedAt: '2026-09-04T02:00:00.000Z', state: 'blocked' }, events: events.filter((event) => event.role === 'ux_product_qa' || event.role === 'release_audit') }))).toEqual([])
+  })
+  it('renders read-only approval evidence with native-disabled decision controls and the exact S2 reason', () => {
+    const markup = renderToStaticMarkup(createElement(ApprovalInbox, { projection: modelV2({ cherryActionLabel: '후보 화면을 확인한다' }) }))
+    for (const value of ['요청', '요청자 → 권한', '차단 대상', '공개 pin', '공개 근거', '만료', '신선도', '계보 / 교체', '불변 이력', '결정 기록은 S2']) expect(markup).toContain(value)
+    expect(markup).toContain('data-completion-authority="false"')
+    expect((markup.match(/<button[^>]*disabled=""/g) ?? [])).toHaveLength(2)
+    expect(ApprovalInbox.toString()).not.toMatch(/onClick|onSubmit|fetch\(|XMLHttpRequest|form/)
+  })
+  it('keeps approval observation accent bounded and decision targets accessible without motion', () => {
+    expect(effectiveProperty(styles, '.oc-approval-item', 'border-left-width')).toBe('7px')
+    expect(effectiveProperty(styles, '.oc-approval-actions button', 'min-height')).toBe('44px')
+    expect(styles).toContain('.oc-approval-actions button:focus-visible')
+    expect(styles).toMatch(/@media\(prefers-reduced-motion:reduce\)/)
+    expect(styles).not.toMatch(/\.oc-approval-(?:item|actions)[^{]*\{[^}]*(?:background|box-shadow):(?:var\(--oc-accent\)|#adff2f)/i)
   })
   it('renders every server-projected role in its real dashboard lens without inventing identity or authority', async () => {
     // @ts-expect-error The server projection is an ESM JavaScript boundary exercised end to end here.

@@ -472,7 +472,13 @@ body:has(.account-workspace){min-width:0}
 .oc-workspace-tabs{display:none}
 .oc-workbench{display:grid;grid-template-columns:minmax(0,1fr) 220px minmax(320px,.72fr);margin-bottom:24px;overflow:hidden;border:1px solid var(--oc-rule-strong);border-radius:var(--oc-radius-lg);background:var(--oc-surface);box-shadow:none}
 .oc-approval-rail,.oc-conversation-panel{min-width:0;border-left:1px solid var(--oc-rule);background:var(--oc-surface)}
-.oc-approval-rail{padding:18px}.oc-approval-rail h2{margin:0 0 12px}.oc-approval-rail p{font-size:12px;line-height:1.5}.oc-approval-rail strong{color:var(--oc-muted);font-size:11px}
+.oc-approval-rail{padding:18px}.oc-approval-rail>header{display:grid;gap:3px;margin-bottom:14px}.oc-approval-rail>header span,.oc-approval-rail>header strong{color:var(--oc-muted);font-size:11px}.oc-approval-rail h2{margin:0}.oc-approval-empty{font-size:12px;line-height:1.5}
+.oc-approval-list{display:grid;gap:12px;margin:0;padding:0;list-style:none}
+.oc-approval-item{display:grid;gap:12px;padding:14px;border:1px solid var(--oc-rule);border-left-color:var(--oc-accent);border-left-style:solid;border-left-width:7px;border-radius:var(--oc-radius-sm);background:#151817}
+.oc-approval-request{display:grid;gap:4px}.oc-approval-request small{color:var(--oc-muted);font-size:11px}.oc-approval-request h3{margin:0;font-size:14px;line-height:1.45}
+.oc-approval-item dl{display:grid;gap:8px;margin:0}.oc-approval-item dl>div{display:grid;gap:2px}.oc-approval-item dt{color:var(--oc-muted);font-size:10px;font-weight:650}.oc-approval-item dd{margin:0;font-size:12px;line-height:1.45;overflow-wrap:anywhere}
+.oc-approval-reason{margin:0;color:var(--oc-muted);font-size:11px;line-height:1.45}
+.oc-approval-actions{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:8px}.oc-approval-actions button{min-height:44px;border:1px solid var(--oc-rule-strong);border-radius:var(--oc-radius-sm);background:#191c1b;color:var(--oc-muted)}.oc-approval-actions button:focus-visible{outline:3px solid var(--oc-accent);outline-offset:2px}.oc-approval-actions button:disabled{cursor:not-allowed;opacity:.72}
 .oc-conversation-panel>.planner-conversation{height:100%;border:0;border-radius:0}
 .planner-conversation__filters{display:flex;gap:6px;padding:10px 12px;overflow-x:auto;border-bottom:1px solid var(--oc-rule)}
 .planner-conversation__filters button{min-height:44px;flex:none;padding:8px 10px;border:1px solid var(--oc-rule-strong);border-radius:var(--oc-radius-sm);background:transparent;color:var(--oc-muted)}

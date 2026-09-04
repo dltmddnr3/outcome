@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState, type CSSProperties } from 'react'
 import { Archive, Check, ChevronLeft, ChevronRight, Circle, Layers3, Menu, MoreHorizontal, Plug, Plus, Radio, RefreshCw, Search, UserRound, X } from 'lucide-react'
-import { fetchOutcomeDashboard, type PrivateModelV2Event, type PrivateProjectProjection } from '../lib/api'
+import { fetchOutcomeDashboard, type PrivateModelV2Event, type PrivateModelV2Projection, type PrivateProjectProjection } from '../lib/api'
 import { CurrentProjection } from './CurrentProjection'
 import { PlannerConversation, type RoleChatFilter, type RoleChatFixtureState } from './PlannerConversation'
 import { activityLabelKo, axisLabelKo, freshnessLabelKo, gatePresentation, groupPresentation, phasePresentation, projectOutcomePresentation, roleLabel, scopePresentation, sourceLabelKo, sourceStateLabelKo, stagePresentation, stateLabelKo } from './outcomeKorean'
@@ -70,6 +70,36 @@ export const axisStateLabel = axisLabelKo
 export const structureStatusLabel = (value: string) => ({ current: '현재', complete: '완료', partial: '일부 완료', pending: '예정', definition_pending: '정의 대기' }[value] ?? '근거 없음')
 function StageNode({ state, current }: { state: string; current: boolean }) { return <i className={`${state} ${current ? 'current' : ''}`} aria-hidden="true">{state === 'complete' ? <Check size={11} /> : current ? <Radio size={11} /> : <Circle size={9} />}</i> }
 function Axis({ label, value }: { label: string; value: string }) { return <div className="oc-axis"><small>{label}</small><strong>{axisStateLabel(value)}</strong></div> }
+
+const APPROVAL_UNKNOWN = '알 수 없음'
+const blockerStatuses = new Set<PrivateModelV2Event['status']>(['blocked', 'failed', 'rejected', 'safe_hold'])
+const approvalRoleLabel: Record<'planner' | 'builder', string> = { planner: 'Planner', builder: 'Builder' }
+export type ApprovalInboxItem = { kind: 'explicit_cherry_action' | 'evidence_blocker'; requestClass: string; request: string; requester: string; authorityTarget: 'Cherry'; blockedTarget: string; publicPin: string; evidence: string; expiry: string; freshness: string; lineage: string; immutableHistory: string }
+const knownText = (value: string | null | undefined) => typeof value === 'string' && value.trim() ? value.trim() : APPROVAL_UNKNOWN
+export function approvalInboxProjection(projection: PrivateModelV2Projection | undefined): ApprovalInboxItem[] {
+  if (!projection) return []
+  const items: ApprovalInboxItem[] = []
+  const explicitAction = knownText(projection.cherryActionLabel)
+  const blockedTarget = knownText(projection.destination?.label)
+  if (explicitAction !== APPROVAL_UNKNOWN) items.push({ kind: 'explicit_cherry_action', requestClass: '명시적 Cherry action', request: explicitAction, requester: APPROVAL_UNKNOWN, authorityTarget: 'Cherry', blockedTarget, publicPin: APPROVAL_UNKNOWN, evidence: APPROVAL_UNKNOWN, expiry: APPROVAL_UNKNOWN, freshness: knownText(projection.now.observedAt), lineage: APPROVAL_UNKNOWN, immutableHistory: APPROVAL_UNKNOWN })
+  if (projection.state !== 'blocked') return items
+  const blocker = [...projection.events].sort((left, right) => right.sequence - left.sequence).find((event) => (event.role === 'planner' || event.role === 'builder') && blockerStatuses.has(event.status) && knownText(event.summary) !== APPROVAL_UNKNOWN)
+  if (!blocker || (blocker.role !== 'planner' && blocker.role !== 'builder')) return items
+  const evidence = knownText(blocker.summary)
+  items.push({ kind: 'evidence_blocker', requestClass: '근거 기반 차단 확인', request: evidence, requester: approvalRoleLabel[blocker.role], authorityTarget: 'Cherry', blockedTarget, publicPin: APPROVAL_UNKNOWN, evidence, expiry: APPROVAL_UNKNOWN, freshness: knownText(blocker.observedAt), lineage: APPROVAL_UNKNOWN, immutableHistory: `${blocker.id} · sequence ${blocker.sequence}` })
+  return items
+}
+export function ApprovalInbox({ projection, active = false, className = 'oc-approval-rail' }: { projection?: PrivateModelV2Projection; active?: boolean; className?: string }) {
+  const items = approvalInboxProjection(projection)
+  return <aside className={className} data-workspace-panel="승인" data-workspace-active={active ? 'true' : 'false'} data-completion-authority="false" aria-labelledby="oc-approval-title">
+    <header><span>Model v2 · 읽기 전용</span><h2 id="oc-approval-title">승인</h2><strong>승인 권한 위임 없음</strong></header>
+    {items.length === 0 ? <p className="oc-approval-empty" role="status">Cherry의 명시적 행동 또는 확인 가능한 차단 근거가 없습니다.</p> : <ol className="oc-approval-list">{items.map((item, index) => { const reasonId = `oc-approval-reason-${index}`; return <li className="oc-approval-item" key={`${item.kind}-${index}`} data-approval-kind={item.kind}>
+      <div className="oc-approval-request"><small>{item.requestClass}</small><h3>{item.request}</h3></div>
+      <dl><div><dt>요청</dt><dd>{item.request}</dd></div><div><dt>요청자 → 권한</dt><dd>{item.requester} → {item.authorityTarget}</dd></div><div><dt>차단 대상</dt><dd>{item.blockedTarget}</dd></div><div><dt>공개 pin</dt><dd>{item.publicPin}</dd></div><div><dt>공개 근거</dt><dd>{item.evidence}</dd></div><div><dt>만료</dt><dd>{item.expiry}</dd></div><div><dt>신선도</dt><dd>{item.freshness}</dd></div><div><dt>계보 / 교체</dt><dd>{item.lineage}</dd></div><div><dt>불변 이력</dt><dd>{item.immutableHistory}</dd></div></dl>
+      <p className="oc-approval-reason" id={reasonId}>결정 기록은 S2</p><div className="oc-approval-actions" aria-describedby={reasonId}><button type="button" disabled aria-describedby={reasonId}>승인</button><button type="button" disabled aria-describedby={reasonId}>반려</button></div>
+    </li> })}</ol>}
+  </aside>
+}
 
 type NonProductionRoleChatFixture = { state: RoleChatFixtureState; plannerBound: boolean; initialFilter?: RoleChatFilter; onSend: (message: string) => void }
 
@@ -197,7 +227,7 @@ export function OutcomeDashboard({ onUnauthorized, initialData, onLogout, privat
       <details ref={initializeGateDetails} className="oc-gate-inspector" data-default-open="true" data-stage-state={selectedStage?.state ?? 'unknown'} data-gate-available={selectedStage?.gate.available ? 'true' : 'false'} data-gate-closed={selectedStage?.gate.closed ?? 0} data-gate-total={selectedStage?.gate.total ?? 0} aria-label="선택 스테이지 완료 조건"><summary><span><small>완료 조건</small><strong>{selectedStage ? stagePresentation(selectedStage.id, selectedStage.title, selectedStage.purpose)[0] : '스테이지 정의 대기'}</strong></span><span><em>{selectedStage ? entityStateLabel(selectedStage.state) : '근거 없음'}</em><b>{selectedStage ? selectedGateCount(selectedStage) : '근거 없음'}</b></span></summary><div className="oc-gate-content"><header>{selectedStage ? <p>{stagePresentation(selectedStage.id, selectedStage.title, selectedStage.purpose)[1]}</p> : <p>선택한 범위에 스테이지와 완료 조건이 아직 정의되지 않았습니다.</p>}</header>{selectedStage && selectedSummary && <><div className="oc-gate-count"><span><small>확인된 항목 / 전체</small><strong>{selectedGateCount(selectedStage)}</strong></span><em>{entityStateLabel(selectedStage.state)}</em></div>{selectedProgress?.available && <span className="oc-gate-gauge" role="img" aria-label={`현재 스테이지 완료 조건 ${selectedProgress.closed}/${selectedProgress.total}`}><i style={{ transform: `scaleX(${selectedProgress.scale})` }} /></span>}<p className="oc-detail-boundary">{selectedSummary.boundaryCopy}</p><section className="oc-inspector-gates"><h4>남은 완료 조건</h4>{selectedStage.gate.gates.some((gate) => !gate.closed) ? <ol>{selectedStage.gate.gates.filter((gate) => !gate.closed).map((gate) => <li key={gate.id}><b>{gate.id}</b><span>{gatePresentation(selectedStage.id, gate.id, gate.title)}</span></li>)}</ol> : <p>{selectedSummary.checkedCopy}</p>}</section>{selectedGroups.length > 0 && <section data-source-groups><h4>그룹별 확인</h4><div className="oc-groups">{selectedGroups.map((group) => <article key={group.code} data-generic="false"><span><strong>{group.primaryLabel}</strong><small>코드 {group.secondaryCode}</small></span><b>{group.closed}/{group.total}</b></article>)}</div></section>}</>}</div></details>
     </section>
       </div>
-      <aside className="oc-approval-rail" data-workspace-panel="승인" data-workspace-active={workspaceTab === '승인' ? 'true' : 'false'} aria-labelledby="oc-approval-title"><h2 id="oc-approval-title">승인</h2><p>승인 요청이 관측되면 여기에 표시됩니다.</p><strong>승인 권한 위임 없음</strong></aside>
+      <ApprovalInbox className="oc-approval-rail" projection={privateProjection} active={workspaceTab === '승인'} />
       <div className="oc-conversation-panel" data-workspace-panel="대화" data-workspace-active={workspaceTab === '대화' ? 'true' : 'false'}>{roleChat(privateProjection?.events ?? [])}</div>
     </section>
     <details id="oc-technical-evidence" className="oc-technical"><summary><span>기술 증거</span><small>빌드·역할 연결·GitHub·근거 축</small></summary><div className="oc-technical-content"><div className="oc-build" aria-label="제공 중인 고정 빌드"><small>기술 증거 · 프로젝트 식별자 {project.project.id} · {data.build.repository}/{data.build.ref}</small><strong>커밋 {data.build.commit ?? '근거 없음'} · 트리 {data.build.tree ?? '근거 없음'}</strong><span>에셋 {data.build.asset ?? '근거 없음'} · {snapshot ? '배포 스냅샷이며 실시간 세션은 별도 연결 예정' : '실시간 현재 작업은 빌드에 고정되지 않음'}</span></div><section className="oc-timing-evidence" aria-label="시간 근거"><div><small>{timing.elapsed.label}</small><strong>{timing.elapsed.value}</strong>{timing.elapsed.basis && <span>{timing.elapsed.basis}</span>}</div><div><small>{timing.eta.label}</small><strong>{timing.eta.value}</strong></div></section><section className="oc-binding-evidence" aria-label="역할 연결 기술 증거"><h3>역할 연결 근거</h3>{project.bindings.map((binding) => <div key={binding.role}><strong>{roleLabel(binding.role)}</strong><span>{binding.stageId ?? '스테이지 연결 없음'} · 이력 {binding.historyCount} · 관측 {compactTime(binding.observedAt)}</span></div>)}</section><section className="oc-github" aria-label="GitHub 전달 근거 연결"><header><div><small>선택 연결 근거 · GitHub</small><strong>{github.adopted ? 'GitHub 연결 채택' : 'GitHub 연결 미채택'}</strong></div><span className={github.state}>{entityStateLabel(github.state)}</span></header><div>{githubEvidenceItems(github).map((item) => <article key={item.label} className={item.state}><small>{item.label}</small><strong>{item.value}</strong><span>{entityStateLabel(item.state)}</span></article>)}</div><p>완료 판정 권한 없음 · GitHub 활동은 완료 조건 충족이나 Cherry 승인이 아닙니다.</p></section>{selectedStage && <div className="oc-axes" aria-label="선택 스테이지 근거 축"><Axis label="구현" value={selectedStage.axes.implementation} /><Axis label="테스트" value={selectedStage.axes.test} /><Axis label="증거 확정" value={selectedStage.axes.evidence} /><Axis label="변화 관측" value={project.now.status} /></div>}</div></details>
