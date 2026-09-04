@@ -12,6 +12,10 @@ export type PrivateModelV2Event = { id: string; sequence: number; role: 'planner
 export type PrivateModelV2Projection = { schemaVersion: 1; modelVersion: 2; project: { id: string; label: string }; destination: { id: string; label: string } | null; remainingAcceptanceGap: { remaining: number; total: number }; now: { observedAt: string; state: PrivateModelV2State }; readyBoundaryLabels: string[]; nextActionLabel: string | null; cherryActionLabel: string | null; state: PrivateModelV2State; events: PrivateModelV2Event[] }
 export type PrivateProjectProjection = { project: { id: string; name: string }; phases: PrivatePhase[]; current: { phaseId: string; scopeId: string; stageId: string }; modelV2?: PrivateModelV2Projection }
 export type PrivateWorkspaceView = { viewState?: string; projects?: PrivateProjectProjection[]; dashboard?: OutcomeDashboardData }
+export type PrivateDecisionReason = 'evidence_insufficient' | 'scope_not_authorized' | 'superseded_by_newer_observation' | 'defer_pending_external_input'
+export type PrivateDecisionReceipt = { decisionState: 'recorded'; decisionId: string; decision: 'approved' | 'rejected'; rejectionReason: PrivateDecisionReason | null; decidedAt: string; decisionActorClass: 'owner'; notice: '기록됨 · 전달은 이 범위 밖'; supersedesId: string | null; completionAuthority: false }
+
+let privateDecisionBinding: { etag: string; csrf: string; bearer?: string } | null = null
 
 async function readJson<T>(response: Response): Promise<T> {
   const body = await response.json() as T & { error?: string }
@@ -50,7 +54,12 @@ export async function fetchPrivateAccessConfig(): Promise<PrivateAccessConfig> {
 }
 
 export async function fetchPrivateWorkspace(sessionToken?: string): Promise<{ workspace: PrivateWorkspaceView }> {
-  return readJson<{ workspace: PrivateWorkspaceView }>(await fetch('/api/private/workspace', { credentials: 'same-origin', headers: privateSessionHeaders(sessionToken) }))
+  const response = await fetch('/api/private/workspace', { credentials: 'same-origin', headers: privateSessionHeaders(sessionToken) })
+  const value = await readJson<{ workspace: PrivateWorkspaceView }>(response)
+  const etag = response.headers.get('etag') ?? ''
+  const csrf = response.headers.get('x-outcome-csrf') ?? ''
+  privateDecisionBinding = etag && csrf ? { etag, csrf, ...(sessionToken ? { bearer: sessionToken } : {}) } : null
+  return value
 }
 
 const privateSessionHeaders = (sessionToken?: string) => ({ accept: 'application/json', ...(sessionToken && /^[A-Za-z0-9._~-]+$/.test(sessionToken) ? { authorization: `Bearer ${sessionToken}` } : {}) })
@@ -67,4 +76,18 @@ export async function beginPrivateSession(provider: 'google' | 'email_code', nav
 
 export async function endPrivateSession(): Promise<void> {
   await readJson(await fetch('/api/private/auth/logout', { method: 'POST', credentials: 'same-origin' }))
+  privateDecisionBinding = null
+}
+
+const decisionNonce = () => Array.from(crypto.getRandomValues(new Uint8Array(24)), (value) => value.toString(16).padStart(2, '0')).join('')
+
+export async function recordPrivateDecision(input: { projectId: string; eventId: string; sequence: number; decision: 'approved' | 'rejected'; rejectionReason?: PrivateDecisionReason | null }): Promise<PrivateDecisionReceipt> {
+  const binding = privateDecisionBinding
+  if (!binding) throw new Error('decision_store_unavailable')
+  return readJson<PrivateDecisionReceipt>(await fetch('/api/private/decisions', {
+    method: 'POST',
+    credentials: 'same-origin',
+    headers: { ...privateSessionHeaders(binding.bearer), 'content-type': 'application/json', 'x-outcome-csrf': binding.csrf, 'if-match': binding.etag },
+    body: JSON.stringify({ projectId: input.projectId, eventId: input.eventId, sequence: input.sequence, decision: input.decision, rejectionReason: input.decision === 'rejected' ? input.rejectionReason ?? null : null, nonce: decisionNonce() }),
+  }))
 }

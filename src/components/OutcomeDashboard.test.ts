@@ -62,12 +62,24 @@ describe('OUTCOME Package dashboard', () => {
     for (const state of ['ready', 'stale', 'conflict', 'delivery_unknown', 'no_active_work'] as const) expect(approvalInboxProjection(modelV2({ state, now: { observedAt: '2026-09-04T02:00:00.000Z', state }, events }))).toEqual([])
     expect(approvalInboxProjection(modelV2({ state: 'blocked', now: { observedAt: '2026-09-04T02:00:00.000Z', state: 'blocked' }, events: events.filter((event) => event.role === 'ux_product_qa' || event.role === 'release_audit') }))).toEqual([])
   })
-  it('renders read-only approval evidence with native-disabled decision controls and the exact S2 reason', () => {
+  it('keeps explicit Cherry actions truthfully non-recordable with one focusable aria-disabled control per item', () => {
     const markup = renderToStaticMarkup(createElement(ApprovalInbox, { projection: modelV2({ cherryActionLabel: '후보 화면을 확인한다' }) }))
-    for (const value of ['요청', '요청자 → 권한', '차단 대상', '공개 pin', '공개 근거', '만료', '신선도', '계보 / 교체', '불변 이력', '결정 기록은 S2']) expect(markup).toContain(value)
+    for (const value of ['요청', '요청자 → 권한', '차단 대상', '공개 pin', '공개 근거', '만료', '신선도', '계보 / 교체', '불변 이력', '고정 식별자가 없어 결정을 기록할 수 없습니다']) expect(markup).toContain(value)
     expect(markup).toContain('data-completion-authority="false"')
-    expect((markup.match(/<button[^>]*disabled=""/g) ?? [])).toHaveLength(2)
-    expect(ApprovalInbox.toString()).not.toMatch(/onClick|onSubmit|fetch\(|XMLHttpRequest|form/)
+    expect((markup.match(/aria-disabled="true"/g) ?? [])).toHaveLength(1)
+    expect(markup).not.toContain('disabled=""')
+    const explicitBranch = ApprovalInbox.toString().slice(ApprovalInbox.toString().indexOf("item.kind === 'explicit_cherry_action'"), ApprovalInbox.toString().indexOf(': <><label'))
+    expect(explicitBranch).not.toMatch(/onClick|onSubmit|fetch\(|XMLHttpRequest/)
+    expect(markup).not.toMatch(/<form|<a /)
+  })
+  it('enables only evidence blockers with the closed rejection vocabulary and no completion authority', () => {
+    const projection = modelV2({ state: 'blocked', now: { observedAt: '2026-09-04T02:00:00.000Z', state: 'blocked' }, events: [{ id: 'event-builder-blocked', sequence: 7, role: 'builder', type: 'result_observed', summary: '고정 근거가 없어 안전 보류', observedAt: '2026-09-04T01:20:00.000Z', status: 'safe_hold', completionAuthority: false }] })
+    const markup = renderToStaticMarkup(createElement(ApprovalInbox, { projection, onDecision: async () => undefined }))
+    expect((markup.match(/<button/g) ?? [])).toHaveLength(2)
+    expect(markup).not.toContain('disabled=""')
+    for (const value of ['evidence_insufficient', 'scope_not_authorized', 'superseded_by_newer_observation', 'defer_pending_external_input']) expect(markup).toContain(value)
+    expect(ApprovalInbox.toString()).toContain('기록됨 · 전달은 이 범위 밖')
+    expect(markup).not.toMatch(/<form|<a /)
   })
   it('keeps approval observation accent bounded and decision targets accessible without motion', () => {
     expect(effectiveProperty(styles, '.oc-approval-item', 'border-left-width')).toBe('7px')

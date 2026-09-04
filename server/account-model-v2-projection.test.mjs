@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict'
 import test from 'node:test'
-import { ACCOUNT_MODEL_V2_STATES, accountModelV2CherryActionLabel, accountModelV2NextActionLabel, createAccountModelV2Projection } from './account-model-v2-projection.mjs'
+import { ACCOUNT_MODEL_V2_STATES, accountModelV2CherryActionLabel, accountModelV2NextActionLabel, accountModelV2SourceRevision, createAccountModelV2Projection } from './account-model-v2-projection.mjs'
 
 const observedAt = '2026-08-31T00:00:00.000Z'
 const project = (id = 'outcome') => ({
@@ -23,6 +23,13 @@ test('authorized project projection is versioned, deterministic and exact-allowl
   assert.equal(projection.modelVersion, 2)
   assert.equal(JSON.stringify(projection), JSON.stringify(createAccountModelV2Projection(project(), { observedAt })))
   assert.deepEqual(ACCOUNT_MODEL_V2_STATES, ['loading', 'stale', 'conflict', 'blocked', 'delivery_unknown', 'no_active_work', 'ready'])
+})
+
+test('keeps the source revision server-private while binding it to the exact projection object', () => {
+  const projection = createAccountModelV2Projection(project(), { observedAt })
+  assert.match(accountModelV2SourceRevision(projection), /^[a-f0-9]{64}$/)
+  assert.equal(JSON.stringify(projection).includes(accountModelV2SourceRevision(projection)), false)
+  assert.throws(() => accountModelV2SourceRevision(structuredClone(projection)), /source_revision_unavailable/)
 })
 
 test('server-owned action labels are closed, Korean, and omit unknown values', () => {

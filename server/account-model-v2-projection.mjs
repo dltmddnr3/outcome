@@ -23,6 +23,7 @@ const CHERRY_ACTION_LABELS = Object.freeze({
   review_no_outcome_delta: '사용자 결과 변화가 없는 작업을 검토한다',
   resolve_blocker: '차단 원인의 해결 방향을 결정한다',
 })
+const SOURCE_REVISIONS = new WeakMap()
 
 const materialize = (value, seen = new WeakSet()) => {
   if (value === null || typeof value !== 'object') {
@@ -77,6 +78,11 @@ const closedLabel = (labels, value) => {
 
 export const accountModelV2NextActionLabel = (value) => closedLabel(NEXT_ACTION_LABELS, value)
 export const accountModelV2CherryActionLabel = (value) => closedLabel(CHERRY_ACTION_LABELS, value)
+export const accountModelV2SourceRevision = (projection) => {
+  const revision = projection && typeof projection === 'object' ? SOURCE_REVISIONS.get(projection) : null
+  if (!revision) throw new Error('account_model_v2_source_revision_unavailable')
+  return revision
+}
 
 const assertKeys = (value, allowed) => {
   if (Object.keys(value).some((key) => !allowed.has(key))) throw new Error('account_model_v2_unexpected_key')
@@ -167,7 +173,7 @@ export function createAccountModelV2Projection(value, { observedAt } = {}) {
     const normalized = Object.freeze({ id: event.id, sequence: event.sequence, role: event.role, type: event.type, summary: safeEventSummary(event.summary), observedAt: new Date(event.observedAt).toISOString(), status: event.status, completionAuthority: false })
     return normalized
   }).sort((left, right) => left.sequence - right.sequence)
-  return Object.freeze({
+  const output = Object.freeze({
     schemaVersion: 1,
     modelVersion: 2,
     project: Object.freeze({ id: graph.project.id, label: safeText(graph.project.name) }),
@@ -184,4 +190,6 @@ export function createAccountModelV2Projection(value, { observedAt } = {}) {
     state,
     events: Object.freeze(events),
   })
+  SOURCE_REVISIONS.set(output, sourceRevision)
+  return output
 }

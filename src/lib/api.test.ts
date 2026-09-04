@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, it, vi } from 'vitest'
-import { beginPrivateSession, fetchPrivateOwnerSession, fetchPrivateWorkspace } from './api'
+import { beginPrivateSession, fetchPrivateOwnerSession, fetchPrivateWorkspace, recordPrivateDecision } from './api'
 
 afterEach(() => vi.unstubAllGlobals())
 
@@ -40,5 +40,23 @@ describe('hosted private session transition', () => {
     await beginPrivateSession('email_code', navigate)
 
     expect(navigate).not.toHaveBeenCalled()
+  })
+
+  it('keeps freshness and CSRF bindings in memory and submits only the closed decision request', async () => {
+    const fetchMock = vi.fn()
+      .mockResolvedValueOnce(new Response(JSON.stringify({ workspace: { projects: [] } }), { status: 200, headers: { 'content-type': 'application/json', etag: '"revision"', 'x-outcome-csrf': 'csrf-value' } }))
+      .mockResolvedValueOnce(new Response(JSON.stringify({ decisionState: 'recorded', decision: 'approved', rejectionReason: null, decidedAt: '2026-09-04T03:00:00.000Z', decisionActorClass: 'owner', notice: '기록됨 · 전달은 이 범위 밖', completionAuthority: false }), { status: 201, headers: { 'content-type': 'application/json' } }))
+    vi.stubGlobal('fetch', fetchMock)
+    vi.stubGlobal('crypto', { getRandomValues: (value: Uint8Array) => value.fill(7) })
+
+    await fetchPrivateWorkspace('sdk-issued-session')
+    const receipt = await recordPrivateDecision({ projectId: 'outcome', eventId: 'event-builder-blocked', sequence: 7, decision: 'approved' })
+
+    expect(receipt.notice).toBe('기록됨 · 전달은 이 범위 밖')
+    const [, init] = fetchMock.mock.calls[1]
+    expect(init).toMatchObject({ method: 'POST', credentials: 'same-origin' })
+    expect(init.headers).toMatchObject({ authorization: 'Bearer sdk-issued-session', 'content-type': 'application/json', 'x-outcome-csrf': 'csrf-value', 'if-match': '"revision"' })
+    expect(JSON.parse(init.body)).toMatchObject({ projectId: 'outcome', eventId: 'event-builder-blocked', sequence: 7, decision: 'approved', rejectionReason: null })
+    expect(JSON.stringify(init)).not.toContain('localStorage')
   })
 })

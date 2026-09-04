@@ -9,6 +9,7 @@ import { createObserverBridgeRuntimeControl } from '../server/phase3-observer-br
 const result = (status, body) => ({ status, body })
 
 export function handleStableHostRequest({ method = 'GET', pathname = '/' } = {}) {
+  if (pathname === '/api/private/decisions') return result(405, { error: 'read_only' })
   if (method !== 'GET') return result(405, { error: 'read_only' })
   if (pathname === '/api/dashboard') return result(200, { dashboard: snapshot })
   if (pathname === '/api/auth/session') return result(200, { authenticated: false, publicReadOnly: true })
@@ -66,7 +67,7 @@ const bridgeRequestTarget = (target) => {
 }
 const isBridgePathname = (pathname) => bridgeRequestTarget(pathname).candidate
 const selectedHeaders = (headers, companion = false) => {
-  const names = companion ? ['content-type'] : ['content-type', 'origin', 'x-outcome-csrf']
+  const names = companion ? ['content-type'] : ['content-type', 'origin', 'x-outcome-csrf', 'if-match']
   return Object.fromEntries(names.map((name) => [name, String(header(headers, name))]).filter(([, value]) => value))
 }
 const bridgeLocation = (pathname) => {
@@ -117,7 +118,7 @@ const privateSessionDiagnostic = (logger, input, error, configuredOrigin) => {
   try { logger?.info?.('outcome_private_session', { authSource: input.authSource, ...tokenState, ...(sdkReason ? { sdkReason } : {}), ...safeError }) } catch {}
 }
 
-export function createStableHostRequestHandler({ environment = process.env, runtimeFactory = createHostedIdentityRuntime, bridgeRuntimeFactory, clerkClientFactory, clerkTokenVerifier, logger } = {}) {
+export function createStableHostRequestHandler({ environment = process.env, runtimeFactory = createHostedIdentityRuntime, bridgeRuntimeFactory, decisionRuntimeFactory, clerkClientFactory, clerkTokenVerifier, logger } = {}) {
   const configured = readHostedIdentityConfiguration(environment).enabled
   const configuredOrigin = typeof environment?.[HOSTED_IDENTITY_ENV.privateAllowedOrigin] === 'string' ? environment[HOSTED_IDENTITY_ENV.privateAllowedOrigin].trim() : ''
   const validRuntime = (value) => value?.allowedOrigin === configuredOrigin
@@ -126,11 +127,17 @@ export function createStableHostRequestHandler({ environment = process.env, runt
     && typeof value?.service?.readWorkspace === 'function'
     && typeof value?.service?.authenticate === 'function'
   let runtimePromise
+  let decisionRuntimePromise
   const bridgeControl = createObserverBridgeRuntimeControl({ environment, runtimeFactory: bridgeRuntimeFactory })
   const selectedRuntime = async () => {
     if (!configured || typeof runtimeFactory !== 'function') return null
     runtimePromise ??= Promise.resolve().then(() => runtimeFactory({ environment, sealedSnapshot: snapshot, clerkClientFactory, tokenVerifier: clerkTokenVerifier })).then((value) => validRuntime(value) ? value : null).catch(() => null)
     return runtimePromise
+  }
+  const selectedDecisionRuntime = async (hosted) => {
+    if (!hosted || typeof decisionRuntimeFactory !== 'function') return null
+    decisionRuntimePromise ??= Promise.resolve().then(() => decisionRuntimeFactory({ environment, identityRuntime: hosted })).then((value) => value?.allowedOrigin === configuredOrigin && typeof value?.csrfSecret === 'string' && value.csrfSecret.length >= 16 && typeof value?.service?.record === 'function' ? value : null).catch(() => null)
+    return decisionRuntimePromise
   }
   return async ({ method = 'GET', pathname = '/', headers = {}, body, origin } = {}) => {
     const bridgeTarget = bridgeRequestTarget(pathname)
@@ -190,7 +197,14 @@ export function createStableHostRequestHandler({ environment = process.env, runt
         return error?.status ? result(error.status, { error: error.code }) : result(503, { error: 'private_workspace_unavailable' })
       }
     }
-    if (method === 'GET' && pathname === '/api/private/workspace') return handlePrivateAccessRequest({ method, pathname, token: privateSessionToken(headers), service: hosted.service })
+    if ((method === 'GET' && pathname === '/api/private/workspace') || pathname === '/api/private/decisions') {
+      let parsedBody = body
+      if (pathname === '/api/private/decisions' && method === 'POST' && (typeof body === 'string' || Buffer.isBuffer(body))) {
+        if (Buffer.byteLength(body) > 10_000) return result(413, { error: 'request_too_large' })
+        try { parsedBody = JSON.parse(String(body) || '{}') } catch { return result(400, { error: 'invalid_request' }) }
+      }
+      return handlePrivateAccessRequest({ method, pathname, token: privateSessionToken(headers), service: hosted.service, decisionRuntime: await selectedDecisionRuntime(hosted), headers: selectedHeaders(headers), origin, body: parsedBody })
+    }
     return method === 'GET' ? result(404, { error: 'not_found' }) : result(405, { error: 'read_only' })
   }
 }
@@ -213,7 +227,8 @@ const MAXIMUM_STABLE_BRIDGE_BODY_BYTES = 1_048_576
 const rawBridgeBody = async (request, pathname) => {
   const target = bridgeRequestTarget(pathname)
   const body = request.body
-  if (!target.candidate || !target.valid || request.method === 'GET' || typeof body === 'string' || Buffer.isBuffer(body)) return body
+  const decisionCandidate = pathname === '/api/private/decisions'
+  if ((!target.candidate && !decisionCandidate) || (target.candidate && !target.valid) || request.method === 'GET' || typeof body === 'string' || Buffer.isBuffer(body)) return body
   const chunks = []
   let bytes = 0
   try {
@@ -224,7 +239,8 @@ const rawBridgeBody = async (request, pathname) => {
       else if (Buffer.isBuffer(chunk)) value = chunk
       else return undefined
       bytes += value.length
-      if (bytes > MAXIMUM_STABLE_BRIDGE_BODY_BYTES) return Buffer.alloc(MAXIMUM_STABLE_BRIDGE_BODY_BYTES + 1)
+      const maximum = decisionCandidate ? 10_000 : MAXIMUM_STABLE_BRIDGE_BODY_BYTES
+      if (bytes > maximum) return Buffer.alloc(maximum + 1)
       chunks.push(value)
     }
   } catch {

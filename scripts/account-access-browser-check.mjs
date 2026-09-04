@@ -20,6 +20,7 @@ const readyProjects = readyDashboard.projects
 const hostileMilestoneSlug = 'q2-independent-qa'
 const roleEvents = ['planner', 'builder', 'ux_product_qa', 'release_audit'].map((role, index) => ({ id: `event-${role.replaceAll('_', '-')}-1`, sequence: index + 1, role, type: 'work_observed', summary: `${role} public observation`, observedAt: `2026-08-31T00:0${index + 1}:00.000Z`, status: 'observed' }))
 const hostileProjection = createAccountModelV2Projection({ project: { id: 'outcome', name: 'OUTCOME', outcome: 'One safe outcome' }, current: { phaseId: 'destination-one' }, phases: [{ id: 'destination-one', title: 'Destination', purpose: 'Safe outcome', scopes: [{ stages: [{ id: 'milestone-one', title: hostileMilestoneSlug, purpose: 'User result', dependsOn: [], gate: { sourceRef: 'GATES.md', gates: [{ id: 'B1', title: 'Server projection', closed: false }] } }] }] }], events: roleEvents }, { observedAt: '2026-08-31T00:00:00.000Z' })
+const blockedProjection = Object.freeze({ ...createAccountModelV2Projection({ project: { id: 'outcome', name: 'OUTCOME', outcome: 'One safe outcome' }, blocked: true, events: [{ id: 'event-builder-blocked', sequence: 7, role: 'builder', type: 'result_observed', summary: '고정 근거가 없어 안전 보류', observedAt: '2026-09-04T02:00:00.000Z', status: 'safe_hold' }] }, { observedAt: '2026-09-04T02:00:00.000Z' }), cherryActionLabel: '후보 화면을 확인한다' })
 if (JSON.stringify(hostileProjection).includes(hostileMilestoneSlug) || hostileProjection.readyBoundaryLabels.length !== 0) throw new Error('hostile milestone slug survived API projection')
 const memoryStore = createInMemoryAccountStore({ workspaces: [{ id: 'workspace', state: 'active' }], memberships: [{ subject: 'owner', workspaceId: 'workspace', role: 'owner-viewer', state: 'active' }], projects: readyProjects.map((projection) => ({ id: projection.project.id, workspaceId: 'workspace', state: 'active', projection })) })
 const store = { ...memoryStore, workspaceProjection: (workspaceId) => workspaceId === 'workspace' ? structuredClone(readyDashboard) : null }
@@ -130,8 +131,11 @@ try {
     await page.route('**/api/private/workspace', (route) => route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ workspace: { viewState: 'ready', projects: hostileProjects, dashboard: readyDashboard } }) }))
     await page.goto(`${base}/workspace`)
     await page.locator('.current-projection').waitFor()
+    await page.locator('details.oc-v1-compatibility > summary').click()
     for (const [index, label] of ['Planner', 'Builder', 'UX & Product QA', 'Release Audit'].entries()) {
-      await page.getByRole('button', { name: label, exact: true }).click()
+      const filter = page.locator('.planner-conversation__filters button').nth(index + 1)
+      if ((await filter.textContent())?.trim() !== label) throw new Error(`role lens filter order drifted at ${label}`)
+      await filter.evaluate((element) => element.click())
       const event = page.locator(`[data-event-id="${roleEvents[index].id}"]`)
       if (await event.count() !== 1 || await event.getAttribute('data-event-sequence') !== String(index + 1) || await event.getAttribute('data-event-role') !== roleEvents[index].role || await page.locator('[data-non-progress-boundary="true"]').count() !== 1) throw new Error(`role lens ${label} lost stable projected identity or non-progress boundary`)
     }
@@ -165,7 +169,7 @@ try {
     const shell = await page.evaluate(() => {
       const projection = document.querySelector('.current-projection'); const conversation = document.querySelector('.planner-conversation')
       const projectionBox = projection?.getBoundingClientRect(); const conversationBox = conversation?.getBoundingClientRect()
-      return { sidebar: Boolean(document.querySelector('.oc-global-nav')), journey: Boolean(document.querySelector('.oc-outcome-map')), current: document.querySelectorAll('[aria-current=step]').length, overflow: document.documentElement.scrollWidth - document.documentElement.clientWidth, approvedBoundaryLabels: [...document.querySelectorAll('[data-projection-field=boundary] li')].map((item) => item.textContent?.trim()).filter(Boolean), semanticProjectionFirst: Boolean(projection && conversation && (projection.compareDocumentPosition(conversation) & Node.DOCUMENT_POSITION_FOLLOWING)), visualProjectionFirst: innerWidth <= 760 ? Boolean(projectionBox && conversationBox && projectionBox.top < conversationBox.top) : Boolean(projectionBox && conversationBox && conversationBox.left < projectionBox.left), rawActionSlugVisible: ['q2-independent-qa', 'verify-coherent-slice', 'resolve-blocker', 'resolve_blocker'].some((value) => document.body.innerText.includes(value)) }
+      return { sidebar: Boolean(document.querySelector('.oc-global-nav')), journey: Boolean(document.querySelector('.oc-outcome-map')), current: document.querySelectorAll('[aria-current=step]').length, overflow: document.documentElement.scrollWidth - document.documentElement.clientWidth, approvedBoundaryLabels: [...document.querySelectorAll('[data-projection-field=boundary] li')].map((item) => item.textContent?.trim()).filter(Boolean), semanticProjectionFirst: Boolean(projection && conversation && (projection.compareDocumentPosition(conversation) & Node.DOCUMENT_POSITION_FOLLOWING)), visualProjectionFirst: innerWidth <= 760 ? Boolean(projectionBox && conversationBox && conversationBox.top < projectionBox.top) : Boolean(projectionBox && conversationBox && projectionBox.left < conversationBox.left), rawActionSlugVisible: ['q2-independent-qa', 'verify-coherent-slice', 'resolve-blocker', 'resolve_blocker'].some((value) => document.body.innerText.includes(value)) }
     })
     if (!shell.sidebar || !shell.journey || shell.current < 3 || shell.overflow !== 0 || shell.approvedBoundaryLabels.length === 0 || !shell.semanticProjectionFirst || !shell.visualProjectionFirst || shell.rawActionSlugVisible) throw new Error(`${viewport.name} existing shell failed ${JSON.stringify(shell)}`)
     if (viewport.width === 1440) {
@@ -204,6 +208,24 @@ try {
   }
 
   {
+    const context = await browser.newContext({ viewport: { width: 1440, height: 900 }, reducedMotion: 'reduce' })
+    const page = await context.newPage()
+    let decisionRequest = null
+    await page.route('**/api/private/config', (route) => route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ enabled: true, access: 'private_read_only', providers: [], sessionMaximumDays: 7, completionAuthority: false }) }))
+    await page.route('**/api/private/workspace', (route) => route.fulfill({ status: 200, contentType: 'application/json', headers: { etag: '"browser-revision"', 'x-outcome-csrf': 'browser-csrf-secret' }, body: JSON.stringify({ workspace: { viewState: 'ready', projects: [{ ...readyProjects.find((project) => project.project.id === 'outcome'), modelV2: blockedProjection }], dashboard: readyDashboard } }) }))
+    await page.route('**/api/private/decisions', async (route) => { decisionRequest = { headers: route.request().headers(), body: route.request().postDataJSON() }; await route.fulfill({ status: 201, contentType: 'application/json', body: JSON.stringify({ decisionState: 'recorded', decision: 'approved', rejectionReason: null, decidedAt: '2026-09-04T03:00:00.000Z', decisionActorClass: 'owner', notice: '기록됨 · 전달은 이 범위 밖', completionAuthority: false }) }) })
+    await page.goto(`${base}/workspace`)
+    await page.locator('.oc-dashboard').waitFor()
+    await page.locator('details.oc-v1-compatibility > summary').click()
+    const approval = page.locator('.oc-approval-rail')
+    if (await approval.locator('form, a').count() !== 0 || await approval.locator('[data-approval-kind=explicit_cherry_action] button[aria-disabled=true]').count() !== 1 || await approval.locator('[data-approval-kind=explicit_cherry_action] button:disabled').count() !== 0 || await approval.locator('[data-approval-kind=evidence_blocker] option').count() !== 4) throw new Error('decision controls violated the explicit-action or closed-vocabulary boundary')
+    await approval.getByRole('button', { name: '승인 기록' }).click()
+    await approval.getByText('기록됨 · 전달은 이 범위 밖').waitFor()
+    if (!decisionRequest || decisionRequest.headers['x-outcome-csrf'] !== 'browser-csrf-secret' || decisionRequest.headers['if-match'] !== '"browser-revision"' || decisionRequest.body.eventId !== 'event-builder-blocked' || decisionRequest.body.sequence !== 7) throw new Error(`decision browser request lost its server binding ${JSON.stringify(decisionRequest)}`)
+    await context.close()
+  }
+
+  {
     const context = await browser.newContext({ viewport: { width: 1440, height: 900 } })
     const page = await context.newPage()
     await page.route('**/api/private/auth/login', (route) => route.fulfill({ status: 503, contentType: 'application/json', body: JSON.stringify({ error: 'authentication_unavailable' }) }))
@@ -235,5 +257,5 @@ try {
   if (transitions.length !== 6 || transitions.filter(([action]) => action === 'login').length !== 3 || transitions.filter(([action]) => action === 'logout').length !== 3) throw new Error(`injected transition count failed ${JSON.stringify(transitions)}`)
   console.log(`account access browser PASS: account-only legacy convergence=6/6 with anonymous project payload requests=0; Clerk SDK browser markers present with no server callback/session-token handoff; 3 viewports x ${Object.keys(states).length - 1} non-ready states + loading + ready existing-shell login/logout hierarchy; login=${JSON.stringify(loginMeasurements)}; non-ready mobile/phone 200% zoom overflow=0; ready shell overflow=0; touch>=44; project switch preserved`)
 } finally {
-  server.close(); await once(server, 'close'); await browser.close()
+  await browser.close(); server.close(); await once(server, 'close')
 }

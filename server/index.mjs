@@ -53,6 +53,7 @@ export function createOutcomeServer(options = {}) {
   const collectPackages = options.collectPackages ?? (() => collectOutcomePackages({ bindingRegistry: loadBindingRegistry() }))
   const buildReceipt = options.buildReceipt ?? readBuildReceipt(root)
   const accountAccess = options.accountAccess
+  const decisionRuntime = options.decisionRuntime
   const privateTransitionAdapter = options.privateTransitionAdapter
   const operationsGuard = options.operationsGuard
   const failures = new Map()
@@ -67,6 +68,8 @@ export function createOutcomeServer(options = {}) {
     if (url.pathname.startsWith('/api/private/')) {
       const rate = operationsGuard?.allowRequest({ path: url.pathname, source: request.socket.remoteAddress ?? 'unknown' }) ?? { allowed: true }
       if (!rate.allowed) return json(response, 429, { error: 'rate_limited', retryAfter: rate.retryAfter }, { 'retry-after': String(rate.retryAfter) })
+      if (url.pathname === '/api/private/decisions' && request.method === 'POST' && publicReadOnly) return json(response, 405, { error: 'read_only' })
+      if (url.pathname === '/api/private/decisions' && request.method === 'POST' && !decisionRuntime) return json(response, 503, { error: 'decision_store_unavailable' })
       if (url.pathname === '/api/private/auth/login' || url.pathname === '/api/private/auth/logout') {
         if (request.method !== 'POST' || !accountAccess || !privateTransitionAdapter) return json(response, 405, { error: 'read_only' })
         const secure = options.secureCookies ?? process.env.NODE_ENV === 'production'
@@ -83,8 +86,12 @@ export function createOutcomeServer(options = {}) {
           return json(response, 200, { state: 'signed_out', mode: 'injected_adapter' }, { 'set-cookie': cookie('', 0) })
         } catch { return json(response, 503, { error: 'authentication_unavailable' }) }
       }
-      const value = await handlePrivateAccessRequest({ method: request.method, pathname: url.pathname, token: cookieValue(request, '__session'), service: accountAccess })
-      return json(response, value.status, value.body)
+      let body
+      if (url.pathname === '/api/private/decisions' && request.method === 'POST') {
+        try { body = await readBody(request) } catch { return json(response, 400, { error: 'invalid_request' }) }
+      }
+      const value = await handlePrivateAccessRequest({ method: request.method, pathname: url.pathname, token: cookieValue(request, '__session'), service: accountAccess, decisionRuntime, headers: request.headers, origin: request.headers.origin, body })
+      return json(response, value.status, value.body, value.headers)
     }
     if (request.method === 'POST' && url.pathname === '/api/auth/login') {
       if (publicReadOnly || !auth) return json(response, 405, { error: 'read_only' })
