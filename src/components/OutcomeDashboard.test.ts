@@ -79,6 +79,12 @@ describe('OUTCOME Package dashboard', () => {
     expect(markup).not.toContain('disabled=""')
     for (const value of ['evidence_insufficient', 'scope_not_authorized', 'superseded_by_newer_observation', 'defer_pending_external_input']) expect(markup).toContain(value)
     expect(ApprovalInbox.toString()).toContain('기록됨 · 전달은 이 범위 밖')
+    for (const value of ['stagedDecision', '결정 기록 검토', '대상 이벤트', 'completionAuthority=false', '확인 전에는 기록되지 않습니다.', '취소', '확인 기록']) expect(ApprovalInbox.toString()).toContain(value)
+    expect(ApprovalInbox.toString()).toContain('onDecision(stagedDecision)')
+    expect(ApprovalInbox.toString()).toContain('submittingRef.current')
+    expect(ApprovalInbox.toString()).toContain('원본이 변경되었습니다. 결정을 다시 검토하세요.')
+    expect(ApprovalInbox.toString()).toContain('restoreTriggerFocus()')
+    expect(ApprovalInbox.toString()).toContain("onClick: (event) => stageDecision(item, \"approved\", event.currentTarget)")
     expect(markup).not.toMatch(/<form|<a /)
   })
   it('keeps approval observation accent bounded and decision targets accessible without motion', () => {

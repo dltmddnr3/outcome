@@ -100,20 +100,39 @@ export function ApprovalInbox({ projection, active = false, className = 'oc-appr
   const [rejectionReason, setRejectionReason] = useState<PrivateDecisionReason>('evidence_insufficient')
   const [pending, setPending] = useState(false)
   const [notice, setNotice] = useState<string | null>(null)
-  const decide = async (item: ApprovalInboxItem, decision: 'approved' | 'rejected') => {
+  const [stagedDecision, setStagedDecision] = useState<{ eventId: string; sequence: number; decision: 'approved' | 'rejected'; rejectionReason: PrivateDecisionReason | null } | null>(null)
+  const decisionTriggerRef = useRef<HTMLButtonElement | null>(null)
+  const confirmRef = useRef<HTMLButtonElement | null>(null)
+  const submittingRef = useRef(false)
+  const restoreFocusRequestedRef = useRef(false)
+  useEffect(() => {
+    if (stagedDecision) confirmRef.current?.focus()
+    else if (restoreFocusRequestedRef.current) { restoreFocusRequestedRef.current = false; decisionTriggerRef.current?.focus() }
+  }, [stagedDecision])
+  const restoreTriggerFocus = () => { restoreFocusRequestedRef.current = true }
+  const stageDecision = (item: ApprovalInboxItem, decision: 'approved' | 'rejected', trigger: HTMLButtonElement) => {
     const event = projection?.events.find((candidate) => item.kind === 'evidence_blocker' && item.immutableHistory === `${candidate.id} · sequence ${candidate.sequence}`)
     if (!event || !onDecision || pending) return
-    setPending(true); setNotice(null)
-    try { await onDecision({ eventId: event.id, sequence: event.sequence, decision, rejectionReason: decision === 'rejected' ? rejectionReason : null }); setNotice('기록됨 · 전달은 이 범위 밖') }
-    catch { setNotice('결정을 기록하지 못했습니다. 원본을 새로 확인하세요.') }
-    finally { setPending(false) }
+    decisionTriggerRef.current = trigger
+    setNotice(null)
+    setStagedDecision({ eventId: event.id, sequence: event.sequence, decision, rejectionReason: decision === 'rejected' ? rejectionReason : null })
+  }
+  const cancelDecision = () => { if (pending) return; restoreTriggerFocus(); setStagedDecision(null) }
+  const confirmDecision = async () => {
+    if (!stagedDecision || !onDecision || pending || submittingRef.current) return
+    const currentEvent = projection?.events.find((event) => event.id === stagedDecision.eventId && event.sequence === stagedDecision.sequence && blockerStatuses.has(event.status))
+    if (!currentEvent) { restoreTriggerFocus(); setStagedDecision(null); setNotice('원본이 변경되었습니다. 결정을 다시 검토하세요.'); return }
+    submittingRef.current = true; setPending(true); setNotice(null)
+    try { await onDecision(stagedDecision); setStagedDecision(null); setNotice('기록됨 · 전달은 이 범위 밖') }
+    catch { restoreTriggerFocus(); setStagedDecision(null); setNotice('결정을 기록하지 못했습니다. 원본을 새로 확인하세요.') }
+    finally { submittingRef.current = false; setPending(false) }
   }
   return <aside className={className} data-workspace-panel="승인" data-workspace-active={active ? 'true' : 'false'} data-completion-authority="false" aria-labelledby="oc-approval-title">
     <header><span>Model v2 · 읽기 전용</span><h2 id="oc-approval-title">승인</h2><strong>승인 권한 위임 없음</strong></header>
     {items.length === 0 ? <p className="oc-approval-empty" role="status">Cherry의 명시적 행동 또는 확인 가능한 차단 근거가 없습니다.</p> : <ol className="oc-approval-list">{items.map((item, index) => { const reasonId = `oc-approval-reason-${index}`; return <li className="oc-approval-item" key={`${item.kind}-${index}`} data-approval-kind={item.kind}>
       <div className="oc-approval-request"><small>{item.requestClass}</small><h3>{item.request}</h3></div>
       <dl><div><dt>요청</dt><dd>{item.request}</dd></div><div><dt>요청자 → 권한</dt><dd>{item.requester} → {item.authorityTarget}</dd></div><div><dt>차단 대상</dt><dd>{item.blockedTarget}</dd></div><div><dt>공개 pin</dt><dd>{item.publicPin}</dd></div><div><dt>공개 근거</dt><dd>{item.evidence}</dd></div><div><dt>만료</dt><dd>{item.expiry}</dd></div><div><dt>신선도</dt><dd>{item.freshness}</dd></div><div><dt>계보 / 교체</dt><dd>{item.lineage}</dd></div><div><dt>불변 이력</dt><dd>{item.immutableHistory}</dd></div></dl>
-      {item.kind === 'explicit_cherry_action' ? <><p className="oc-approval-reason" id={reasonId}>고정 식별자가 없어 결정을 기록할 수 없습니다</p><div className="oc-approval-actions" aria-describedby={reasonId}><button type="button" aria-disabled="true" aria-describedby={reasonId}>결정 기록 불가</button></div></> : <><label className="oc-approval-rejection"><span>반려 사유</span><select value={rejectionReason} onChange={(event) => setRejectionReason(event.target.value as PrivateDecisionReason)}>{rejectionReasons.map((reason) => <option key={reason.value} value={reason.value}>{reason.label}</option>)}</select></label><p className="oc-approval-reason" id={reasonId}>이 결정은 기록만 하며 전달·완료·배포 권한이 아닙니다.</p><div className="oc-approval-actions" aria-describedby={reasonId}><button type="button" disabled={pending || !onDecision} onClick={() => void decide(item, 'approved')} aria-describedby={reasonId}>승인 기록</button><button type="button" disabled={pending || !onDecision} onClick={() => void decide(item, 'rejected')} aria-describedby={reasonId}>반려 기록</button></div></>}
+      {item.kind === 'explicit_cherry_action' ? <><p className="oc-approval-reason" id={reasonId}>고정 식별자가 없어 결정을 기록할 수 없습니다</p><div className="oc-approval-actions" aria-describedby={reasonId}><button type="button" aria-disabled="true" aria-describedby={reasonId}>결정 기록 불가</button></div></> : <><label className="oc-approval-rejection"><span>반려 사유</span><select value={rejectionReason} onChange={(event) => setRejectionReason(event.target.value as PrivateDecisionReason)}>{rejectionReasons.map((reason) => <option key={reason.value} value={reason.value}>{reason.label}</option>)}</select></label><p className="oc-approval-reason" id={reasonId}>이 결정은 기록만 하며 전달·완료·배포 권한이 아닙니다.</p><div className="oc-approval-actions" aria-describedby={reasonId}><button type="button" disabled={pending || !onDecision} onClick={(event) => stageDecision(item, 'approved', event.currentTarget)} aria-describedby={reasonId}>승인 기록</button><button type="button" disabled={pending || !onDecision} onClick={(event) => stageDecision(item, 'rejected', event.currentTarget)} aria-describedby={reasonId}>반려 기록</button></div>{stagedDecision && item.immutableHistory === `${stagedDecision.eventId} · sequence ${stagedDecision.sequence}` && <section className="oc-decision-review" role="alertdialog" aria-labelledby="oc-decision-review-title" aria-describedby="oc-decision-review-boundary"><h4 id="oc-decision-review-title">결정 기록 검토</h4><dl><div><dt>대상 이벤트</dt><dd>{stagedDecision.eventId} · sequence {stagedDecision.sequence}</dd></div><div><dt>결정</dt><dd>{stagedDecision.decision === 'approved' ? '승인' : '반려'}</dd></div>{stagedDecision.rejectionReason && <div><dt>반려 사유</dt><dd>{rejectionReasons.find((reason) => reason.value === stagedDecision.rejectionReason)?.label} · {stagedDecision.rejectionReason}</dd></div>}</dl><p id="oc-decision-review-boundary">completionAuthority=false · 확인 전에는 기록되지 않습니다.</p><div className="oc-decision-review-actions"><button type="button" disabled={pending} onClick={cancelDecision}>취소</button><button ref={confirmRef} type="button" disabled={pending} onClick={() => void confirmDecision()}>확인 기록</button></div></section>}</>}
     </li> })}</ol>}
     {notice && <p className="oc-approval-notice" role="status">{notice}</p>}
   </aside>

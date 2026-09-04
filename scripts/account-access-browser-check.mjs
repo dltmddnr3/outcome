@@ -207,21 +207,42 @@ try {
     await context.close()
   }
 
-  {
-    const context = await browser.newContext({ viewport: { width: 1440, height: 900 }, reducedMotion: 'reduce' })
+  for (const decisionProbe of [{ name: 'desktop-pointer', viewport: { width: 1440, height: 900 }, activation: 'pointer' }, { name: 'mobile-keyboard', viewport: { width: 390, height: 844 }, activation: 'keyboard' }]) {
+    const context = await browser.newContext({ viewport: decisionProbe.viewport, reducedMotion: 'reduce' })
     const page = await context.newPage()
-    let decisionRequest = null
+    const decisionRequests = []
     await page.route('**/api/private/config', (route) => route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ enabled: true, access: 'private_read_only', providers: [], sessionMaximumDays: 7, completionAuthority: false }) }))
     await page.route('**/api/private/workspace', (route) => route.fulfill({ status: 200, contentType: 'application/json', headers: { etag: '"browser-revision"', 'x-outcome-csrf': 'browser-csrf-secret' }, body: JSON.stringify({ workspace: { viewState: 'ready', projects: [{ ...readyProjects.find((project) => project.project.id === 'outcome'), modelV2: blockedProjection }], dashboard: readyDashboard } }) }))
-    await page.route('**/api/private/decisions', async (route) => { decisionRequest = { headers: route.request().headers(), body: route.request().postDataJSON() }; await route.fulfill({ status: 201, contentType: 'application/json', body: JSON.stringify({ decisionState: 'recorded', decision: 'approved', rejectionReason: null, decidedAt: '2026-09-04T03:00:00.000Z', decisionActorClass: 'owner', notice: '기록됨 · 전달은 이 범위 밖', completionAuthority: false }) }) })
+    await page.route('**/api/private/decisions', async (route) => { decisionRequests.push({ headers: route.request().headers(), body: route.request().postDataJSON() }); await new Promise((resolve) => setTimeout(resolve, 80)); if (decisionRequests.length > 1) await route.fulfill({ status: 503, contentType: 'application/json', body: JSON.stringify({ error: 'decision_store_unavailable' }) }); else await route.fulfill({ status: 201, contentType: 'application/json', body: JSON.stringify({ decisionState: 'recorded', decision: 'approved', rejectionReason: null, decidedAt: '2026-09-04T03:00:00.000Z', decisionActorClass: 'owner', notice: '기록됨 · 전달은 이 범위 밖', completionAuthority: false }) }) })
     await page.goto(`${base}/workspace`)
     await page.locator('.oc-dashboard').waitFor()
     await page.locator('details.oc-v1-compatibility > summary').click()
+    if (decisionProbe.viewport.width <= 760) await page.locator('.oc-workspace-tabs').getByRole('button', { name: '승인' }).click()
     const approval = page.locator('.oc-approval-rail')
     if (await approval.locator('form, a').count() !== 0 || await approval.locator('[data-approval-kind=explicit_cherry_action] button[aria-disabled=true]').count() !== 1 || await approval.locator('[data-approval-kind=explicit_cherry_action] button:disabled').count() !== 0 || await approval.locator('[data-approval-kind=evidence_blocker] option').count() !== 4) throw new Error('decision controls violated the explicit-action or closed-vocabulary boundary')
-    await approval.getByRole('button', { name: '승인 기록' }).click()
+    const stageButton = approval.getByRole('button', { name: '승인 기록' })
+    if (decisionProbe.activation === 'keyboard') { await stageButton.focus(); await page.keyboard.press('Enter') } else await stageButton.click()
+    const review = approval.getByRole('alertdialog', { name: '결정 기록 검토' })
+    await review.waitFor()
+    if (decisionRequests.length !== 0) throw new Error(`${decisionProbe.name} first activation sent POST before confirmation`)
+    for (const value of ['event-builder-blocked', 'sequence 7', '승인', 'completionAuthority=false']) if (!(await review.textContent())?.includes(value)) throw new Error(`${decisionProbe.name} review omitted ${value}`)
+    await review.getByRole('button', { name: '취소' }).click()
+    if (decisionRequests.length !== 0 || await stageButton.evaluate((element) => document.activeElement !== element)) throw new Error(`${decisionProbe.name} cancel mutated or failed to restore focus`)
+    const rejectButton = approval.getByRole('button', { name: '반려 기록' })
+    await rejectButton.click(); await review.waitFor()
+    for (const value of ['반려', '근거가 충분하지 않음', 'evidence_insufficient']) if (!(await review.textContent())?.includes(value)) throw new Error(`${decisionProbe.name} rejection review omitted ${value}`)
+    await review.getByRole('button', { name: '취소' }).click()
+    if (decisionRequests.length !== 0 || await rejectButton.evaluate((element) => document.activeElement !== element)) throw new Error(`${decisionProbe.name} rejection cancel mutated or failed to restore focus`)
+    if (decisionProbe.activation === 'keyboard') await page.keyboard.press('Enter'); else await stageButton.click()
+    await review.waitFor()
+    await review.getByRole('button', { name: '확인 기록' }).evaluate((button) => { button.click(); button.click() })
     await approval.getByText('기록됨 · 전달은 이 범위 밖').waitFor()
-    if (!decisionRequest || decisionRequest.headers['x-outcome-csrf'] !== 'browser-csrf-secret' || decisionRequest.headers['if-match'] !== '"browser-revision"' || decisionRequest.body.eventId !== 'event-builder-blocked' || decisionRequest.body.sequence !== 7) throw new Error(`decision browser request lost its server binding ${JSON.stringify(decisionRequest)}`)
+    const decisionRequest = decisionRequests[0]
+    if (decisionRequests.length !== 1 || !decisionRequest || decisionRequest.headers['x-outcome-csrf'] !== 'browser-csrf-secret' || decisionRequest.headers['if-match'] !== '"browser-revision"' || decisionRequest.body.eventId !== 'event-builder-blocked' || decisionRequest.body.sequence !== 7) throw new Error(`${decisionProbe.name} decision browser request lost its staged server binding ${JSON.stringify(decisionRequests)}`)
+    await stageButton.click(); await review.waitFor(); await review.getByRole('button', { name: '확인 기록' }).click()
+    await approval.getByText('결정을 기록하지 못했습니다. 원본을 새로 확인하세요.').waitFor()
+    const errorFocus = await page.evaluate(() => ({ text: document.activeElement?.textContent?.trim(), tag: document.activeElement?.tagName }))
+    if (decisionRequests.length !== 2 || await stageButton.evaluate((element) => document.activeElement !== element)) throw new Error(`${decisionProbe.name} error did not remain single-submit or restore focus requests=${decisionRequests.length} focus=${JSON.stringify(errorFocus)}`)
     await context.close()
   }
 
@@ -255,7 +276,7 @@ try {
     await context.close()
   }
   if (transitions.length !== 6 || transitions.filter(([action]) => action === 'login').length !== 3 || transitions.filter(([action]) => action === 'logout').length !== 3) throw new Error(`injected transition count failed ${JSON.stringify(transitions)}`)
-  console.log(`account access browser PASS: account-only legacy convergence=6/6 with anonymous project payload requests=0; Clerk SDK browser markers present with no server callback/session-token handoff; 3 viewports x ${Object.keys(states).length - 1} non-ready states + loading + ready existing-shell login/logout hierarchy; login=${JSON.stringify(loginMeasurements)}; non-ready mobile/phone 200% zoom overflow=0; ready shell overflow=0; touch>=44; project switch preserved`)
+  console.log(`account access browser PASS: account-only legacy convergence=6/6 with anonymous project payload requests=0; Clerk SDK browser markers present with no server callback/session-token handoff; 3 viewports x ${Object.keys(states).length - 1} non-ready states + loading + ready existing-shell login/logout hierarchy; decision confirmation desktop-pointer+mobile-keyboard first POST=0 cancel POST=0 confirm POST=1 double-submit=1 error-focus-restored; login=${JSON.stringify(loginMeasurements)}; non-ready mobile/phone 200% zoom overflow=0; ready shell overflow=0; touch>=44; project switch preserved`)
 } finally {
   await browser.close(); server.close(); await once(server, 'close')
 }
