@@ -1,3 +1,5 @@
+import { createElement } from 'react'
+import { renderToStaticMarkup } from 'react-dom/server'
 import { describe, expect, it } from 'vitest'
 import { OutcomeDashboard, axisStateLabel, bindingHeroLabel, bindingObservationLabel, collapsedStageCount, currentHierarchy, defaultHierarchySelection, deriveScopeState, deriveStageRailState, desktopConversationBreakpoint, detailContentPolicy, entityStateLabel, findStage, gateGroupPresentation, gateProgress, githubEvidenceItems, heroGateEvidence, hierarchyIsExploring, hierarchyPlacement, meaningfulGateGroups, mobileHierarchyLevels, mobileWorkspaceTabs, nextStageOptionIndex, nowPresentation, projectHeroModel, resolveHierarchySelection, selectedGateCount, selectedStageContext, selectHierarchyPhase, selectHierarchyScope, selectLiveBinding, selectProject, snapshotPresentation, sourceStateLabel, stageDetailSemantics, structuralPhaseModel, structureStatusLabel, summarizeStage, timingPresentation, workspaceManagementItems, type Binding, type GithubConnector, type PackageProject, type PackageStage } from './OutcomeDashboard'
 import { activityLabelKo, axisLabelKo, gatePresentation, groupPresentation, hierarchyLabels, loginErrorPresentation, phasePresentation, projectOutcomePresentation, roleLabel, stagePresentation } from './outcomeKorean'
@@ -7,10 +9,32 @@ const github = (overrides: Partial<GithubConnector> = {}): GithubConnector => ({
 const project = (id: string, title: string): PackageProject => ({ status: 'valid', errors: [], observedAt: null, project: { id, name: title, outcome: `${title} outcome`, acceptanceAuthority: 'Cherry' }, connectors: { github: github() }, phases: [{ id: `${id}-phase`, title: 'Phase', purpose: 'Phase purpose', completion: null, scopes: [{ id: `${id}-scope`, title: 'Scope', purpose: 'Scope purpose', stages: [stage({ id: `${id}-stage` })] }] }], current: { phaseId: `${id}-phase`, scopeId: `${id}-scope`, stageId: `${id}-stage` }, next: null, bindings: [], now: { status: 'unbound', activity: null, observedAt: null, source: 'runtime_registry' }, progress: { available: false, reason: 'no_cross_stage_aggregate' } })
 
 describe('OUTCOME Package dashboard', () => {
+  it('integrates one explicit default-off Planner fixture adapter without production leakage', () => {
+    const initialData = { schemaVersion: 2 as const, observedAt: '2026-09-04T00:00:00.000Z', build: { repository: 'OUTCOME', ref: 'main', commit: null, tree: null, asset: null, runtimeNowPinned: false as const }, projects: [project('outcome', 'OUTCOME')] }
+    const absent = renderToStaticMarkup(createElement(OutcomeDashboard, { onUnauthorized: () => undefined, initialData }))
+    expect(absent).not.toContain('data-role-chat-state')
+    expect(absent).not.toContain('data-planner-composer="true"')
+    const ready = renderToStaticMarkup(createElement(OutcomeDashboard, { onUnauthorized: () => undefined, initialData, nonProductionRoleChatFixture: { state: 'ready', plannerBound: true, initialFilter: '전체', onSend: () => undefined } }))
+    expect(ready).toContain('data-role-chat-state="ready"')
+    expect((ready.match(/data-planner-composer="true"/g) ?? [])).toHaveLength(1)
+    for (const state of ['ready', 'streaming', 'tool-running', 'waiting-approval', 'offline-reconnecting', 'permission-absent', 'unbound-stale', 'delivery_unknown'] as const) {
+      const stateMarkup = renderToStaticMarkup(createElement(OutcomeDashboard, { onUnauthorized: () => undefined, initialData, nonProductionRoleChatFixture: { state, plannerBound: true, initialFilter: '전체', onSend: () => undefined } }))
+      expect(stateMarkup).toContain(`data-role-chat-state="${state}"`)
+      if (state === 'permission-absent' || state === 'unbound-stale') expect(stateMarkup).not.toContain('data-planner-composer="true"')
+      if (state === 'delivery_unknown') { expect(stateMarkup).toContain('자동 재전송하지 않습니다.'); expect(stateMarkup).not.toContain('다시 보내기') }
+    }
+    for (const filter of ['Builder', 'UX & Product QA', 'Release Audit'] as const) {
+      const specialist = renderToStaticMarkup(createElement(OutcomeDashboard, { onUnauthorized: () => undefined, initialData, nonProductionRoleChatFixture: { state: 'ready', plannerBound: true, initialFilter: filter, onSend: () => undefined } }))
+      expect(specialist).not.toContain('data-planner-composer="true"')
+    }
+    const privateProjects = [{ project: { id: 'outcome', name: 'OUTCOME' }, phases: [], current: { phaseId: 'outcome-phase', scopeId: 'outcome-scope', stageId: 'outcome-stage' }, modelV2: { schemaVersion: 1 as const, modelVersion: 2 as const, project: { id: 'outcome', label: 'OUTCOME' }, destination: null, remainingAcceptanceGap: { remaining: 1, total: 1 }, now: { observedAt: '2026-09-04T00:00:00.000Z', state: 'ready' as const }, readyBoundaryLabels: [], nextActionLabel: null, cherryActionLabel: null, state: 'ready' as const, events: [] } }]
+    const integrated = renderToStaticMarkup(createElement(OutcomeDashboard, { onUnauthorized: () => undefined, initialData, privateProjects, nonProductionRoleChatFixture: { state: 'ready', plannerBound: true, initialFilter: 'Planner', onSend: () => undefined } }))
+    expect((integrated.match(/data-planner-composer="true"/g) ?? [])).toHaveLength(1)
+  })
   it('D3 workspace order and responsive navigation preserve one project context', () => {
     const source = OutcomeDashboard.toString()
     const workbench = source.slice(source.indexOf('oc-workbench'))
-    const tokens = ['oc-map-workspace', 'oc-approval-rail', 'PlannerConversation']
+    const tokens = ['oc-map-workspace', 'oc-approval-rail', 'oc-conversation-panel']
     expect(tokens.map((token) => workbench.indexOf(token))).toEqual([...tokens].map((token) => workbench.indexOf(token)).sort((a, b) => a - b))
     expect(mobileWorkspaceTabs).toEqual(['지도', '대화', '승인'])
     expect(desktopConversationBreakpoint).toBe(1100)

@@ -1,8 +1,8 @@
 import { useEffect, useRef, useState, type CSSProperties } from 'react'
 import { Archive, Check, ChevronLeft, ChevronRight, Circle, Layers3, Menu, MoreHorizontal, Plug, Plus, Radio, RefreshCw, Search, UserRound, X } from 'lucide-react'
-import { fetchOutcomeDashboard, type PrivateProjectProjection } from '../lib/api'
+import { fetchOutcomeDashboard, type PrivateModelV2Event, type PrivateProjectProjection } from '../lib/api'
 import { CurrentProjection } from './CurrentProjection'
-import { PlannerConversation } from './PlannerConversation'
+import { PlannerConversation, type RoleChatFilter, type RoleChatFixtureState } from './PlannerConversation'
 import { activityLabelKo, axisLabelKo, freshnessLabelKo, gatePresentation, groupPresentation, phasePresentation, projectOutcomePresentation, roleLabel, scopePresentation, sourceLabelKo, sourceStateLabelKo, stagePresentation, stateLabelKo } from './outcomeKorean'
 
 type SourceState = 'valid' | 'stale' | 'unknown' | 'conflict'
@@ -71,9 +71,14 @@ export const structureStatusLabel = (value: string) => ({ current: '현재', com
 function StageNode({ state, current }: { state: string; current: boolean }) { return <i className={`${state} ${current ? 'current' : ''}`} aria-hidden="true">{state === 'complete' ? <Check size={11} /> : current ? <Radio size={11} /> : <Circle size={9} />}</i> }
 function Axis({ label, value }: { label: string; value: string }) { return <div className="oc-axis"><small>{label}</small><strong>{axisStateLabel(value)}</strong></div> }
 
-export function OutcomeDashboard({ onUnauthorized, initialData, onLogout, privateProjects }: { onUnauthorized: () => void; initialData?: OutcomeDashboardData; onLogout?: () => Promise<void>; privateProjects?: PrivateProjectProjection[] }) {
+type NonProductionRoleChatFixture = { state: RoleChatFixtureState; plannerBound: boolean; initialFilter?: RoleChatFilter; onSend: (message: string) => void }
+
+export function OutcomeDashboard({ onUnauthorized, initialData, onLogout, privateProjects, nonProductionRoleChatFixture }: { onUnauthorized: () => void; initialData?: OutcomeDashboardData; onLogout?: () => Promise<void>; privateProjects?: PrivateProjectProjection[]; nonProductionRoleChatFixture?: NonProductionRoleChatFixture }) {
   const [data, setData] = useState<OutcomeDashboardData | null>(initialData ?? null); const [selectedProjectId, setSelectedProjectId] = useState('outcome'); const [selection, setSelection] = useState<HierarchySelection | null>(null); const [mobileLevel, setMobileLevel] = useState(0); const [workspaceTab, setWorkspaceTab] = useState<(typeof mobileWorkspaceTabs)[number]>('지도'); const [stagesExpanded, setStagesExpanded] = useState(false); const [error, setError] = useState<string | null>(null)
   const [navigationOpen, setNavigationOpen] = useState(false); const [projectQuery, setProjectQuery] = useState(''); const menuButtonRef = useRef<HTMLButtonElement>(null); const navigationRef = useRef<HTMLElement>(null); const contentRef = useRef<HTMLElement>(null)
+  const productionBuild = (import.meta as ImportMeta & { env?: { PROD?: boolean } }).env?.PROD === true
+  const roleChatFixture = productionBuild ? undefined : nonProductionRoleChatFixture
+  const roleChat = (events: PrivateModelV2Event[]) => <PlannerConversation events={events} fixtureState={roleChatFixture?.state} plannerBound={roleChatFixture?.plannerBound} initialFilter={roleChatFixture?.initialFilter} onSend={roleChatFixture?.onSend} />
   const load = async () => { if (initialData) { setData(initialData); setError(null); return }; try { setData(await fetchOutcomeDashboard()); setError(null) } catch (reason) { const message = reason instanceof Error ? reason.message : ''; if (message === 'authentication_required') onUnauthorized(); else setError('대시보드를 읽지 못했습니다.') } }
   useEffect(() => { if (initialData) { setData(initialData); return }; void load(); const timer = window.setInterval(() => void load(), 10_000); return () => window.clearInterval(timer) }, [initialData])
   useEffect(() => {
@@ -112,7 +117,7 @@ export function OutcomeDashboard({ onUnauthorized, initialData, onLogout, privat
           <nav className="oc-management" aria-label="관리">{workspaceManagementItems.map((item) => <button key={item.id} type="button" disabled aria-label={`${item.label} · 준비 중`}>{item.id === 'archive' ? <Archive size={18} aria-hidden="true" /> : <Plug size={18} aria-hidden="true" />}<span>{item.label}</span><small>준비 중</small></button>)}</nav></div>
         {onLogout ? <button className="oc-nav-account" type="button" data-private-logout="true" onClick={() => void onLogout()}><UserRound size={18} aria-hidden="true" /><span><strong>Cherry 계정</strong><small>로그아웃</small></span></button> : <a className="oc-nav-account" href="/workspace" onClick={() => closePrivateNavigation()}><UserRound size={18} aria-hidden="true" /><span><strong>로그인 또는 계정 관리</strong><small>비공개 워크스페이스</small></span></a>}
       </aside>
-      <main ref={contentRef} id="oc-main-content" className="oc-dashboard-content" tabIndex={-1}><header className="oc-topbar"><button ref={menuButtonRef} className="oc-nav-trigger" aria-label="전역 탐색 열기" aria-expanded={navigationOpen} onClick={() => setNavigationOpen(true)}><Menu size={20} aria-hidden="true" /></button></header><div className="oc-primary-workspace"><CurrentProjection projection={privateOnlyProject.modelV2} /><PlannerConversation events={privateOnlyProject.modelV2.events} /></div><details className="oc-v1-compatibility"><summary><span>v1 호환 정보</span><small>현재 projection에는 호환 위계가 없습니다</small></summary><div className="oc-v1-compatibility__content" role="status"><h2>v1 호환 정보 없음</h2><p>서버가 제공한 호환 위계가 없어 페이즈·범위·스테이지를 대신 계산하지 않습니다.</p></div></details></main>
+      <main ref={contentRef} id="oc-main-content" className="oc-dashboard-content" tabIndex={-1}><header className="oc-topbar"><button ref={menuButtonRef} className="oc-nav-trigger" aria-label="전역 탐색 열기" aria-expanded={navigationOpen} onClick={() => setNavigationOpen(true)}><Menu size={20} aria-hidden="true" /></button></header><div className="oc-primary-workspace"><CurrentProjection projection={privateOnlyProject.modelV2} />{roleChat(privateOnlyProject.modelV2.events)}</div><details className="oc-v1-compatibility"><summary><span>v1 호환 정보</span><small>현재 projection에는 호환 위계가 없습니다</small></summary><div className="oc-v1-compatibility__content" role="status"><h2>v1 호환 정보 없음</h2><p>서버가 제공한 호환 위계가 없어 페이즈·범위·스테이지를 대신 계산하지 않습니다.</p></div></details></main>
     </section>
   }
   const privateProjection = project ? privateProjects?.find((item) => item.project.id === project.project.id)?.modelV2 : undefined
@@ -134,7 +139,7 @@ export function OutcomeDashboard({ onUnauthorized, initialData, onLogout, privat
     </aside>
     <main ref={contentRef} id="oc-main-content" className="oc-dashboard-content" tabIndex={-1}>
       <header className="oc-topbar"><button ref={menuButtonRef} className="oc-nav-trigger" aria-label="전역 탐색 열기" aria-expanded={navigationOpen} onClick={() => setNavigationOpen(true)}><Menu size={20} aria-hidden="true" /></button></header>
-      <div className="oc-primary-workspace"><CurrentProjection projection={privateProjection} /><PlannerConversation events={privateProjection.events} /></div>
+      <div className="oc-primary-workspace"><CurrentProjection projection={privateProjection} />{roleChat(privateProjection.events)}</div>
       <details className="oc-v1-compatibility"><summary><span>v1 호환 정보</span><small>현재 projection에는 호환 위계가 없습니다</small></summary><div className="oc-v1-compatibility__content" role="status"><h2>v1 호환 정보 없음</h2><p>서버가 제공한 호환 위계가 없어 페이즈·범위·스테이지를 대신 계산하지 않습니다.</p></div></details>
     </main>
   </section>
@@ -168,7 +173,7 @@ export function OutcomeDashboard({ onUnauthorized, initialData, onLogout, privat
       {!privateProjection && <div className="oc-bindings" role="group" aria-label="역할별 세션 관측">{project.bindings.map((binding) => { const live = liveBinding === binding; return <details key={binding.role} className={`oc-role-row ${binding.status}`} data-live={live ? 'true' : 'false'}><summary><strong>{roleLabel(binding.role)}</strong><span>{bindingHeroLabel(binding)}</span>{live && <span className="oc-live-signal" aria-label="실시간 활동"><i aria-hidden="true" /><b>실시간</b></span>}</summary><div className="oc-role-history"><p>버전 {binding.bindingVersion ?? 0} · 이력 {binding.historyCount} · {binding.stageId ?? '스테이지 연결 없음'}</p>{(binding.history ?? []).length ? <ol>{binding.history!.map((event, index) => <li key={`${event.action}-${event.after_version}-${index}`}><strong>{event.action}</strong><span>버전 {event.before_version}→{event.after_version} · {compactTime(event.occurred_at)} · {event.stage_id ?? binding.stageId ?? '스테이지 연결 없음'}</span></li>)}</ol> : <p>전환 이력 없음</p>}</div></details> })}</div>}
       {project.status !== 'valid' && <div className={`oc-warning ${project.status}`} role="status"><strong>{sourceStateLabel(project.status)}</strong><span>원본 묶음의 참조와 식별자를 다시 확인하세요.</span></div>}
     </section>
-    {privateProjection && <div className="oc-primary-workspace"><CurrentProjection projection={privateProjection} /><PlannerConversation events={privateProjection.events} /></div>}
+    {privateProjection && <div className="oc-primary-workspace"><CurrentProjection projection={privateProjection} /></div>}
     <details className="oc-v1-compatibility" open={!privateProjection}>
       {privateProjection && <summary><span>v1 호환 정보</span><small>역할 연결과 기술 근거는 필요할 때만 확인</small></summary>}
       <div className="oc-v1-compatibility__content">
@@ -193,7 +198,7 @@ export function OutcomeDashboard({ onUnauthorized, initialData, onLogout, privat
     </section>
       </div>
       <aside className="oc-approval-rail" data-workspace-panel="승인" data-workspace-active={workspaceTab === '승인' ? 'true' : 'false'} aria-labelledby="oc-approval-title"><h2 id="oc-approval-title">승인</h2><p>승인 요청이 관측되면 여기에 표시됩니다.</p><strong>승인 권한 위임 없음</strong></aside>
-      <div className="oc-conversation-panel" data-workspace-panel="대화" data-workspace-active={workspaceTab === '대화' ? 'true' : 'false'}><PlannerConversation events={privateProjection?.events ?? []} /></div>
+      <div className="oc-conversation-panel" data-workspace-panel="대화" data-workspace-active={workspaceTab === '대화' ? 'true' : 'false'}>{roleChat(privateProjection?.events ?? [])}</div>
     </section>
     <details id="oc-technical-evidence" className="oc-technical"><summary><span>기술 증거</span><small>빌드·역할 연결·GitHub·근거 축</small></summary><div className="oc-technical-content"><div className="oc-build" aria-label="제공 중인 고정 빌드"><small>기술 증거 · 프로젝트 식별자 {project.project.id} · {data.build.repository}/{data.build.ref}</small><strong>커밋 {data.build.commit ?? '근거 없음'} · 트리 {data.build.tree ?? '근거 없음'}</strong><span>에셋 {data.build.asset ?? '근거 없음'} · {snapshot ? '배포 스냅샷이며 실시간 세션은 별도 연결 예정' : '실시간 현재 작업은 빌드에 고정되지 않음'}</span></div><section className="oc-timing-evidence" aria-label="시간 근거"><div><small>{timing.elapsed.label}</small><strong>{timing.elapsed.value}</strong>{timing.elapsed.basis && <span>{timing.elapsed.basis}</span>}</div><div><small>{timing.eta.label}</small><strong>{timing.eta.value}</strong></div></section><section className="oc-binding-evidence" aria-label="역할 연결 기술 증거"><h3>역할 연결 근거</h3>{project.bindings.map((binding) => <div key={binding.role}><strong>{roleLabel(binding.role)}</strong><span>{binding.stageId ?? '스테이지 연결 없음'} · 이력 {binding.historyCount} · 관측 {compactTime(binding.observedAt)}</span></div>)}</section><section className="oc-github" aria-label="GitHub 전달 근거 연결"><header><div><small>선택 연결 근거 · GitHub</small><strong>{github.adopted ? 'GitHub 연결 채택' : 'GitHub 연결 미채택'}</strong></div><span className={github.state}>{entityStateLabel(github.state)}</span></header><div>{githubEvidenceItems(github).map((item) => <article key={item.label} className={item.state}><small>{item.label}</small><strong>{item.value}</strong><span>{entityStateLabel(item.state)}</span></article>)}</div><p>완료 판정 권한 없음 · GitHub 활동은 완료 조건 충족이나 Cherry 승인이 아닙니다.</p></section>{selectedStage && <div className="oc-axes" aria-label="선택 스테이지 근거 축"><Axis label="구현" value={selectedStage.axes.implementation} /><Axis label="테스트" value={selectedStage.axes.test} /><Axis label="증거 확정" value={selectedStage.axes.evidence} /><Axis label="변화 관측" value={project.now.status} /></div>}</div></details>
       </div>
