@@ -63,19 +63,59 @@ describe('Phase 4 role chat D3 contract', () => {
   ]
 
   it('C1-R6 keeps the production runtime composer hidden under the default-off server contract', async () => {
-    // @ts-expect-error The test consumes the server's JavaScript contract without adding it to the browser type graph.
+    const bundlerModule = 'esbuild', browserModule = '@playwright/test', httpModule = 'node:http'
+    const { build } = await import(bundlerModule)
+    const { chromium } = await import(browserModule)
+    const { createServer } = await import(httpModule)
+    // @ts-expect-error The test consumes the server JavaScript contract without changing the browser type graph.
     const { handlePrivateChatRequest } = await import('../../server/outcome-chat-api.mjs')
+    const root = new URL('../..', import.meta.url).pathname
     const result = await handlePrivateChatRequest({
       method: 'GET',
       url: '/api/private/chat/timeline?project_id=outcome&after_sequence=0',
-      service: { timeline: async () => ({ target: { role: 'planner', binding_version: 7 }, events: [], completion_authority: false }) },
+      service: { timeline: async () => ({ target: { role: 'planner', binding_version: 7 }, events: [{ event_id: 'event-0000000000000001', sequence: 1, observed_at: '2026-09-04T00:05:00.000Z', kind: 'user_message', state: 'queued', correlation_id: 'message-0000000000000001', payload: { private_content: { text: 'Mounted timeline completed' } } }], completion_authority: false }) },
       owner: { authenticated: true, actor: 'cherry_owner', allowed_origin: 'https://preview.invalid', csrf: 'csrf-value' },
     })
     expect(result.status).toBe(200)
-    expect(result.body.csrf).toBe('')
-    const html = renderToStaticMarkup(<PlannerConversation events={events} />)
-    expect(html).not.toContain('data-planner-composer="true"')
-  })
+    const bundled = await build({
+      absWorkingDir: root, bundle: true, write: false, platform: 'browser', format: 'iife', jsx: 'automatic',
+      define: { 'process.env.NODE_ENV': '"production"' },
+      stdin: { resolveDir: root, loader: 'tsx', contents: 'import React from "react"; import {createRoot} from "react-dom/client"; import {PlannerConversation} from "./src/components/PlannerConversation"; createRoot(document.getElementById("root")!).render(<PlannerConversation events={[]} />);' },
+    })
+    const script = bundled.outputFiles[0].text
+    const server = createServer((request: { url?: string }, response: { writeHead: (status: number, headers: object) => void; end: (body: string) => void }) => {
+      response.writeHead(200, { 'content-type': request.url === '/fixture.js' ? 'text/javascript' : 'text/html' })
+      response.end(request.url === '/fixture.js' ? script : '<div id="root"></div><script src="/fixture.js"></script>')
+    })
+    let browser
+    const diagnostics = { pageErrors: 0, requestFailures: 0, timelineResponses: 0, ready: false, renderedMessages: 0, composers: -1 }
+    try {
+      await new Promise<void>((resolve) => server.listen(0, '127.0.0.1', resolve))
+      browser = await chromium.launch({ headless: true, executablePath: '/Applications/Google Chrome.app/Contents/MacOS/Google Chrome' })
+      const page = await browser.newPage()
+      page.on('pageerror', () => { diagnostics.pageErrors += 1 })
+      page.on('requestfailed', () => { diagnostics.requestFailures += 1 })
+      await page.route('**/api/private/chat/timeline?*', async (route: { fulfill: (input: object) => Promise<void> }) => {
+        diagnostics.timelineResponses += 1
+        await route.fulfill({ status: result.status, contentType: 'application/json', body: JSON.stringify(result.body) })
+      })
+      await page.goto(`http://127.0.0.1:${server.address().port}/`)
+      await page.locator('[data-chat-availability="ready"]').waitFor({ timeout: 10_000 })
+      diagnostics.ready = true
+      diagnostics.renderedMessages = await page.getByText('Mounted timeline completed', { exact: true }).count()
+      diagnostics.composers = await page.locator('[data-planner-composer="true"]').count()
+      expect(diagnostics.pageErrors).toBe(0)
+      expect(diagnostics.requestFailures).toBe(0)
+      expect(diagnostics.timelineResponses).toBe(1)
+      expect(diagnostics.renderedMessages).toBe(1)
+      expect(diagnostics.composers).toBe(0)
+      expect(result.body.csrf).toBe('')
+    } finally {
+      console.info('C1-R6 mounted observations', JSON.stringify(diagnostics))
+      await browser?.close()
+      await new Promise<void>((resolve, reject) => server.close((error?: Error) => error ? reject(error) : resolve()))
+    }
+  }, 30_000)
 
   it('keeps a non-empty durable timeline and canonical events visible together', () => {
     const fixtureTimeline = [{ event_id: 'event-0000000000000001', sequence: 1, observed_at: '2026-09-04T00:05:00.000Z', kind: 'user_message' as const, state: 'queued' as const, correlation_id: 'message-0123456789abcdef', payload: { private_content: { text: '서버에 기록된 메시지' } } }]
