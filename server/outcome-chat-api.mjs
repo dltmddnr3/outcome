@@ -54,10 +54,10 @@ const timelineProjection = (value, afterSequence) => { const row = record(value,
 const submitProjection = (value) => { const row = record(value, ['accepted', 'sequence', 'event_id', 'dispatch_state', 'delivery', 'execution_started', 'result_attached', 'evidence_attached']); if (row.accepted !== true || !DISPATCH.has(row.dispatch_state) || row.execution_started !== false || row.result_attached !== false || row.evidence_attached !== false || !DELIVERY.has(row.delivery) || (row.dispatch_state !== 'invoked' && row.delivery !== 'delivery_unknown')) fail('invalid_response'); return { accepted: true, sequence: finiteInteger(row.sequence, 1), event_id: finiteEventId(row.event_id), dispatch_state: row.dispatch_state, delivery: row.delivery, execution_started: false, result_attached: false, evidence_attached: false } }
 
 async function handle(input) {
-  const request = record(input, ['method', 'url', 'headers', 'rawBody', 'service', 'owner', 'rateLimit'], 'invalid_request')
+  const request = record(input, ['method', 'url', 'headers', 'rawBody', 'service', 'owner', 'rateLimit', 'sendEnabled'], 'invalid_request')
   if (!request.service) return response(503, { error: 'chat_unavailable' })
   if (typeof request.method !== 'string' || typeof request.url !== 'string' || typeof request.rateLimit !== 'function') fail('invalid_request')
-  const parsed = new URL(request.url, 'http://outcome.local'), allowed = (request.method === 'GET' && parsed.pathname === '/api/private/chat/timeline') || (request.method === 'POST' && parsed.pathname === '/api/private/chat/messages')
+  const parsed = new URL(request.url, 'http://outcome.local'), allowed = (request.method === 'GET' && parsed.pathname === '/api/private/chat/timeline') || (request.sendEnabled && request.method === 'POST' && parsed.pathname === '/api/private/chat/messages')
   if (!allowed) return response(405, { error: 'read_only' })
   if (request.owner === null || request.owner === undefined) return response(401, { error: 'authentication_required' })
   const owner = ownerProjection(request.owner), headers = headerProjection(request.headers)
@@ -70,7 +70,7 @@ async function handle(input) {
     const keys = [...parsed.searchParams.keys()]; if (keys.sort().join(',') !== ['after_sequence', 'project_id'].join(',')) return response(400, { error: 'invalid_request' })
     const afterSequence = Number(parsed.searchParams.get('after_sequence'))
     if (!Number.isSafeInteger(afterSequence) || afterSequence < 0) return response(400, { error: 'invalid_request' })
-    return response(200, { ...timelineProjection(await request.service.timeline({ project_id: parsed.searchParams.get('project_id'), after_sequence: afterSequence, owner }), afterSequence), csrf: owner.csrf })
+    return response(200, { ...timelineProjection(await request.service.timeline({ project_id: parsed.searchParams.get('project_id'), after_sequence: afterSequence, owner }), afterSequence), csrf: request.sendEnabled ? owner.csrf : '' })
   }
   if (!headers['content-type']?.startsWith('application/json')) return response(415, { error: 'content_type_required' })
   if (headers.origin !== owner.allowed_origin || headers['x-outcome-csrf'] !== owner.csrf) return response(403, { error: 'request_forbidden' })
@@ -87,7 +87,7 @@ async function handle(input) {
 
 export async function handlePrivateChatRequest(input = {}) {
   try {
-    const defaults = { method: undefined, url: undefined, headers: {}, rawBody: '', service: undefined, owner: undefined, rateLimit: () => ({ allowed: true }) }
+    const defaults = { method: undefined, url: undefined, headers: {}, rawBody: '', service: undefined, owner: undefined, rateLimit: () => ({ allowed: true }), sendEnabled: false }
     if (!input || typeof input !== 'object' || Array.isArray(input) || types.isProxy(input)) fail('invalid_request')
     const descriptors = Object.getOwnPropertyDescriptors(input); if (Reflect.ownKeys(descriptors).some((key) => typeof key !== 'string' || !Object.hasOwn(defaults, key)) || Object.values(descriptors).some((item) => !item.enumerable || !Object.hasOwn(item, 'value'))) fail('invalid_request')
     return await handle({ ...defaults, ...Object.fromEntries(Object.entries(descriptors).map(([key, descriptor]) => [key, descriptor.value])) })

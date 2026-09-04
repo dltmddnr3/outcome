@@ -4,10 +4,33 @@ import { handlePrivateChatRequest } from './outcome-chat-api.mjs'
 
 const owner = { authenticated: true, actor: 'cherry_owner', allowed_origin: 'https://preview.invalid', csrf: 'csrf-value' }
 const service = { timeline: async () => ({ target: { role: 'planner', binding_version: 7 }, events: [], completion_authority: false }), submitPlannerMessage: async () => ({ accepted: true, sequence: 1, event_id: 'event-0000000000000001', dispatch_state: 'invoked', delivery: 'acknowledged', execution_started: false, result_attached: false, evidence_attached: false }) }
-const post = (overrides = {}) => handlePrivateChatRequest({ method: 'POST', url: '/api/private/chat/messages', headers: { 'content-type': 'application/json', origin: owner.allowed_origin, 'x-outcome-csrf': owner.csrf, 'idempotency-key': 'message-0000000000000001' }, rawBody: JSON.stringify({ project_id: 'outcome', message: '안녕하세요' }), service, owner, ...overrides })
+const postInput = { method: 'POST', url: '/api/private/chat/messages', headers: { 'content-type': 'application/json', origin: owner.allowed_origin, 'x-outcome-csrf': owner.csrf, 'idempotency-key': 'message-0000000000000001' }, rawBody: JSON.stringify({ project_id: 'outcome', message: '안녕하세요' }), service, owner }
+const post = (overrides = {}) => handlePrivateChatRequest({ ...postInput, sendEnabled: true, ...overrides })
+const defaultPost = (overrides = {}) => handlePrivateChatRequest({ ...postInput, ...overrides })
+
+test('C1-R1 keeps message submission default-off before service dispatch', async () => {
+  let calls = 0
+  const denied = await defaultPost({ service: { ...service, submitPlannerMessage: async () => { calls += 1; return service.submitPlannerMessage() } } })
+  assert.equal(denied.status, 405); assert.deepEqual(denied.body, { error: 'read_only' }); assert.equal(calls, 0)
+})
+
+test('C1-R2 preserves timeline reads when send is default-off', async () => {
+  const result = await handlePrivateChatRequest({ method: 'GET', url: '/api/private/chat/timeline?project_id=outcome&after_sequence=0', service, owner })
+  assert.equal(result.status, 200); assert.deepEqual(result.body.target, { role: 'planner', binding_version: 7 }); assert.equal(result.body.csrf, '')
+})
+
+test('C1-R3 suppresses the owner csrf value while send is default-off', async () => {
+  const result = await handlePrivateChatRequest({ method: 'GET', url: '/api/private/chat/timeline?project_id=outcome&after_sequence=0', service, owner })
+  assert.equal(result.body.csrf, ''); assert.equal(JSON.stringify(result).includes(owner.csrf), false)
+})
+
+test('C1-R5 permits message submission only with explicit send enablement', async () => {
+  assert.equal((await defaultPost()).status, 405)
+  assert.equal((await post()).status, 202)
+})
 
 test('GET timeline and POST message expose only exact private routes with no-store', async () => {
-  const get = await handlePrivateChatRequest({ method: 'GET', url: '/api/private/chat/timeline?project_id=outcome&after_sequence=0', service, owner }); assert.equal(get.status, 200); assert.equal(get.headers['cache-control'], 'no-store'); assert.deepEqual(get.body.target, { role: 'planner', binding_version: 7 }); assert.equal(get.body.csrf, 'csrf-value')
+  const get = await handlePrivateChatRequest({ method: 'GET', url: '/api/private/chat/timeline?project_id=outcome&after_sequence=0', service, owner, sendEnabled: true }); assert.equal(get.status, 200); assert.equal(get.headers['cache-control'], 'no-store'); assert.deepEqual(get.body.target, { role: 'planner', binding_version: 7 }); assert.equal(get.body.csrf, 'csrf-value')
   const sent = await post(); assert.equal(sent.status, 202); assert.equal(sent.headers['cache-control'], 'no-store'); assert.equal(JSON.stringify(sent).includes('destination'), false)
   assert.equal((await handlePrivateChatRequest({ method: 'PUT', url: '/api/private/chat/messages', service, owner })).status, 405)
 })

@@ -6,6 +6,8 @@ import { createOutcomeServer } from '../server/index.mjs'
 import { createDecisionRecordService, createInMemoryDecisionRecordStore } from '../server/outcome-decision-record.mjs'
 
 const paths = ['/api/dashboard', '/api/dashboard/cherry-note', '/api/auth/login', '/api/auth/logout', '/api/private/config', '/api/private/workspace', '/api/unknown', '/cherry-note-dashboard']
+const privatePaths = ['/api/private/chat/timeline', '/api/private/chat/messages', '/api/private/bridge/admin/viewers/register', '/api/private/bridge/admin/viewers/revoke', '/api/private/bridge/admin/challenges/cleanup', '/api/private/bridge/admin/readiness']
+const allowedPrivateRoute = 'GET /api/private/chat/timeline'
 const methods = ['POST', 'PUT', 'PATCH', 'DELETE']
 const rejectedDecisionMethods = ['GET', 'HEAD', 'OPTIONS', 'PUT', 'PATCH', 'DELETE']
 const canonicalBody = '{"error":"read_only"}'
@@ -61,6 +63,17 @@ export async function checkMutationMatrix(base, label, fetchImpl = fetch) {
   return { count, apiBodies, emptyPageBodies, decisionRows }
 }
 
+export function checkStablePrivateMutationMatrix(handler = handleStableHostRequest) {
+  let count = 0
+  for (const path of privatePaths) for (const method of methods) {
+    const response = handler({ method, pathname: path })
+    assertMutationResponse({ label: 'stable-private', method, path, status: response.status, text: JSON.stringify(response.body) })
+    count += 1
+  }
+  console.log(`stable private mutation ${count}/24 rows verified; allowed read=${allowedPrivateRoute}`)
+  return count
+}
+
 if (process.argv[1] === fileURLToPath(import.meta.url)) {
   const publicServer = createOutcomeServer({ publicReadOnly: true })
   publicServer.listen(0, '127.0.0.1'); await once(publicServer, 'listening')
@@ -73,6 +86,7 @@ if (process.argv[1] === fileURLToPath(import.meta.url)) {
     const stable = handleStableHostRequest({ method, pathname: '/api/private/decisions' })
     assertDecisionMutationResponse({ method, status: stable.status, text: JSON.stringify(stable.body) })
   }
+  checkStablePrivateMutationMatrix()
 
   const privateUnavailable = createOutcomeServer({ publicReadOnly: false, password: 'private-test-password', secret: 'private-test-secret-that-is-long-enough' })
   privateUnavailable.listen(0, '127.0.0.1'); await once(privateUnavailable, 'listening')

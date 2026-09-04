@@ -156,9 +156,9 @@ test('hosted private chat GET and POST route through durable service with no-sto
   })
   const common = { authorization: 'Bearer server-valid', origin: 'https://preview.invalid.vercel.app', 'x-outcome-csrf': 'synthetic-csrf-boundary-value-123456' }
   const timeline = await handler({ method: 'GET', pathname: '/api/private/chat/timeline?project_id=outcome&after_sequence=0', headers: common })
-  assert.equal(timeline.status, 200); assert.equal(timeline.headers['cache-control'], 'no-store')
+  assert.equal(timeline.status, 200); assert.equal(timeline.headers['cache-control'], 'no-store'); assert.equal(timeline.body.csrf, '')
   const submit = await handler({ method: 'POST', pathname: '/api/private/chat/messages', headers: { ...common, 'content-type': 'application/json', 'idempotency-key': 'message-0000000000000001' }, body: JSON.stringify({ project_id: 'outcome', message: 'persist me' }) })
-  assert.equal(submit.status, 202); assert.equal(submit.body.dispatch_state, 'not_invoked'); assert.equal(calls.length, 2)
+  assert.equal(submit.status, 405); assert.deepEqual(submit.body, { error: 'read_only' }); assert.equal(calls.length, 1)
   assert.equal(JSON.stringify({ timeline, submit, calls }).includes('locator'), false)
 })
 

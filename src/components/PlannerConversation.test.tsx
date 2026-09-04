@@ -62,6 +62,21 @@ describe('Phase 4 role chat D3 contract', () => {
     { id: 'event-qa-4', sequence: 4, role: 'ux_product_qa' as const, completionAuthority: false as const, type: 'result_observed' as const, summary: '제품 QA 관측', observedAt: '2026-09-04T00:04:00.000Z', status: 'observed' as const },
   ]
 
+  it('C1-R6 keeps the production runtime composer hidden under the default-off server contract', async () => {
+    // @ts-expect-error The test consumes the server's JavaScript contract without adding it to the browser type graph.
+    const { handlePrivateChatRequest } = await import('../../server/outcome-chat-api.mjs')
+    const result = await handlePrivateChatRequest({
+      method: 'GET',
+      url: '/api/private/chat/timeline?project_id=outcome&after_sequence=0',
+      service: { timeline: async () => ({ target: { role: 'planner', binding_version: 7 }, events: [], completion_authority: false }) },
+      owner: { authenticated: true, actor: 'cherry_owner', allowed_origin: 'https://preview.invalid', csrf: 'csrf-value' },
+    })
+    expect(result.status).toBe(200)
+    expect(result.body.csrf).toBe('')
+    const html = renderToStaticMarkup(<PlannerConversation events={events} />)
+    expect(html).not.toContain('data-planner-composer="true"')
+  })
+
   it('keeps a non-empty durable timeline and canonical events visible together', () => {
     const fixtureTimeline = [{ event_id: 'event-0000000000000001', sequence: 1, observed_at: '2026-09-04T00:05:00.000Z', kind: 'user_message' as const, state: 'queued' as const, correlation_id: 'message-0123456789abcdef', payload: { private_content: { text: '서버에 기록된 메시지' } } }]
     const html = renderToStaticMarkup(<PlannerConversation events={events} fixtureState="ready" fixtureTimeline={fixtureTimeline} plannerBound onSend={() => undefined} />)

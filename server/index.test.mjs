@@ -73,9 +73,9 @@ test('injected chat service exposes only timeline and message routes', async () 
   const server = createOutcomeServer({ password, secret, secureCookies: false, collect: () => dashboard, chatService })
   server.listen(0, '127.0.0.1'); await once(server, 'listening'); const base = `http://127.0.0.1:${server.address().port}`
   try {
-    const timeline = await fetch(`${base}/api/private/chat/timeline?project_id=outcome&after_sequence=0`); assert.equal(timeline.status, 200); assert.deepEqual(await timeline.json(), { target: { role: 'planner', binding_version: 7 }, events: [], completion_authority: false, csrf: 'csrf-value' })
-    const sent = await fetch(`${base}/api/private/chat/messages`, { method: 'POST', headers: { 'content-type': 'application/json', origin: 'http://outcome.local', 'x-outcome-csrf': 'csrf-value', 'idempotency-key': 'message-0000000000000001' }, body: JSON.stringify({ project_id: 'outcome', message: '안녕하세요' }) }); assert.equal(sent.status, 202); assert.equal((await sent.json()).delivery, 'acknowledged')
-    assert.deepEqual(calls, { auth: 2, timeline: 1, submit: 1 })
+    const timeline = await fetch(`${base}/api/private/chat/timeline?project_id=outcome&after_sequence=0`); assert.equal(timeline.status, 200); assert.deepEqual(await timeline.json(), { target: { role: 'planner', binding_version: 7 }, events: [], completion_authority: false, csrf: '' })
+    const sent = await fetch(`${base}/api/private/chat/messages`, { method: 'POST', headers: { 'content-type': 'application/json', origin: 'http://outcome.local', 'x-outcome-csrf': 'csrf-value', 'idempotency-key': 'message-0000000000000001' }, body: JSON.stringify({ project_id: 'outcome', message: '안녕하세요' }) }); assert.equal(sent.status, 405); assert.deepEqual(await sent.json(), { error: 'read_only' })
+    assert.deepEqual(calls, { auth: 2, timeline: 1, submit: 0 })
   } finally { server.close(); await once(server, 'close') }
 })
 
