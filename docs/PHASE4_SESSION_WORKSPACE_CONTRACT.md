@@ -1,17 +1,17 @@
 # OUTCOME Phase 4 · Session Workspace Contract
 
-Updated: 2026-08-26 KST
+Updated: 2026-09-04 KST
 Status: **Cherry-approved product direction · definition only · implementation not started**
 
 ## Product decision
 
-OUTCOME의 역할별 채팅은 보조적인 텍스트 입력창이 아니다. Codex 앱과 거의 동일한 수준으로 세션의 대화와 실제 작업 흐름을 이해하고 제어할 수 있는 실시간 작업 워크스페이스여야 한다.
+OUTCOME의 채팅은 **Planner single input channel**이다. Cherry가 입력하는 composer는 Planner 보기에 하나만 존재한다. Builder·UX & Product QA·Release Audit 보기는 Planner가 라우팅한 동일 작업 원장의 읽기 전용 필터이며, 별도 채팅방이나 직접 지시 입구를 만들지 않는다. Codex 앱과 거의 동일한 수준으로 실제 작업 흐름을 이해하되 역할 권한과 단일 입구를 보존한다.
 
 현재 대시보드의 `세션 채팅 · 연결 준비 중` 영역은 이 최종 제품의 자리만 예약한다. 실제 session event source가 연결되기 전에는 메시지 입력, 전송, 작업 애니메이션이나 완료 상태를 가장하지 않는다.
 
 ## Outcome
 
-Cherry가 OUTCOME을 벗어나 Codex/Claude 화면을 따로 열지 않고도 프로젝트의 Planner, Builder, UX & Product QA, Release Audit 세션과 대화하고, 각 세션이 무엇을 계획하고 실행하고 검증하며 무엇을 기다리는지 실시간으로 이해한다.
+Cherry가 OUTCOME을 벗어나 Codex/Claude 화면을 따로 열지 않고도 Planner 한 채널과 대화하고, Planner가 Builder·UX & Product QA·Release Audit에 라우팅한 작업과 각 역할의 응답·검증·대기 상태를 같은 원장에서 이해한다.
 
 ## 사용자 판단
 
@@ -27,7 +27,7 @@ Cherry는 선택 프로젝트에서 다음을 즉시 판단할 수 있어야 한
 
 하나의 ordered timeline에서 다음 event type을 같은 시간축으로 제공한다.
 
-- 사용자 메시지와 첨부
+- Planner 채널의 사용자 메시지
 - 에이전트 응답의 실시간 streaming
 - commentary와 사용자에게 공개 가능한 작업 설명
 - 계획 생성·수정과 단계별 상태
@@ -56,13 +56,16 @@ Cherry는 선택 프로젝트에서 다음을 즉시 판단할 수 있어야 한
 | `reconnecting` | event stream 재연결과 sequence 복구 중 | 대기, 수동 새로고침 |
 
 세션 상태는 작업 진행 신호이며 Project/Phase/Scope/Stage/Gate 진행률이 아니다. Gate는 Package evidence가 조건을 충족할 때만 별도로 바뀐다.
+No session activity changes progress, health, confidence, Gate state or completion authority.
 
 ## 상호작용 계약
 
-- 프로젝트별 네 역할 탭에서 역할 전환과 연결·신선도 상태를 확인한다.
+- 프로젝트별 네 역할 표시는 **read-only filters over the same ordered event dataset**이다. 역할 필터는 별도 자료나 별도 방을 만들지 않는다(**do not create separate rooms**).
 - 각 역할에는 project-scoped active thread와 교체 이력이 연결된다.
-- 새 요청은 기본적으로 Planner에게 들어가며 다른 역할 전달은 Planner routing receipt로 표시한다.
-- 사용자는 메시지·첨부를 보내고 streaming을 중단하며 실패한 turn을 명시적으로 재시도할 수 있다.
+- 모든 새 요청은 Planner에게만 들어가며, **only the Planner view exposes a composer**. 다른 역할 보기에는 composer·직접 전송·우회 입력을 표시하지 않고 `Planner에게 요청`으로 돌아가는 명시적 이동만 제공한다.
+- Planner는 검증된 대상 역할 하나에만 라우팅하며 다른 역할 전달은 Planner routing receipt로 표시한다. Direct Cherry-to-Builder, Cherry-to-QA and Cherry-to-Release-Audit send paths are forbidden.
+- 사용자는 Planner 메시지를 보내고 streaming을 중단할 수 있다. Role-chat attachments and clarification threads are excluded from this MVP.
+- 자동 재시도는 외부 전송이 일어나지 않았음이 증명된 pre-dispatch 실패에만 허용한다. 전송 뒤 응답이 불명확하면 `delivery_unknown`으로 종료하며 새로운 Cherry 행동 없이 재전송하지 않는다.
 - 승인 카드는 exact action, target, impact, expiry, rollback을 보여준 뒤 승인·거절을 받는다.
 - tool result, diff, test, artifact는 timeline을 압도하지 않는 접기 상세로 제공한다.
 - Stage 연결은 문맥 표시와 evidence pointer를 제공하지만 세션 UI가 Gate를 자기 폐쇄하지 않는다.
@@ -95,8 +98,8 @@ Cherry는 선택 프로젝트에서 다음을 즉시 판단할 수 있어야 한
 
 ## UX acceptance
 
-- desktop에서는 왼쪽 세션 timeline과 오른쪽 Outcome Map을 동시에 읽고, 필요하면 어느 쪽이든 폭을 조절하거나 집중 보기로 전환할 수 있다.
-- mobile에서는 역할 전환 → timeline → tool/artifact 상세 → Outcome Map을 한 손 탐색으로 오가며 현재 맥락을 잃지 않는다.
+- desktop에서는 정보 우선순위를 Outcome Map → 승인 → Planner 대화로 유지한다. 1100px 이상 통합 배치를 실측하고, 임계 폭 아래에서는 대화를 승인과 동급의 peer tab으로 접는다.
+- mobile에서는 지도·대화·승인의 세 최상위 목적지를 한 손으로 오가며 현재 맥락을 잃지 않는다. 역할 필터는 대화 안의 읽기 렌즈이며 새 최상위 탭이 아니다.
 - streaming 중에도 메시지, 계획, 도구, 검증, 승인 요청이 시각적으로 구분된다.
 - 현재 역할, 현재 turn state, 마지막 관측 시각과 Stage 연결이 첫 화면에서 식별된다.
 - 긴 tool output과 diff는 접혀 있고 사용자가 열기 전까지 대화 흐름을 밀어내지 않는다.
@@ -119,3 +122,8 @@ Phase 4 entry에는 Phase 3 supported adapter evidence, account/private workspac
 - 활동량을 결과 진행률로 계산
 - 승인 없는 provider/resource/file/release mutation
 - 실제 event source가 없는 demo animation을 운영 UI에 표시
+- 공급자 화면을 대신하는 범용 채팅
+- 역할 채팅 안에서 역할·세션·프로젝트 생성
+- Direct Cherry-to-specialist messaging 또는 승인 대행
+- Role-chat attachments, clarification threads 또는 콘텐츠 조정
+- Gate 자기 폐쇄, 활동 기반 progress, 배포·출시 조작

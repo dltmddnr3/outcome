@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { OutcomeDashboard, axisStateLabel, bindingHeroLabel, bindingObservationLabel, collapsedStageCount, currentHierarchy, defaultHierarchySelection, deriveScopeState, deriveStageRailState, detailContentPolicy, entityStateLabel, findStage, gateGroupPresentation, gateProgress, githubEvidenceItems, heroGateEvidence, hierarchyIsExploring, hierarchyPlacement, meaningfulGateGroups, mobileHierarchyLevels, nextStageOptionIndex, nowPresentation, projectHeroModel, resolveHierarchySelection, selectedGateCount, selectedStageContext, selectHierarchyPhase, selectHierarchyScope, selectLiveBinding, selectProject, snapshotPresentation, sourceStateLabel, stageDetailSemantics, structuralPhaseModel, structureStatusLabel, summarizeStage, timingPresentation, workspaceManagementItems, type Binding, type GithubConnector, type PackageProject, type PackageStage } from './OutcomeDashboard'
+import { OutcomeDashboard, axisStateLabel, bindingHeroLabel, bindingObservationLabel, collapsedStageCount, currentHierarchy, defaultHierarchySelection, deriveScopeState, deriveStageRailState, desktopConversationBreakpoint, detailContentPolicy, entityStateLabel, findStage, gateGroupPresentation, gateProgress, githubEvidenceItems, heroGateEvidence, hierarchyIsExploring, hierarchyPlacement, meaningfulGateGroups, mobileHierarchyLevels, mobileWorkspaceTabs, nextStageOptionIndex, nowPresentation, projectHeroModel, resolveHierarchySelection, selectedGateCount, selectedStageContext, selectHierarchyPhase, selectHierarchyScope, selectLiveBinding, selectProject, snapshotPresentation, sourceStateLabel, stageDetailSemantics, structuralPhaseModel, structureStatusLabel, summarizeStage, timingPresentation, workspaceManagementItems, type Binding, type GithubConnector, type PackageProject, type PackageStage } from './OutcomeDashboard'
 import { activityLabelKo, axisLabelKo, gatePresentation, groupPresentation, hierarchyLabels, loginErrorPresentation, phasePresentation, projectOutcomePresentation, roleLabel, stagePresentation } from './outcomeKorean'
 
 const stage = (overrides: Partial<PackageStage> = {}): PackageStage => ({ id: 'stage-one', title: 'Stage One', purpose: 'Verify the result', dependsOn: [], gatePurpose: 'Stage One acceptance checklist', sourceState: 'present', state: 'active', gate: { gates: [{ id: 'G1', title: 'closed', closed: true, groupCode: 'G' }, { id: 'G2', title: 'remaining', closed: false, groupCode: 'G' }], groups: [{ code: 'G', name: '증거', closed: 1, total: 2 }], total: 2, closed: 1, available: true, sourceRef: 'GATES.md' }, axes: { implementation: 'active', test: 'pending', evidence: 'pending', independentQa: 'not_started', cherryAcceptance: 'pending', release: 'not_started' }, ...overrides })
@@ -7,6 +7,14 @@ const github = (overrides: Partial<GithubConnector> = {}): GithubConnector => ({
 const project = (id: string, title: string): PackageProject => ({ status: 'valid', errors: [], observedAt: null, project: { id, name: title, outcome: `${title} outcome`, acceptanceAuthority: 'Cherry' }, connectors: { github: github() }, phases: [{ id: `${id}-phase`, title: 'Phase', purpose: 'Phase purpose', completion: null, scopes: [{ id: `${id}-scope`, title: 'Scope', purpose: 'Scope purpose', stages: [stage({ id: `${id}-stage` })] }] }], current: { phaseId: `${id}-phase`, scopeId: `${id}-scope`, stageId: `${id}-stage` }, next: null, bindings: [], now: { status: 'unbound', activity: null, observedAt: null, source: 'runtime_registry' }, progress: { available: false, reason: 'no_cross_stage_aggregate' } })
 
 describe('OUTCOME Package dashboard', () => {
+  it('D3 workspace order and responsive navigation preserve one project context', () => {
+    const source = OutcomeDashboard.toString()
+    const workbench = source.slice(source.indexOf('oc-workbench'))
+    const tokens = ['oc-map-workspace', 'oc-approval-rail', 'PlannerConversation']
+    expect(tokens.map((token) => workbench.indexOf(token))).toEqual([...tokens].map((token) => workbench.indexOf(token)).sort((a, b) => a - b))
+    expect(mobileWorkspaceTabs).toEqual(['지도', '대화', '승인'])
+    expect(desktopConversationBreakpoint).toBe(1100)
+  })
   it('왼쪽 레일은 프로젝트 작업공간과 정직한 준비 중 기능만 제공한다', () => {
     expect(workspaceManagementItems).toEqual([
       { id: 'archive', label: '보관함', disabled: true },
@@ -52,9 +60,8 @@ describe('OUTCOME Package dashboard', () => {
   it('기존 세 current surface를 하나의 프로젝트 여정으로 통합한다', () => {
     const source = OutcomeDashboard.toString()
     expect(source).toContain('oc-workbench')
-    expect(source).toContain('oc-chat-placeholder')
-    expect(source).toContain('세션 채팅')
-    expect(source).toContain('연결 준비 중')
+    expect(source).toContain('oc-approval-rail')
+    expect(source).toContain('PlannerConversation')
     expect(source).toContain('data-default-open')
     expect(source).toContain('프로젝트 여정')
     expect(source).not.toContain('결과 지도')
