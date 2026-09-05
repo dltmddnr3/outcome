@@ -56,7 +56,17 @@ function inspectCsrfLiterals(code) {
     } else if (value.kind !== ts.SyntaxKind.NullKeyword) runtimeExpressions++
   }
   const visit = (node) => {
-    if (ts.isPropertyAssignment(node) || ts.isVariableDeclaration(node) || ts.isPropertyDeclaration(node)) inspect(node.name, node.initializer)
+    // Parameters cover functions/arrows/methods/constructors. Binding elements
+    // cover object/array declaration and parameter defaults, including aliases.
+    if (ts.isPropertyAssignment(node) || ts.isVariableDeclaration(node) || ts.isPropertyDeclaration(node) || ts.isParameter(node) || ts.isBindingElement(node)) inspect(node.name, node.initializer)
+    if (ts.isBindingElement(node) && node.propertyName) inspect(node.propertyName, node.initializer)
+    if (ts.isShorthandPropertyAssignment(node)) inspect(node.name, node.objectAssignmentInitializer)
+    // In an assignment pattern, { csrf: local = "literal" } pairs the
+    // property key with the default as well as the local binding name.
+    if (ts.isPropertyAssignment(node)) {
+      const value = unwrap(node.initializer)
+      if (ts.isBinaryExpression(value) && value.operatorToken.kind === ts.SyntaxKind.EqualsToken) inspect(node.name, value.right)
+    }
     if (ts.isBinaryExpression(node) && node.operatorToken.kind === ts.SyntaxKind.EqualsToken) inspect(node.left, node.right)
     ts.forEachChild(node, visit)
   }
