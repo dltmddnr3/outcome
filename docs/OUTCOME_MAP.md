@@ -1,9 +1,9 @@
-# OUTCOME Map · MVP
+# OUTCOME Map
 
 Contract status: **APPROVED**
-Updated: 2026-08-25 KST
+Updated: 2026-08-31 KST
 
-이 문서는 OUTCOME 프로젝트 자체의 `Project → Phase → Scope → Stage` 구조와 각 목적을 정의합니다. 상태는 연결된 Gate evidence와 immutable receipt에서만 판정하며 이 문서의 설명만으로 완료를 선언하지 않습니다.
+이 문서는 live v1 compatibility projection과 승인된 v2 migration target을 함께 정의합니다. v2의 canonical semantics는 `docs/OUTCOME_MODEL_V2.md`이며, live activation 전까지 기존 parser는 `Project → Phase → Scope → Stage`를 읽습니다. 상태는 Acceptance Predicate/Gate evidence와 immutable receipt에서만 판정합니다.
 
 ```yaml
 project_id: outcome
@@ -13,10 +13,22 @@ package_schema_version: 1
 project_purpose: >-
   여러 AI 역할과 세션이 만드는 활동을 프로젝트 결과 구조와 검증 증거에 연결해,
   Cherry가 현재 위치와 다음 경계를 30초 안에 이해하게 한다.
+active_workstream:
+  canonical_stage_id: outcome-milestone-model-v2-local-default-projection
+  canonical_gate_id: B1-B3
+  objective_delta: >-
+    Model v2를 selective context를 사용하는 local default로 전환하고 실제 OUTCOME work canary로
+    검증한 뒤, 같은 deterministic projection을 private workspace의 기본 사용자 경험으로 제공한다.
+  stop_condition: >-
+    source digest, v1 rollback parity, privacy allowlist, context load set 또는 deterministic projection을
+    증명할 수 없거나 동일 접근 correction attempt가 2회를 초과한다.
+  fallback: V1_COMPATIBILITY_PROJECTION
 contract_file: docs/OUTCOME_CONTRACT.md
 gates_files:
   - GATES.md
   - GATES_OUTCOME_MVP.md
+  - GATES_OUTCOME_MODEL_V2.md
+  - GATES_OUTCOME_MODEL_V2_LOCAL_DEFAULT_AND_SERVICE_PROJECTION.md
   - GATES_PHASE4_TIMELINE_STATUS_READ.md
 runtime_binding_source: OUTCOME-managed registry
 source_connectors:
@@ -50,7 +62,7 @@ phases:
         purpose: 모든 프로젝트가 동일한 의미로 등록될 수 있는 계약, 위계, Gate, 역할 경계를 고정한다.
         included:
           - three-document project input contract
-          - Project → Phase → Scope → Stage → Gate semantics
+          - historical Project → Phase → Scope → Stage → Gate compatibility semantics
           - four-role session binding and authority
         excluded:
           - dashboard product implementation
@@ -340,7 +352,7 @@ phases:
           - id: outcome-stage-phase3-planner-routing
             title: Planner-routed instruction candidate
             purpose: target validation, idempotency, receipt, timeout·cancel·wrong-binding denial과 dispatch 안전 경계를 증명한다.
-            depends_on: [outcome-stage-phase3-multi-pc-observation]
+            depends_on: [outcome-stage-phase3-private-session-registry]
             gates_file: GATES_PHASE3_PLANNER_WORK_ROUTING.md#T1-T7
             gate_groups:
               - code: T
@@ -385,7 +397,7 @@ phases:
   - id: outcome-phase-4
     title: Phase 4 · In-OUTCOME Development
     purpose: Codex/Claude 화면 없이 OUTCOME 안에서 프로젝트 생성, 역할 세션 구성, Codex 수준의 실시간 작업 타임라인과 제어를 수행한다.
-    completion: project creation, four-role session creation, session workspace, and end-to-end development are evidence-closed.
+    completion: project creation, four-role session creation, realtime Observer service, session workspace, and end-to-end development are evidence-closed.
     scopes:
       - id: outcome-phase-4-project-creation
         title: Project and Package creation
@@ -394,6 +406,10 @@ phases:
       - id: outcome-phase-4-role-sessions
         title: Four-role session composition
         purpose: Planner, Builder, UX & Product QA, Release Audit 세션을 프로젝트에 생성·연결한다.
+        stages: []
+      - id: outcome-phase-4-realtime-observer
+        title: Realtime execution Observer
+        purpose: Phase 3 Observer Bridge와 provider 또는 local companion adapter의 append-only lifecycle event를 durable state로 투영하고 5초 이내 streaming UI에 반영하며, 30초 fallback으로 event loss와 stale/disconnected 상태를 검출한다. 세션 heartbeat와 AI 화면 판독은 제품 runtime이 아니다.
         stages: []
       - id: outcome-phase-4-linked-chat
         title: Codex-level session workspace
@@ -428,16 +444,28 @@ phases:
       - id: outcome-phase-5-composition
         title: Beyond fixed sessions
         purpose: 고정된 세션보다 더 많은 역할·도구·실행 단위를 Outcome에 맞게 구성한다.
-        stages: []
+        stages:
+          - id: outcome-milestone-model-v2-pilot
+            title: Outcome Graph v2 live pilot
+            purpose: stable destination semantics, dynamic execution and deterministic current projection을 한 local canary로 접합한다.
+            depends_on: []
+            gates_file: GATES_OUTCOME_MODEL_V2.md#P1-P8-S1-S4-C1-C3
+          - id: outcome-milestone-model-v2-local-default-projection
+            title: Model v2 local default and product projection
+            purpose: selective context를 사용하는 v2 기본 실행을 실제 작업으로 증명하고 그 projection을 OUTCOME 서비스의 기본 사용자 경험으로 제공한다.
+            depends_on: [outcome-milestone-model-v2-pilot]
+            gates_file: GATES_OUTCOME_MODEL_V2_LOCAL_DEFAULT_AND_SERVICE_PROJECTION.md#A1-A4-Q1-B1-B3-Q2-A5-C1
 ```
 
 ## 현재 위치
 
-- Current: `outcome-phase-2 / outcome-phase-2-account-service / outcome-stage-account-access-hosted-identity-preview · P5 MacBook/mobile direct journey`
-- Next: `P5 모바일 철회 UX correction 비민감 대상 확인 절차 교정`; 이전 Preview의 단일 모바일 철회 검수는 private payload 제거와 SDK no-request 경계는 안전했지만, 이전 ready tab을 일반 첫 로그인으로 오분류해 `FAIL · CORRECTION REQUIRED`였다. 교정 candidate `ebac7d538152fddc432fcdb4d1ee7b80a6cbe87b` / tree `83cb4182f086b3cc0ad1634fd2b44d3c6c151fc1`는 Preview `dpl_4P1AusHZo37fTCY92oUpVk1CrmHP`로 `READY`다. 첫 재검수 승인은 받았지만 Clerk 대상 탐색 도구 출력에 계정 식별 정보가 포함되어 즉시 중단했고 세션·설정 mutation은 `0`이다. 승인은 폐기했으며 비민감 대상 확인 절차와 새 10분 단일 사용 승인 전에는 재실행하지 않는다. P5 행렬은 `10/19`로 유지한다. MacBook Google 로그인·재로그인·email code, 양쪽 만료·제공자 장애와 MacBook 철회도 남아 있다. Production·Supabase·DNS·도메인·출시는 계속 미승인이다.
+- Primary implementation target: `outcome-milestone-model-v2-local-default-projection · Slice A A1-A4 OPEN`. The prior Model v2 design/default-off/local-opt-in pilot is accepted supporting evidence; the current target is local default plus selective-context real-work verification. Slice B service projection remains locked until Q1. This does not close Phase 3, O2, Cherry acceptance, deployment or release.
+- Current: `outcome-phase-3 / outcome-phase-3-evidence-continuity / outcome-stage-phase3-cherry-acceptance · OPEN`
+- Parallel locked evidence: `outcome-stage-phase3-multi-pc-observation · O2 real two-location proof OPEN/LOCKED`.
+- Next: exact candidate `99aeb22823f6ce5fa4957e6b511c941444db52dc` is active on the stable Preview alias at READY deployment `dpl_AvMiUni3Z48jbe2jhqMbAcscL3M7`. Fresh UX & Product QA `Q1-Q4 4/4` and separate Release Audit `A1-A4 4/4` are evidence-closed; audit terminal is `PASS_RELEASE_AUDIT_ONLY`, quality `96/100`, receipt commit `ca066562f7b779f0eb7fde4e2e27355cf774a51b`. Phase 3 is `38/43`. The next eligible boundary is Cherry physical acceptance `C1-C4`; O2 actual two-location evidence remains independently `OPEN/LOCKED`, and release remains separate.
 - P5 controlled failure preflight: 모바일 철회·제공자 장애·만료를 서로 분리한 `GATES_PHASE2_ACCOUNT_ACCESS_P5_CONTROLLED_FAILURE_PREFLIGHT.md` `F1-F7 7/7` 준비 계약이 있다. 모바일 철회 실행은 비민감 영수증으로 고정됐고 실기기 FAIL은 `GATES_PHASE2_ACCOUNT_ACCESS_P5_REVOCATION_FAIL_ROUTING.md`로 correction에 되돌렸다. 제공자 장애와 만료는 철회 교정·복구 뒤 각각 실행 직전 10분 유효 단일 사용 Cherry 승인이 필요하다.
 - Dashboard registration: Package-driven Cherry Note/OUTCOME UI, GitHub connector Gate M15, fresh UX & Product QA Q1–Q4, separate fresh Release Audit A1–A4, Cherry acceptance C1–C2, stable snapshot host S1–S6, and registered Package portfolio foundation P1–P6 are evidence-closed.
 - Phase 1 closure boundary: 2026-08-25 KST Cherry가 내부사용 Local MVP 종료를 승인했다. 외부 공개 수준 MVP와 release approval은 이 결정에 포함되지 않는다.
-- Future roadmap visibility: Phase 2의 account access definition `K6 6/6`, provider-neutral disabled implementation `I1-I8 8/8`, prior fresh UX/Product re-QA `Q1-Q4 4/4`, prior Release re-Audit `A1-A4 4/4`, hosted-preview execution contract `H1-H6 6/6`, browser-viable public-redacted code readiness `B1-B12 12/12`, hosted-data 실행 사전준비 `E1-E8 8/8`, HP3 운영 활성화 결정 사전준비 `R1-R8 8/8`은 각각의 exact candidate 또는 문서 증거로 닫혔다. HP1 hosted identity는 승인·Development 단일 소유자 경계·실제 인증/연결/거부/철회·Preview-only immutable deployment·redacted cost/rollback receipt가 증명된 `P1-P6 5/6`이며 P5 실기기 잔여 행렬만 open이다. HP2 hosted data `D1-D7 0/7`, hosted fresh QA `Q1-Q4 0/4`, hosted fresh Audit `A1-A4 0/4`, hosted Cherry acceptance `C1-C4 0/4`, HP3 운영 자원 준비·새 QA·새 Audit·Cherry 운영 후보 승인·운영 활성화는 합계 `0/24`로 locked/open이다. 두 사전준비 완료는 HP1 완료, HP2·HP3 승인, 운영 활성화나 출시를 대신하지 않는다. 이전 candidate의 QA/Audit은 다음 provider/data/domain candidate에 재사용하지 않는다. production hierarchy 등록은 추적 가시성만 제공하며 실행 권한이 아니다. Phase 3 목적·Planner-only 경로·첫 proof와 Codex-first/Mac mini/high-risk 재확인 구현 전제는 Cherry 승인으로 계약화됐고, synthetic/no-op Codex Adapter Technical Spike `S1-S6 6/6`만 exact evidence로 닫혀 Phase 3 실행 Gate `6/43`이다. production relay는 `NO_GO`, fallback은 `UNBOUND_MANUAL_NAVIGATION`이며 Registry 이후 Stage는 locked/open이다. Phase 3은 current가 아니며 public-service release와 Phase 2 전체, Phase 3 전체, Phase 4와 5는 완료가 아니다.
+- Future roadmap visibility: Phase 2의 account access definition `K6 6/6`, provider-neutral disabled implementation `I1-I8 8/8`, prior fresh UX/Product re-QA `Q1-Q4 4/4`, prior Release re-Audit `A1-A4 4/4`, hosted-preview execution contract `H1-H6 6/6`, browser-viable public-redacted code readiness `B1-B12 12/12`, hosted-data 실행 사전준비 `E1-E8 8/8`, HP3 운영 활성화 결정 사전준비 `R1-R8 8/8`은 각각의 exact candidate 또는 문서 증거로 닫혔다. HP1 hosted identity는 `P1-P6 5/6`, P5는 `11/19 OPEN · DEFERRED`이며 HP2·HP3와 Phase 2 완료는 아니다. Phase 3은 Technical Spike `6/6`, Private Registry `6/6`, Observation Relay synthetic `5/6`, Planner routing `7/7`, Evidence continuity `6/6`, current Fresh QA `4/4`, current Release Audit `4/4`로 실행 Gate `38/43`이다. O2 실제 두 위치는 `OPEN/LOCKED`, production relay `NO_GO`, fallback은 `UNBOUND_MANUAL_NAVIGATION`이다. Cherry acceptance `C1-C4`와 Phase 3 completion remain open.
 - `MVP_SCOPE_CLOSED`: true
 - `EXTERNAL_OUTCOME_COMPLETE`: false

@@ -170,3 +170,31 @@ EXPECT: both native exits `0`; `11/11` pass in each; the no-resolvable-HEAD case
 EVIDENCE: directory-backed run `11/11`, exit `0`, stdout SHA-256 `b60fb8fd1ed49c13063a5dc4398b8dc5107973bf2f2960daa91ae7639fcf6f58`; file-backed run `11/11`, exit `0`, stdout SHA-256 `ae6a37677580dc7c4b3ed747179a8271f8d4d6a473e9481b7909d8222ec92908`; both stderr empty SHA-256 `e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855`. Unexpected failures `0`, retries `0`.
 
 This is Builder-only evidence for the corrected fixture. S3/S8 and all broader stock commands are `NOT_RUN` in this bounded correction. T1–T8 checkboxes remain OPEN; fresh independent QA and separate Release Audit are still required. No push, deployment, acceptance, release, permission, provider, runtime, environment, database, registry or canonical-root mutation is authorized. `completionAuthority=false`.
+
+## Isolated Map integration — scoped dependency hold (2026-09-06 KST)
+
+Planner handoff SHA-256 `e81733982e4b63cd1d3123fec4f9cb82589d859001fdbfd6220e649083ec5bff` authorized one isolated three-path Map integration from parent `faebfbcda1e08b810ee04cf08942c4371708c047` under the existing `AP-4-READ-STATUS / T1-T8` Gate. Protected Builder identity, parent/tree, canonical HEAD/tree, current user Map SHA/mode/size, and canonical status/diff fingerprints matched before `STARTED + CONTINUITY_READY`.
+
+Owner reconciliation succeeded before tests: immutable current Map input SHA-256 `68629afe62bec92e74b6ab2840f626863893b041f668e30e9c70379574b58ae4`; integrated Map SHA-256 `93de54c9abf98f61ff1bffa10e9f8ec40f53266118f7241908994fb89de26ab2`; timeline Gate entry count `1`; linked-chat Stage count `1`; removing exactly those additions reconstructed the input byte-for-byte. Required v2/compatibility paths were present in the parent.
+
+Latest Builder terminal: `SAFE_HOLD_MISSING_OFFLINE_DEPENDENCY`. The first sealed actual-package parser/schema check exited `1` before assertions because Node could not resolve existing package `yaml` imported by `server/outcome-package.mjs` (`ERR_MODULE_NOT_FOUND`). This is a scoped dependency gap, not a product-test failure. No install/fetch/copy/link, retry, source repair, remaining command execution, commit, or push followed. Commands 2–4 are `NOT_RUN`; automatic retries `0`; candidate commit `none`; push `0`. The isolated worktree and task-owned snapshot remain recoverable. T1–T8 acceptance, fresh QA, separate Audit, Cherry acceptance, canonical promotion, deployment and release remain OPEN. `completionAuthority=false`.
+
+## Offline dependency continuation — Builder checks complete (2026-09-06 KST)
+
+Planner authorized one candidate-local ignored symlink to the already-present read-only dependency tree, not an install or dependency-source change. Candidate/aa51 package and lockfile hashes matched exactly; lockfile and installed `yaml` were both version `2.9.0`. The prior failed import output remains preserved.
+
+After setup, the failed-before-assertion parser command ran once and passed the actual integrated Package: valid, zero errors, one timeline Stage, exact Gate IDs T1–T8. The previously NOT_RUN commands then ran once each: timeline status `36/36`, integrated Map current-projection drift exact `cold_compile_required/source_digest_drift` with all safety counters zero, and Model v2 compatibility `19/19`. Every owner command exited `0`; no assertion failure, correction, install, fetch, package-manager script, dependency edit, or source/test expectation edit occurred.
+
+Latest Builder state: `CANDIDATE_READY_BUILDER_ONLY`, pending the single containing commit and exact post-commit pin. Tracked delta is exactly the three allowlisted paths; the dependency symlink is ignored and excluded from the candidate tree. Push remains `0`. T1–T8 independent acceptance, fresh QA, separate Audit, Cherry acceptance, canonical promotion, deployment and release remain OPEN. `completionAuthority=false`.
+
+## Map integration — terminal precommit validation hold
+
+Latest Builder terminal is `SAFE_HOLD_PRECOMMIT_VALIDATION_HARNESS`. The first exact-three porcelain assertion exited `1` because its whole-stream `trim()` removed the first row's leading Git status-column space. Output showed count `3` and only the allowlisted Gate, Map and receipt, but the self-check compared `M GATES...` against ` M GATES...` and returned `exact_three=false`.
+
+No corrected harness, status replay, staging, commit, or push follows. All four owner commands remain locally green, but no immutable candidate was created. The existing isolated worktree, integrated Map, input snapshot, Gate and receipt remain recoverable; canonical remains outside the mutation scope. Fresh QA, separate Audit, Cherry acceptance and canonical promotion remain OPEN. `candidate_commit=none`; `push_count=0`; `automatic_retry_count=0`; `completionAuthority=false`.
+
+## Map integration — corrected precommit parser PASS
+
+Planner independently verified the same NUL porcelain stream and authorized one corrected parser evaluation. It preserved the first two status bytes, removed only the terminal empty NUL record, parsed paths from index 3, and rejected rename/copy or multiplicity. Native exit was `0`: exactly three records, exact status/path set `true`, rename/copy count `0`. The rows were the allowlisted Gate and Map as unstaged tracked modifications plus the allowlisted new receipt.
+
+No product suite, setup, integration or owner test was replayed. This supersedes only the whitespace-parsing harness failure and permits exact-three staging, staged diff-check and the original single commit ceiling. Push remains `0`; canonical/provider/runtime/environment mutation remains `0`. Fresh QA, separate Audit, Cherry acceptance and canonical promotion remain OPEN. `completionAuthority=false`.
