@@ -1,5 +1,10 @@
 import assert from 'node:assert/strict'
-import { readFileSync } from 'node:fs'
+import { readFileSync, mkdtempSync, mkdirSync, writeFileSync, rmSync } from 'node:fs'
+import { spawnSync } from 'node:child_process'
+import { tmpdir } from 'node:os'
+import { join, relative } from 'node:path'
+import { fileURLToPath } from 'node:url'
+import { createHash } from 'node:crypto'
 import test from 'node:test'
 import { assertDecisionMutationResponse, assertMutationResponse } from './check-mutation-matrix.mjs'
 
@@ -7,6 +12,36 @@ const matrixSource = readFileSync(new URL('./check-mutation-matrix.mjs', import.
 const redactionSource = readFileSync(new URL('./check-public-redaction.mjs', import.meta.url), 'utf8')
 const scopeSource = readFileSync(new URL('./check-scope.mjs', import.meta.url), 'utf8')
 const privateRoutes = ['/api/private/chat/timeline', '/api/private/chat/messages', '/api/private/bridge/admin/viewers/register', '/api/private/bridge/admin/viewers/revoke', '/api/private/bridge/admin/challenges/cleanup', '/api/private/bridge/admin/readiness']
+
+test('F3 complete scanner rejects CSRF literal syntax variants and preserves AF-1 controls', () => {
+  const root = fileURLToPath(new URL('..', import.meta.url))
+  const fixtures = mkdtempSync(join(tmpdir(), 'outcome-f3-scanner-'))
+  const secret = 'SyntheticValueAB' // 16 characters; never a credential.
+  assert.equal(secret.length, 16)
+  const cases = [
+    ['qa-original', 'globalThis.probe={"csrf":"QaSyntheticSecretValueABCDEFG"}', true],
+    ...['csrf', '"csrf"', "'csrf'"].flatMap((key, k) => ['"', "'", '`'].map((quote, q) => [`property-${k}-${q}`, `globalThis.probe={${key} \n : \t ${quote}${secret}${quote}}`, true])),
+    ['assignment', `globalThis.csrf = '${secret}'`, true],
+    ['bracket-assignment', `globalThis['csrf'] = \`${secret}\``, true],
+    ['computed-literal', `globalThis.probe={['csrf']:"${secret}"}`, true],
+    ['length-15', `globalThis.probe={"csrf":"${secret.slice(0, 15)}"}`, false],
+    ['af1-identifiers', 'globalThis.probe={csrf:"",private_content:null,route:"/api/private/chat/timeline",other:"/api/private/chat/messages"}', false],
+  ]
+  try {
+    mkdirSync(join(fixtures, 'assets'))
+    writeFileSync(join(fixtures, 'index.html'), '<h1>프로젝트 여정</h1><script src="/assets/probe.js"></script>')
+    for (const [label, code, reject] of cases) {
+      writeFileSync(join(fixtures, 'assets/probe.js'), code)
+      const result = spawnSync(process.execPath, ['scripts/check-public-redaction.mjs'], { cwd: root, encoding: 'utf8', timeout: 30_000, env: { ...process.env, OUTCOME_CANDIDATE_DIST: relative(root, fixtures), OUTCOME_PUBLIC_URL: '' } })
+      const csrfFailure = result.stderr.includes('bundle:csrf-secret-literal')
+      console.info(JSON.stringify({ label, fixtureSha256: createHash('sha256').update(code).digest('hex'), scannerExit: result.status, csrfFailure }))
+      assert.equal(result.error, undefined, `${label}: scanner environment failure`)
+      assert.equal(result.status, reject ? 1 : 0, `${label}: unexpected complete scanner exit`)
+      assert.equal(csrfFailure, reject, `${label}: wrong failure class`)
+      if (!reject) assert.match(result.stdout, /G-6d csrf build secrets=0/)
+    }
+  } finally { rmSync(fixtures, { recursive: true, force: true }) }
+})
 
 test('C2-R1 mutation matrix names all six private chat and bridge routes', () => {
   for (const route of privateRoutes) assert.equal(matrixSource.includes(route), true, route)

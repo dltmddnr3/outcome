@@ -30,7 +30,10 @@ const privateValueKeys = ['private_content', 'correlation_id', 'binding_version'
 const privateStringValue = /"(?:correlation_id|csrf|account_ref|workspace_id|event_id|idempotency_key|claim_token|consumer_id)"\s*:\s*"(?:[^"\\]|\\.)+"/i
 const privateBindingValue = /"binding_version"\s*:\s*(?:[1-9][0-9]*|"[^"\\]+")/i
 const privateContentValue = /"private_content"\s*:\s*(?:"(?:[^"\\]|\\.)+"|\{\s*"text"\s*:\s*"(?:[^"\\]|\\.)+")/i
-const csrfBuildSecret = /\bcsrf\s*[:=]\s*["'`]([A-Za-z0-9._~+/=-]{16,})["'`]/i
+// Lexical literal check, not JavaScript evaluation: quoted/unquoted keys and literal
+// bracket keys are supported. Escaped identifiers/values, concatenation, dynamic
+// computed keys and template interpolation require separate semantic analysis.
+const csrfBuildSecret = /(?:\bcsrf|(["'])csrf\1|\[\s*(["'])csrf\2\s*\])\s*[:=]\s*(["'`])[A-Za-z0-9._~+/=-]{16,}\3/i
 const server = createOutcomeServer({ root: runtime, publicReadOnly: true, buildReceipt })
 server.listen(0, '127.0.0.1'); await once(server, 'listening')
 try {
