@@ -53,7 +53,19 @@ const eventProjection = (value) => {
   if (userMessage && (!DELIVERY.has(row.delivery) || !DISPATCH.has(row.dispatch_state))) fail('invalid_response')
   return { event_id: finiteEventId(row.event_id), sequence: finiteInteger(row.sequence, 1), observed_at: finiteTime(row.observed_at), kind, state, correlation_id: finiteCorrelationId(row.correlation_id), payload: kind === 'user_message' ? { private_content: { text: finiteText(privateContent.text) } } : {}, ...(userMessage ? { delivery: row.delivery, dispatch_state: row.dispatch_state } : {}) }
 }
-const timelineProjection = (value, afterSequence) => { const row = record(value, ['target', 'events', 'completion_authority']); const target = record(row.target, ['role', 'binding_version']); if (target.role !== 'planner') fail('invalid_response'); if (!Array.isArray(row.events) || types.isProxy(row.events) || row.completion_authority !== false) fail('invalid_response'); const events = row.events.map(eventProjection), ids = new Set(); let prior = afterSequence, priorTime = ''; for (const event of events) { if (event.sequence !== prior + 1 || ids.has(event.event_id) || priorTime && event.observed_at < priorTime) fail('invalid_response'); ids.add(event.event_id); prior = event.sequence; priorTime = event.observed_at } return { target: { role: 'planner', binding_version: finiteInteger(target.binding_version, 1) }, events, completion_authority: false } }
+const timelineEventsProjection = (value) => {
+  if (types.isProxy(value) || !Array.isArray(value) || Object.getPrototypeOf(value) !== Array.prototype) fail('invalid_response')
+  const descriptors = Object.getOwnPropertyDescriptors(value), length = descriptors.length.value
+  if (Reflect.ownKeys(descriptors).length !== length + 1) fail('invalid_response')
+  // Validate every slot before materialization; never call the carrier's methods or getters.
+  for (let index = 0; index < length; index++) {
+    if (!Object.hasOwn(descriptors, index) || !descriptors[index].enumerable || !Object.hasOwn(descriptors[index], 'value')) fail('invalid_response')
+  }
+  const events = []
+  for (let index = 0; index < length; index++) events[index] = eventProjection(descriptors[index].value)
+  return events
+}
+const timelineProjection = (value, afterSequence) => { const row = record(value, ['target', 'events', 'completion_authority']); const target = record(row.target, ['role', 'binding_version']); if (target.role !== 'planner') fail('invalid_response'); if (row.completion_authority !== false) fail('invalid_response'); const events = timelineEventsProjection(row.events), ids = new Set(); let prior = afterSequence, priorTime = ''; for (const event of events) { if (event.sequence !== prior + 1 || ids.has(event.event_id) || priorTime && event.observed_at < priorTime) fail('invalid_response'); ids.add(event.event_id); prior = event.sequence; priorTime = event.observed_at } return { target: { role: 'planner', binding_version: finiteInteger(target.binding_version, 1) }, events, completion_authority: false } }
 const submitProjection = (value) => { const row = record(value, ['accepted', 'sequence', 'event_id', 'dispatch_state', 'delivery', 'execution_started', 'result_attached', 'evidence_attached']); if (row.accepted !== true || !DISPATCH.has(row.dispatch_state) || row.execution_started !== false || row.result_attached !== false || row.evidence_attached !== false || !DELIVERY.has(row.delivery) || (row.dispatch_state !== 'invoked' && row.delivery !== 'delivery_unknown')) fail('invalid_response'); return { accepted: true, sequence: finiteInteger(row.sequence, 1), event_id: finiteEventId(row.event_id), dispatch_state: row.dispatch_state, delivery: row.delivery, execution_started: false, result_attached: false, evidence_attached: false } }
 
 async function handle(input) {

@@ -43,6 +43,66 @@ const postInput = { method: 'POST', url: '/api/private/chat/messages', headers: 
 const post = (overrides = {}) => handlePrivateChatRequest({ ...postInput, sendEnabled: true, ...overrides })
 const defaultPost = (overrides = {}) => handlePrivateChatRequest({ ...postInput, ...overrides })
 
+test('TIMELINE-ARRAY-RED rejects an own array index getter without evaluation', async () => {
+  let traps = 0
+  const event = { event_id: 'event-0000000000000001', sequence: 1, observed_at: '2026-09-03T00:00:00.000Z', kind: 'user_message', state: 'queued', correlation_id: 'message-0000000000000001', payload: { private_content: { text: 'ordinary' } }, delivery: 'acknowledged', dispatch_state: 'invoked' }
+  const events = []
+  Object.defineProperty(events, '0', { enumerable: true, get() { traps++; return event } })
+  const result = await handlePrivateChatRequest({ method: 'GET', url: '/api/private/chat/timeline?project_id=outcome&after_sequence=0', service: { timeline: async () => ({ target: { role: 'planner', binding_version: 7 }, events, completion_authority: false }) }, owner })
+  assert.deepEqual({ traps, status: result.status }, { traps: 0, status: 503 })
+  assert.deepEqual(result.body, { error: 'chat_unavailable' })
+})
+
+test('T2 timeline array carriers reject holes accessors methods species and proxies without callbacks', async () => {
+  let traps = 0
+  const trap = () => { traps++; throw new Error('private-array-callback') }
+  const event = { event_id: 'event-0000000000000001', sequence: 1, observed_at: '2026-09-03T00:00:00.000Z', kind: 'user_message', state: 'queued', correlation_id: 'message-0000000000000001', payload: { private_content: { text: 'ordinary' } }, delivery: 'acknowledged', dispatch_state: 'invoked' }
+  const read = events => handlePrivateChatRequest({ method: 'GET', url: '/api/private/chat/timeline?project_id=outcome&after_sequence=0', service: { timeline: async () => ({ target: { role: 'planner', binding_version: 7 }, events, completion_authority: false }) }, owner })
+  const bad = [undefined, null, {}, 'events', new Array(1), new Array(4294967295), [event, ,], [, event], [undefined]]
+  for (const index of [0, 1]) {
+    const getter = [event, event]; Object.defineProperty(getter, index, { enumerable: true, get: trap }); bad.push(getter)
+    const setter = [event, event]; Object.defineProperty(setter, index, { enumerable: true, set: trap }); bad.push(setter)
+    const hidden = [event, event]; Object.defineProperty(hidden, index, { enumerable: false }); bad.push(hidden)
+  }
+  for (const key of ['map', 'constructor', Symbol.iterator, Symbol.species, Symbol('extra')]) {
+    const accessor = [event]; Object.defineProperty(accessor, key, { get: trap }); bad.push(accessor)
+    const method = [event]; Object.defineProperty(method, key, { value: trap }); bad.push(method)
+  }
+  const species = [event]; Object.defineProperty(species, 'constructor', { value: { get [Symbol.species]() { return trap() } } }); bad.push(species)
+  const inherited = new Array(1), prototype = Object.create(Array.prototype)
+  for (const key of ['0', 'map', 'constructor', Symbol.iterator]) Object.defineProperty(prototype, key, { get: trap })
+  Object.setPrototypeOf(inherited, prototype); bad.push(inherited)
+  class EventArray extends Array { static get [Symbol.species]() { return trap() } }
+  bad.push(new EventArray(event), Object.setPrototypeOf([event], null))
+  const handler = { get: trap, getPrototypeOf: trap, ownKeys: trap, getOwnPropertyDescriptor: trap }
+  bad.push(new Proxy([event], handler), new Proxy({}, handler))
+  const revoked = Proxy.revocable([event], handler); revoked.revoke(); bad.push(revoked.proxy)
+  for (const events of bad) {
+    const result = await read(events)
+    assert.equal(result.status, 503); assert.deepEqual(result.body, { error: 'chat_unavailable' }); assert.equal(traps, 0)
+  }
+  const missing = await handlePrivateChatRequest({ method: 'GET', url: '/api/private/chat/timeline?project_id=outcome&after_sequence=0', service: { timeline: async () => ({ target: { role: 'planner', binding_version: 7 }, completion_authority: false }) }, owner })
+  assert.equal(missing.status, 503); assert.deepEqual(missing.body, { error: 'chat_unavailable' }); assert.equal(traps, 0)
+})
+
+test('T2 plain empty frozen and sealed timeline arrays retain closed status schema ordering and detached output', async () => {
+  const read = (events, afterSequence = 0) => handlePrivateChatRequest({ method: 'GET', url: `/api/private/chat/timeline?project_id=outcome&after_sequence=${afterSequence}`, service: { timeline: async () => ({ target: { role: 'planner', binding_version: 7 }, events, completion_authority: false }) }, owner })
+  for (const wrap of [events => events, Object.freeze, Object.seal]) {
+    assert.deepEqual((await read(wrap([]))).body.events, [])
+    const first = { event_id: 'event-0000000000000001', sequence: 1, observed_at: '2026-09-03T00:00:00.000Z', kind: 'user_message', state: 'queued', correlation_id: 'message-0000000000000001', payload: { private_content: { text: 'ordinary' } }, delivery: 'failed', dispatch_state: 'dispatch_intent_recorded' }
+    const second = { event_id: 'event-0000000000000002', sequence: 2, observed_at: '2026-09-03T00:00:01.000Z', kind: 'commentary', state: 'responding', correlation_id: 'message-0000000000000002', payload: {} }
+    const single = await read(wrap([first])); assert.equal(single.status, 200); assert.deepEqual(single.body.events, [first])
+    const events = wrap([first, second]), result = await read(events)
+    assert.equal(result.status, 200); assert.deepEqual(result.body.events, [first, second]); assert.equal(result.body.completion_authority, false)
+    assert.equal(Object.keys(result.body.events[0]).length, 9); assert.equal(Object.keys(result.body.events[1]).length, 7)
+    assert.notEqual(result.body.events, events); assert.notEqual(result.body.events[0], first); assert.notEqual(result.body.events[0].payload.private_content, first.payload.private_content); assert.notEqual(result.body.events[1].payload, second.payload)
+    const resumed = await read(wrap([second]), 1); assert.equal(resumed.status, 200); assert.deepEqual(resumed.body.events, [second])
+    result.body.events[0].payload.private_content.text = 'output mutation'; assert.equal(first.payload.private_content.text, 'ordinary')
+    first.delivery = 'rejected'; assert.equal(result.body.events[0].delivery, 'failed')
+    second.payload.extra = 'source mutation'; assert.deepEqual(result.body.events[1].payload, {})
+  }
+})
+
 test('TIMELINE-RED API accepts exact authoritative user status fields', async () => {
   const event = { event_id: 'event-0000000000000001', sequence: 1, observed_at: '2026-09-03T00:00:00.000Z', kind: 'user_message', state: 'queued', correlation_id: 'message-0000000000000001', payload: { private_content: { text: 'persisted' } }, delivery: 'failed', dispatch_state: 'dispatch_intent_recorded' }
   const result = await handlePrivateChatRequest({ method: 'GET', url: '/api/private/chat/timeline?project_id=outcome&after_sequence=0', service: { ...service, timeline: async () => ({ target: { role: 'planner', binding_version: 7 }, events: [event], completion_authority: false }) }, owner })

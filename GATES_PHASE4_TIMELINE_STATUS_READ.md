@@ -108,3 +108,53 @@ Known warning retained: docs/PHASE4_TIMELINE_STATUS_READ_CONTRACT.md:14 has an e
 Latest bounded state: PACKAGING_AUTHORIZED_WITH_DOCUMENT_WHITESPACE_WARNING. Reconcile this append-only Gate through exact named staging and add only docs/OUTCOME_TIMELINE_PACKAGING_FALLBACK_RECEIPT_20260905.md to the existing13 paths. Original unused ceiling: commit1/push1, no hook bypass or mutation retry. Final CANDIDATE_READY_WITH_DOCUMENT_WHITESPACE_WARNING may be reported only after exact candidate/tree/parent, source/index preservation and remote-ref readback. The receipt is committed as a precommit evidence record; its containing candidate pin and push result are reported separately after readback to avoid a self-referential commit claim.
 
 source_changes_this_fallback=0 (product/test/Map/contract); evidence-only Gate append and packaging receipt are the only file edits. correction_count=1; test_reruns=0. Previous Audit FAIL remains OPEN. Fresh official QA, separate Release Audit and Cherry acceptance remain required; T1-T8 acceptance stays OPEN. No canonical promotion, runtime activation, hosted change, deployment or release. completionAuthority=false.
+
+## Array-slot correction 1 — SAFE_HOLD before RED (2026-09-05)
+
+Independent QA on aae42568715baac57e1034d37d1568870aeb5c55 returned NEEDS_REVISION for T2/A4: an ordinary events array index0 getter executed once and returned HTTP200, versus required trap0/generic503. QA receipt SHA-256 e9f63e3979f896d15c1ec306abbfbd3b37a3b3885bcce903e7e5a67d7799135a. The same expression exists in the parent; this is not established as a newly introduced regression or remote exploit. Prior Builder passes and packaging warning history above are unchanged; they do not override this QA failure.
+
+New bounded handoff SHA-256 deaee0436eabb06ae37dc688e61e3898beddb2d20a7fa1ad3a2391c84479a983 authorized one correction under the same AP-4-READ-STATUS/T1-T8 and four-path allowlist. Entry candidate/tree/parent, isolated cwd/branch, registry163 current role/app/self singularity, clean tracked/index and seven immutable untracked receipts matched.
+
+Latest Builder terminal: SAFE_HOLD_SETUP_EXECUTION_ERROR. A read-only canonical-root Git-state script using CommonJS require was invoked with node --input-type=module; native exit1, ReferenceError: require is not defined in ES module scope. This is an unexpected setup/invocation failure, NOT the planned accessor RED. Its same tool orchestration lacked exit gating and continued to add the ten-line TIMELINE-ARRAY-RED test and hash source/test before returning. This continuation is explicitly recorded as a process breach; it is not excused by the command being read-only. No product implementation, RED run, GREEN/stock check, staging, commit or push occurred. No invocation repair or retry follows.
+
+CHECK planned: one sealed accessor RED on unchanged product, then descriptor-safe trap0/503 and valid controls, followed by all nine handoff commands sequentially. Actual EVIDENCE: RED NOT RUN; all nine GREEN commands NOT RUN; no new Builder candidate. Product SHA-256 remains bee12c9d7fae02adede94ad04b6166538f392afc70aba8df09274e1218774556; unexecuted test SHA-256 c6093a2a9d52fb3c7b26c6ee46e6d5e17874c6d80a6d658f0a4fc8e80ebe3572. Read-only preservation confirms 658 frozen tracked paths, seven old receipts, shared dependency packages/link and generated cache content/modes unchanged. Canonical-root state was not obtained by the failed command; no claim of successful root readback.
+
+Recovery receipt: docs/OUTCOME_TIMELINE_ARRAY_SLOT_CORRECTION_RECEIPT_20260905.md. Preserve unpromoted test and append-only evidence, clean index, base HEAD and prior receipts. correction_attempts=1; product_corrections=0; retries=0; commit=0; push=0. Planner must choose a bounded fallback or new path before any resumption. T2/A4 remains unmet, T1-T8 acceptance remains OPEN, old90daddb Audit FAIL remains OPEN. No QA/Audit/Cherry acceptance, canonical promotion, runtime/hosted/deployment/release or completion authority.
+
+## Native preflight fallback — first RED plan sealed (2026-09-05)
+
+Authority e24af28ac6d7f14ea69bd6da86816589ebda8dbdf9c9876e946bc77e4b612b78 selects direct native Git preflight, not repaired Node-helper replay. The preceding setup hold and same-call continuation breach remain unchanged. Old hold receipt f3d583166731d34529c3b60a7cec9b0e23d7bf60b597a87a3846635752ec75f2 is now frozen and untracked. Same milestone/AP-4-READ-STATUS/T1-T8; four writable paths only, with new docs/OUTCOME_TIMELINE_ARRAY_NATIVE_FALLBACK_RECEIPT_20260905.md replacing the old receipt.
+
+Native Git and shasum each returned exit0 before any dependent edit. Isolated HEAD/tree/parent and branch matched original handoff; index empty; exact predeclared test/Gate dirty; eight old receipts preserved. Canonical-root current HEAD516dc6759ef77a774c7246e4495e56d6b8491580/treec13324bd096427c149b7b1e6928628ac31a15141; complete native output streams hashed with pipefail: status58de2fc91b80d262aec497222b94941967c8285825525b643796623ee9549173, tracked diff629baff31f6304cdbd780f64cd66722c5ade3ee87b9bf7749c3aab44a09efdcb. Initial displayed status/diff text was truncated; these full-stream hashes, not that display, establish the preservation comparison. Proven ESM preservation method confirmed frozen tracked files/dependencies/caches unchanged; doctor registry163 healthy, current role/app/self match1.
+
+CHECK: node --test --test-name-pattern=TIMELINE-ARRAY-RED server/outcome-chat-api.test.mjs
+EXPECT: native exit1, exactly one selected failure: actual traps1/status200 vs expected traps0/status503. Setup/import/syntax failures are not accepted RED. Product SHA bee12c9d7fae02adede94ad04b6166538f392afc70aba8df09274e1218774556, unchanged regression SHA c6093a2a9d52fb3c7b26c6ee46e6d5e17874c6d80a6d658f0a4fc8e80ebe3572. No prior RED or stock command was executed. EVIDENCE: first RED pending; then one product correction and original nine sequential GREEN commands only if expected RED is observed. Inspect every native completion before any dependent action; no diagnostic-plus-edit orchestration. First unexpected failure stops with no repair/retry. Acceptance remains OPEN; completionAuthority=false.
+
+## Native fallback — GREEN source and command plan sealed
+
+First RED actual: native exit1, tests1/pass0/fail1, exact traps1/status200 versus traps0/status503; no setup/import/syntax error. Complete RED.json SHA47d9828e5c06d2f9541ed8845ab04ffd892bd5a0404c7e476bb3127c16ee1816. This is the unused first evaluation, not a replay of the setup failure.
+
+Single surgical product correction rejects Proxy/nonplain arrays before reflection, requires exact dense enumerable own-data slots and no extra carrier properties, validates every slot before projecting into a fresh array without using the carrier's map/index/constructor/species/iterator. Empty/plain/frozen/sealed arrays remain supported. Existing event schemas/status/privacy/scope/order rules are unchanged.
+
+Sealed API SHA256 d05e686fe48c75b4635e28d6518df46e62afcc2eedb8d9c6822a44021b5a5401; tests SHA256 f96a5b291156a6cf65484bf576311bd8ea160accf566b92e46ef2e422e167064. Existing RED assertion is unchanged; two added tests exercise hostile carriers and paired plain/detached/status/ordering controls. No source/test edit after this seal. Explicit cwd for every command: /Users/rosum/.codex/worktrees/aa51/OUTCOME. Existing dependency body and generated cache fingerprints recorded separately; no install/fetch/config edits.
+
+Execute once each in this order; inspect prior completed native exit0 before starting the next:
+1. node --test server/outcome-chat.test.mjs server/outcome-chat-api.test.mjs server/outcome-chat-postgres.test.mjs server/outcome-chat-hosted-runtime.test.mjs
+2. node --test server/outcome-current-projection.test.mjs
+3. npm test
+4. npm run build
+5. npm run test:security
+6. npm run check:scope
+7. npm run check:mutations
+8. node --test scripts/*.test.mjs server/*.test.mjs
+9. npm run test:package-model
+
+EXPECT: all nine native exits0, complete outputs retained, frozen source/receipts/dependency body preserved. No summed overlapping counts. EVIDENCE: GREEN pending. Any unexpected failure or unclear execution seals this route with no test/harness/source repair or replay. Only all-pass plus exact preservation permits named four-path staging, individual new-delta diff-check, commit1/push1. Prior setup hold and old Audit FAIL remain recorded; T1-T8 acceptance remains OPEN. completionAuthority=false.
+
+## Native fallback — Builder checks complete, packaging eligible
+
+All nine planned commands completed once in declared order with native exit0. T1–T6 focused82/82 (including unchanged getter RED now trap0/generic503, hostile carrier controls and normal detached arrays); T7 current projection11/11; npm test frontend130/130 and server670/670; build exit0/1654 modules; T8 security75/75 plus snapshot/env checks; scope98 files; mutation matrices verified; broad762/762; package50/50. These overlapping counts are not summed. Full command outputs and sealed source pins are hashed in docs/OUTCOME_TIMELINE_ARRAY_NATIVE_FALLBACK_RECEIPT_20260905.md. No unexpected evaluation failure or source/test edits after GREEN sealing.
+
+Preservation: 658 frozen tracked paths, all eight prior immutable/untracked receipts, QA receipt/harness/plan, dependency package/link body and canonical-root HEAD/tree/status/diff unchanged. Stock Vitest updated only its generated .vite/vitest results.json cache entry; 9592 dependency-body entries unchanged. This generated cache update is recorded separately, not claimed as total node_modules byte identity.
+
+Latest local state: READY_FOR_CANDIDATE_PACKAGING_BUILDER_ONLY. Named four-path staging and new-delta native diff-check still precede the unused commit1/push1. The committed receipt is a precommit evidence record; containing candidate/tree/parent and exact diff-check/commit/push/remote readback are reported separately without self-referential commit claims. Earlier setup failure, same-call continuation breach, QA failure, canary/packaging history and inherited contract EOF warning remain unchanged. This Builder correction is not fresh independent QA or Audit. T1–T8 acceptance, old90daddb Audit FAIL, Cherry acceptance and release remain OPEN. completionAuthority=false.
