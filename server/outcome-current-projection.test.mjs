@@ -224,7 +224,7 @@ test('O1 default canary fails closed when its repository has no resolvable HEAD'
   const fixture = mkdtempSync(join(tmpdir(), 'outcome-o1-no-head-'))
   try {
     cpSync(new URL('../', import.meta.url), fixture, { recursive: true })
-    unlinkSync(join(fixture, '.git'))
+    rmSync(join(fixture, '.git'), { recursive: true, force: true })
     const run = spawnSync(process.execPath, ['scripts/outcome-model-v2-local-canary.mjs'], { cwd: fixture, encoding: 'utf8' })
     assert.equal(run.status, 2)
     const result = JSON.parse(run.stdout)
