@@ -3,6 +3,7 @@ import { existsSync, mkdtempSync, readFileSync, rmSync, symlinkSync } from 'node
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { chromium } from '@playwright/test'
+import ts from 'typescript'
 import { LOCAL_ABSOLUTE_PATH_SOURCE } from '../server/cherry-note-dashboard.mjs'
 import { createOutcomeServer, readBuildReceipt } from '../server/index.mjs'
 
@@ -30,10 +31,38 @@ const privateValueKeys = ['private_content', 'correlation_id', 'binding_version'
 const privateStringValue = /"(?:correlation_id|csrf|account_ref|workspace_id|event_id|idempotency_key|claim_token|consumer_id)"\s*:\s*"(?:[^"\\]|\\.)+"/i
 const privateBindingValue = /"binding_version"\s*:\s*(?:[1-9][0-9]*|"[^"\\]+")/i
 const privateContentValue = /"private_content"\s*:\s*(?:"(?:[^"\\]|\\.)+"|\{\s*"text"\s*:\s*"(?:[^"\\]|\\.)+")/i
-// Lexical literal check, not JavaScript evaluation: quoted/unquoted keys and literal
-// bracket keys are supported. Escaped identifiers/values, concatenation, dynamic
-// computed keys and template interpolation require separate semantic analysis.
-const csrfBuildSecret = /(?:\bcsrf|(["'])csrf\1|\[\s*(["'])csrf\2\s*\])\s*[:=]\s*(["'`])[A-Za-z0-9._~+/=-]{16,}\3/i
+// Inspect decoded literals, never execute/evaluate expressions or strip comments.
+// Runtime expressions, aliases and dynamic computed keys are not data-flow verified.
+function inspectCsrfLiterals(code) {
+  const source = ts.createSourceFile('asset.js', code, ts.ScriptTarget.Latest, true, ts.ScriptKind.JS)
+  if (source.parseDiagnostics.length) throw new Error('public redaction check error: bundle:javascript-parse')
+  const unwrap = (node) => node && ts.isParenthesizedExpression(node) ? unwrap(node.expression) : node
+  const name = (node) => {
+    node = unwrap(node)
+    if (!node) return null
+    if (ts.isIdentifier(node) || ts.isStringLiteralLike(node)) return node.text.toLowerCase()
+    if (ts.isComputedPropertyName(node)) return ts.isStringLiteralLike(unwrap(node.expression)) ? unwrap(node.expression).text.toLowerCase() : null
+    if (ts.isPropertyAccessExpression(node)) return name(node.name)
+    if (ts.isElementAccessExpression(node)) return ts.isStringLiteralLike(unwrap(node.argumentExpression)) ? unwrap(node.argumentExpression).text.toLowerCase() : null
+    return null
+  }
+  let secrets = 0
+  let runtimeExpressions = 0
+  const inspect = (key, value) => {
+    if (name(key) !== 'csrf' || !value) return
+    value = unwrap(value)
+    if (ts.isStringLiteralLike(value)) {
+      if (/^[A-Za-z0-9._~+/=-]{16,}$/.test(value.text)) secrets++
+    } else if (value.kind !== ts.SyntaxKind.NullKeyword) runtimeExpressions++
+  }
+  const visit = (node) => {
+    if (ts.isPropertyAssignment(node) || ts.isVariableDeclaration(node) || ts.isPropertyDeclaration(node)) inspect(node.name, node.initializer)
+    if (ts.isBinaryExpression(node) && node.operatorToken.kind === ts.SyntaxKind.EqualsToken) inspect(node.left, node.right)
+    ts.forEachChild(node, visit)
+  }
+  visit(source)
+  return { secrets, runtimeExpressions }
+}
 const server = createOutcomeServer({ root: runtime, publicReadOnly: true, buildReceipt })
 server.listen(0, '127.0.0.1'); await once(server, 'listening')
 try {
@@ -43,7 +72,10 @@ try {
     const api = (await Promise.all(['/api/dashboard', '/api/dashboard/cherry-note'].map(async (path) => (await fetch(`${base}${path}`)).text()))).join('\n')
     const html = localAssets ? readFileSync(join(candidateDist, 'index.html'), 'utf8') : await (await fetch(`${base}/cherry-note-dashboard`)).text()
     const assetPaths = [...html.matchAll(/(?:src|href)="(\/assets\/[^"]+)"/g)].map((match) => match[1])
-    const bundle = (await Promise.all(assetPaths.map((path) => localAssets ? readFileSync(join(candidateDist, path), 'utf8') : fetch(`${base}${path}`).then((response) => response.text())))).join('\n')
+    const assets = await Promise.all(assetPaths.map(async (path) => ({ path, text: localAssets ? readFileSync(join(candidateDist, path), 'utf8') : await fetch(`${base}${path}`).then((response) => { if (!response.ok) throw new Error('public redaction check error: bundle:asset-fetch'); return response.text() }) })))
+    const bundle = assets.map((asset) => asset.text).join('\n')
+    const syntax = assets.filter((asset) => /\.(?:mjs|cjs|js)(?:[?#]|$)/i.test(asset.path)).map((asset) => inspectCsrfLiterals(asset.text))
+    if (!syntax.length) throw new Error('public redaction check error: bundle:javascript-assets-missing')
     const page = await browser.newPage(); await page.goto(`${base}/cherry-note-dashboard`); await page.getByText('프로젝트 여정', { exact: true }).waitFor(); const renderedUI = await page.locator('body').innerText(); await page.close()
     const surfaces = { api, html, bundle, renderedUI }
     const hits = Object.entries(surfaces).flatMap(([surface, text]) => Object.entries(patterns).flatMap(([name, pattern]) => pattern.test(text) ? [`${label}:${surface}:${name}`] : []))
@@ -52,10 +84,11 @@ try {
       privateBindingValue.test(text) ? `${label}:${surface}:binding-version-value` : null,
       privateContentValue.test(text) ? `${label}:${surface}:private-content-value` : null,
     ].filter(Boolean))
-    const csrfSecretHits = csrfBuildSecret.test(bundle) ? [`${label}:bundle:csrf-secret-literal`] : []
+    const csrfSecretHits = syntax.some((asset) => asset.secrets > 0) ? [`${label}:bundle:csrf-secret-literal`] : []
     hits.push(...privateValueHits, ...csrfSecretHits)
     if (hits.length) throw new Error(`public redaction failures: ${hits.join(', ')}`)
     console.log(`${label} G-6a/G-6b private response values=0; G-6c bundle value classes=0; G-6d csrf build secrets=0; G-6e routes=${Object.keys(privateResponseVocabulary).length}/6 values=${privateValueKeys.length}/10`)
+    console.log(`G-6d syntax assets=${syntax.length}; nonliteral csrf expressions=${syntax.reduce((sum, asset) => sum + asset.runtimeExpressions, 0)}; dynamic data flow=unverified`)
   }
   try { await check(`http://127.0.0.1:${server.address().port}`, 'local', true); if (process.env.OUTCOME_PUBLIC_URL) await check(process.env.OUTCOME_PUBLIC_URL, 'public') } finally { await browser.close() }
 } finally { server.close(); await once(server, 'close'); rmSync(runtime, { recursive: true, force: true }) }

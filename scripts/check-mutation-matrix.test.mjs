@@ -24,12 +24,26 @@ test('F3 complete scanner rejects CSRF literal syntax variants and preserves AF-
     ['assignment', `globalThis.csrf = '${secret}'`, true],
     ['bracket-assignment', `globalThis['csrf'] = \`${secret}\``, true],
     ['computed-literal', `globalThis.probe={['csrf']:"${secret}"}`, true],
+    ['comment-property', `globalThis.probe={csrf: /* ordinary comment */ "${secret}"}`, true],
+    ['comment-assignment', `globalThis.csrf /* left */ = // right\n "${secret}"`, true],
+    ['comment-bracket', `globalThis[/* key */ 'csrf'] = /* value */ '${secret}'`, true],
+    ['escaped-key', `globalThis.probe={"c\\u0073rf":"${secret}"}`, true],
+    ['escaped-identifier', `globalThis.probe={c\\u0073rf:"${secret}"}`, true],
+    ['decoded-value-16', 'globalThis.probe={csrf:"SyntheticValueA\\u0042"}', true],
+    ['decoded-value-15', 'globalThis.probe={csrf:"SyntheticValue\\u0041"}', false],
+    ['comment-looking-string', 'globalThis.probe={note:"/* csrf: secret */ //",csrf:""}', false],
+    ['runtime-value', 'globalThis.probe={csrf:globalThis.runtimeCsrf}', false],
+    ['parenthesized', `globalThis.csrf = ("${secret}")`, true],
+    ['variable', `const csrf = "${secret}"`, true],
+    ['parse-error', 'globalThis.probe={csrf:', 'javascript-parse'],
     ['length-15', `globalThis.probe={"csrf":"${secret.slice(0, 15)}"}`, false],
     ['af1-identifiers', 'globalThis.probe={csrf:"",private_content:null,route:"/api/private/chat/timeline",other:"/api/private/chat/messages"}', false],
   ]
   try {
     mkdirSync(join(fixtures, 'assets'))
-    writeFileSync(join(fixtures, 'index.html'), '<h1>프로젝트 여정</h1><script src="/assets/probe.js"></script>')
+    writeFileSync(join(fixtures, 'index.html'), '<h1>프로젝트 여정</h1><link href="/assets/style.css" rel="stylesheet"><script src="/assets/clean.js"></script><script src="/assets/probe.js"></script>')
+    writeFileSync(join(fixtures, 'assets/style.css'), 'body { color: black; }')
+    writeFileSync(join(fixtures, 'assets/clean.js'), 'globalThis.cleanProbe = true;')
     for (const [label, code, reject] of cases) {
       writeFileSync(join(fixtures, 'assets/probe.js'), code)
       const result = spawnSync(process.execPath, ['scripts/check-public-redaction.mjs'], { cwd: root, encoding: 'utf8', timeout: 30_000, env: { ...process.env, OUTCOME_CANDIDATE_DIST: relative(root, fixtures), OUTCOME_PUBLIC_URL: '' } })
@@ -37,7 +51,8 @@ test('F3 complete scanner rejects CSRF literal syntax variants and preserves AF-
       console.info(JSON.stringify({ label, fixtureSha256: createHash('sha256').update(code).digest('hex'), scannerExit: result.status, csrfFailure }))
       assert.equal(result.error, undefined, `${label}: scanner environment failure`)
       assert.equal(result.status, reject ? 1 : 0, `${label}: unexpected complete scanner exit`)
-      assert.equal(csrfFailure, reject, `${label}: wrong failure class`)
+      assert.equal(csrfFailure, reject === true, `${label}: wrong failure class`)
+      if (typeof reject === 'string') assert.ok(result.stderr.includes(`bundle:${reject}`), `${label}: missing check error`)
       if (!reject) assert.match(result.stdout, /G-6d csrf build secrets=0/)
     }
   } finally { rmSync(fixtures, { recursive: true, force: true }) }
