@@ -66,4 +66,16 @@ Planner independently verified the same NUL status stream and authorized one cor
 
 Actual result: native exit `0`; record count `3`; exact status-and-path set `true`; rename/copy count `0`. Rows were exactly ` M GATES_PHASE4_TIMELINE_STATUS_READ.md`, ` M docs/OUTCOME_MAP.md`, and `?? docs/OUTCOME_TIMELINE_STATUS_MAP_INTEGRATION_RECEIPT_20260906.md`. No product/setup/integration test was rerun. This supersedes only the faulty whitespace parsing result and restores eligibility for exact-three staging, staged diff-check, and the one containing commit. Push remains `0`; canonical mutation remains `0`; `completionAuthority=false`.
 
+## Fresh QA correction — stock current-projection coherence
+
+Fresh independent QA receipt SHA-256 `4848fb2fa9c71750ec6b47a468da1a548eb1059799b148d45d3fc3c11107b46a` returned `NEEDS_REVISION` for candidate `daabad09d7ff9419139a0d60620343d043fcbd4c`: the unchanged stock current-projection command ran `11` tests with `10` pass / `1` fail because line 169 still required preceding Map SHA `d6991056...`. That independent result is the immutable RED; Builder did not rerun it merely to reproduce failure.
+
+The earlier statement that an equivalent owner command was sufficient and the `CANDIDATE_READY_BUILDER_ONLY` terminal for `daabad09...` are superseded for stock-regression eligibility only. Equivalent evidence did not override the failing repository regression.
+
+Planner authorized exactly one test correction. A pre-edit owner check found the old digest exactly once and the integrated digest zero times. The single changed line replaces only `d6991056545763f6ad81b4c1ba553d0fd40c2d14843498eeb0a6f32b7af65165` with exact integrated Map SHA `93de54c9abf98f61ff1bffa10e9f8ec40f53266118f7241908994fb89de26ab2`. Historical source assertions, canary exit/status, safety counters and all other test bytes remain unchanged.
+
+CHECK: `/usr/local/bin/node --test server/outcome-current-projection.test.mjs`
+EXPECT: native exit `0`, `11/11`, with the integrated Map case still proving `cold_compile_required / source_digest_drift` and all safety counters zero.
+EVIDENCE: native exit `0`; tests `11`; pass `11`; fail `0`. No prior package, timeline, model-v2, setup or integration suite was replayed. Map SHA remains fixed at `93de54c9abf98f61ff1bffa10e9f8ec40f53266118f7241908994fb89de26ab2`. Fresh re-QA, separate Audit, Cherry acceptance and canonical promotion remain required. `completionAuthority=false`.
+
 No canonical promotion, fresh QA, Release Audit, Cherry acceptance, deployment, runtime, provider, database, environment, registry, alias, or release authority is granted. `completionAuthority=false`.

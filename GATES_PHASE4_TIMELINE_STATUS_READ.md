@@ -198,3 +198,13 @@ No corrected harness, status replay, staging, commit, or push follows. All four 
 Planner independently verified the same NUL porcelain stream and authorized one corrected parser evaluation. It preserved the first two status bytes, removed only the terminal empty NUL record, parsed paths from index 3, and rejected rename/copy or multiplicity. Native exit was `0`: exactly three records, exact status/path set `true`, rename/copy count `0`. The rows were the allowlisted Gate and Map as unstaged tracked modifications plus the allowlisted new receipt.
 
 No product suite, setup, integration or owner test was replayed. This supersedes only the whitespace-parsing harness failure and permits exact-three staging, staged diff-check and the original single commit ceiling. Push remains `0`; canonical/provider/runtime/environment mutation remains `0`. Fresh QA, separate Audit, Cherry acceptance and canonical promotion remain OPEN. `completionAuthority=false`.
+
+## First substantive fresh-QA correction — stock projection GREEN
+
+Fresh independent QA receipt SHA-256 `4848fb2fa9c71750ec6b47a468da1a548eb1059799b148d45d3fc3c11107b46a` is the immutable RED for candidate `daabad09d7ff9419139a0d60620343d043fcbd4c`: stock current-projection `11` total, `10` pass, `1` fail because its current Map assertion still pinned `d6991056...`. The earlier equivalent owner command did not override that failing repository regression; `daabad09...` candidate-ready wording is superseded for stock-regression eligibility.
+
+Planner authorized only the exact single expectation update in `server/outcome-current-projection.test.mjs`. Pre-edit counts were old digest `1`, integrated digest `0`; the correction replaces only that expected SHA with `93de54c9abf98f61ff1bffa10e9f8ec40f53266118f7241908994fb89de26ab2`. Historical assertions and the canary/safety/exit contract remain unchanged.
+
+CHECK: `/usr/local/bin/node --test server/outcome-current-projection.test.mjs`
+EXPECT: native exit `0`, `11/11`, unchanged fail-closed integrated Map semantics.
+EVIDENCE: native exit `0`; `11/11` pass. The Phase 4 case reaches and verifies exact `cold_compile_required / source_digest_drift`, automatic retry zero and all safety counters zero. Prior package/timeline/model-v2 evidence is retained without replay. Map SHA remains `93de54c9abf98f61ff1bffa10e9f8ec40f53266118f7241908994fb89de26ab2`. Fresh re-QA, separate Audit, Cherry acceptance and canonical promotion remain OPEN. `completionAuthority=false`.

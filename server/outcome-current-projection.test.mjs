@@ -166,7 +166,7 @@ test('O1 terminal canary fails closed without a second consumption or callback',
 })
 
 test('Phase 4 current Map drift fails closed without consumption or a receipt', () => {
-  assert.equal(sha256(readFileSync(new URL('docs/OUTCOME_MAP.md', root))), 'd6991056545763f6ad81b4c1ba553d0fd40c2d14843498eeb0a6f32b7af65165')
+  assert.equal(sha256(readFileSync(new URL('docs/OUTCOME_MAP.md', root))), '93de54c9abf98f61ff1bffa10e9f8ec40f53266118f7241908994fb89de26ab2')
   for (const [path, expected] of historicalSources) if (path !== 'docs/OUTCOME_MAP.md') assert.equal(sha256(readFileSync(new URL(path, root))), expected)
   const run = spawnSync(process.execPath, ['scripts/outcome-model-v2-local-canary.mjs', '--source-root', root.pathname], { cwd: root, encoding: 'utf8' })
   assert.equal(run.status, 2)
