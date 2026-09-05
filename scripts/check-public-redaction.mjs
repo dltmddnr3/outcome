@@ -67,7 +67,10 @@ function inspectCsrfLiterals(code) {
       const value = unwrap(node.initializer)
       if (ts.isBinaryExpression(value) && value.operatorToken.kind === ts.SyntaxKind.EqualsToken) inspect(node.name, value.right)
     }
-    if (ts.isBinaryExpression(node) && node.operatorToken.kind === ts.SyntaxKind.EqualsToken) inspect(node.left, node.right)
+    // All 16 AssignmentOperator tokens: reject embedded RHS secret literals,
+    // including arithmetic/bitwise assignment, without asserting a runtime result.
+    // Comparisons, equality and nonassignment logical expressions are excluded.
+    if (ts.isBinaryExpression(node) && node.operatorToken.kind >= ts.SyntaxKind.FirstAssignment && node.operatorToken.kind <= ts.SyntaxKind.LastAssignment) inspect(node.left, node.right)
     ts.forEachChild(node, visit)
   }
   visit(source)

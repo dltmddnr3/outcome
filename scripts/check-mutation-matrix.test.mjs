@@ -6,6 +6,7 @@ import { join, relative } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { createHash } from 'node:crypto'
 import test from 'node:test'
+import ts from 'typescript'
 import { assertDecisionMutationResponse, assertMutationResponse } from './check-mutation-matrix.mjs'
 
 const matrixSource = readFileSync(new URL('./check-mutation-matrix.mjs', import.meta.url), 'utf8')
@@ -18,6 +19,17 @@ test('F3 complete scanner rejects CSRF literal syntax variants and preserves AF-
   const fixtures = mkdtempSync(join(tmpdir(), 'outcome-f3-scanner-'))
   const secret = 'SyntheticValueAB' // 16 characters; never a credential.
   assert.equal(secret.length, 16)
+  const operators = ['=', '+=', '-=', '*=', '**=', '/=', '%=', '<<=', '>>=', '>>>=', '&=', '|=', '||=', '&&=', '??=', '^=']
+  // Independently derive the finite union from the installed parser declarations.
+  const declarations = readFileSync(new URL(import.meta.resolve('typescript').replace(/typescript\.js$/, 'typescript.d.ts')), 'utf8')
+  const assignmentUnion = ['AssignmentOperator', 'CompoundAssignmentOperator'].map((name) => {
+    const match = declarations.match(new RegExp(`type ${name} = ([^;]+);`))
+    assert.ok(match, `missing installed ${name} declaration`)
+    return [...match[1].matchAll(/SyntaxKind\.(\w+)/g)].map((item) => ts.SyntaxKind[item[1]])
+  }).flat().sort((a, b) => a - b)
+  assert.equal(assignmentUnion.length, 16)
+  assert.deepEqual(operators.map((operator) => ts.stringToToken(operator)).sort((a, b) => a - b), assignmentUnion)
+  assert.deepEqual(assignmentUnion, Array.from({ length: ts.SyntaxKind.LastAssignment - ts.SyntaxKind.FirstAssignment + 1 }, (_, i) => ts.SyntaxKind.FirstAssignment + i))
   const cases = [
     ['qa-original', 'globalThis.probe={"csrf":"QaSyntheticSecretValueABCDEFG"}', true],
     ...['csrf', '"csrf"', "'csrf'"].flatMap((key, k) => ['"', "'", '`'].map((quote, q) => [`property-${k}-${q}`, `globalThis.probe={${key} \n : \t ${quote}${secret}${quote}}`, true])),
@@ -54,6 +66,12 @@ test('F3 complete scanner rejects CSRF literal syntax variants and preserves AF-
     ['parameter-runtime', 'function probe(csrf = globalThis.runtimeCsrf) {}', false],
     ['binding-runtime', 'const {csrf: local = globalThis.runtimeCsrf} = {}', false],
     ['ordinary-default', `function probe(ordinary = "${secret}") {}`, false],
+    ...operators.flatMap((operator, index) => [
+      [`operator-${index}-member`, `globalThis.csrf ${operator} "${secret}"`, true],
+      [`operator-${index}-bracket`, `globalThis['csrf'] ${operator} "${secret}"`, true],
+      [`operator-${index}-controls`, ['globalThis.csrf', "globalThis['csrf']"].flatMap((target) => [`${target} ${operator} globalThis.runtimeCsrf`, `${target} ${operator} "short"`]).concat(`globalThis.unrelated ${operator} "${secret}"`).join(';'), false],
+    ]),
+    ['nonassignment-controls', ['==', '===', '!=', '!==', '<', '>', '<=', '>=', '+', '-', '*', '/', '%', '**', '<<', '>>', '>>>', '&', '|', '^', '&&', '||', '??'].map((operator) => `globalThis.csrf ${operator} "${secret}"`).join(';'), false],
     ['parse-error', 'globalThis.probe={csrf:', 'javascript-parse'],
     ['length-15', `globalThis.probe={"csrf":"${secret.slice(0, 15)}"}`, false],
     ['af1-identifiers', 'globalThis.probe={csrf:"",private_content:null,route:"/api/private/chat/timeline",other:"/api/private/chat/messages"}', false],
