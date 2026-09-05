@@ -120,7 +120,14 @@ export function createInMemoryChatRepository({ snapshot = { schema_version: 1, s
     markDispatch(input) { return commit((draft) => { const item = draft.idempotency.find((row) => row.project_id === input.project_id && row.binding_version === input.binding_version && row.key === input.idempotency_key); if (!item || item.result.dispatch_state !== 'not_invoked') fail('materialization_failed'); item.result.dispatch_state = 'dispatch_intent_recorded'; return clone(item.result) }) },
     markInvoked(input) { return commit((draft) => { const item = draft.idempotency.find((row) => row.project_id === input.project_id && row.binding_version === input.binding_version && row.key === input.idempotency_key); if (!item || item.result.dispatch_state !== 'dispatch_intent_recorded') fail('materialization_failed'); item.result.dispatch_state = 'invoked'; return clone(item.result) }) },
     finalize(input) { return commit((draft) => { const item = draft.idempotency.find((row) => row.project_id === input.project_id && row.binding_version === input.binding_version && row.key === input.idempotency_key); if (!item || item.result.dispatch_state !== 'invoked') fail('materialization_failed'); item.result.delivery = input.delivery; return clone(item.result) }) },
-    timeline({ project_id, binding_version, after_sequence }) { const stream = state.streams.find((item) => item.project_id === project_id && item.binding_version === binding_version); return clone((stream?.events ?? []).filter((event) => event.sequence > after_sequence)) },
+    timeline({ project_id, binding_version, after_sequence }) {
+      const stream = state.streams.find((item) => item.project_id === project_id && item.binding_version === binding_version)
+      return clone((stream?.events ?? []).filter((event) => event.sequence > after_sequence).map((event) => {
+        if (event.kind !== 'user_message') return event
+        const { result } = state.idempotency.find((item) => item.project_id === project_id && item.binding_version === binding_version && item.key === event.correlation_id)
+        return { ...event, delivery: result.delivery, dispatch_state: result.dispatch_state }
+      }))
+    },
     snapshot: () => clone(state),
   })
 }

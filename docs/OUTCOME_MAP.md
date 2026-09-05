@@ -17,6 +17,7 @@ contract_file: docs/OUTCOME_CONTRACT.md
 gates_files:
   - GATES.md
   - GATES_OUTCOME_MVP.md
+  - GATES_PHASE4_TIMELINE_STATUS_READ.md
 runtime_binding_source: OUTCOME-managed registry
 source_connectors:
   github:
@@ -397,7 +398,15 @@ phases:
       - id: outcome-phase-4-linked-chat
         title: Codex-level session workspace
         purpose: OUTCOME 안에서 역할별 메시지 streaming, 계획, 도구 실행, 파일 변경·diff, 테스트, 승인 요청, 중단·재시도와 재연결을 하나의 source-grounded 작업 타임라인으로 제공한다.
-        stages: []
+        stages:
+          - id: outcome-stage-phase4-timeline-status-read
+            title: Timeline status read candidate
+            purpose: AP-4-READ-STATUS로 authorized user message의 저장된 delivery와 dispatch facts를 읽기·재조회에 보존한다. Hosted 실행과 UI 상태 표시 및 수용은 포함하지 않는다.
+            depends_on: []
+            gates_file: GATES_PHASE4_TIMELINE_STATUS_READ.md#T1-T8
+            gate_groups:
+              - code: T
+                primary_label: 저장 메시지 상태 읽기
       - id: outcome-phase-4-full-development
         title: Full development workspace
         purpose: 외부 Codex/Claude 화면 없이 개발 흐름을 완결한다.

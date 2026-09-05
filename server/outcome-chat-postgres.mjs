@@ -52,8 +52,8 @@ export function createOutcomeChatPostgresRepository({ transact } = {}) {
     },
     async timeline(input) {
       const value = plain(input, ['workspace_id','project_id','binding_version','after_sequence'])
-      return transact(async ({ query }) => (await query(`select message_id event_id,sequence,observed_at,'user_message' kind,'queued' state,idempotency_key correlation_id,private_message
-        from outcome_private.chat_messages where workspace_id=$1 and project_id=$2 and binding_version=$3 and sequence>$4 order by sequence asc`, [value.workspace_id,value.project_id,value.binding_version,value.after_sequence])).rows.map((item) => ({ event_id:item.event_id, sequence:Number(item.sequence), observed_at:new Date(item.observed_at).toISOString(), kind:'user_message', state:'queued', correlation_id:item.correlation_id, payload:{private_content:{text:item.private_message}} })))
+      return transact(async ({ query }) => (await query(`select message_id event_id,sequence,observed_at,'user_message' kind,'queued' state,idempotency_key correlation_id,private_message,delivery,dispatch_state
+        from outcome_private.chat_messages where workspace_id=$1 and project_id=$2 and binding_version=$3 and sequence>$4 order by sequence asc`, [value.workspace_id,value.project_id,value.binding_version,value.after_sequence])).rows.map((item) => ({ event_id:item.event_id, sequence:Number(item.sequence), observed_at:new Date(item.observed_at).toISOString(), kind:'user_message', state:'queued', correlation_id:item.correlation_id, payload:{private_content:{text:item.private_message}}, delivery:item.delivery, dispatch_state:item.dispatch_state })))
     },
     async claim(input) {
       const value = plain(input, ['consumer_id','claimed_at','lease_expires_at'])

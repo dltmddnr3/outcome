@@ -1,9 +1,9 @@
 import assert from 'node:assert/strict'
 import { execFileSync, spawnSync } from 'node:child_process'
 import { createHash } from 'node:crypto'
-import { appendFileSync, cpSync, mkdtempSync, readFileSync, rmSync, statSync, symlinkSync, unlinkSync, writeFileSync } from 'node:fs'
+import { appendFileSync, cpSync, mkdirSync, mkdtempSync, readFileSync, rmSync, statSync, symlinkSync, unlinkSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
-import { join } from 'node:path'
+import { dirname, join } from 'node:path'
 import { test } from 'node:test'
 import {
   CURRENT_PROJECTION_SOURCES,
@@ -14,6 +14,37 @@ import {
 
 const root = new URL('../', import.meta.url)
 const sha256 = (value) => createHash('sha256').update(value).digest('hex')
+
+const historicalBase = '90daddb222b705b48e6af0c764707c4758ed296f'
+const historicalSources = [
+  ['AGENTS.md', 'cbda193480670fdbc0dfd5aa1cbcae2a945418ba8b670246997d3ba44f39cb93'],
+  ['docs/OUTCOME_CONTRACT.md', 'c25e8f3920018aeca4bb219c8f9a678fa21700f3d4ebfe0d6c66a5481d20a442'],
+  ['docs/OUTCOME_MAP.md', 'da2b8c47bce8522d36f6e70ca5c5dc940988df6f8cf2b773b8e13a68e1bf60d3'],
+  ['docs/OUTCOME_MODEL_V2_LOCAL_DEFAULT_AND_SERVICE_PROJECTION_CONTRACT.md', 'b7c0f31cec46dc658b950b28a65dff02ee21867a67f72a3e61428651de2ae657'],
+  ['GATES_OUTCOME_MODEL_V2_LOCAL_DEFAULT_AND_SERVICE_PROJECTION.md', 'b6c156c60cfca729c261641a96401590f44d9e47845d5ae34dd4a028790e7357'],
+  ['docs/OUTCOME_MODEL_V2_SERVICE_PROJECTION_Q2_PUBLIC_MILESTONE_LABEL_CORRECTION_BUILDER_RECEIPT.md', '80a01e7597941d21b281da26b711005421831670ff4668ce80d2e6302a90acad'],
+  ['docs/OUTCOME_MODEL_V2_SERVICE_PROJECTION_Q2_PUBLIC_MILESTONE_LABEL_CORRECTION_FRESH_REQA_RECEIPT.md', '41f80e48b9475f59fabb636768470f87bf9d49cef22544e8b26f558fa0c0e8a3'],
+  ['docs/OUTCOME_MODEL_V2_SERVICE_PROJECTION_Q2_EVIDENCE_PROMOTION_RECEIPT.md', '75cae693bad35f8a7791941eefbd008605162073ee817fa3c7632d73c8b98dfb'],
+  ['docs/OUTCOME_MODEL_V2_A5_COHERENT_CANDIDATE_FRESH_RELEASE_AUDIT_RECEIPT.md', '9e77063cfbc09517fa5e8376846902075a449205006ff021eff91765c279ba5b'],
+  ['GATES_OUTCOME_MODEL_V2_SELECTIVE_CONTEXT_LOCAL_ACTIVATION.md', '50987cbba74c275ce5143c26d4ecb20c2fad377dfea2b7f50b75c621a989628f'],
+  ['snapshot/outcome-model-v2-current.json', '8981ec71e586822b1f498e1f82e6539930a9841b88b36759db0dd42e34da7302'],
+]
+const historicalFixture = () => {
+  // Read and verify the complete immutable closure before writing any fixture file.
+  const blobs = historicalSources.map(([path, expected]) => {
+    const bytes = execFileSync('git', ['-C', root.pathname, 'cat-file', 'blob', historicalBase + ':' + path])
+    assert.equal(sha256(bytes), expected, path)
+    return { path, bytes }
+  })
+  const fixture = mkdtempSync(join(tmpdir(), 'outcome-o1-historical-'))
+  for (const { path, bytes } of blobs) {
+    const target = join(fixture, path)
+    mkdirSync(dirname(target), { recursive: true })
+    writeFileSync(target, bytes, { flag: 'wx' })
+    assert.equal(sha256(readFileSync(target)), sha256(bytes))
+  }
+  return fixture
+}
 const sourceBytes = () => Object.fromEntries(Object.entries(CURRENT_PROJECTION_SOURCES).map(([sourceClass, row]) => [sourceClass, readFileSync(new URL(row.source_ref, root))]))
 const input = () => outcomeCurrentProjectionInput(sourceBytes())
 const attempt = (state = 'delivery_unknown') => ({ id: 'attempt-one', work_id: 'work-o1-selective-context-dogfood', fingerprint: input().work_items[0].fingerprint, state, automatic_retry_count: 0 })
@@ -116,24 +147,38 @@ test('B3 explicit rollback returns exact v1-compatible local result', () => {
 })
 
 test('O1 terminal canary fails closed without a second consumption or callback', () => {
-  const run = spawnSync(process.execPath, ['scripts/outcome-model-v2-local-canary.mjs', '--source-root', new URL('../', import.meta.url).pathname], { encoding: 'utf8' })
+  const fixture = historicalFixture()
+  try {
+    const run = spawnSync(process.execPath, ['scripts/outcome-model-v2-local-canary.mjs', '--source-root', fixture], { cwd: root, encoding: 'utf8' })
+    assert.equal(run.status, 2)
+    const result = JSON.parse(run.stdout)
+    assert.equal(result.outcome, 'cold_compile_required')
+    assert.equal(result.reason, 'o1_evidence_closed')
+    assert.equal(Object.hasOwn(result, 'local_consumption_count'), false)
+    assert.equal(Object.hasOwn(result, 'selective_context_receipt'), false)
+    assert.equal(result.automatic_retry_count, 0)
+    assert.equal(result.safety.duplicate_execution_count, 0)
+    assert.equal(result.safety.false_completion_count, 0)
+    assert.equal(Object.values(result.safety).every(value => value === 0), true)
+    const serialized = JSON.stringify(result)
+    for (const pattern of [/\/Users\//, /(?:thread|session|task|turn)[_-]?id/i, /credential|password|secret|token/i, /raw[_-]?(?:prompt|result)/i, /source_ref|locator_ref|registry_payload/i]) assert.doesNotMatch(serialized, pattern)
+  } finally { rmSync(fixture, { recursive: true, force: true }) }
+})
+
+test('Phase 4 current Map drift fails closed without consumption or a receipt', () => {
+  assert.equal(sha256(readFileSync(new URL('docs/OUTCOME_MAP.md', root))), 'd6991056545763f6ad81b4c1ba553d0fd40c2d14843498eeb0a6f32b7af65165')
+  for (const [path, expected] of historicalSources) if (path !== 'docs/OUTCOME_MAP.md') assert.equal(sha256(readFileSync(new URL(path, root))), expected)
+  const run = spawnSync(process.execPath, ['scripts/outcome-model-v2-local-canary.mjs', '--source-root', root.pathname], { cwd: root, encoding: 'utf8' })
   assert.equal(run.status, 2)
-  const result = JSON.parse(run.stdout)
-  assert.equal(result.outcome, 'cold_compile_required')
-  assert.equal(result.reason, 'o1_evidence_closed')
-  assert.equal(Object.hasOwn(result, 'local_consumption_count'), false)
-  assert.equal(Object.hasOwn(result, 'selective_context_receipt'), false)
-  assert.equal(result.automatic_retry_count, 0)
-  assert.equal(result.safety.duplicate_execution_count, 0)
-  assert.equal(result.safety.false_completion_count, 0)
-  const serialized = JSON.stringify(result)
-  for (const pattern of [/\/Users\//, /(?:thread|session|task|turn)[_-]?id/i, /credential|password|secret|token/i, /raw[_-]?(?:prompt|result)/i, /source_ref|locator_ref|registry_payload/i]) assert.doesNotMatch(serialized, pattern)
+  assert.deepEqual(JSON.parse(run.stdout), {
+    schema_version: 2, outcome: 'cold_compile_required', reason: 'source_digest_drift', automatic_retry_count: 0,
+    safety: { duplicate_execution_count: 0, unauthorized_canonical_transition_count: 0, registry_provider_environment_mutation_count: 0, false_completion_count: 0 },
+  })
 })
 
 test('O1 canary rejects snapshot whitespace drift and missing snapshot before consumption', () => {
-  const fixture = mkdtempSync(join(tmpdir(), 'outcome-o1-canary-'))
+  const fixture = historicalFixture()
   try {
-    cpSync(new URL('../', import.meta.url), fixture, { recursive: true })
     const snapshot = join(fixture, 'snapshot/outcome-model-v2-current.json')
     const snapshotBytes = readFileSync(snapshot)
     appendFileSync(snapshot, ' ')
@@ -161,11 +206,8 @@ test('O1 default canary binds one HEAD tree and ignores dirty Contract and Map o
   const fixture = mkdtempSync(join(tmpdir(), 'outcome-o1-head-'))
   try {
     execFileSync('git', ['clone', '--quiet', '--no-checkout', new URL('../', import.meta.url).pathname, fixture])
-    execFileSync('git', ['-C', fixture, 'checkout', '--quiet', '--detach', 'HEAD'])
-    writeFileSync(join(fixture, 'scripts/outcome-model-v2-local-canary.mjs'), readFileSync(new URL('../scripts/outcome-model-v2-local-canary.mjs', import.meta.url)))
-    writeFileSync(join(fixture, 'snapshot/outcome-model-v2-current.json'), readFileSync(new URL('../snapshot/outcome-model-v2-current.json', import.meta.url)))
-    execFileSync('git', ['-C', fixture, 'add', 'snapshot/outcome-model-v2-current.json'])
-    execFileSync('git', ['-C', fixture, '-c', 'user.name=OUTCOME Test', '-c', 'user.email=outcome-test.invalid', 'commit', '--quiet', '--allow-empty', '-m', 'Materialize terminal snapshot'])
+    execFileSync('git', ['-C', fixture, 'checkout', '--quiet', '--detach', historicalBase])
+    for (const [path, expected] of historicalSources) assert.equal(sha256(readFileSync(join(fixture, path))), expected)
     const contract = join(fixture, 'docs/OUTCOME_CONTRACT.md'); const map = join(fixture, 'docs/OUTCOME_MAP.md')
     appendFileSync(contract, '\nHEAD-bound hostile Contract overlay\n'); appendFileSync(map, '\nHEAD-bound hostile Map overlay\n')
     const before = { contract: sha256(readFileSync(contract)), map: sha256(readFileSync(map)), contractMode: statSync(contract).mode, mapMode: statSync(map).mode }

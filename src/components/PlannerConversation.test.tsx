@@ -23,7 +23,7 @@ describe('Planner conversation observed-event contract', () => {
   })
 
   it('rejects decreasing observed timestamps at the client boundary', () => {
-    const event = (event_id: string, sequence: number, observed_at: string) => ({ event_id, sequence, observed_at, kind: 'user_message' as const, state: 'queued' as const, correlation_id: `message-${String(sequence).padStart(16, '0')}`, payload: { private_content: { text: 'ordinary' } } })
+    const event = (event_id: string, sequence: number, observed_at: string) => ({ event_id, sequence, observed_at, kind: 'user_message' as const, state: 'queued' as const, delivery: 'acknowledged' as const, dispatch_state: 'invoked' as const, correlation_id: `message-${String(sequence).padStart(16, '0')}`, payload: { private_content: { text: 'ordinary' } } })
     expect(() => validatePrivateTimeline([event('event-0000000000000001', 1, '2026-09-03T00:00:01.000Z'), event('event-0000000000000002', 2, '2026-09-03T00:00:00.000Z')])).toThrow('timeline_conflict')
   })
 
@@ -73,10 +73,13 @@ describe('Phase 4 role chat D3 contract', () => {
     const result = await handlePrivateChatRequest({
       method: 'GET',
       url: '/api/private/chat/timeline?project_id=outcome&after_sequence=0',
-      service: { timeline: async () => ({ target: { role: 'planner', binding_version: 7 }, events: [{ event_id: 'event-0000000000000001', sequence: 1, observed_at: '2026-09-04T00:05:00.000Z', kind: 'user_message', state: 'queued', correlation_id: 'message-0000000000000001', payload: { private_content: { text: 'Mounted timeline completed' } } }], completion_authority: false }) },
+      service: { timeline: async () => ({ target: { role: 'planner', binding_version: 7 }, events: [{ event_id: 'event-0000000000000001', sequence: 1, observed_at: '2026-09-04T00:05:00.000Z', kind: 'user_message', state: 'queued', delivery: 'acknowledged', dispatch_state: 'invoked', correlation_id: 'message-0000000000000001', payload: { private_content: { text: 'Mounted timeline completed' } } }], completion_authority: false }) },
       owner: { authenticated: true, actor: 'cherry_owner', allowed_origin: 'https://preview.invalid', csrf: 'csrf-value' },
     })
     expect(result.status).toBe(200)
+    expect(result.body.events[0].delivery).toBe('acknowledged')
+    expect(result.body.events[0].dispatch_state).toBe('invoked')
+    expect(result.body.events[0].state).toBe('queued')
     const bundled = await build({
       absWorkingDir: root, bundle: true, write: false, platform: 'browser', format: 'iife', jsx: 'automatic',
       define: { 'process.env.NODE_ENV': '"production"' },
@@ -118,7 +121,7 @@ describe('Phase 4 role chat D3 contract', () => {
   }, 30_000)
 
   it('keeps a non-empty durable timeline and canonical events visible together', () => {
-    const fixtureTimeline = [{ event_id: 'event-0000000000000001', sequence: 1, observed_at: '2026-09-04T00:05:00.000Z', kind: 'user_message' as const, state: 'queued' as const, correlation_id: 'message-0123456789abcdef', payload: { private_content: { text: '서버에 기록된 메시지' } } }]
+    const fixtureTimeline = [{ event_id: 'event-0000000000000001', sequence: 1, observed_at: '2026-09-04T00:05:00.000Z', kind: 'user_message' as const, state: 'queued' as const, delivery: 'acknowledged' as const, dispatch_state: 'invoked' as const, correlation_id: 'message-0123456789abcdef', payload: { private_content: { text: '서버에 기록된 메시지' } } }]
     const html = renderToStaticMarkup(<PlannerConversation events={events} fixtureState="ready" fixtureTimeline={fixtureTimeline} plannerBound onSend={() => undefined} />)
     expect(html).toContain('서버에 기록된 메시지')
     expect(html).toContain('event-planner-1')

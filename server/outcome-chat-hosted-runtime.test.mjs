@@ -84,10 +84,21 @@ test('hosted submit authorizes exact owner workspace and persists only a queued 
 })
 
 test('fresh service instance reads the same server-authoritative ordered timeline', async () => {
-  const events = [{ event_id: 'event-0000000000000001', sequence: 1, observed_at: '2026-09-03T00:00:00.000Z', kind: 'user_message', state: 'queued', correlation_id: 'message-0000000000000001', payload: { private_content: { text: 'persisted' } } }]
-  const repository = { async reserve() {}, async timeline() { return structuredClone(events) } }
+  const events = [{ event_id: 'event-0000000000000001', sequence: 1, observed_at: '2026-09-03T00:00:00.000Z', kind: 'user_message', state: 'queued', correlation_id: 'message-0000000000000001', payload: { private_content: { text: 'persisted' } }, delivery: 'failed', dispatch_state: 'dispatch_intent_recorded' }]
+  const calls = []
+  const repository = { async reserve() {}, async timeline(scope) { calls.push(scope); return structuredClone(events) } }
   const options = { repository, bindingVersion: 3, workspaceId: 'account-only-preview', projectId: 'outcome' }
-  for (const service of [createOutcomeChatHostedService(options), createOutcomeChatHostedService(options)]) assert.deepEqual((await service.timeline({ project_id: 'outcome', after_sequence: 0, owner: { authenticated: true, actor: 'cherry_owner', workspace_id: 'account-only-preview', account_ref: 'a'.repeat(64), project_ids: ['outcome'] } })).events, events)
+  const owner = { authenticated: true, actor: 'cherry_owner', workspace_id: 'account-only-preview', account_ref: 'a'.repeat(64), project_ids: ['outcome'] }
+  for (const service of [createOutcomeChatHostedService(options), createOutcomeChatHostedService(options)]) {
+    const result = await service.timeline({ project_id: 'outcome', binding_version: 99, after_sequence: 0, owner })
+    assert.deepEqual(result.events, events); assert.equal(result.target.binding_version, 3)
+    assert.deepEqual(calls.at(-1), { workspace_id: 'account-only-preview', project_id: 'outcome', binding_version: 3, after_sequence: 0 })
+    const before = calls.length
+    for (const patch of [{ authenticated: false }, { actor: 'other' }, { workspace_id: 'other' }, { project_ids: ['other'] }, { account_ref: 'invalid' }]) await assert.rejects(service.timeline({ project_id: 'outcome', after_sequence: 0, owner: { ...owner, ...patch } }), /access_denied/)
+    await assert.rejects(service.timeline({ project_id: 'other', after_sequence: 0, owner }), /access_denied/)
+    assert.equal(calls.length, before)
+  }
+  assert.equal(calls.length, 2)
 })
 
 test('hosted runtime factory pins verified TLS and the runtime login without exposing configuration values', async () => {

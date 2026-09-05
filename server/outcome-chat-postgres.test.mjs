@@ -1,7 +1,49 @@
 import assert from 'node:assert/strict'
+
+test('T4 common reachable memory and Postgres row fixtures project identical statuses', async () => {
+  const { createInMemoryChatRepository } = await import('./outcome-chat.mjs')
+  const memory = createInMemoryChatRepository(), scope = { project_id: 'outcome', binding_version: 7, idempotency_key: 'message-0000000000000001' }
+  memory.reserve({ ...scope, message: 'persisted', observed_at: '2026-09-03T00:00:00.000Z' })
+  const compare = async () => {
+    const snapshot = memory.snapshot(), event = snapshot.streams[0].events[0], status = snapshot.idempotency[0].result
+    const calls = []
+    const pg = createOutcomeChatPostgresRepository({ transact: async operation => operation({ query: async (sql, params) => { calls.push({ sql, params }); return { rows: [{ ...event, sequence: String(event.sequence), private_message: event.payload.private_content.text, delivery: status.delivery, dispatch_state: status.dispatch_state }] } } }) })
+    const projected = await pg.timeline({ workspace_id: 'workspace-one', project_id: 'outcome', binding_version: 7, after_sequence: 0 })
+    assert.deepEqual(projected, createInMemoryChatRepository({ snapshot }).timeline({ project_id: 'outcome', binding_version: 7, after_sequence: 0 }))
+    assert.equal(calls.length, 1); assert.deepEqual(calls[0].params, ['workspace-one', 'outcome', 7, 0])
+    assert.match(calls[0].sql, /where workspace_id=\$1 and project_id=\$2 and binding_version=\$3 and sequence>\$4 order by sequence asc/)
+  }
+  await compare(); memory.markDispatch(scope); await compare(); memory.markInvoked(scope); await compare()
+  for (const delivery of ['acknowledged', 'delivery_unknown', 'rejected', 'failed']) { memory.finalize({ ...scope, delivery }); await compare() }
+})
+
+test('T4 T6 Postgres preserves pre-invocation failure history and every caller scope parameter', async () => {
+  for (const delivery of ['failed', 'rejected']) {
+    const calls = [], row = { event_id: 'event-0000000000000001', sequence: 4, observed_at: '2026-09-03T00:00:00.000Z', correlation_id: 'message-0000000000000001', private_message: 'persisted', delivery, dispatch_state: 'dispatch_intent_recorded' }
+    const pg = createOutcomeChatPostgresRepository({ transact: async operation => operation({ query: async (sql, params) => { calls.push({ sql, params }); return { rows: [row] } } }) })
+    for (const scope of [{ workspace_id: 'workspace-one', project_id: 'outcome', binding_version: 7, after_sequence: 3 }, { workspace_id: 'workspace-two', project_id: 'other', binding_version: 8, after_sequence: 2 }]) {
+      const [event] = await pg.timeline(scope)
+      assert.equal(event.delivery, delivery); assert.equal(event.dispatch_state, 'dispatch_intent_recorded'); assert.equal(event.state, 'queued')
+      assert.deepEqual(calls.at(-1).params, [scope.workspace_id, scope.project_id, scope.binding_version, scope.after_sequence])
+    }
+    assert.equal(calls.length, 2)
+  }
+})
 import { readFileSync } from 'node:fs'
 import { readFile } from 'node:fs/promises'
 import test from 'node:test'
+
+test('TIMELINE-RED Postgres selects same-row status with exact read scope', async () => {
+  const calls = []
+  const item = { event_id: 'event-0000000000000001', sequence: '2', observed_at: '2026-09-03T00:00:00.000Z', correlation_id: 'message-0000000000000001', private_message: 'persisted', delivery: 'rejected', dispatch_state: 'dispatch_intent_recorded' }
+  const repository = createOutcomeChatPostgresRepository({ transact: async (operation) => operation({ query: async (sql, params) => { calls.push({ sql, params }); return { rows: [item] } } }) })
+  const events = await repository.timeline({ workspace_id: 'workspace-one', project_id: 'outcome', binding_version: 7, after_sequence: 1 })
+  assert.equal(calls.length, 1)
+  assert.match(calls[0].sql, /correlation_id,private_message,delivery,dispatch_state\s+from outcome_private\.chat_messages/)
+  assert.deepEqual(calls[0].params, ['workspace-one', 'outcome', 7, 1])
+  assert.doesNotMatch(calls[0].sql, /\b(join|insert|update|delete)\b/i)
+  assert.equal(events[0].delivery, 'rejected'); assert.equal(events[0].dispatch_state, 'dispatch_intent_recorded')
+})
 import { PGlite } from '@electric-sql/pglite'
 import { createOutcomeChatPostgresRepository, createOutcomeChatTransactionPort } from './outcome-chat-postgres.mjs'
 

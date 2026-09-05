@@ -1,4 +1,60 @@
 import assert from 'node:assert/strict'
+
+test('T1 T5 transitions survive reload and projected copies cannot alter seven-field snapshots', () => {
+  const repository = createInMemoryChatRepository()
+  const scope = { project_id: 'outcome', binding_version: 7, idempotency_key: input.idempotency_key }
+  repository.reserve({ ...scope, message: 'persisted', observed_at: '2026-09-03T00:00:00.000Z' })
+  const check = (delivery, dispatch_state) => {
+    const snapshot = repository.snapshot(), restored = createInMemoryChatRepository({ snapshot })
+    const query = { project_id: scope.project_id, binding_version: scope.binding_version, after_sequence: 0 }
+    const events = restored.timeline(query)
+    assert.equal(events[0].delivery, delivery); assert.equal(events[0].dispatch_state, dispatch_state); assert.equal(events[0].state, 'queued')
+    assert.deepEqual(Object.keys(snapshot.streams[0].events[0]).sort(), ['event_id', 'sequence', 'observed_at', 'kind', 'state', 'correlation_id', 'payload'].sort())
+    events[0].delivery = 'failed'; events[0].dispatch_state = 'not_invoked'; events[0].payload.private_content.text = 'changed'
+    assert.deepEqual(restored.snapshot(), snapshot); assert.deepEqual(repository.snapshot(), snapshot)
+    assert.equal(restored.timeline(query)[0].delivery, delivery); assert.equal(restored.timeline(query)[0].payload.private_content.text, 'persisted')
+    assert.deepEqual(restored.timeline({ ...query, after_sequence: 1 }), [])
+  }
+  check('delivery_unknown', 'not_invoked')
+  repository.markDispatch(scope); check('delivery_unknown', 'dispatch_intent_recorded')
+  repository.markInvoked(scope); check('delivery_unknown', 'invoked')
+  for (const delivery of ['acknowledged', 'delivery_unknown', 'rejected', 'failed']) { repository.finalize({ ...scope, delivery }); check(delivery, 'invoked') }
+})
+
+test('T6 timeline status joins exact project binding and correlation only', async () => {
+  const repository = createInMemoryChatRepository()
+  const scopes = [{ project_id: 'other', binding_version: 7 }, { project_id: 'outcome', binding_version: 8 }, { project_id: 'outcome', binding_version: 7 }]
+  for (const [i, scope] of scopes.entries()) {
+    const request = { ...scope, idempotency_key: input.idempotency_key }
+    repository.reserve({ ...request, message: 'scope-' + i, observed_at: '2026-09-03T00:00:00.000Z' })
+    if (i === 0) { repository.markDispatch(request); repository.markInvoked(request); repository.finalize({ ...request, delivery: 'rejected' }) }
+    if (i === 1) repository.markDispatch(request)
+  }
+  const extra = { project_id: 'outcome', binding_version: 7, idempotency_key: 'message-0000000000000002' }
+  repository.reserve({ ...extra, message: 'other correlation', observed_at: '2026-09-03T00:00:00.000Z' })
+  repository.markDispatch(extra); repository.markInvoked(extra); repository.finalize({ ...extra, delivery: 'failed' })
+  const restored = createInMemoryChatRepository({ snapshot: repository.snapshot() })
+  const expected = [['rejected', 'invoked'], ['delivery_unknown', 'dispatch_intent_recorded'], ['delivery_unknown', 'not_invoked']]
+  for (const [i, scope] of scopes.entries()) {
+    const event = restored.timeline({ ...scope, after_sequence: 0 })[0]
+    assert.deepEqual([event.delivery, event.dispatch_state], expected[i]); assert.equal(event.payload.private_content.text, 'scope-' + i)
+  }
+  const { service, calls } = fixture({ repository: restored })
+  const result = await service.timeline({ project_id: 'outcome', role: 'planner', binding_version: 8, after_sequence: 0, owner })
+  assert.equal(result.target.binding_version, 7); assert.equal(result.events.length, 2)
+  assert.deepEqual(result.events.map(e => e.delivery), ['delivery_unknown', 'failed']); assert.equal(calls.transport, 0)
+  assert.deepEqual(restored.timeline({ project_id: 'missing', binding_version: 7, after_sequence: 0 }), [])
+})
+
+test('T5 reserved non-user timeline events retain the seven-field shape', () => {
+  for (const kind of ['assistant_message', 'commentary', 'plan', 'tool_call', 'tool_result', 'file_change', 'diff', 'test_result', 'approval_request', 'waiting_user', 'error', 'connection']) {
+    const event = { event_id: 'event-0000000000000001', sequence: 1, observed_at: '2026-09-03T00:00:00.000Z', kind, state: 'queued', correlation_id: input.idempotency_key, payload: {} }
+    const snapshot = { schema_version: 1, streams: [{ project_id: 'outcome', role: 'planner', binding_version: 7, events: [event] }], idempotency: [] }
+    const repository = createInMemoryChatRepository({ snapshot })
+    assert.deepEqual(repository.timeline({ project_id: 'outcome', binding_version: 7, after_sequence: 0 }), [event])
+    assert.deepEqual(repository.snapshot(), snapshot)
+  }
+})
 import { createHash } from 'node:crypto'
 import test from 'node:test'
 import { createInMemoryChatRepository, createOutcomeChatService, validateChatSnapshot } from './outcome-chat.mjs'
@@ -14,12 +70,23 @@ const fixture = (overrides = {}) => {
   return { service, repository, calls }
 }
 
+test('TIMELINE-RED memory reload preserves authoritative status without another send', async () => {
+  const { service, repository, calls } = fixture()
+  const submitted = await service.submitPlannerMessage(input)
+  const reloaded = fixture({ repository: createInMemoryChatRepository({ snapshot: repository.snapshot() }) })
+  const result = await reloaded.service.timeline({ project_id: 'outcome', after_sequence: 0, owner })
+  assert.equal(result.events[0].delivery, submitted.delivery)
+  assert.equal(result.events[0].dispatch_state, submitted.dispatch_state)
+  assert.equal(result.events[0].state, 'queued')
+  assert.equal(calls.transport, 1); assert.equal(reloaded.calls.transport, 0)
+})
+
 test('submission appends one ordered event and invokes transport exactly once', async () => {
   const { service, repository, calls } = fixture(); const result = await service.submitPlannerMessage(input)
   assert.equal(result.accepted, true); assert.equal(result.sequence, 1); assert.match(result.event_id, /^event-[a-f0-9]{16}$/); assert.equal(result.dispatch_state, 'invoked'); assert.equal(result.delivery, 'acknowledged'); assert.equal(result.execution_started, false); assert.equal(result.result_attached, false); assert.equal(result.evidence_attached, false)
   assert.equal(calls.resolve, 2); assert.equal(calls.transport, 1)
   const timeline = await service.timeline({ project_id: 'outcome', role: 'planner', binding_version: 7, after_sequence: 0, owner })
-  assert.equal(timeline.events.length, 1); assert.deepEqual(timeline.events[0], { event_id: result.event_id, sequence: 1, observed_at: '2026-09-03T00:00:00.000Z', kind: 'user_message', state: 'queued', correlation_id: 'message-0000000000000001', payload: { private_content: { text: '계획을 시작해 주세요.' } } }); assert.equal(timeline.completion_authority, false)
+  assert.equal(timeline.events.length, 1); assert.deepEqual(timeline.events[0], { event_id: result.event_id, sequence: 1, observed_at: '2026-09-03T00:00:00.000Z', kind: 'user_message', state: 'queued', delivery: 'acknowledged', dispatch_state: 'invoked', correlation_id: 'message-0000000000000001', payload: { private_content: { text: '계획을 시작해 주세요.' } } }); assert.equal(timeline.completion_authority, false)
   assert.equal(JSON.stringify(repository.snapshot()).includes('opaque'), false)
 })
 
