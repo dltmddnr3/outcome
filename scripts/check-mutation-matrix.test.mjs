@@ -1,5 +1,5 @@
 import assert from 'node:assert/strict'
-import { readFileSync, mkdtempSync, mkdirSync, writeFileSync, rmSync } from 'node:fs'
+import { readFileSync, mkdtempSync, mkdirSync, writeFileSync, rmSync, symlinkSync } from 'node:fs'
 import { spawnSync } from 'node:child_process'
 import { tmpdir } from 'node:os'
 import { join, relative } from 'node:path'
@@ -91,6 +91,87 @@ test('F3 complete scanner rejects CSRF literal syntax variants and preserves AF-
       assert.equal(csrfFailure, reject === true, `${label}: wrong failure class`)
       if (typeof reject === 'string') assert.ok(result.stderr.includes(`bundle:${reject}`), `${label}: missing check error`)
       if (!reject) assert.match(result.stdout, /G-6d csrf build secrets=0/)
+    }
+  } finally { rmSync(fixtures, { recursive: true, force: true }) }
+})
+
+test('F7 complete scanner discovers HTML-equivalent scripts and contains asset URLs', () => {
+  const root = fileURLToPath(new URL('..', import.meta.url))
+  const fixtures = mkdtempSync(join(tmpdir(), 'outcome-f7-scanner-'))
+  const dist = join(fixtures, 'dist')
+  const secret = 'globalThis.csrf = "SyntheticValueAB";'
+  const cases = [
+    ['double', '<script src="/assets/probe.js"></script>', true, 2],
+    ['single', "<script src='/assets/probe.js'></script>", true, 2],
+    ['unquoted', '<script src=/assets/probe.js></script>', true, 2],
+    ['whitespace-case', '<ScRiPt\n SrC \t=\n "/assets/probe.js" ></sCrIpT>', true, 2],
+    ['entity', '<script src="&#47;assets&#47;pro&#98;e.js"></script>', true, 2],
+    ['relative', '<script src="assets/probe.js"></script>', true, 2],
+    ['dot-relative', '<script src="./assets/probe.js"></script>', true, 2],
+    ['query-fragment', '<script src="/assets/probe.js?v=1&amp;x=2#code"></script>', true, 2],
+    ['encoded-filename', '<script src="/assets/pro%62e.js"></script>', true, 2],
+    ['base-relative', '<base href="/assets/"><script src="probe.js"></script>', true, 2],
+    ['first-base-only', '<base href="/assets/"><base href="https://outside.invalid/"><script src="probe.js"></script>', true, 2],
+    ['duplicate-first-secret', '<script src="/assets/probe.js" SRC="/assets/clean.js"></script>', true, 2],
+    ['duplicate-first-clean', '<script src="/assets/clean.js" SRC="/assets/probe.js"></script>', false, 2],
+    ['comment', '<!-- <script src="/assets/probe.js"></script> -->', false, 1],
+    ['data-attribute', '<div data-src="/assets/probe.js"></div>', false, 1],
+    ['escaped-lookalike', '<div>&lt;script src="/assets/probe.js"&gt;</div>', false, 1],
+    ['template-inert', '<template><script src="/assets/probe.js"></script></template>', false, 1],
+    ['modulepreload', '<link rel="MoDuLePrElOaD" href="/assets/probe.js">', true, 1],
+    ['script-preload', '<link rel="preload" as="SCRIPT" href="/assets/probe.js">', true, 1],
+    ['stylesheet', "<link rel='stylesheet' href='/assets/style.css?x=1#style'>", false, 1],
+    ['style-preload', '<link rel="preload" as="style" href="/assets/style.css">', false, 1],
+    ['runtime-control', '<script src="/assets/runtime.js"></script>', false, 2],
+    ['short-control', '<script src="/assets/short.js"></script>', false, 2],
+    ['nonstandard-extension', '<script src="/assets/probe.dat"></script>', true, 2],
+    ['missing', '<script src="/assets/missing.js"></script>', 'asset-read'],
+    ['empty', '<script src=""></script>', 'asset-reference'],
+    ['foreign-origin', '<script src="https://outside.invalid/probe.js"></script>', 'asset-origin'],
+    ['scheme-relative', '<script src="//outside.invalid/probe.js"></script>', 'asset-origin'],
+    ['foreign-base', '<base href="https://outside.invalid/"><script src="probe.js"></script>', 'asset-origin'],
+    ['file-url', '<script src="file:///outside/probe.js"></script>', 'asset-origin'],
+    ['data-url', '<script src="data:text/javascript,void(0)"></script>', 'asset-origin'],
+    ['encoded-slash', '<script src="/assets%2fprobe.js"></script>', 'asset-path'],
+    ['encoded-traversal', '<script src="/assets/%2e%2e%2foutside.js"></script>', 'asset-path'],
+    ['malformed-encoding', '<script src="/assets/%zz.js"></script>', 'asset-path'],
+    ['symlink-escape', '<script src="/assets/escape.js"></script>', 'asset-path'],
+    ...[9, 10, 12, 13, 32].flatMap((code) => [
+      [`rel-ascii-${code}`, `<link rel="other${String.fromCharCode(code)}MoDuLePrElOaD" href="/assets/probe.js">`, true, 1, 2],
+      [`rel-ascii-entity-${code}`, `<link rel="other&#${code};STYLESHEET" href="/assets/style.css">`, false, 1],
+    ]),
+    ...[11, 160, 8195, 8239, 65279].flatMap((code) => [
+      [`rel-nonascii-${code}`, `<link rel="modulepreload${String.fromCharCode(code)}other" href="/assets/probe.js">`, false, 1],
+      [`rel-nonascii-entity-${code}`, `<link rel="modulepreload&#${code};other" href="/assets/probe.js">`, false, 1],
+    ]),
+    ['rel-upper', '<link rel="MODULEPRELOAD" href="/assets/probe.js">', true, 1, 2],
+    ['rel-mixed-token', '<link rel="other MoDuLePrElOaD other" href="/assets/probe.js">', true, 1, 2],
+    ['rel-substring', '<link rel="xmodulepreload" href="/assets/probe.js">', false, 1],
+    ['rel-nbsp-stylesheet', '<link rel="stylesheet&#160;other" href="/assets/not-a-stylesheet.css">', false, 1],
+  ]
+  try {
+    mkdirSync(join(dist, 'assets'), { recursive: true })
+    writeFileSync(join(dist, 'assets/clean.js'), 'globalThis.cleanProbe = true;')
+    writeFileSync(join(dist, 'assets/probe.js'), secret)
+    writeFileSync(join(dist, 'assets/probe.dat'), secret)
+    writeFileSync(join(dist, 'assets/runtime.js'), 'globalThis.csrf = globalThis.runtimeCsrf;')
+    writeFileSync(join(dist, 'assets/short.js'), 'globalThis.csrf = "short";')
+    writeFileSync(join(dist, 'assets/style.css'), 'body { color: black; }')
+    writeFileSync(join(fixtures, 'outside.js'), secret)
+    symlinkSync(join(fixtures, 'outside.js'), join(dist, 'assets/escape.js'))
+    for (const [label, markup, reject, scripts, expectedInspected] of cases) {
+      writeFileSync(join(dist, 'index.html'), `<h1>프로젝트 여정</h1><script src="/assets/clean.js"></script>${markup}`)
+      const result = spawnSync(process.execPath, ['scripts/check-public-redaction.mjs'], { cwd: root, encoding: 'utf8', timeout: 30_000, env: { ...process.env, OUTCOME_CANDIDATE_DIST: relative(root, dist), OUTCOME_PUBLIC_URL: '' } })
+      const csrfFailure = result.stderr.includes('bundle:csrf-secret-literal')
+      console.info(JSON.stringify({ label: `F7-${label}`, scannerExit: result.status, csrfFailure, discovery: result.stdout.trim() }))
+      assert.equal(result.error, undefined, `${label}: environment failure`)
+      assert.equal(result.status, reject ? 1 : 0, `${label}: scanner exit`)
+      assert.equal(csrfFailure, reject === true, `${label}: failure class`)
+      if (typeof reject === 'string') assert.ok(result.stderr.includes(`bundle:${reject}`), `${label}: missing failure class`)
+      else {
+        const inspected = expectedInspected ?? scripts + (['modulepreload', 'script-preload'].includes(label) ? 1 : 0)
+        assert.ok(result.stdout.includes(`direct scripts=${scripts}; inspected script references=${inspected};`), `${label}: discovery count`)
+      }
     }
   } finally { rmSync(fixtures, { recursive: true, force: true }) }
 })

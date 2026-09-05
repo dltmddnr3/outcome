@@ -1,7 +1,7 @@
 import { once } from 'node:events'
-import { existsSync, mkdtempSync, readFileSync, rmSync, symlinkSync } from 'node:fs'
+import { existsSync, mkdtempSync, readFileSync, realpathSync, rmSync, symlinkSync } from 'node:fs'
 import { tmpdir } from 'node:os'
-import { join } from 'node:path'
+import { isAbsolute, join, relative, resolve } from 'node:path'
 import { chromium } from '@playwright/test'
 import ts from 'typescript'
 import { LOCAL_ABSOLUTE_PATH_SOURCE } from '../server/cherry-note-dashboard.mjs'
@@ -84,11 +84,66 @@ try {
   const check = async (base, label, localAssets = false) => {
     const api = (await Promise.all(['/api/dashboard', '/api/dashboard/cherry-note'].map(async (path) => (await fetch(`${base}${path}`)).text()))).join('\n')
     const html = localAssets ? readFileSync(join(candidateDist, 'index.html'), 'utf8') : await (await fetch(`${base}/cherry-note-dashboard`)).text()
-    const assetPaths = [...html.matchAll(/(?:src|href)="(\/assets\/[^"]+)"/g)].map((match) => match[1])
-    const assets = await Promise.all(assetPaths.map(async (path) => ({ path, text: localAssets ? readFileSync(join(candidateDist, path), 'utf8') : await fetch(`${base}${path}`).then((response) => { if (!response.ok) throw new Error('public redaction check error: bundle:asset-fetch'); return response.text() }) })))
+    // Detached browser HTML parsing supplies attribute/entity/duplicate semantics.
+    // Discovery never attaches candidate nodes, evaluates their code or fetches assets.
+    const discoveryPage = await browser.newPage()
+    await discoveryPage.route('**/*', (route) => route.abort())
+    let discovery
+    try {
+      discovery = await discoveryPage.evaluate((markup) => {
+        const doc = new DOMParser().parseFromString(markup, 'text/html')
+        const references = Array.from(doc.querySelectorAll('script[src], link[href]')).flatMap((node) => {
+          if (node.localName === 'script') return [{ value: node.getAttribute('src'), kind: 'script' }]
+          // relList tokenizes HTML ASCII whitespace but preserves case.
+          const rel = Array.from(node.relList, (token) => token.replace(/[A-Z]/g, (letter) => letter.toLowerCase()))
+          const as = (node.getAttribute('as') ?? '').toLowerCase()
+          if (rel.includes('modulepreload') || (rel.includes('preload') && as === 'script')) return [{ value: node.getAttribute('href'), kind: 'script' }]
+          if (rel.includes('stylesheet') || (rel.includes('preload') && as === 'style')) return [{ value: node.getAttribute('href'), kind: 'style' }]
+          return []
+        })
+        return { base: doc.querySelector('base[href]')?.getAttribute('href') ?? null, references, scripts: doc.querySelectorAll('script[src]').length, inline: doc.querySelectorAll('script:not([src])').length }
+      }, html)
+    } finally { await discoveryPage.close() }
+    const documentURL = new URL(`${base}/cherry-note-dashboard`)
+    const checkedURL = (value, against) => {
+      let url
+      try { url = new URL(value, against) } catch { throw new Error('public redaction check error: bundle:asset-reference') }
+      if (!['http:', 'https:'].includes(url.protocol) || url.origin !== documentURL.origin || url.username || url.password) throw new Error('public redaction check error: bundle:asset-origin')
+      return url
+    }
+    const baseURL = discovery.base === null ? documentURL : checkedURL(discovery.base, documentURL)
+    const distRoot = realpathSync(candidateDist)
+    const assets = await Promise.all(discovery.references.map(async ({ value, kind }) => {
+      if (!value.trim()) throw new Error('public redaction check error: bundle:asset-reference')
+      const url = checkedURL(value, baseURL)
+      let path
+      try { path = decodeURIComponent(url.pathname) } catch { throw new Error('public redaction check error: bundle:asset-path') }
+      if (/%(?:2f|5c|00)/i.test(url.pathname) || path.includes('\\') || path.includes('\0')) throw new Error('public redaction check error: bundle:asset-path')
+      let text
+      if (localAssets) {
+        const contained = (target) => { const rel = relative(distRoot, target); return rel !== '..' && !rel.startsWith('../') && !isAbsolute(rel) }
+        const target = resolve(distRoot, `.${path}`)
+        if (!contained(target)) throw new Error('public redaction check error: bundle:asset-path')
+        try {
+          if (!contained(realpathSync(target))) throw new Error('public redaction check error: bundle:asset-path')
+          text = readFileSync(target, 'utf8')
+        } catch (error) {
+          if (error.message.includes('bundle:asset-path')) throw error
+          throw new Error('public redaction check error: bundle:asset-read')
+        }
+      } else {
+        // No redirect may turn a same-origin link into an arbitrary-origin fetch.
+        const response = await fetch(url, { redirect: 'manual' })
+        if (!response.ok) throw new Error('public redaction check error: bundle:asset-fetch')
+        text = await response.text()
+      }
+      return { path, kind, text }
+    }))
     const bundle = assets.map((asset) => asset.text).join('\n')
-    const syntax = assets.filter((asset) => /\.(?:mjs|cjs|js)(?:[?#]|$)/i.test(asset.path)).map((asset) => inspectCsrfLiterals(asset.text))
+    const syntax = assets.filter((asset) => asset.kind === 'script').map((asset) => inspectCsrfLiterals(asset.text))
     if (!syntax.length) throw new Error('public redaction check error: bundle:javascript-assets-missing')
+    console.log(`G-6d discovery direct scripts=${discovery.scripts}; inspected script references=${syntax.length}; inline scripts=${discovery.inline} unverified; recursive imports=unverified`)
+    if (syntax.some((asset) => asset.secrets > 0)) throw new Error(`public redaction failures: ${label}:bundle:csrf-secret-literal`)
     const page = await browser.newPage(); await page.goto(`${base}/cherry-note-dashboard`); await page.getByText('프로젝트 여정', { exact: true }).waitFor(); const renderedUI = await page.locator('body').innerText(); await page.close()
     const surfaces = { api, html, bundle, renderedUI }
     const hits = Object.entries(surfaces).flatMap(([surface, text]) => Object.entries(patterns).flatMap(([name, pattern]) => pattern.test(text) ? [`${label}:${surface}:${name}`] : []))
