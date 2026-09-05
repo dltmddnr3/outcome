@@ -124,7 +124,13 @@ export function createContinuityAdapter(options) {
   let closed = false
   const persist = (which, path, text, count) => {
     try { const result = commitContinuityCheckpoint({ path, expectedDigest: heads[which].digest, checkpoint: text }); heads[which] = { digest: result.digest, count } }
-    catch (error) { if (storageCode(error) === 'storage_readback') heads[which] = { digest: 'UNKNOWN', count: null }; throw error }
+    catch (error) {
+      // Only these CAS refusals prove the target was not written. Native I/O,
+      // readback and finalization errors may follow persistence: never keep an
+      // apparently known old head or adopt bytes to resolve that uncertainty.
+      if (!['storage_input', 'storage_locked', 'storage_conflict'].includes(storageCode(error))) heads[which] = { digest: 'UNKNOWN', count: null }
+      throw error
+    }
   }
   return Object.freeze({
     checkpointHead: () => ({ ...heads.checkpoint }),

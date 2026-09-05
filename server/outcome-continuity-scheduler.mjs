@@ -237,21 +237,21 @@ export function commitContinuityCheckpoint(options) {
   const lock = `${o.path}.lock`
   let fd
   try { fd = openSync(lock, 'wx', 0o600) } catch { fail('storage_locked') }
-  let temp = null
   try {
     let prior = null
     try { prior = readFileSync(o.path, 'utf8') } catch (e) { if (e.code !== 'ENOENT') throw e }
     if ((prior === null ? null : hash(prior)) !== o.expectedDigest) fail('storage_conflict')
-    temp = `${o.path}.next-${randomUUID()}`
+    const temp = `${o.path}.next-${randomUUID()}`
     const file = openSync(temp, 'wx', 0o600)
     try { writeFileSync(file, o.checkpoint); fsyncSync(file) } finally { closeSync(file) }
-    renameSync(temp, o.path); temp = null
+    renameSync(temp, o.path)
     const directory = openSync(dirname(o.path), 'r')
     try { fsyncSync(directory) } finally { closeSync(directory) }
     if (readFileSync(o.path, 'utf8') !== o.checkpoint) fail('storage_readback')
     return { digest: hash(o.checkpoint) }
   } finally {
-    if (temp) { try { unlinkSync(temp) } catch { /* preserve an unknown leftover */ } }
+    // Success moves this attempt's temp to the target. Failure leaves any temp
+    // intact as evidence; only our acquired lock is released, never scavenged.
     closeSync(fd); unlinkSync(lock)
   }
 }

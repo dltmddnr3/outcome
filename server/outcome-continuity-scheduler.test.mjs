@@ -1,7 +1,8 @@
 import test from 'node:test'
 import assert from 'node:assert/strict'
 import { generateKeyPairSync, sign, createHash } from 'node:crypto'
-import { mkdtempSync, readFileSync, writeFileSync, rmSync } from 'node:fs'
+import fs, { mkdtempSync, readFileSync, writeFileSync, rmSync, readdirSync, existsSync, statSync } from 'node:fs'
+import { syncBuiltinESMExports } from 'node:module'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { createContinuityScheduler, continuityWorkDigest, commitContinuityCheckpoint } from './outcome-continuity-scheduler.mjs'
@@ -194,4 +195,47 @@ test('public projection contains only finite counts and no private work or recei
   for (const value of [i.id, i.job.id, i.job.worker, i.job.candidate, i.job.scope, i.job.approvalSource]) assert.equal(view.includes(value), false)
   assert.equal(h.kernel.projectPublic().completionAuthority, false)
   assert.equal(h.kernel.projectPublic().liveCyclesVerified, false)
+})
+
+for (const mode of ['partial-write', 'file-fsync', 'rename']) {
+  test(`QA-C1 failed transaction retains its own temp after ${mode}`, () => {
+    const dir = mkdtempSync(join(tmpdir(), 'outcome-cas-retention-'))
+    const native = Object.fromEntries(['openSync', 'writeFileSync', 'fsyncSync', 'renameSync'].map(k => [k, fs[k]]))
+    const path = join(dir, 'checkpoint.json'), old = canonical({ schema: 1, events: [] }), next = canonical({ schema: 1, events: ['next-evidence'] })
+    let tempPath = null, tempFd = null, injected = 0
+    try {
+      writeFileSync(path, old)
+      writeFileSync(path + '.next-unrelated', 'older evidence')
+      writeFileSync(join(dir, 'unrelated.lock'), 'foreign lease')
+      const fault = () => { injected++; throw Object.assign(new Error('test-owned EIO'), { code: 'EIO' }) }
+      fs.openSync = (...args) => { const fd = native.openSync(...args); if (typeof args[0] === 'string' && args[0].startsWith(path + '.next-')) { tempPath = args[0]; tempFd = fd } return fd }
+      fs.writeFileSync = (...args) => { if (mode === 'partial-write' && args[0] === tempFd) { native.writeFileSync(tempFd, args[1].slice(0, 7)); fault() } return native.writeFileSync(...args) }
+      fs.fsyncSync = (fd) => { if (mode === 'file-fsync' && fd === tempFd) fault(); return native.fsyncSync(fd) }
+      fs.renameSync = (...args) => { if (mode === 'rename' && args[0] === tempPath) fault(); return native.renameSync(...args) }
+      syncBuiltinESMExports()
+      try { assert.throws(() => commitContinuityCheckpoint({ path, expectedDigest: sha(old), checkpoint: next }), /test-owned EIO/) }
+      finally { Object.assign(fs, native); syncBuiltinESMExports() }
+      assert.equal(injected, 1)
+      assert.equal(readFileSync(path, 'utf8'), old)
+      assert.equal(readFileSync(path + '.next-unrelated', 'utf8'), 'older evidence')
+      assert.equal(readFileSync(join(dir, 'unrelated.lock'), 'utf8'), 'foreign lease')
+      assert.equal(existsSync(path + '.lock'), false)
+      assert.equal(existsSync(tempPath), true)
+      assert.equal(statSync(tempPath).mode & 0o777, 0o600)
+      assert.equal(readFileSync(tempPath, 'utf8'), mode === 'partial-write' ? next.slice(0, 7) : next)
+    } finally { Object.assign(fs, native); syncBuiltinESMExports(); rmSync(dir, { recursive: true, force: true }) }
+  })
+}
+
+test('QA-C1 successful transaction renames its temp and preserves unrelated artifacts', () => {
+  const dir = mkdtempSync(join(tmpdir(), 'outcome-cas-success-'))
+  try {
+    const path = join(dir, 'checkpoint.json'), checkpoint = canonical({ schema: 1, events: [] })
+    writeFileSync(path + '.next-old', 'older evidence'); writeFileSync(join(dir, 'unrelated.lock'), 'foreign lease')
+    assert.deepEqual(commitContinuityCheckpoint({ path, expectedDigest: null, checkpoint }), { digest: sha(checkpoint) })
+    assert.equal(readFileSync(path, 'utf8'), checkpoint)
+    assert.deepEqual(readdirSync(dir).sort(), ['checkpoint.json', 'checkpoint.json.next-old', 'unrelated.lock'])
+    assert.equal(readFileSync(path + '.next-old', 'utf8'), 'older evidence')
+    assert.equal(readFileSync(join(dir, 'unrelated.lock'), 'utf8'), 'foreign lease')
+  } finally { rmSync(dir, { recursive: true, force: true }) }
 })

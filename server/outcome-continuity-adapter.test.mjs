@@ -1,7 +1,8 @@
 import test, { after } from 'node:test'
 import assert from 'node:assert/strict'
 import { generateKeyPairSync, sign, createHash } from 'node:crypto'
-import { mkdtempSync, readFileSync, writeFileSync, existsSync, readdirSync, rmSync } from 'node:fs'
+import fs, { mkdtempSync, readFileSync, writeFileSync, existsSync, readdirSync, rmSync } from 'node:fs'
+import { syncBuiltinESMExports } from 'node:module'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { createContinuityScheduler, commitContinuityCheckpoint, continuityWorkDigest } from './outcome-continuity-scheduler.mjs'
@@ -83,8 +84,11 @@ check('R-15', 'descriptor exact data-only fields', () => { const e = environment
 check('R-16', 'adapter has no transport or mutation imports', () => { const s = readFileSync(new URL('./outcome-continuity-adapter.mjs', import.meta.url), 'utf8'); assert.doesNotMatch(s, /from\s+['"]node:(?:http|https|net|dgram|tls|child_process|path)['"]|\bfetch\s*\(|mutateRegistry|recoverRegistryLock|migrateLegacyRegistry/) })
 check('R-17', 'function-valued inputs refuse without callbacks', () => { let calls = 0; const fn = () => calls++; const e = environment(); assert.throws(() => api.createContinuityAdapter({ ...e.options, verifier: fn }), /invalid_dependency/); assert.throws(() => e.adapter().tick(fn, e.token, e.expected), /encoding/); assert.throws(() => api.adapterCanonical({ data: fn }), /shape/); assert.equal(calls, 0) })
 check('R-18', 'hostile tick objects reject before side effects', () => { let calls = 0; const proxy = new Proxy({}, { ownKeys() { calls++; return [] }, get() { calls++ } }); const e = environment(); assert.throws(() => e.adapter().tick(e.text, proxy, e.expected), /shape/); assert.throws(() => api.adapterCanonical(JSON.parse('{"__proto__":{}}')), /shape/); assert.equal(calls, 0); noFiles(e) })
-check('R-19', 'pinned non-regression source bytes unchanged', () => {
-  const pins = { 'outcome-continuity-scheduler.mjs': '4dcbe17aa37b71248dc77c1471e25f8b57b78409a61bba1a68ee9cb6ad739421', 'outcome-continuity-scheduler.test.mjs': 'e26b5402fb6741405e553b1ac95e9197af29fc6fd01834007955a5c4bc4aed25', 'outcome-execution-control-plane.mjs': 'c2f93d6486d2504a9df077e3c1b20fb88057c969a60ce1f96960c907e3a3df31', 'outcome-execution-control-plane.test.mjs': '566f8d6b9672bcbd6ced71471aa09703bf42347dbab8227888a1ec32b8412eb3', 'outcome-role-transport-evidence.mjs': 'd01f432cfc763f9586b691b1fa71ec5f7816d3841df86a12d1718bb05286d7eb', 'outcome-role-transport-evidence.test.mjs': 'cb5878f91edb2ac709625054cae6c70e1655b5acec7c833e0df4786b25f88baa', 'outcome-role-transport-evidence-fixtures.test.mjs': '18e779bb670c92db02edc851a612e2fcbb17431941f6cc5234acc977632d27df' }
+check('R-19', 'explicit QA-C1 scheduler replacement pins and unchanged non-regression bytes', () => {
+  // QA_C1_TWO_GAP_REPAIR_BUILDER_HANDOFF_20260905.md authorizes these two replacements only.
+  // Previous scheduler source: 4dcbe17aa37b71248dc77c1471e25f8b57b78409a61bba1a68ee9cb6ad739421
+  // Previous scheduler test: e26b5402fb6741405e553b1ac95e9197af29fc6fd01834007955a5c4bc4aed25
+  const pins = { 'outcome-continuity-scheduler.mjs': 'cfb3c1b7f2c0c82c7bb9cf4d222bda411453aa806ff3739def564565b23d5234', 'outcome-continuity-scheduler.test.mjs': 'ec12f42e9312ec19e95acf8a840c58e8f6cfd715d235e530ad174bf3ff33852b', 'outcome-execution-control-plane.mjs': 'c2f93d6486d2504a9df077e3c1b20fb88057c969a60ce1f96960c907e3a3df31', 'outcome-execution-control-plane.test.mjs': '566f8d6b9672bcbd6ced71471aa09703bf42347dbab8227888a1ec32b8412eb3', 'outcome-role-transport-evidence.mjs': 'd01f432cfc763f9586b691b1fa71ec5f7816d3841df86a12d1718bb05286d7eb', 'outcome-role-transport-evidence.test.mjs': 'cb5878f91edb2ac709625054cae6c70e1655b5acec7c833e0df4786b25f88baa', 'outcome-role-transport-evidence-fixtures.test.mjs': '18e779bb670c92db02edc851a612e2fcbb17431941f6cc5234acc977632d27df' }
   for (const [name, hash] of Object.entries(pins)) assert.equal(sha(readFileSync(new URL(name, import.meta.url))), hash, name)
 })
 check('R-20', 'expected snapshot excludes proxies accessors and extra fields', () => { let calls = 0; const e = environment(); const samples = [new Proxy({}, { ownKeys() { calls++; return [] } }), Object.create(null), {}, { ...e.expected, extra: true }, { ...e.expected, get role() { calls++; return 'builder' } }]; for (const value of samples) assert.throws(() => api.adapterExpectedSnapshot(value, Object.keys(e.expected)), /shape/); assert.equal(calls, 0); noFiles(e) })
@@ -119,3 +123,73 @@ check('R-48', 'options Proxy rejection is trap-free', () => { let calls = 0; con
 check('R-49', 'checkpointPath getter never executes', () => { const e = environment(); let calls = 0; assert.throws(() => api.createContinuityAdapter({ ...e.options, get checkpointPath() { calls++; return 'bad' } }), /shape/); assert.equal(calls, 0); noFiles(e) })
 check('R-50', 'old CAS temp artifact is preserved', () => { const e = environment('claim'); const path = e.options.checkpointPath + '.next-old'; writeFileSync(path, 'preserve'); e.tick(e.adapter()); assert.equal(readFileSync(path, 'utf8'), 'preserve') })
 check('R-51', 'terminal remains fail-closed with no verdict invention', () => { const e = environment('terminal'); const before = e.scheduler.checkpoint(); assert.throws(() => e.tick(e.adapter()), /verdict_mapping_undecided/); assert.equal(e.scheduler.checkpoint(), before); noFiles(e) })
+
+// Test-process-only fault injection. Restore native bindings before assertions or
+// cleanup; no production callback, signer, transport or storage seam is added.
+const withStorageFault = (target, mode, fn) => {
+  const native = Object.fromEntries(['renameSync', 'openSync', 'readFileSync', 'fsyncSync', 'unlinkSync'].map(k => [k, fs[k]]))
+  let renamed = false, directoryFd = null, injected = 0
+  const fault = () => { injected++; throw Object.assign(new Error('test-owned EIO'), { code: 'EIO' }) }
+  fs.renameSync = (from, to) => { const result = native.renameSync(from, to); if (to === target) renamed = true; return result }
+  fs.openSync = (...args) => { const fd = native.openSync(...args); if (renamed && args[1] === 'r') directoryFd = fd; return fd }
+  fs.readFileSync = (...args) => {
+    if (renamed && args[0] === target && injected === 0) {
+      if (mode === 'native-read') fault()
+      if (mode === 'mismatch') { injected++; return 'mismatch' }
+    }
+    return native.readFileSync(...args)
+  }
+  fs.fsyncSync = (fd) => { if (mode === 'directory-fsync' && renamed && fd === directoryFd && injected === 0) fault(); return native.fsyncSync(fd) }
+  fs.unlinkSync = (path) => { const result = native.unlinkSync(path); if (mode === 'lock-release' && renamed && path === target + '.lock' && injected === 0) fault(); return result }
+  syncBuiltinESMExports()
+  try { fn() } finally { Object.assign(fs, native); syncBuiltinESMExports() }
+  assert.equal(injected, 1)
+}
+
+for (const which of ['checkpoint', 'ledger', 'descriptor']) for (const mode of ['native-read', 'mismatch', 'directory-fsync', 'lock-release']) {
+  test(`QA-C1 ambiguous ${which} ${mode} quarantines the head without a send`, () => {
+    const e = environment('claim'); const a = e.adapter(); const target = e.options[which + 'Path']
+    let returned = false
+    withStorageFault(target, mode, () => assert.throws(() => { e.tick(a); returned = true }, /test-owned EIO|storage_readback|ledger_behind_checkpoint/))
+    assert.equal(returned, false)
+    assert.equal(existsSync(target), true) // Physical presence is not verified persistence.
+    assert.equal(existsSync(target + '.lock'), false)
+    assert.equal(e.scheduler.privateView().intents[0].phase, 'claimed')
+    assert.deepEqual(e.scheduler.privateView().needsReadback, [e.intent.id])
+    assert.equal(e.scheduler.projectPublic().canDispatch, false)
+    assert.equal(e.scheduler.projectPublic().counts.active, 0)
+    assert.equal(e.options.verifier.inspectStart(e.start, startExpected).consumed, which === 'descriptor')
+    if (which !== 'descriptor') assert.equal(existsSync(e.options.descriptorPath), false)
+    if (which === 'descriptor') {
+      assert.equal(JSON.parse(readFileSync(e.options.ledgerPath, 'utf8')).events[0].receipt_id, e.start.payload.receipt_id)
+      const checkpoint = readFileSync(e.options.checkpointPath, 'utf8')
+      const reloaded = createContinuityScheduler({ publicKey, checkpoint, expectedDigest: sha(checkpoint) })
+      assert.equal(reloaded.reduce(e.text).send, null)
+      assert.equal(reloaded.privateView().intents[0].phase, 'claimed')
+    }
+    const beforeRetry = readdirSync(e.dir).map(name => [name, readFileSync(join(e.dir, name), 'utf8')])
+    assert.throws(() => e.tick(a), /tick_closed/)
+    assert.deepEqual(readdirSync(e.dir).map(name => [name, readFileSync(join(e.dir, name), 'utf8')]), beforeRetry)
+    assert.deepEqual(a[which + 'Head'](), { digest: 'UNKNOWN', count: null })
+    assert.throws(() => api.createContinuityAdapter({ ...e.options, [which + 'Digest']: 'UNKNOWN' }), /storage_input/)
+  })
+}
+
+for (const which of ['checkpoint', 'ledger', 'descriptor']) for (const refusal of ['lock', 'conflict']) {
+  test(`QA-C1 proven pre-write ${which} ${refusal} preserves the prior head and evidence`, () => {
+    const e = environment('claim'); const a = e.adapter(); const target = e.options[which + 'Path']
+    const prior = a[which + 'Head'](); const protectedPath = target + (refusal === 'lock' ? '.lock' : '')
+    writeFileSync(protectedPath, 'pre-existing evidence')
+    writeFileSync(target + '.next-unrelated', 'unrelated leftover')
+    assert.throws(() => e.tick(a), /storage_locked|storage_conflict/)
+    assert.deepEqual(a[which + 'Head'](), prior)
+    assert.equal(readFileSync(protectedPath, 'utf8'), 'pre-existing evidence')
+    assert.equal(readFileSync(target + '.next-unrelated', 'utf8'), 'unrelated leftover')
+    if (refusal === 'lock') assert.equal(existsSync(target), false)
+    assert.equal(e.options.verifier.inspectStart(e.start, startExpected).consumed, which === 'descriptor')
+    assert.equal(e.scheduler.privateView().intents[0].phase, 'claimed')
+    assert.equal(e.scheduler.projectPublic().canDispatch, false)
+    if (which !== 'descriptor') assert.equal(existsSync(e.options.descriptorPath), false)
+    assert.throws(() => e.tick(a), /tick_closed/)
+  })
+}
