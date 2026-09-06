@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState, type CSSProperties } from 'react'
+import { useEffect, useRef, useState, useSyncExternalStore, type CSSProperties } from 'react'
 import { Archive, Check, ChevronLeft, ChevronRight, Circle, Layers3, Menu, MoreHorizontal, Plug, Plus, Radio, RefreshCw, Search, UserRound, X } from 'lucide-react'
 import { fetchOutcomeDashboard, recordPrivateDecision, type PrivateDecisionReason, type PrivateModelV2Event, type PrivateModelV2Projection, type PrivateProjectProjection } from '../lib/api'
 import { CurrentProjection } from './CurrentProjection'
@@ -21,6 +21,20 @@ export type HierarchySelection = { phaseId: string | null; scopeId: string | nul
 export const mobileHierarchyLevels = ['페이즈', '범위', '스테이지'] as const
 export const mobileWorkspaceTabs = ['지도', '대화', '승인'] as const
 export const desktopConversationBreakpoint = 1100
+type WorkspaceTab = (typeof mobileWorkspaceTabs)[number]
+type WorkspacePanelSemantics = { id: string; role: 'region' | 'tabpanel'; 'aria-labelledby': string; hidden?: boolean; tabIndex?: number }
+const workspaceTabKeys: Record<WorkspaceTab, string> = { 지도: 'map', 대화: 'conversation', 승인: 'approval' }
+const workspacePanelHeadings: Record<WorkspaceTab, string> = { 지도: 'oc-map-title', 대화: 'planner-conversation-title', 승인: 'oc-approval-title' }
+const workspaceMediaQuery = `(max-width: ${desktopConversationBreakpoint - 1}px)`
+const readMobileWorkspace = () => typeof window !== 'undefined' && window.matchMedia(workspaceMediaQuery).matches
+const subscribeMobileWorkspace = (notify: () => void) => {
+  if (typeof window === 'undefined') return () => undefined
+  const media = window.matchMedia(workspaceMediaQuery); media.addEventListener('change', notify)
+  return () => media.removeEventListener('change', notify)
+}
+const useMobileWorkspace = () => useSyncExternalStore(subscribeMobileWorkspace, readMobileWorkspace, () => true)
+const workspaceTabId = (label: WorkspaceTab) => `oc-workspace-tab-${workspaceTabKeys[label]}`
+const workspacePanelId = (label: WorkspaceTab) => `oc-workspace-panel-${workspaceTabKeys[label]}`
 export const workspaceManagementItems = [
   { id: 'archive', label: '보관함', disabled: true },
   { id: 'connections', label: '연결 관리', disabled: true },
@@ -95,7 +109,7 @@ const rejectionReasons: ReadonlyArray<{ value: PrivateDecisionReason; label: str
   { value: 'superseded_by_newer_observation', label: '더 최신 관측으로 교체됨' },
   { value: 'defer_pending_external_input', label: '외부 입력 대기' },
 ]
-export function ApprovalInbox({ projection, active = false, className = 'oc-approval-rail', onDecision }: { projection?: PrivateModelV2Projection; active?: boolean; className?: string; onDecision?: (input: { eventId: string; sequence: number; decision: 'approved' | 'rejected'; rejectionReason: PrivateDecisionReason | null }) => Promise<void> }) {
+export function ApprovalInbox({ projection, active = false, className = 'oc-approval-rail', workspaceSemantics, onDecision }: { projection?: PrivateModelV2Projection; active?: boolean; className?: string; workspaceSemantics?: WorkspacePanelSemantics; onDecision?: (input: { eventId: string; sequence: number; decision: 'approved' | 'rejected'; rejectionReason: PrivateDecisionReason | null }) => Promise<void> }) {
   const items = approvalInboxProjection(projection)
   const [rejectionReason, setRejectionReason] = useState<PrivateDecisionReason>('evidence_insufficient')
   const [pending, setPending] = useState(false)
@@ -127,7 +141,7 @@ export function ApprovalInbox({ projection, active = false, className = 'oc-appr
     catch { restoreTriggerFocus(); setStagedDecision(null); setNotice('결정을 기록하지 못했습니다. 원본을 새로 확인하세요.') }
     finally { submittingRef.current = false; setPending(false) }
   }
-  return <aside className={className} data-workspace-panel="승인" data-workspace-active={active ? 'true' : 'false'} data-completion-authority="false" aria-labelledby="oc-approval-title">
+  return <aside className={className} id={workspaceSemantics?.id} role={workspaceSemantics?.role} hidden={workspaceSemantics?.hidden} tabIndex={workspaceSemantics?.tabIndex} data-workspace-panel="승인" data-workspace-active={active ? 'true' : 'false'} data-completion-authority="false" aria-labelledby={workspaceSemantics?.['aria-labelledby'] ?? 'oc-approval-title'}>
     <header><span>Model v2 · 읽기 전용</span><h2 id="oc-approval-title">승인</h2><strong>승인 권한 위임 없음</strong></header>
     {items.length === 0 ? <p className="oc-approval-empty" role="status">Cherry의 명시적 행동 또는 확인 가능한 차단 근거가 없습니다.</p> : <ol className="oc-approval-list">{items.map((item, index) => { const reasonId = `oc-approval-reason-${index}`; return <li className="oc-approval-item" key={`${item.kind}-${index}`} data-approval-kind={item.kind}>
       <div className="oc-approval-request"><small>{item.requestClass}</small><h3>{item.request}</h3></div>
@@ -141,8 +155,8 @@ export function ApprovalInbox({ projection, active = false, className = 'oc-appr
 type NonProductionRoleChatFixture = { state: RoleChatFixtureState; plannerBound: boolean; initialFilter?: RoleChatFilter; onSend: (message: string) => void }
 
 export function OutcomeDashboard({ onUnauthorized, initialData, onLogout, privateProjects, nonProductionRoleChatFixture }: { onUnauthorized: () => void; initialData?: OutcomeDashboardData; onLogout?: () => Promise<void>; privateProjects?: PrivateProjectProjection[]; nonProductionRoleChatFixture?: NonProductionRoleChatFixture }) {
-  const [data, setData] = useState<OutcomeDashboardData | null>(initialData ?? null); const [selectedProjectId, setSelectedProjectId] = useState('outcome'); const [selection, setSelection] = useState<HierarchySelection | null>(null); const [mobileLevel, setMobileLevel] = useState(0); const [workspaceTab, setWorkspaceTab] = useState<(typeof mobileWorkspaceTabs)[number]>('지도'); const [stagesExpanded, setStagesExpanded] = useState(false); const [error, setError] = useState<string | null>(null)
-  const [navigationOpen, setNavigationOpen] = useState(false); const [projectQuery, setProjectQuery] = useState(''); const menuButtonRef = useRef<HTMLButtonElement>(null); const navigationRef = useRef<HTMLElement>(null); const contentRef = useRef<HTMLElement>(null)
+  const [data, setData] = useState<OutcomeDashboardData | null>(initialData ?? null); const [selectedProjectId, setSelectedProjectId] = useState('outcome'); const [selection, setSelection] = useState<HierarchySelection | null>(null); const [mobileLevel, setMobileLevel] = useState(0); const [workspaceTab, setWorkspaceTab] = useState<WorkspaceTab>('지도'); const [stagesExpanded, setStagesExpanded] = useState(false); const [error, setError] = useState<string | null>(null)
+  const [navigationOpen, setNavigationOpen] = useState(false); const [projectQuery, setProjectQuery] = useState(''); const menuButtonRef = useRef<HTMLButtonElement>(null); const navigationRef = useRef<HTMLElement>(null); const contentRef = useRef<HTMLElement>(null); const workspaceTabRefs = useRef(new Map<WorkspaceTab, HTMLButtonElement>()); const isMobileWorkspace = useMobileWorkspace()
   const productionBuild = (import.meta as ImportMeta & { env?: { PROD?: boolean } }).env?.PROD === true
   const roleChatFixture = productionBuild ? undefined : nonProductionRoleChatFixture
   const roleChat = (events: PrivateModelV2Event[]) => <PlannerConversation events={events} fixtureState={roleChatFixture?.state} plannerBound={roleChatFixture?.plannerBound} initialFilter={roleChatFixture?.initialFilter} onSend={roleChatFixture?.onSend} />
@@ -165,6 +179,18 @@ export function OutcomeDashboard({ onUnauthorized, initialData, onLogout, privat
     document.addEventListener('keydown', onKeyDown); window.requestAnimationFrame(() => navigationRef.current?.querySelector<HTMLElement>('.oc-nav-close')?.focus())
     return () => { document.body.style.overflow = previousOverflow; if (content) content.inert = false; document.removeEventListener('keydown', onKeyDown) }
   }, [navigationOpen])
+  useEffect(() => {
+    if (!isMobileWorkspace || typeof document === 'undefined') return
+    const active = document.activeElement instanceof HTMLElement ? document.activeElement : null
+    if (active?.closest('[data-workspace-panel][hidden]')) workspaceTabRefs.current.get(workspaceTab)?.focus()
+  }, [isMobileWorkspace, workspaceTab])
+  const workspacePanelSemantics = (label: WorkspaceTab): WorkspacePanelSemantics => ({ id: workspacePanelId(label), role: isMobileWorkspace ? 'tabpanel' : 'region', 'aria-labelledby': isMobileWorkspace ? workspaceTabId(label) : workspacePanelHeadings[label], hidden: isMobileWorkspace && workspaceTab !== label, tabIndex: isMobileWorkspace && workspaceTab === label ? 0 : undefined })
+  const activateWorkspaceTab = (label: WorkspaceTab, trigger: HTMLButtonElement) => { setWorkspaceTab(label); window.requestAnimationFrame(() => { const active = document.activeElement instanceof HTMLElement ? document.activeElement : null; if (active?.closest('[data-workspace-panel][hidden]')) trigger.focus() }) }
+  const handleWorkspaceTabKeys = (event: React.KeyboardEvent<HTMLButtonElement>, index: number) => {
+    const targetIndex = event.key === 'Home' ? 0 : event.key === 'End' ? mobileWorkspaceTabs.length - 1 : event.key === 'ArrowRight' ? (index + 1) % mobileWorkspaceTabs.length : event.key === 'ArrowLeft' ? (index - 1 + mobileWorkspaceTabs.length) % mobileWorkspaceTabs.length : null
+    if (targetIndex === null) return
+    event.preventDefault(); workspaceTabRefs.current.get(mobileWorkspaceTabs[targetIndex])?.focus()
+  }
   const dashboardProjects = data ? privateProjects?.length ? data.projects.filter((item) => privateProjects.some((privateProject) => privateProject.project.id === item.project.id)) : data.projects : []
   const project = data ? selectProject(dashboardProjects, selectedProjectId) : null
   const privateOnlyProject = privateProjects?.find((item) => item.project.id === selectedProjectId) ?? privateProjects?.[0]
@@ -245,9 +271,9 @@ export function OutcomeDashboard({ onUnauthorized, initialData, onLogout, privat
     <details className="oc-v1-compatibility" open={!privateProjection}>
       {privateProjection && <summary><span>v1 호환 정보</span><small>역할 연결과 기술 근거는 필요할 때만 확인</small></summary>}
       <div className="oc-v1-compatibility__content">
-    <nav className="oc-workspace-tabs" aria-label="모바일 작업공간">{mobileWorkspaceTabs.map((label) => <button key={label} type="button" aria-current={workspaceTab === label ? 'page' : undefined} onClick={() => setWorkspaceTab(label)}>{label}</button>)}</nav>
+    <nav className="oc-workspace-tabs" role={isMobileWorkspace ? 'tablist' : undefined} aria-label="모바일 작업공간">{mobileWorkspaceTabs.map((label, index) => { const selected = workspaceTab === label; return <button ref={(element) => { if (element) workspaceTabRefs.current.set(label, element); else workspaceTabRefs.current.delete(label) }} key={label} id={workspaceTabId(label)} type="button" role={isMobileWorkspace ? 'tab' : undefined} aria-controls={isMobileWorkspace ? workspacePanelId(label) : undefined} aria-selected={isMobileWorkspace ? selected : undefined} tabIndex={isMobileWorkspace ? selected ? 0 : -1 : undefined} onKeyDown={isMobileWorkspace ? (event) => handleWorkspaceTabKeys(event, index) : undefined} onClick={(event) => activateWorkspaceTab(label, event.currentTarget)}>{label}{isMobileWorkspace && selected && <span className="oc-visually-hidden">선택 중</span>}</button> })}</nav>
     <section className="oc-workbench" aria-label="프로젝트 작업대" data-conversation-peer-breakpoint={desktopConversationBreakpoint - 1}>
-      <div className="oc-map-workspace" data-workspace-panel="지도" data-workspace-active={workspaceTab === '지도' ? 'true' : 'false'}>
+      <section className="oc-map-workspace" {...workspacePanelSemantics('지도')} data-workspace-panel="지도" data-workspace-active={workspaceTab === '지도' ? 'true' : 'false'}>
     <div className="oc-hierarchy-sticky">
       <div className="oc-structure-band" role="img" aria-label={`전체 진행 흐름 · 현재 페이즈 ${current.phaseIndex}/${current.phaseTotal} · ${phases.map((phase) => `${phase.index} ${structureStatusLabel(phase.status)}`).join(', ')}`} data-structure-signature={phases.map((phase) => `${phase.id}:${phase.complete}/${phase.stages}:${phase.status}`).join('|')}>
         <div className="oc-progress-summary"><strong>전체 진행 흐름</strong><span><Radio size={13} aria-hidden="true" />현재 페이즈 {current.phaseIndex} / {current.phaseTotal}</span></div>
@@ -264,9 +290,9 @@ export function OutcomeDashboard({ onUnauthorized, initialData, onLogout, privat
       </div>
       <details ref={initializeGateDetails} className="oc-gate-inspector" data-default-open="true" data-stage-state={selectedStage?.state ?? 'unknown'} data-gate-available={selectedStage?.gate.available ? 'true' : 'false'} data-gate-closed={selectedStage?.gate.closed ?? 0} data-gate-total={selectedStage?.gate.total ?? 0} aria-label="선택 스테이지 완료 조건"><summary><span><small>완료 조건</small><strong>{selectedStage ? stagePresentation(selectedStage.id, selectedStage.title, selectedStage.purpose)[0] : '스테이지 정의 대기'}</strong></span><span><em>{selectedStage ? entityStateLabel(selectedStage.state) : '근거 없음'}</em><b>{selectedStage ? selectedGateCount(selectedStage) : '근거 없음'}</b></span></summary><div className="oc-gate-content"><header>{selectedStage ? <p>{stagePresentation(selectedStage.id, selectedStage.title, selectedStage.purpose)[1]}</p> : <p>선택한 범위에 스테이지와 완료 조건이 아직 정의되지 않았습니다.</p>}</header>{selectedStage && selectedSummary && <><div className="oc-gate-count"><span><small>확인된 항목 / 전체</small><strong>{selectedGateCount(selectedStage)}</strong></span><em>{entityStateLabel(selectedStage.state)}</em></div>{selectedProgress?.available && <span className="oc-gate-gauge" role="img" aria-label={`현재 스테이지 완료 조건 ${selectedProgress.closed}/${selectedProgress.total}`}><i style={{ transform: `scaleX(${selectedProgress.scale})` }} /></span>}<p className="oc-detail-boundary">{selectedSummary.boundaryCopy}</p><section className="oc-inspector-gates"><h4>남은 완료 조건</h4>{selectedStage.gate.gates.some((gate) => !gate.closed) ? <ol>{selectedStage.gate.gates.filter((gate) => !gate.closed).map((gate) => <li key={gate.id}><b>{gate.id}</b><span>{gatePresentation(selectedStage.id, gate.id, gate.title)}</span></li>)}</ol> : <p>{selectedSummary.checkedCopy}</p>}</section>{selectedGroups.length > 0 && <section data-source-groups><h4>그룹별 확인</h4><div className="oc-groups">{selectedGroups.map((group) => <article key={group.code} data-generic="false"><span><strong>{group.primaryLabel}</strong><small>코드 {group.secondaryCode}</small></span><b>{group.closed}/{group.total}</b></article>)}</div></section>}</>}</div></details>
     </section>
-      </div>
-      <ApprovalInbox className="oc-approval-rail" projection={privateProjection} active={workspaceTab === '승인'} onDecision={privateProjection ? recordDecision(privateProjection.project.id) : undefined} />
-      <div className="oc-conversation-panel" data-workspace-panel="대화" data-workspace-active={workspaceTab === '대화' ? 'true' : 'false'}>{roleChat(privateProjection?.events ?? [])}</div>
+      </section>
+      <ApprovalInbox className="oc-approval-rail" projection={privateProjection} active={workspaceTab === '승인'} workspaceSemantics={workspacePanelSemantics('승인')} onDecision={privateProjection ? recordDecision(privateProjection.project.id) : undefined} />
+      <section className="oc-conversation-panel" {...workspacePanelSemantics('대화')} data-workspace-panel="대화" data-workspace-active={workspaceTab === '대화' ? 'true' : 'false'}>{roleChat(privateProjection?.events ?? [])}</section>
     </section>
     <details id="oc-technical-evidence" className="oc-technical"><summary><span>기술 증거</span><small>빌드·역할 연결·GitHub·근거 축</small></summary><div className="oc-technical-content"><div className="oc-build" aria-label="제공 중인 고정 빌드"><small>기술 증거 · 프로젝트 식별자 {project.project.id} · {data.build.repository}/{data.build.ref}</small><strong>커밋 {data.build.commit ?? '근거 없음'} · 트리 {data.build.tree ?? '근거 없음'}</strong><span>에셋 {data.build.asset ?? '근거 없음'} · {snapshot ? '배포 스냅샷이며 실시간 세션은 별도 연결 예정' : '실시간 현재 작업은 빌드에 고정되지 않음'}</span></div><section className="oc-timing-evidence" aria-label="시간 근거"><div><small>{timing.elapsed.label}</small><strong>{timing.elapsed.value}</strong>{timing.elapsed.basis && <span>{timing.elapsed.basis}</span>}</div><div><small>{timing.eta.label}</small><strong>{timing.eta.value}</strong></div></section><section className="oc-binding-evidence" aria-label="역할 연결 기술 증거"><h3>역할 연결 근거</h3>{project.bindings.map((binding) => <div key={binding.role}><strong>{roleLabel(binding.role)}</strong><span>{binding.stageId ?? '스테이지 연결 없음'} · 이력 {binding.historyCount} · 관측 {compactTime(binding.observedAt)}</span></div>)}</section><section className="oc-github" aria-label="GitHub 전달 근거 연결"><header><div><small>선택 연결 근거 · GitHub</small><strong>{github.adopted ? 'GitHub 연결 채택' : 'GitHub 연결 미채택'}</strong></div><span className={github.state}>{entityStateLabel(github.state)}</span></header><div>{githubEvidenceItems(github).map((item) => <article key={item.label} className={item.state}><small>{item.label}</small><strong>{item.value}</strong><span>{entityStateLabel(item.state)}</span></article>)}</div><p>완료 판정 권한 없음 · GitHub 활동은 완료 조건 충족이나 Cherry 승인이 아닙니다.</p></section>{selectedStage && <div className="oc-axes" aria-label="선택 스테이지 근거 축"><Axis label="구현" value={selectedStage.axes.implementation} /><Axis label="테스트" value={selectedStage.axes.test} /><Axis label="증거 확정" value={selectedStage.axes.evidence} /><Axis label="변화 관측" value={project.now.status} /></div>}</div></details>
       </div>

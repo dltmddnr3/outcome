@@ -5,7 +5,7 @@ import { assertDashboardMeasurement, assertMobileHierarchyFlowMeasurement, asser
 
 const passingMeasurement = () => ({
   documentOverflow: 0, clippedDescendants: [], ellipsisTruncation: [], viewportEscape: [], siblingIntersections: [], roleDescendantIntersections: [], roleStatusOverflow: [], undersizedText: [], lowContrastText: [], undersizedControls: [], unexpectedEnglish: [], translationFallback: [], activeAnimationCount: 0, heroHeight: 352,
-  pageHeading: true, sequentialHeadings: true, compactHero: true, roleGeometry: true, heroGeometry: true, mobileMapFirstFold: true, mobileDomOrder: true, mobileHierarchyTruth: true, workspaceSidebarTruth: true, workbenchTruth: true, wideCanvasTruth: true, gateDetailsTruth: true, refinedVisualSystemTruth: true, currentStageActionTruth: true, singleProgressRailTruth: true, phaseNavigationUniqueTruth: true, currentSelectionDistinctionTruth: true, folderHierarchyTruth: true, phaseCurrentMarkerTruth: true, phaseLabelsFull: true, phaseBandTruth: true, phaseOptionTitlesFull: true, desktopPhaseListFirstFold: true, liveSemantics: true, structureTruth: true, phaseCompletionTruth: true, stagePositionTruth: true, snapshotHeroTruth: true, oneMapSurface: true, roving: true, desktopColumns: true, mobileDrill: true, gateCountTruth: true, gaugeTruth: true, explorationTruth: true, groupTruth: true, singleStaleNowSignal: true, snapshotBadgeTextTruth: true, technicalCollapsed: true, technicalEvidence: true, noFabricatedProgress: true, firstFold: true,
+  pageHeading: true, sequentialHeadings: true, compactHero: true, roleGeometry: true, heroGeometry: true, mobileMapFirstFold: true, mobileDomOrder: true, mobileHierarchyTruth: true, workspaceSidebarTruth: true, workbenchTruth: true, workspaceTabSemanticsTruth: true, workspacePanelSemanticsTruth: true, desktopWorkspaceRegionsTruth: true, workspaceVisualTruth: true, workspaceFocusTruth: true, wideCanvasTruth: true, gateDetailsTruth: true, refinedVisualSystemTruth: true, currentStageActionTruth: true, singleProgressRailTruth: true, phaseNavigationUniqueTruth: true, currentSelectionDistinctionTruth: true, folderHierarchyTruth: true, phaseCurrentMarkerTruth: true, phaseLabelsFull: true, phaseBandTruth: true, phaseOptionTitlesFull: true, desktopPhaseListFirstFold: true, liveSemantics: true, structureTruth: true, phaseCompletionTruth: true, stagePositionTruth: true, snapshotHeroTruth: true, oneMapSurface: true, roving: true, desktopColumns: true, mobileDrill: true, gateCountTruth: true, gaugeTruth: true, explorationTruth: true, groupTruth: true, singleStaleNowSignal: true, snapshotBadgeTextTruth: true, technicalCollapsed: true, technicalEvidence: true, noFabricatedProgress: true, firstFold: true,
 })
 
 test('nested summary role rows resolve the accessible title and status targets', () => {
@@ -43,6 +43,12 @@ test('responsive assertions fail closed for wrong columns, stacked mobile levels
 test('split workbench fails closed without truthful chat placeholder or full-width Gate details', () => {
   assert.throws(() => assertDashboardMeasurement('desktop/outcome', { ...passingMeasurement(), workbenchTruth: false }), /workbenchTruth=false/)
   assert.throws(() => assertDashboardMeasurement('mobile/outcome', { ...passingMeasurement(), gateDetailsTruth: false }), /gateDetailsTruth=false/)
+})
+
+test('S-IA-1 shell semantics fail closed for tabs panels desktop regions visual scope and hidden focus', () => {
+  for (const key of ['workspaceTabSemanticsTruth', 'workspacePanelSemanticsTruth', 'desktopWorkspaceRegionsTruth', 'workspaceVisualTruth', 'workspaceFocusTruth']) {
+    assert.throws(() => assertDashboardMeasurement('responsive/outcome', { ...passingMeasurement(), [key]: false }), new RegExp(`${key}=false`))
+  }
 })
 
 test('wide canvas fails closed when primary surfaces remain inset or misaligned', () => {

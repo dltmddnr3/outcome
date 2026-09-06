@@ -142,6 +142,25 @@ describe('OUTCOME Package dashboard', () => {
     expect(mobileWorkspaceTabs).toEqual(['지도', '대화', '승인'])
     expect(desktopConversationBreakpoint).toBe(1100)
   })
+  it('S-IA-1 mobile shell exposes one three-tab roving control with reciprocal hidden panels', () => {
+    const initialData = { schemaVersion: 2 as const, observedAt: '2026-09-04T00:00:00.000Z', build: { repository: 'OUTCOME', ref: 'main', commit: null, tree: null, asset: null, runtimeNowPinned: false as const }, projects: [project('outcome', 'OUTCOME')] }
+    const markup = renderToStaticMarkup(createElement(OutcomeDashboard, { onUnauthorized: () => undefined, initialData }))
+    const workspaceTablist = markup.slice(markup.indexOf('<nav class="oc-workspace-tabs"'), markup.indexOf('</nav>', markup.indexOf('<nav class="oc-workspace-tabs"')) + 6)
+    const tabs = markup.match(/<button[^>]*role="tab"[^>]*>/g) ?? []
+    expect((markup.match(/role="tablist"/g) ?? [])).toHaveLength(1)
+    expect(tabs).toHaveLength(3)
+    expect((markup.match(/role="tabpanel"/g) ?? [])).toHaveLength(3)
+    expect(tabs.filter((tab) => tab.includes('aria-selected="true"'))).toHaveLength(1)
+    expect(tabs.filter((tab) => tab.includes('tabindex="0"'))).toHaveLength(1)
+    expect((markup.match(/hidden=""/g) ?? [])).toHaveLength(2)
+    for (const key of ['map', 'conversation', 'approval']) {
+      expect(markup).toContain(`id="oc-workspace-tab-${key}"`)
+      expect(markup).toContain(`aria-controls="oc-workspace-panel-${key}"`)
+      expect(markup).toContain(`id="oc-workspace-panel-${key}"`)
+      expect(markup).toContain(`aria-labelledby="oc-workspace-tab-${key}"`)
+    }
+    expect((workspaceTablist.match(/>선택 중</g) ?? [])).toHaveLength(1)
+  })
   it('왼쪽 레일은 프로젝트 작업공간과 정직한 준비 중 기능만 제공한다', () => {
     expect(workspaceManagementItems).toEqual([
       { id: 'archive', label: '보관함', disabled: true },
@@ -334,7 +353,7 @@ describe('OUTCOME Package dashboard', () => {
     expect(source).toContain('전체 진행 흐름')
     expect(source).toContain('phases.length')
     expect(source).not.toContain('페이즈 탐색')
-    expect(source).not.toContain('role: "tablist"')
+    expect(source).toContain('role: isMobileWorkspace ? "tablist"')
   })
   it('긴 완료 branch만 disclosure 대상으로 접고 선택된 과거 Stage는 노출한다', () => {
     const stages = Array.from({ length: 13 }, (_, index) => stage({ id: `stage-${index + 1}`, state: index < 12 ? 'complete' : 'active' }))
