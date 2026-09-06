@@ -81,7 +81,7 @@ describe('account workspace presentation contract', () => {
     const dashboard = { ...deploymentFixture, build: { repository: 'test/repo', ref: 'test', commit: null, tree: null, asset: null, runtimeNowPinned: false } } as unknown as OutcomeDashboardData
     const legacyProjects = readyWorkspace.projects.map(({ modelV2: _modelV2, ...project }) => project)
     const html = renderToStaticMarkup(<AccountWorkspace state="ready" workspace={{ projects: legacyProjects, dashboard }} />)
-    expect(html).toContain('<details class="oc-v1-compatibility" open="">')
+    expect(html).toContain('<div class="oc-v1-compatibility" data-compatibility-static="true">')
     expect(html).not.toContain('Current Projection')
   })
 

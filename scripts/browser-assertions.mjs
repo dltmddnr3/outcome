@@ -240,8 +240,102 @@ async function assertWorkspaceShellContract(page, name) {
   await tabs.nth(0).click(); await tabs.nth(0).focus(); await page.keyboard.press('Tab'); if (await page.locator('#oc-workspace-panel-map').evaluate((item) => item !== document.activeElement)) throw new Error(`${name}: Tab did not enter the selected panel first`)
 }
 
+async function assertV3VisualFixContract(page, name) {
+  const original = page.viewportSize()
+  if (!original || original.width !== 1440) return
+  const failures = []
+  const measurements = []
+  try {
+    for (const width of [1408, 1436, 1437, 1438, 1440]) {
+      await page.setViewportSize({ width, height: 900 })
+      await page.waitForFunction((expected) => window.innerWidth === expected, width)
+      const layout = await page.evaluate(() => {
+        const workbench = document.querySelector('.oc-workbench')
+        const map = workbench?.querySelector(':scope > .oc-map-workspace')
+        const rail = workbench?.querySelector(':scope > .oc-approval-rail')
+        const conversation = workbench?.querySelector(':scope > .oc-conversation-panel')
+        const finalMapColumn = map?.querySelector('.oc-map-columns > :last-child')
+        if (!workbench || !map || !rail || !conversation || !finalMapColumn) return null
+        const rect = (element) => element.getBoundingClientRect()
+        const workbenchRect = rect(workbench)
+        const contentRight = workbenchRect.right - 1
+        return {
+          contentWidth: workbench.clientWidth,
+          scrollWidth: workbench.scrollWidth,
+          overflow: Math.max(0, workbench.scrollWidth - workbench.clientWidth),
+          widths: [map, rail, conversation].map((element) => Math.round(rect(element).width)),
+          panelRightGaps: [map, rail, conversation].map((element) => Math.round(rect(element).right - contentRight)),
+          conversationOverflow: Math.max(0, conversation.scrollWidth - conversation.clientWidth),
+          mapInnerGap: Math.round(rect(finalMapColumn).right - rect(map).right),
+          mapColumnsOverflow: Math.max(0, map.querySelector('.oc-map-columns').scrollWidth - map.querySelector('.oc-map-columns').clientWidth),
+          documentOverflow: document.documentElement.scrollWidth - window.innerWidth,
+        }
+      })
+      const dashboard = await measureDashboard(page)
+      measurements.push({ width, ...layout, viewportEscape: dashboard.viewportEscape.length, ellipsis: dashboard.ellipsisTruncation.length })
+      if (!layout) { failures.push(`V3-A-03@${width}=missing`); continue }
+      if (layout.contentWidth !== width - 298) failures.push(`V3-A-03@${width}=content-${layout.contentWidth}`)
+      if (layout.widths.join('/') !== '630/210/268') failures.push(`V3-A-04@${width}=${layout.widths.join('/')}`)
+      if (layout.panelRightGaps.some((gap) => gap > 0)) failures.push(`V3-B-01@${width}=${layout.panelRightGaps.join('/')}`)
+      if (dashboard.viewportEscape.length || layout.documentOverflow) failures.push(`V3-B-02@${width}=escape-${dashboard.viewportEscape.length}/document-${layout.documentOverflow}`)
+      if (layout.overflow || layout.conversationOverflow) failures.push(`V3-B-03@${width}=workbench-${layout.overflow}/conversation-${layout.conversationOverflow}`)
+      if (layout.mapInnerGap > 0 || layout.mapColumnsOverflow > 1) failures.push(`V3-A-07@${width}=gap-${layout.mapInnerGap}/overflow-${layout.mapColumnsOverflow}`)
+      if (dashboard.ellipsisTruncation.length) failures.push(`V3-TRUNCATION@${width}=${dashboard.ellipsisTruncation.join(',')}`)
+    }
+    const overflowing = measurements.filter((item) => item.overflow > 0)
+    if (overflowing.length && new Set(overflowing.map((item) => item.overflow + item.contentWidth)).size !== 1) failures.push(`V3-G-02=${JSON.stringify(overflowing)}`)
+    await page.setViewportSize(original)
+    await page.waitForFunction((expected) => window.innerWidth === expected, original.width)
+    const semantics = await page.evaluate(() => {
+      const wrapper = document.querySelector('.oc-v1-compatibility')
+      const technical = document.querySelector('details#oc-technical-evidence.oc-technical > summary')
+      return {
+        compatibilityDetails: document.querySelectorAll('details.oc-v1-compatibility').length,
+        wrapperCount: document.querySelectorAll('.oc-v1-compatibility').length,
+        staticCount: document.querySelectorAll('div.oc-v1-compatibility[data-compatibility-static=true]').length,
+        unavailableCount: document.querySelectorAll('[data-compatibility-available]').length,
+        forbiddenAttributes: wrapper ? [...wrapper.attributes].filter((attribute) => attribute.name === 'role' || attribute.name === 'tabindex' || attribute.name.startsWith('aria-')).map((attribute) => attribute.name) : ['missing'],
+        mapTitleCount: wrapper?.querySelectorAll('h2#oc-map-title').length ?? 0,
+        navigationCount: wrapper?.querySelectorAll('nav[aria-label="모바일 작업공간"]').length ?? 0,
+        workbenchCount: wrapper?.querySelectorAll('section.oc-workbench[aria-label="프로젝트 작업대"]').length ?? 0,
+        technicalCount: technical ? 1 : 0,
+      }
+    })
+    if (semantics.compatibilityDetails !== 0 || semantics.wrapperCount !== 1 || semantics.staticCount !== 1 || semantics.unavailableCount !== 0) failures.push(`V3-C-02=${JSON.stringify(semantics)}`)
+    const roleSummaries = page.locator('.oc-role-row > summary:visible')
+    await page.locator('.cn-refresh').focus()
+    const roleSummaryCount = await roleSummaries.count()
+    for (let index = 0; index < roleSummaryCount; index += 1) {
+      await page.keyboard.press('Tab')
+      if (!await roleSummaries.nth(index).evaluate((element) => element === document.activeElement)) {
+        const actual = await page.evaluate(() => ({ tag: document.activeElement?.tagName, id: document.activeElement?.id, className: document.activeElement?.className }))
+        failures.push(`V4-C-03-ORDER=role-${index}/${JSON.stringify(actual)}`)
+        break
+      }
+    }
+    await page.keyboard.press('Tab')
+    if (!await page.locator('button.oc-show-current-button').evaluate((element) => element === document.activeElement)) {
+      const actual = await page.evaluate(() => ({ tag: document.activeElement?.tagName, id: document.activeElement?.id, className: document.activeElement?.className, compatibilityHost: Boolean(document.activeElement?.matches?.('details.oc-v1-compatibility') || document.activeElement?.closest?.('details.oc-v1-compatibility')) }))
+      failures.push(`V4-C-03-ORDER=unexpected-stop-before-current-stage/${JSON.stringify(actual)}`)
+    }
+    const wrapperState = await page.locator('.oc-v1-compatibility').evaluate((element) => ({
+      tag: element.tagName,
+      staticValue: element.getAttribute('data-compatibility-static'),
+      hasOpenState: 'open' in element,
+      directSummaryCount: element.querySelectorAll(':scope > summary').length,
+      forbiddenAttributes: [...element.attributes].filter((attribute) => attribute.name === 'role' || attribute.name === 'tabindex' || attribute.name.startsWith('aria-')).map((attribute) => attribute.name),
+      workbenchVisible: (element.querySelector('.oc-workbench')?.getBoundingClientRect().height ?? 0) > 0,
+    }))
+    if (wrapperState.tag !== 'DIV' || wrapperState.staticValue !== 'true' || wrapperState.hasOpenState || wrapperState.directSummaryCount !== 0 || wrapperState.forbiddenAttributes.length || !wrapperState.workbenchVisible) failures.push(`V4-C-04-STRUCTURE=${JSON.stringify(wrapperState)}`)
+  } finally {
+    await page.setViewportSize(original)
+    await page.waitForFunction((expected) => window.innerWidth === expected, original.width)
+  }
+  if (failures.length) throw new Error(`${name}: ${failures.join(' | ')} | measurements=${JSON.stringify(measurements)}`)
+}
+
 export async function verifyAllDashboardStates(page, viewportName) {
-  await page.getByRole('heading', { name: '프로젝트 여정', exact: true }).waitFor(); await assertWorkspaceSidebarContract(page, viewportName); await assertSplitWorkbenchContract(page, viewportName); await assertWorkspaceShellContract(page, viewportName); const projectButtons = page.locator('.oc-project-select')
+  await page.getByRole('heading', { name: '프로젝트 여정', exact: true }).waitFor(); await assertWorkspaceSidebarContract(page, viewportName); await assertSplitWorkbenchContract(page, viewportName); await assertWorkspaceShellContract(page, viewportName); await assertV3VisualFixContract(page, viewportName); const projectButtons = page.locator('.oc-project-select')
   const payload = await page.evaluate(async () => { const response = await fetch('/api/dashboard', { headers: { accept: 'application/json' } }); if (!response.ok) throw new Error(`dashboard payload ${response.status}`); return (await response.json()).dashboard })
   const projectCount = payload.projects?.length ?? 0; if (projectCount < 1 || await projectButtons.count() !== projectCount || await page.locator('.oc-project-menu').count() !== projectCount) throw new Error(`${viewportName}: project switch/menu count does not match payload (${await projectButtons.count()}/${await page.locator('.oc-project-menu').count()}/${projectCount})`)
   await ensureGlobalNavigationOpen(page); const search = page.locator('.oc-project-search input'); const secondName = payload.projects[Math.min(1, projectCount - 1)].project.name; await search.fill(secondName); if (await projectButtons.count() !== 1 || (await projectButtons.first().textContent())?.includes(secondName) !== true) throw new Error(`${viewportName}: project search did not filter loaded projects`); await search.fill('__no_matching_project__'); if (!await page.getByText('일치하는 프로젝트가 없습니다.', { exact: true }).isVisible()) throw new Error(`${viewportName}: project search empty state missing`); await search.fill(''); if (await projectButtons.count() !== projectCount) throw new Error(`${viewportName}: clearing project search did not restore payload projects`)

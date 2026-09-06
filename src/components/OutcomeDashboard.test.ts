@@ -47,6 +47,45 @@ describe('OUTCOME Package dashboard', () => {
     expect(contrast('#555857', '#707372')).toBeLessThan(3)
     expect(contrast('#707372', '#898c8b')).toBeLessThan(3)
   })
+  it('V3-A-01 pins the 1408 workbench to 630 210 268 with no legacy conversation minimum', () => {
+    const expected = '@media(min-width:1408px){.oc-workbench{grid-template-columns:minmax(630px,1fr) 210px minmax(268px,.72fr)}}'
+    const legacy = '@media(min-width:1408px){.oc-workbench{grid-template-columns:minmax(630px,1fr) 210px minmax(300px,.72fr)}}'
+    expect(styles.split(expected)).toHaveLength(2)
+    expect(styles).not.toContain(legacy)
+  })
+  it('V3-A-02 preserves the two-pixel safety reserve at the 1408 content width', () => {
+    const tracks = styles.match(/@media\(min-width:1408px\)\{\.oc-workbench\{grid-template-columns:minmax\((\d+)px,1fr\) (\d+)px minmax\((\d+)px,\.72fr\)\}\}/)
+    expect(tracks).not.toBeNull()
+    const minima = tracks!.slice(1).map(Number)
+    expect(minima).toEqual([630, 210, 268])
+    expect(minima.reduce((sum: number, value: number) => sum + value, 0)).toBeLessThanOrEqual(1408 - 298 - 2)
+  })
+  it('V3-A-07 keeps the outer map minimum at or above its three inner columns', () => {
+    const outer = styles.match(/@media\(min-width:1408px\)\{\.oc-workbench\{grid-template-columns:minmax\((\d+)px,1fr\)/)
+    const inner = styles.match(/\.oc-map-columns\{grid-template-columns:minmax\((\d+)px,\.75fr\) minmax\((\d+)px,\.9fr\) minmax\((\d+)px,1\.35fr\)/)
+    expect(outer).not.toBeNull()
+    expect(inner).not.toBeNull()
+    const innerMinimum = inner!.slice(1).map(Number).reduce((sum: number, value: number) => sum + value, 0)
+    expect(innerMinimum).toBe(630)
+    expect(Number(outer![1])).toBeGreaterThanOrEqual(innerMinimum)
+  })
+  it('V3-C-01 and V3-F-01 render one unnamed public wrapper and preserve the named private disclosure', () => {
+    const initialData = { schemaVersion: 2 as const, observedAt: '2026-09-04T00:00:00.000Z', build: { repository: 'OUTCOME', ref: 'main', commit: null, tree: null, asset: null, runtimeNowPinned: false as const }, projects: [project('outcome', 'OUTCOME')] }
+    const publicMarkup = renderToStaticMarkup(createElement(OutcomeDashboard, { onUnauthorized: () => undefined, initialData }))
+    expect((publicMarkup.match(/data-compatibility-available=/g) ?? [])).toHaveLength(0)
+    expect((publicMarkup.match(/<details class="oc-v1-compatibility"/g) ?? [])).toHaveLength(0)
+    expect((publicMarkup.match(/<div class="oc-v1-compatibility" data-compatibility-static="true">/g) ?? [])).toHaveLength(1)
+    const publicWrapper = publicMarkup.match(/<div class="oc-v1-compatibility" data-compatibility-static="true"([^>]*)>/)
+    expect(publicWrapper).not.toBeNull()
+    expect(publicWrapper![1]).not.toMatch(/\b(?:role|aria-[\w-]+|tabindex)=/i)
+    expect((publicMarkup.match(/<h2 id="oc-map-title">프로젝트 여정<\/h2>/g) ?? [])).toHaveLength(1)
+    expect((publicMarkup.match(/<details id="oc-technical-evidence" class="oc-technical">/g) ?? [])).toHaveLength(1)
+    const privateProjects = [{ project: { id: 'outcome', name: 'OUTCOME' }, phases: [], current: { phaseId: 'outcome-phase', scopeId: 'outcome-scope', stageId: 'outcome-stage' }, modelV2: modelV2() }]
+    const privateMarkup = renderToStaticMarkup(createElement(OutcomeDashboard, { onUnauthorized: () => undefined, initialData, privateProjects }))
+    expect((privateMarkup.match(/<details class="oc-v1-compatibility"><summary><span>v1 호환 정보<\/span>/g) ?? [])).toHaveLength(1)
+    expect(privateMarkup).not.toContain('<details class="oc-v1-compatibility" open="">')
+    expect(privateMarkup).not.toContain('data-compatibility-static="true"')
+  })
   it('projects at most one explicit Cherry action without inventing missing evidence or lineage', () => {
     expect(approvalInboxProjection(modelV2({ cherryActionLabel: '  후보 화면을 확인한다  ', nextActionLabel: 'Builder가 구현한다', readyBoundaryLabels: ['다음 단계'] }))).toEqual([{ kind: 'explicit_cherry_action', requestClass: '명시적 Cherry action', request: '후보 화면을 확인한다', requester: '알 수 없음', authorityTarget: 'Cherry', blockedTarget: 'Cherry 판단 경계', publicPin: '알 수 없음', evidence: '알 수 없음', expiry: '알 수 없음', freshness: '2026-09-04T02:00:00.000Z', lineage: '알 수 없음', immutableHistory: '알 수 없음' }])
     expect(approvalInboxProjection(modelV2({ cherryActionLabel: '   ', nextActionLabel: 'Cherry가 아닌 다음 행동', readyBoundaryLabels: ['승인처럼 보이는 경계'] }))).toEqual([])

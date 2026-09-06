@@ -218,7 +218,7 @@ try {
     await page.goto(`${base}/workspace`)
     await page.locator('.oc-dashboard').waitFor()
     await page.locator('details.oc-v1-compatibility > summary').click()
-    if (decisionProbe.viewport.width <= 760) await page.locator('.oc-workspace-tabs').getByRole('button', { name: '승인' }).click()
+    if (decisionProbe.viewport.width <= 760) await page.locator('.oc-workspace-tabs').getByRole('tab', { name: '승인' }).click()
     const approval = page.locator('.oc-approval-rail')
     if (await approval.locator('form, a').count() !== 0 || await approval.locator('[data-approval-kind=explicit_cherry_action] button[aria-disabled=true]').count() !== 1 || await approval.locator('[data-approval-kind=explicit_cherry_action] button:disabled').count() !== 0 || await approval.locator('[data-approval-kind=evidence_blocker] option').count() !== 4) throw new Error('decision controls violated the explicit-action or closed-vocabulary boundary')
     const stageButton = approval.getByRole('button', { name: '승인 기록' })
