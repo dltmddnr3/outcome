@@ -47,18 +47,22 @@ describe('OUTCOME Package dashboard', () => {
     expect(contrast('#555857', '#707372')).toBeLessThan(3)
     expect(contrast('#707372', '#898c8b')).toBeLessThan(3)
   })
-  it('V3-A-01 pins the 1408 workbench to 630 210 268 with no legacy conversation minimum', () => {
-    const expected = '@media(min-width:1408px){.oc-workbench{grid-template-columns:minmax(630px,1fr) 210px minmax(268px,.72fr)}}'
+  it('V3-A-01 pins the wide workbench to 630 210 268 minima with no legacy conversation minimum', () => {
+    const expected = '@media(min-width:1408px){.oc-workbench{grid-template-columns:minmax(630px,1fr) 210px minmax(268px,1fr)}}'
     const legacy = '@media(min-width:1408px){.oc-workbench{grid-template-columns:minmax(630px,1fr) 210px minmax(300px,.72fr)}}'
     expect(styles.split(expected)).toHaveLength(2)
     expect(styles).not.toContain(legacy)
   })
-  it('V3-A-02 preserves the two-pixel safety reserve at the 1408 content width', () => {
-    const tracks = styles.match(/@media\(min-width:1408px\)\{\.oc-workbench\{grid-template-columns:minmax\((\d+)px,1fr\) (\d+)px minmax\((\d+)px,\.72fr\)\}\}/)
+  it('V3-A-02 fills the 1408 content width while preserving all three track minima', () => {
+    const tracks = styles.match(/@media\(min-width:1408px\)\{\.oc-workbench\{grid-template-columns:minmax\((\d+)px,1fr\) (\d+)px minmax\((\d+)px,1fr\)\}\}/)
     expect(tracks).not.toBeNull()
     const minima = tracks!.slice(1).map(Number)
     expect(minima).toEqual([630, 210, 268])
-    expect(minima.reduce((sum: number, value: number) => sum + value, 0)).toBeLessThanOrEqual(1408 - 298 - 2)
+    const contentWidth = 1408 - 298
+    const conversationWidth = contentWidth - minima[0] - minima[1]
+    expect(conversationWidth).toBe(270)
+    expect(conversationWidth).toBeGreaterThanOrEqual(minima[2])
+    expect(minima[0] + minima[1] + conversationWidth).toBe(contentWidth)
   })
   it('V3-A-07 keeps the outer map minimum at or above its three inner columns', () => {
     const outer = styles.match(/@media\(min-width:1408px\)\{\.oc-workbench\{grid-template-columns:minmax\((\d+)px,1fr\)/)

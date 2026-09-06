@@ -275,7 +275,10 @@ async function assertV3VisualFixContract(page, name) {
       measurements.push({ width, ...layout, viewportEscape: dashboard.viewportEscape.length, ellipsis: dashboard.ellipsisTruncation.length })
       if (!layout) { failures.push(`V3-A-03@${width}=missing`); continue }
       if (layout.contentWidth !== width - 298) failures.push(`V3-A-03@${width}=content-${layout.contentWidth}`)
-      if (layout.widths.join('/') !== '630/210/268') failures.push(`V3-A-04@${width}=${layout.widths.join('/')}`)
+      const expectedWidths = [630, 210, layout.contentWidth - 630 - 210]
+      if (layout.widths.join('/') !== expectedWidths.join('/')) failures.push(`V3-A-04@${width}=${layout.widths.join('/')}/${expectedWidths.join('/')}`)
+      if (layout.widths.reduce((sum, value) => sum + value, 0) !== layout.contentWidth) failures.push(`V4-GRID-FILL-SUM@${width}=${layout.widths.join('+')}/${layout.contentWidth}`)
+      if (layout.panelRightGaps[2] !== 0) failures.push(`V4-GRID-FILL-RIGHT@${width}=${layout.panelRightGaps[2]}`)
       if (layout.panelRightGaps.some((gap) => gap > 0)) failures.push(`V3-B-01@${width}=${layout.panelRightGaps.join('/')}`)
       if (dashboard.viewportEscape.length || layout.documentOverflow) failures.push(`V3-B-02@${width}=escape-${dashboard.viewportEscape.length}/document-${layout.documentOverflow}`)
       if (layout.overflow || layout.conversationOverflow) failures.push(`V3-B-03@${width}=workbench-${layout.overflow}/conversation-${layout.conversationOverflow}`)

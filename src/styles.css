@@ -521,7 +521,7 @@ body:has(.account-workspace){min-width:0}
 .oc-gate-content .oc-gate-count{margin-top:12px}
 .oc-gate-inspector:focus-within>summary{outline-color:var(--oc-accent)}
 
-@media(min-width:1408px){.oc-workbench{grid-template-columns:minmax(630px,1fr) 210px minmax(268px,.72fr)}}
+@media(min-width:1408px){.oc-workbench{grid-template-columns:minmax(630px,1fr) 210px minmax(268px,1fr)}}
 
 @media(max-width:1099px){
   .oc-workspace-tabs{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));margin-bottom:8px;border:1px solid var(--oc-rule-strong);background:var(--oc-surface)}
