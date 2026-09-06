@@ -3,7 +3,7 @@ import { renderToStaticMarkup } from 'react-dom/server'
 import { describe, expect, it } from 'vitest'
 // @ts-expect-error The test runtime provides this Node built-in; the browser bundle never imports this file.
 import { readFileSync } from 'node:fs'
-import { ApprovalInbox, OutcomeDashboard, approvalInboxProjection, axisStateLabel, bindingHeroLabel, bindingObservationLabel, collapsedStageCount, currentHierarchy, defaultHierarchySelection, deriveScopeState, deriveStageRailState, desktopConversationBreakpoint, detailContentPolicy, entityStateLabel, findStage, gateGroupPresentation, gateProgress, githubEvidenceItems, heroGateEvidence, hierarchyIsExploring, hierarchyPlacement, meaningfulGateGroups, mobileHierarchyLevels, mobileWorkspaceTabs, nextStageOptionIndex, nowPresentation, projectHeroModel, resolveHierarchySelection, selectedGateCount, selectedStageContext, selectHierarchyPhase, selectHierarchyScope, selectLiveBinding, selectProject, snapshotPresentation, sourceStateLabel, stageDetailSemantics, structuralPhaseModel, structureStatusLabel, summarizeStage, timingPresentation, workspaceManagementItems, type Binding, type GithubConnector, type PackageProject, type PackageStage } from './OutcomeDashboard'
+import { ApprovalInbox, OutcomeDashboard, WorkspaceStateShell, approvalInboxProjection, axisStateLabel, bindingHeroLabel, bindingObservationLabel, collapsedStageCount, currentHierarchy, defaultHierarchySelection, deriveScopeState, deriveStageRailState, desktopConversationBreakpoint, detailContentPolicy, entityStateLabel, findStage, gateGroupPresentation, gateProgress, githubEvidenceItems, heroGateEvidence, hierarchyIsExploring, hierarchyPlacement, meaningfulGateGroups, mobileHierarchyLevels, mobileWorkspaceTabs, nextStageOptionIndex, nowPresentation, projectHeroModel, resolveHierarchySelection, selectedGateCount, selectedStageContext, selectHierarchyPhase, selectHierarchyScope, selectLiveBinding, selectProject, snapshotPresentation, sourceStateLabel, stageDetailSemantics, structuralPhaseModel, structureStatusLabel, summarizeStage, timingPresentation, workspaceManagementItems, type Binding, type GithubConnector, type PackageProject, type PackageStage } from './OutcomeDashboard'
 import { activityLabelKo, axisLabelKo, gatePresentation, groupPresentation, hierarchyLabels, loginErrorPresentation, phasePresentation, projectOutcomePresentation, roleLabel, stagePresentation } from './outcomeKorean'
 import type { PrivateModelV2Projection } from '../lib/api'
 
@@ -160,6 +160,35 @@ describe('OUTCOME Package dashboard', () => {
       expect(markup).toContain(`aria-labelledby="oc-workspace-tab-${key}"`)
     }
     expect((workspaceTablist.match(/>선택 중</g) ?? [])).toHaveLength(1)
+  })
+  it.each(['loading', 'error'] as const)('S-IA-1 %s keeps the mobile shell and state content inside its selected panel', (state) => {
+    const markup = renderToStaticMarkup(createElement(WorkspaceStateShell, { state, isMobileWorkspace: true, workspaceTab: '지도', onSelectWorkspaceTab: () => undefined, onRetry: () => undefined }))
+    const tabs = markup.match(/<button[^>]*role="tab"[^>]*>/g) ?? []
+    const selectedPanel = markup.slice(markup.indexOf('id="oc-workspace-panel-map"'), markup.indexOf('</section>', markup.indexOf('id="oc-workspace-panel-map"')))
+    expect((markup.match(/role="tablist"/g) ?? [])).toHaveLength(1)
+    expect(tabs).toHaveLength(3)
+    expect(tabs.filter((tab) => tab.includes('aria-selected="true"') && tab.includes('tabindex="0"'))).toHaveLength(1)
+    expect((markup.match(/role="tabpanel"/g) ?? [])).toHaveLength(3)
+    expect((markup.match(/hidden=""/g) ?? [])).toHaveLength(2)
+    expect(selectedPanel).toContain(`data-dashboard-state="${state}"`)
+    expect(state === 'error' ? selectedPanel.includes('다시 확인') : !markup.includes('다시 확인')).toBe(true)
+    if (state === 'loading') {
+      const integratedMarkup = renderToStaticMarkup(createElement(OutcomeDashboard, { onUnauthorized: () => undefined }))
+      expect(integratedMarkup).toContain('data-state-shell="loading"')
+      expect((integratedMarkup.match(/role="tab"/g) ?? [])).toHaveLength(3)
+      expect((integratedMarkup.match(/data-workspace-panel=/g) ?? [])).toHaveLength(3)
+    }
+  })
+  it.each(['loading', 'error'] as const)('S-IA-1 %s keeps three ordered desktop regions without tab roles', (state) => {
+    const markup = renderToStaticMarkup(createElement(WorkspaceStateShell, { state, isMobileWorkspace: false, workspaceTab: '지도', onSelectWorkspaceTab: () => undefined, onRetry: () => undefined }))
+    expect(markup).not.toContain('role="tablist"')
+    expect(markup).not.toContain('role="tab"')
+    expect(markup).not.toContain('role="tabpanel"')
+    expect((markup.match(/role="region"/g) ?? [])).toHaveLength(3)
+    const panels = ['data-workspace-panel="지도"', 'data-workspace-panel="승인"', 'data-workspace-panel="대화"']
+    expect(panels.map((token) => markup.indexOf(token))).toEqual([...panels].map((token) => markup.indexOf(token)).sort((a, b) => a - b))
+    for (const heading of ['oc-map-title', 'oc-approval-title', 'planner-conversation-title']) expect(markup).toContain(`aria-labelledby="${heading}"`)
+    expect(markup.slice(markup.indexOf('id="oc-workspace-panel-map"'), markup.indexOf('</section>', markup.indexOf('id="oc-workspace-panel-map"')))).toContain(`data-dashboard-state="${state}"`)
   })
   it('왼쪽 레일은 프로젝트 작업공간과 정직한 준비 중 기능만 제공한다', () => {
     expect(workspaceManagementItems).toEqual([
