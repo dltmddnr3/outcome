@@ -3,7 +3,7 @@ import test from 'node:test'
 import { mkdtempSync, readFileSync, writeFileSync } from 'node:fs'
 import { join } from 'node:path'
 import { tmpdir } from 'node:os'
-import { createEmptyRegistry } from './outcome-session-registry-persistence.mjs'
+import { __withPorts, createEmptyRegistry } from './outcome-session-registry-persistence.mjs'
 import { runSessionCli, runSessionControl } from './outcome-session-control.mjs'
 
 const setup = () => { const path = join(mkdtempSync(join(tmpdir(), 'outcome-control-')), 'registry.json'); createEmptyRegistry(path, ['outcome']); return path }
@@ -45,14 +45,15 @@ test('CLI accepts locator only through private stdin and its serializable result
   assert.throws(() => runSessionCli(['assign', '--locator', 'argv-private'], ''), /locator_argv_forbidden/)
 })
 
-test('doctor exposes identity-unavailable lock state and denies recovery without owner details', () => {
+test('doctor exposes identity-unknown lock state and denies recovery without owner details', () => {
   const path = setup(); const lockPath = `${path}.lock`
   writeFileSync(lockPath, `${JSON.stringify({ schema_version: 1, owner_pid: 99_999_999, owner_uid: typeof process.getuid === 'function' ? process.getuid() : null, process_start_identity: 'missing process', created_at: '2026-08-27T00:00:00.000Z', owner_nonce: '33333333-3333-4333-8333-333333333333' })}\n`, { mode: 0o600 })
   const before = readFileSync(lockPath)
-  const diagnosis = runSessionControl({ registryPath: path, action: 'doctor', projectIds: ['outcome'] })
-  assert.equal(diagnosis.lock.state, 'identity_unavailable')
+  const unknownProbe = { processIdentity: () => ({ kind: 'unknown' }) }
+  const diagnosis = __withPorts(unknownProbe, () => runSessionControl({ registryPath: path, action: 'doctor', projectIds: ['outcome'] }))
+  assert.equal(diagnosis.lock.state, 'identity_unknown')
   for (const field of ['owner_pid', 'owner_uid', 'process_start_identity', 'owner_nonce', lockPath]) assert.equal(JSON.stringify(diagnosis).includes(field), false)
-  assert.throws(() => runSessionControl({ registryPath: path, action: 'recover-lock', recoveryRef: diagnosis.lock.recoveryRef }), /registry_lock_identity_unavailable/)
+  assert.throws(() => __withPorts(unknownProbe, () => runSessionControl({ registryPath: path, action: 'recover-lock', recoveryRef: diagnosis.lock.recoveryRef })), /registry_lock_identity_unknown/)
   assert.deepEqual(readFileSync(lockPath), before)
-  assert.equal(runSessionControl({ registryPath: path, action: 'doctor', projectIds: ['outcome'] }).lock.state, 'identity_unavailable')
+  assert.equal(__withPorts(unknownProbe, () => runSessionControl({ registryPath: path, action: 'doctor', projectIds: ['outcome'] })).lock.state, 'identity_unknown')
 })

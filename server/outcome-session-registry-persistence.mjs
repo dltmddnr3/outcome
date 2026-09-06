@@ -35,11 +35,21 @@ const safePublicReason = (value) => typeof value === 'string' && SAFE_REASON.tes
 const sanitizedPublicText = (value) => value == null ? null : safePublicText(value) ? value : null
 const safePublicTime = (value) => isoTime(value) ? value : null
 const PRIVATE_ALIAS_SEGMENTS = new Set(['codex', 'openai', 'chatgpt', 'provider', 'anthropic', 'claude', 'google', 'gemini', 'session', 'sess', 'thread', 'task', 'turn', 'conversation', 'chat', 'run', 'message', 'msg', 'assistant', 'asst'])
+export function __classifyProbeOutcome(outcome) {
+  const o = outcome ?? {}
+  const raw = String(o.stdout ?? o.output?.[1] ?? '')
+  const text = raw.trim()
+  if (o.threw !== true) return text ? { kind: 'alive', identity: text.replace(/\s+/g, ' ') } : { kind: 'unknown' }
+  if (o.status === 1 && o.signal == null && o.code == null && o.killed !== true && text === '') return { kind: 'absent' }
+  return { kind: 'unknown' }
+}
 const defaultProcessIdentity = (pid) => {
   try {
-    const value = execFileSync('ps', ['-p', String(pid), '-o', 'uid=', '-o', 'lstart='], { encoding: 'utf8', stdio: ['ignore', 'pipe', 'ignore'], timeout: 1000 }).trim()
-    return value ? value.replace(/\s+/g, ' ') : null
-  } catch { return null }
+    const stdout = execFileSync('ps', ['-p', String(pid), '-o', 'uid=', '-o', 'lstart='], { encoding: 'utf8', stdio: ['ignore', 'pipe', 'ignore'], timeout: 1000 })
+    return __classifyProbeOutcome({ threw: false, stdout })
+  } catch (error) {
+    return __classifyProbeOutcome({ threw: true, status: error?.status, signal: error?.signal, code: error?.code, killed: error?.killed, stdout: error?.stdout, output: error?.output })
+  }
 }
 const DEFAULT_PORTS = Object.freeze({
   fsyncFile: (descriptor) => fsyncSync(descriptor),
@@ -243,25 +253,26 @@ function inspectRegistryLock(path, options = {}) {
   if (!value || typeof value !== 'object' || Array.isArray(value) || !hasExactKeys(value, LOCK_KEYS, [...LOCK_KEYS]) || value.schema_version !== 1 || !Number.isInteger(value.owner_pid) || value.owner_pid < 1 || value.owner_uid !== currentUid || typeof value.process_start_identity !== 'string' || !value.process_start_identity || !isoTime(value.created_at) || !UUID.test(value.owner_nonce) || !Number.isFinite(age) || age < 0) return { state: 'invalid', recoveryRef, ageSeconds: null }
   const ageSeconds = Math.floor(age / 1000)
   const observedIdentity = currentPorts.processIdentity(value.owner_pid)
-  if (observedIdentity === value.process_start_identity) return { state: 'live', recoveryRef, ageSeconds }
+  if (observedIdentity.kind === 'alive' && observedIdentity.identity === value.process_start_identity) return { state: 'live', recoveryRef, ageSeconds }
   if (age < LOCK_STALE_MILLISECONDS) return { state: 'unconfirmed', recoveryRef, ageSeconds }
-  if (observedIdentity === null) return { state: 'identity_unavailable', recoveryRef, ageSeconds }
-  return { state: 'orphaned', recoveryRef, ageSeconds }
+  if (observedIdentity.kind === 'absent') return { state: 'orphaned', recoveryRef, ageSeconds }
+  if (observedIdentity.kind === 'alive') return { state: 'pid_reused', recoveryRef, ageSeconds }
+  return { state: 'identity_unknown', recoveryRef, ageSeconds }
 }
 
 function ownsLock(lockPath, ownership) {
   try {
     const value = JSON.parse(readExactPrivateFile(lockPath, 'registry_lock_ownership_lost').toString('utf8'))
     const currentUid = typeof process.getuid === 'function' ? process.getuid() : null
-    return hasExactKeys(value, LOCK_KEYS, [...LOCK_KEYS]) && value.schema_version === 1 && value.owner_uid === currentUid && value.owner_pid === ownership.owner_pid && value.process_start_identity === ownership.process_start_identity && value.owner_nonce === ownership.owner_nonce && currentPorts.processIdentity(value.owner_pid) === ownership.process_start_identity
+    return hasExactKeys(value, LOCK_KEYS, [...LOCK_KEYS]) && value.schema_version === 1 && value.owner_uid === currentUid && value.owner_pid === ownership.owner_pid && value.process_start_identity === ownership.process_start_identity && value.owner_nonce === ownership.owner_nonce
   } catch { return false }
 }
 
 function withLock(path, operation) {
   const lockPath = `${path}.lock`; const identity = currentPorts.processIdentity(process.pid)
-  if (!identity) fail('registry_lock_identity_unavailable')
+  if (identity.kind !== 'alive') fail('registry_lock_self_identity_unavailable')
   const candidatePath = `${lockPath}.candidate-${process.pid}-${randomUUID()}`
-  const ownership = { owner_pid: process.pid, process_start_identity: identity, owner_nonce: randomUUID() }
+  const ownership = { owner_pid: process.pid, process_start_identity: identity.identity, owner_nonce: randomUUID() }
   const descriptor = openSync(candidatePath, 'wx', 0o600)
   try {
     fchmodSync(descriptor, 0o600)
@@ -391,7 +402,7 @@ export function recoverRegistryLock(path, { recoveryRef, now = new Date() } = {}
   const diagnosis = inspectRegistryLock(path, { now })
   if (diagnosis.state === 'clear') fail('registry_lock_missing')
   if (diagnosis.state === 'live') fail('registry_lock_live')
-  if (diagnosis.state !== 'orphaned') fail(`registry_lock_${diagnosis.state}`)
+  if (!['orphaned', 'pid_reused'].includes(diagnosis.state)) fail(`registry_lock_${diagnosis.state}`)
   if (typeof recoveryRef !== 'string' || recoveryRef !== diagnosis.recoveryRef) fail('registry_lock_changed')
   const lockPath = `${path}.lock`; const quarantine = `${lockPath}.recovery-${randomUUID()}`
   try {

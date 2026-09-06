@@ -566,3 +566,8 @@ body:has(.account-workspace){min-width:0}
 .planner-conversation__actions button{min-height:44px;padding:0 14px;border:1px solid var(--oc-rule-strong);border-radius:var(--oc-radius-md);background:var(--oc-surface-raised);color:var(--oc-text);font-weight:650}
 .planner-conversation__actions button[type=submit]{border-color:var(--oc-accent);background:var(--oc-accent);color:#0b0f0b}
 .planner-conversation__actions button:disabled{cursor:not-allowed;opacity:.5}
+.oc-destination-review dt{font-size:11px}
+.oc-destination-review>div{display:grid;gap:2px;padding-bottom:8px;border-bottom:1px solid var(--oc-rule)}
+.oc-destination-review>div:last-child{padding-bottom:0;border-bottom:0}
+.oc-destination-review dd.oc-destination-review__source{color:var(--oc-muted);font-size:11px}
+.oc-destination-review dd.oc-destination-review__actions{grid-template-columns:1fr;margin-top:4px}

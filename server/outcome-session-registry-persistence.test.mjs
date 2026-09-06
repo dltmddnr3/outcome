@@ -237,10 +237,10 @@ test('doctor protects live locks and explicitly recovers only old identity-bound
   assert.throws(() => recoverRegistryLock(path, { recoveryRef: wrongOwner.lock.recoveryRef, now: new Date('2026-08-27T00:10:00.000Z') }), /registry_lock_invalid/)
 
   writeFileSync(lockPath, `${JSON.stringify(dead)}\n`, { mode: 0o600 })
-  const unavailable = doctorRegistry(path, ['outcome'], { now: new Date('2026-08-27T00:10:00.000Z') })
-  assert.equal(unavailable.ok, false); assert.equal(unavailable.lock.state, 'identity_unavailable'); assert.deepEqual(unavailable.issues, ['registry_lock_identity_unavailable'])
-  assert.throws(() => recoverRegistryLock(path, { recoveryRef: unavailable.lock.recoveryRef, now: new Date('2026-08-27T00:10:00.000Z') }), /registry_lock_identity_unavailable/)
-  assert.equal(existsSync(lockPath), true)
+  const orphaned = doctorRegistry(path, ['outcome'], { now: new Date('2026-08-27T00:10:00.000Z') })
+  assert.equal(orphaned.ok, false); assert.equal(orphaned.lock.state, 'orphaned'); assert.deepEqual(orphaned.issues, ['registry_lock_orphaned'])
+  assert.deepEqual(recoverRegistryLock(path, { recoveryRef: orphaned.lock.recoveryRef, now: new Date('2026-08-27T00:10:00.000Z') }), { ok: true, recovered: true })
+  assert.equal(existsSync(lockPath), false)
   assert.doesNotMatch(readFileSync(new URL('./outcome-session-registry-persistence.mjs', import.meta.url), 'utf8'), /process\.kill\s*\(/)
 })
 
@@ -335,6 +335,7 @@ const seamForbiddenPatterns = [
 // D10_SEAM_TESTS_START
 const hasSeam = () => typeof registryModule.__withPorts === 'function'
 const requireSeam = () => { assert.equal(typeof registryModule.__withPorts, 'function'); return registryModule.__withPorts }
+const requireClassifier = () => { assert.equal(typeof registryModule.__classifyProbeOutcome, 'function'); return registryModule.__classifyProbeOutcome }
 const errorWithCode = (code) => Object.assign(new Error(`hostile-${code}`), { code })
 const currentIdentity = () => execFileSync('ps', ['-p', String(process.pid), '-o', 'uid=', '-o', 'lstart='], { encoding: 'utf8' }).trim().replace(/\s+/g, ' ')
 const assignInput = (overrides = {}) => ({ action: 'assign', projectId: 'outcome', role: 'builder', expectedVersion: 0, locator: 'private', ...meta, ...overrides })
@@ -348,6 +349,108 @@ const registryTempExists = (path) => entriesFor(path).some((name) => name.starts
 const lockCandidateExists = (path) => entriesFor(path).some((name) => name.startsWith(`${basename(path)}.lock.candidate-`))
 const mutateWithPorts = (path, overrides, input = assignInput()) => requireSeam()(overrides, () => mutateRegistry(path, input))
 const sourceText = () => readFileSync(new URL('./outcome-session-registry-persistence.mjs', import.meta.url), 'utf8')
+
+for (const [id, outcome, expected] of [
+  ['R-16', { threw: true, status: 1, signal: null, code: null, killed: false, stdout: '' }, { kind: 'absent' }],
+  ['R-17', { threw: true, status: 1, signal: null, code: null, killed: false, stdout: '   \n' }, { kind: 'absent' }],
+  ['R-18', { threw: true, status: 1, signal: null, code: null, killed: false, stdout: 'x' }, { kind: 'unknown' }],
+  ['R-19', { threw: true, status: null, signal: 'SIGTERM', killed: true }, { kind: 'unknown' }],
+  ['R-20', { threw: true, code: 'ENOENT' }, { kind: 'unknown' }],
+  ['R-21', { threw: true, status: 2, signal: null, code: null, stdout: '' }, { kind: 'unknown' }],
+  ['R-22', { threw: false, stdout: '  ' }, { kind: 'unknown' }],
+  ['R-23', { threw: false, stdout: '501 Sun Sep  6 13:20:59 2026' }, { kind: 'alive', identity: '501 Sun Sep 6 13:20:59 2026' }],
+  ['R-24', { threw: true, status: 1, signal: null, code: null, killed: false, stdout: '', stderr: 'ps: No such process' }, { kind: 'absent' }],
+]) test(`${id} classifies one total process-probe outcome`, () => {
+  assert.deepEqual(requireClassifier()(outcome), expected)
+})
+
+const writeProbeLock = (path, overrides = {}) => {
+  const value = { schema_version: 1, owner_pid: 99_999_999, owner_uid: typeof process.getuid === 'function' ? process.getuid() : null, process_start_identity: 'recorded identity', created_at: '2026-08-27T00:00:00.000Z', owner_nonce: '11111111-1111-4111-8111-111111111111', ...overrides }
+  writeFileSync(`${path}.lock`, `${JSON.stringify(value)}\n`, { mode: 0o600 })
+  return readFileSync(`${path}.lock`)
+}
+const probeDiagnosis = (path, result, now = '2026-08-27T00:10:00.000Z') => requireSeam()({ processIdentity: () => result }, () => doctorRegistry(path, ['outcome'], { now: new Date(now) }))
+
+test('R-01 stale absent owner is orphaned', () => {
+  const path = registryFixture(); writeProbeLock(path)
+  assert.equal(probeDiagnosis(path, { kind: 'absent' }).lock.state, 'orphaned')
+  assert.match(sourceText(), /observedIdentity\.kind === 'absent'/)
+})
+
+test('R-02 orphaned lock is recoverable', () => {
+  const path = registryFixture(); writeProbeLock(path); const diagnosis = probeDiagnosis(path, { kind: 'absent' })
+  assert.deepEqual(requireSeam()({ processIdentity: () => ({ kind: 'absent' }) }, () => recoverRegistryLock(path, { recoveryRef: diagnosis.lock.recoveryRef, now: new Date('2026-08-27T00:10:00.000Z') })), { ok: true, recovered: true })
+  assert.equal(existsSync(`${path}.lock`), false)
+  assert.match(sourceText(), /\['orphaned', 'pid_reused'\]\.includes\(diagnosis\.state\)/)
+})
+
+test('R-03 stale alive mismatched identity is pid_reused', () => {
+  const path = registryFixture(); writeProbeLock(path)
+  assert.equal(probeDiagnosis(path, { kind: 'alive', identity: 'replacement identity' }).lock.state, 'pid_reused')
+})
+
+test('R-04 pid_reused lock is recoverable', () => {
+  const path = registryFixture(); writeProbeLock(path); const result = { kind: 'alive', identity: 'replacement identity' }; const diagnosis = probeDiagnosis(path, result)
+  assert.equal(diagnosis.lock.state, 'pid_reused')
+  assert.deepEqual(requireSeam()({ processIdentity: () => result }, () => recoverRegistryLock(path, { recoveryRef: diagnosis.lock.recoveryRef, now: new Date('2026-08-27T00:10:00.000Z') })), { ok: true, recovered: true })
+})
+
+test('R-05 stale unknown identity stays fail-closed', () => {
+  const path = registryFixture(); writeProbeLock(path)
+  assert.equal(probeDiagnosis(path, { kind: 'unknown' }).lock.state, 'identity_unknown')
+})
+
+test('R-06 identity_unknown recovery preserves exact lock bytes', () => {
+  const path = registryFixture(); const before = writeProbeLock(path); const diagnosis = probeDiagnosis(path, { kind: 'unknown' })
+  assert.throws(() => requireSeam()({ processIdentity: () => ({ kind: 'unknown' }) }, () => recoverRegistryLock(path, { recoveryRef: diagnosis.lock.recoveryRef, now: new Date('2026-08-27T00:10:00.000Z') })), /registry_lock_identity_unknown/)
+  assert.deepEqual(readFileSync(`${path}.lock`), before)
+})
+
+test('R-07 a young unknown lock remains unconfirmed', () => {
+  const path = registryFixture(); writeProbeLock(path, { created_at: '2026-08-27T00:09:45.001Z' })
+  assert.equal(probeDiagnosis(path, { kind: 'unknown' }).lock.state, 'unconfirmed')
+})
+
+test('R-08 unknown self identity creates no lock artifact', () => {
+  const path = registryFixture(); const before = readFileSync(path)
+  assert.throws(() => mutateWithPorts(path, { processIdentity: () => ({ kind: 'unknown' }) }), /registry_lock_self_identity_unavailable/)
+  assert.deepEqual(readFileSync(path), before); assert.equal(entriesFor(path).some((name) => name.includes('.lock')), false)
+})
+
+test('R-09 release does not probe and removes its unchanged lock', () => {
+  const path = registryFixture(); let calls = 0
+  const result = mutateWithPorts(path, { processIdentity: () => { calls += 1; return calls === 1 ? { kind: 'alive', identity: 'owner identity' } : { kind: 'unknown' } } })
+  assert.equal(result.status, 'active'); assert.equal(calls, 1); assert.equal(existsSync(`${path}.lock`), false)
+})
+
+test('R-10 precommit ownership check does not probe', () => {
+  const path = registryFixture(); let calls = 0; let entries = 0
+  const result = mutateWithPorts(path, { processIdentity: () => { calls += 1; return calls === 1 ? { kind: 'alive', identity: 'owner identity' } : { kind: 'unknown' } }, renameEntry: (from, to) => { entries += 1; renameSync(from, to) } })
+  assert.equal(result.status, 'active'); assert.equal(calls, 1); assert.equal(entries, 1)
+})
+
+test('R-13 doctor emits only the three new public-safe lock tokens', () => {
+  for (const [probe, state] of [[{ kind: 'absent' }, 'orphaned'], [{ kind: 'alive', identity: 'replacement identity' }, 'pid_reused'], [{ kind: 'unknown' }, 'identity_unknown']]) {
+    const path = registryFixture(); writeProbeLock(path); const diagnosis = probeDiagnosis(path, probe)
+    assert.equal(diagnosis.lock.state, state); assert.deepEqual(diagnosis.issues, [`registry_lock_${state}`]); assert.equal(JSON.stringify(diagnosis).includes(['identity', 'unavailable'].join('_')), false)
+  }
+})
+
+test('R-14 public lock states expose no owner identity nonce pid or path', () => {
+  for (const probe of [{ kind: 'absent' }, { kind: 'alive', identity: 'replacement identity' }, { kind: 'unknown' }]) {
+    const path = registryFixture(); const bytes = writeProbeLock(path); const lock = probeDiagnosis(path, probe).lock; const output = JSON.stringify(lock)
+    for (const secret of ['recorded identity', '11111111-1111-4111-8111-111111111111', '99999999', path, bytes.toString('utf8')]) assert.equal(output.includes(secret), false)
+  }
+})
+
+test('R-15 one mutation has one injected probe call and one default ps call site', () => {
+  const path = registryFixture(); const calls = []
+  mutateWithPorts(path, { processIdentity: (pid) => { calls.push(pid); return { kind: 'alive', identity: 'owner identity' } } })
+  assert.deepEqual(calls, [process.pid]); assert.equal((sourceText().match(/execFileSync\(/g) ?? []).length, 1)
+  assert.equal((sourceText().match(/export function __classifyProbeOutcome/g) ?? []).length, 1)
+  const productionReferences = readdirSync(new URL('.', import.meta.url), { withFileTypes: true }).filter((entry) => entry.isFile() && entry.name.endsWith('.mjs') && entry.name !== 'outcome-session-registry-persistence.mjs' && !entry.name.endsWith('.test.mjs')).flatMap((entry) => (readFileSync(new URL(entry.name, import.meta.url), 'utf8').match(/__classifyProbeOutcome/g) ?? []))
+  assert.equal(productionReferences.length, 0)
+})
 
 test('file fsync precedes every entry operation', () => {
   if (!hasSeam()) { publicBaseline(); return }
@@ -442,29 +545,28 @@ test('owned lock cleanup failure returns success with residue', () => {
 test('available process identity permits lock acquisition', () => {
   if (!hasSeam()) { publicBaseline(); return }
   const path = registryFixture(); let calls = 0
-  mutateWithPorts(path, { processIdentity: () => { calls += 1; return 'stable identity' }, fsyncFile: (descriptor) => { if (registryTempExists(path)) assert.equal(lockValue(path).process_start_identity, 'stable identity'); fsyncSync(descriptor) } })
-  assert.equal(calls >= 1, true)
+  mutateWithPorts(path, { processIdentity: () => { calls += 1; return { kind: 'alive', identity: 'stable identity' } }, fsyncFile: (descriptor) => { if (registryTempExists(path)) assert.equal(lockValue(path).process_start_identity, 'stable identity'); fsyncSync(descriptor) } })
+  assert.equal(calls, 1)
 })
 
 test('missing current identity creates no lock artifacts', () => {
   if (!hasSeam()) { assert.throws(() => mutateRegistry(registryFixture(), assignInput({ expectedVersion: 2 })), /stale_version/); return }
   const path = registryFixture(); const before = readFileSync(path)
-  assert.throws(() => mutateWithPorts(path, { processIdentity: () => null }), /registry_lock_identity_unavailable/)
+  assert.throws(() => mutateWithPorts(path, { processIdentity: () => ({ kind: 'unknown' }) }), /registry_lock_self_identity_unavailable/)
   assert.deepEqual(readFileSync(path), before); assert.equal(entriesFor(path).some((name) => name.includes('.lock')), false)
 })
 
-for (const boundary of ['pre-entry', 'release']) test('identity replacement is rejected at both ownership boundaries', () => {
-  const path = registryFixture(); let identity = 'owner identity'; let entries = 0; let lockRemoval = 0
+for (const boundary of ['pre-entry', 'release']) test('probe drift is irrelevant at both file-ownership boundaries', () => {
+  const path = registryFixture(); let identity = { kind: 'alive', identity: 'owner identity' }; let entries = 0; let lockRemoval = 0
   const overrides = {
     processIdentity: () => identity,
     renameEntry: (from, to) => { entries += 1; renameSync(from, to) },
     removeEntry: (entry, options) => { if (entry === `${path}.lock`) lockRemoval += 1; delegateRemove(entry, options) },
   }
-  if (boundary === 'pre-entry') overrides.fsyncFile = (descriptor) => { if (registryTempExists(path)) identity = 'replacement identity'; fsyncSync(descriptor) }
-  else overrides.syncDirectory = (dir) => { identity = 'replacement identity'; delegateSyncDirectory(dir) }
-  if (boundary === 'pre-entry') assert.throws(() => mutateWithPorts(path, overrides), /registry_lock_ownership_lost/)
-  else assert.equal(mutateWithPorts(path, overrides).status, 'active')
-  assert.equal(entries, boundary === 'pre-entry' ? 0 : 1); assert.equal(lockRemoval, 0)
+  if (boundary === 'pre-entry') overrides.fsyncFile = (descriptor) => { if (registryTempExists(path)) identity = { kind: 'unknown' }; fsyncSync(descriptor) }
+  else overrides.syncDirectory = (dir) => { identity = { kind: 'unknown' }; delegateSyncDirectory(dir) }
+  assert.equal(mutateWithPorts(path, overrides).status, 'active')
+  assert.equal(entries, 1); assert.equal(lockRemoval, 1)
 })
 
 test('supported POSIX no-follow path remains usable', () => { const path = publicBaseline(); assert.equal(loadRegistry(path).bindings.length, 1) })
@@ -545,7 +647,7 @@ test('unchanged exact owner permits one commit', () => {
   assert.equal(seen, 1); assert.equal(entries, 1)
 })
 
-test('precommit nonce replacement writes zero entries', () => {
+test('R-11 precommit nonce replacement writes zero entries', () => {
   const path = registryFixture(); let entries = 0
   assert.throws(() => mutateWithPorts(path, { fsyncFile: (descriptor) => { if (registryTempExists(path)) { const value = lockValue(path); writeFileSync(`${path}.lock`, `${JSON.stringify({ ...value, owner_nonce: '88888888-8888-4888-8888-888888888888' })}\n`, { mode: 0o600 }) } fsyncSync(descriptor) }, renameEntry: () => { entries += 1 } }), /registry_lock_ownership_lost/)
   assert.equal(entries, 0)
@@ -558,7 +660,7 @@ test('unchanged exact owner removes one lock', () => {
   assert.equal(removals, 1); assert.equal(existsSync(`${path}.lock`), false); assert.equal(mutateRegistry(path, { ...assignInput(), expectedVersion: 1, action: 'observe', status: 'idle', observedAt: meta.occurredAt }).status, 'idle')
 })
 
-test('release nonce replacement preserves foreign lock', () => {
+test('R-12 release nonce replacement preserves foreign lock', () => {
   const path = registryFixture(); let bytes; let removals = 0
   assert.equal(mutateWithPorts(path, { syncDirectory: (dir) => { const value = lockValue(path); bytes = Buffer.from(`${JSON.stringify({ ...value, owner_nonce: '77777777-7777-4777-8777-777777777777' })}\n`); writeFileSync(`${path}.lock`, bytes, { mode: 0o600 }); delegateSyncDirectory(dir) }, removeEntry: (entry, options) => { if (entry === `${path}.lock`) removals += 1; delegateRemove(entry, options) } }).status, 'active')
   assert.equal(removals, 0); assert.deepEqual(readFileSync(`${path}.lock`), bytes)
@@ -680,21 +782,21 @@ const identityUnavailableFixture = (path) => {
   writeFileSync(`${path}.lock`, `${JSON.stringify(value)}\n`, { mode: 0o600 }); return readFileSync(`${path}.lock`)
 }
 
-test('identity-unavailable lock is never classified orphaned', () => {
+test('identity-unknown lock is never classified orphaned', () => {
   const path = registryFixture(); identityUnavailableFixture(path)
-  const diagnosis = requireSeam()({ processIdentity: () => null }, () => doctorRegistry(path, ['outcome'], { now: new Date('2026-08-27T00:10:00.000Z') }).lock)
-  assert.deepEqual(diagnosis, { state: 'identity_unavailable', recoveryRef: diagnosis.recoveryRef, ageSeconds: 600 }); assert.match(diagnosis.recoveryRef, /^[a-f0-9]{64}$/)
+  const diagnosis = requireSeam()({ processIdentity: () => ({ kind: 'unknown' }) }, () => doctorRegistry(path, ['outcome'], { now: new Date('2026-08-27T00:10:00.000Z') }).lock)
+  assert.deepEqual(diagnosis, { state: 'identity_unknown', recoveryRef: diagnosis.recoveryRef, ageSeconds: 600 }); assert.match(diagnosis.recoveryRef, /^[a-f0-9]{64}$/)
 })
 
-test('identity-unavailable lock recovery is denied without mutation', () => {
+test('identity-unknown lock recovery is denied without mutation', () => {
   const path = registryFixture(); const before = identityUnavailableFixture(path)
-  assert.throws(() => requireSeam()({ processIdentity: () => null }, () => recoverRegistryLock(path, { recoveryRef: createHash('sha256').update(before).digest('hex'), now: new Date('2026-08-27T00:10:00.000Z') })), /registry_lock_identity_unavailable/)
+  assert.throws(() => requireSeam()({ processIdentity: () => ({ kind: 'unknown' }) }, () => recoverRegistryLock(path, { recoveryRef: createHash('sha256').update(before).digest('hex'), now: new Date('2026-08-27T00:10:00.000Z') })), /registry_lock_identity_unknown/)
   assert.deepEqual(readFileSync(`${path}.lock`), before); assert.equal(entriesFor(path).some((name) => name.includes('.recovery-')), false)
 })
 
-test('doctor reports identity-unavailable lock without recovery', () => {
+test('doctor reports identity-unknown lock without recovery', () => {
   const path = registryFixture(); const before = identityUnavailableFixture(path)
-  const result = requireSeam()({ processIdentity: () => null }, () => doctorRegistry(path, ['outcome'], { now: new Date('2026-08-27T00:10:00.000Z') }))
-  assert.equal(result.ok, false); assert.deepEqual(result.issues, ['registry_lock_identity_unavailable']); assert.equal(result.lock.state, 'identity_unavailable'); assert.match(result.lock.recoveryRef, /^[a-f0-9]{64}$/); assert.equal(result.lock.ageSeconds, 600); assert.deepEqual(readFileSync(`${path}.lock`), before)
+  const result = requireSeam()({ processIdentity: () => ({ kind: 'unknown' }) }, () => doctorRegistry(path, ['outcome'], { now: new Date('2026-08-27T00:10:00.000Z') }))
+  assert.equal(result.ok, false); assert.deepEqual(result.issues, ['registry_lock_identity_unknown']); assert.equal(result.lock.state, 'identity_unknown'); assert.match(result.lock.recoveryRef, /^[a-f0-9]{64}$/); assert.equal(result.lock.ageSeconds, 600); assert.deepEqual(readFileSync(`${path}.lock`), before)
 })
 // D10_SEAM_TESTS_END
