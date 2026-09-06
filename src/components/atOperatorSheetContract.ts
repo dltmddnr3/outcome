@@ -30,12 +30,6 @@ export type AtOperatorSheetRowStateRecord = {
   qaFlag: typeof AT_OPERATOR_SHEET_INITIAL_QA_FLAG
 }
 
-const exactKeys = (value: object, expected: readonly string[]) => {
-  const actual = Object.keys(value).sort()
-  const wanted = [...expected].sort()
-  return actual.length === wanted.length && actual.every((key, index) => key === wanted[index])
-}
-
 const isRecord = (value: unknown): value is Record<string, unknown> => {
   if (value === null || typeof value !== 'object' || Array.isArray(value)) return false
   const prototype = Object.getPrototypeOf(value)
@@ -49,8 +43,25 @@ export function serializeAtOperatorSheetRowStates(value: unknown): string {
   if (!Array.isArray(value)) throw new Error('row_state_snapshot_not_array')
   if (value.length !== AT_OPERATOR_SHEET_ROW_IDS.length) throw new Error(`row_state_count_invalid:${value.length}`)
 
+  const requiredKeys = ['row', 'rowState', 'qaFlag']
+  for (const [index, candidate] of value.entries()) {
+    if (!isRecord(candidate)) throw new Error(`row_state_record_invalid:${index}`)
+    const actualKeys = Object.keys(candidate)
+    const missing = requiredKeys.filter((key) => !actualKeys.includes(key)).sort()
+    if (missing.length) throw new Error(`row_state_missing_keys:${index}:${missing.join(',')}`)
+    const extra = actualKeys.filter((key) => !requiredKeys.includes(key)).sort()
+    if (extra.length) throw new Error(`row_state_extra_keys:${index}:${extra.join(',')}`)
+  }
+
+  const seen = new Set<AtOperatorSheetRowId>()
+  for (const [index, candidate] of value.entries()) {
+    const row = candidate.row
+    if (!AT_OPERATOR_SHEET_ROW_IDS.includes(row as AtOperatorSheetRowId)) throw new Error(`row_state_unknown_id:${index}:${String(row)}`)
+    if (seen.has(row as AtOperatorSheetRowId)) throw new Error(`row_state_duplicate_id:${String(row)}`)
+    seen.add(row as AtOperatorSheetRowId)
+  }
+
   const canonical = value.map((candidate, index): AtOperatorSheetRowStateRecord => {
-    if (!isRecord(candidate) || !exactKeys(candidate, ['row', 'rowState', 'qaFlag'])) throw new Error(`row_state_shape_invalid:${index}`)
     const expectedRow = AT_OPERATOR_SHEET_ROW_IDS[index]
     if (candidate.row !== expectedRow) throw new Error(`row_state_order_invalid:${index}:${String(candidate.row)}:${expectedRow}`)
     if (!AT_OPERATOR_SHEET_ROW_STATES.includes(candidate.rowState as AtOperatorSheetRowState)) throw new Error(`row_state_value_invalid:${expectedRow}:${String(candidate.rowState)}`)
@@ -129,4 +140,17 @@ export const AT_OPERATOR_SHEET_ACCENT_FORBIDDEN_PROPERTIES = Object.freeze([
 export const AT_OPERATOR_SHEET_BADGE_ACCENT_FORBIDDEN_PROPERTIES = Object.freeze([
   'color',
   'background-color',
+] as const)
+
+export const AT_OPERATOR_SHEET_PAINT_ELEMENT_ROLES = Object.freeze([
+  'sheet',
+  'table',
+  'card',
+  'input-cell',
+  'badge',
+  'preview',
+  'current-row',
+  'current-card',
+  'focused-control',
+  'selected-input',
 ] as const)

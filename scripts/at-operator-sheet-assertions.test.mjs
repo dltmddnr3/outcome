@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict'
 import test from 'node:test'
-import { createInitialAtOperatorSheetRowStates } from '../src/components/atOperatorSheetContract.ts'
+import { AT_OPERATOR_SHEET_SCOPE, createInitialAtOperatorSheetRowStates } from '../src/components/atOperatorSheetContract.ts'
 import {
   assertAtOperatorSheetMobilePlatformEvidence,
   assertAtOperatorSheetPaint,
@@ -17,6 +17,7 @@ const mobileEvidence = (overrides = {}) => ({
   ],
   ...overrides,
 })
+const paintEvidence = (observations, overrides = {}) => ({ scopeSelector: AT_OPERATOR_SHEET_SCOPE, matchedScopeCount: 1, observations, ...overrides })
 
 test('canonical row-state bytes and SHA remain equal for an unchanged snapshot', () => {
   const rows = createInitialAtOperatorSheetRowStates()
@@ -29,7 +30,7 @@ test('hostile row-state mutation fails with the exact differing row', () => {
   const before = createInitialAtOperatorSheetRowStates()
   const after = structuredClone(before)
   after[6].rowState = 'IN_PROGRESS'
-  assert.throws(() => assertAtOperatorSheetRowStateInvariant(before, after), /row_state_changed:SC-07a/)
+  assert.throws(() => assertAtOperatorSheetRowStateInvariant(before, after), { message: 'row_state_changed:SC-07a' })
 })
 
 test('both exact mobile platforms and disambiguated paths satisfy completion', () => {
@@ -64,7 +65,7 @@ test('malformed build and run path segments fail closed before path comparison',
 })
 
 test('exact neutral paints and the three allowed accent positions pass', () => {
-  const result = assertAtOperatorSheetPaint([
+  const result = assertAtOperatorSheetPaint(paintEvidence([
     { elementRole: 'sheet', property: 'background-color', value: 'rgb(9, 11, 9)' },
     { elementRole: 'badge', property: 'color', value: '#a6aea4' },
     { elementRole: 'current-row', property: 'border-left-color', value: '#adff2f' },
@@ -72,22 +73,42 @@ test('exact neutral paints and the three allowed accent positions pass', () => {
     { elementRole: 'focused-control', property: 'outline-color', value: '#adff2f' },
     { elementRole: 'selected-input', property: 'border-color', value: '#adff2f' },
     { elementRole: 'preview', property: 'box-shadow', value: 'none' },
-  ])
+  ]))
   assert.deepEqual(result, { valid: true, observations: 7 })
+})
+
+test('paint carrier requires the exact non-empty Operator Sheet scope', () => {
+  const observations = [{ elementRole: 'sheet', property: 'background-color', value: '#090b09' }]
+  assert.equal(assertAtOperatorSheetPaint(paintEvidence(observations)).valid, true)
+  assert.throws(() => assertAtOperatorSheetPaint({ matchedScopeCount: 1, observations }), { message: 'paint_carrier_missing_keys:scopeSelector' })
+  assert.throws(() => assertAtOperatorSheetPaint(paintEvidence(observations, { scopeSelector: '.outside' })), { message: 'paint_scope_mismatch:.outside:[data-at-operator-sheet]' })
+  assert.throws(() => assertAtOperatorSheetPaint(paintEvidence(observations, { matchedScopeCount: 0 })), { message: 'paint_scope_census_invalid:0' })
+  assert.throws(() => assertAtOperatorSheetPaint(paintEvidence(observations, { matchedScopeCount: 1.5 })), { message: 'paint_scope_census_invalid:1.5' })
+})
+
+test('paint carrier and observations reject extra, missing, malformed, and external provenance exactly', () => {
+  const valid = { elementRole: 'sheet', property: 'background-color', value: '#090b09' }
+  assert.throws(() => assertAtOperatorSheetPaint(null), { message: 'paint_carrier_record_invalid' })
+  assert.throws(() => assertAtOperatorSheetPaint({ ...paintEvidence([valid]), outside: true }), { message: 'paint_carrier_extra_keys:outside' })
+  assert.throws(() => assertAtOperatorSheetPaint(paintEvidence('not-an-array')), { message: 'paint_observations_empty' })
+  assert.throws(() => assertAtOperatorSheetPaint(paintEvidence([{ elementRole: 'sheet', property: 'background-color' }])), { message: 'paint_observation_missing_keys:0:value' })
+  assert.throws(() => assertAtOperatorSheetPaint(paintEvidence([{ ...valid, outside: true }])), { message: 'paint_observation_extra_keys:0:outside' })
+  assert.throws(() => assertAtOperatorSheetPaint(paintEvidence([null])), { message: 'paint_observation_record_invalid:0' })
+  assert.throws(() => assertAtOperatorSheetPaint(paintEvidence([{ ...valid, elementRole: 'totally-unlisted-external-app-node' }])), { message: 'paint_element_role_unknown:0:totally-unlisted-external-app-node' })
 })
 
 test('accent in a forbidden background, fill, shadow, or badge position fails closed', () => {
   for (const observation of [
     { elementRole: 'sheet', property: 'background-color', value: '#adff2f' },
-    { elementRole: 'icon', property: 'fill', value: '#adff2f' },
+    { elementRole: 'preview', property: 'fill', value: '#adff2f' },
     { elementRole: 'preview', property: 'box-shadow', value: '0 0 2px #adff2f' },
     { elementRole: 'badge', property: 'color', value: '#adff2f' },
-  ]) assert.throws(() => assertAtOperatorSheetPaint([observation]), /(?:accent_placement_forbidden|paint_value_not_allowed)/)
+  ]) assert.throws(() => assertAtOperatorSheetPaint(paintEvidence([observation])), /(?:accent_placement_forbidden|paint_value_not_allowed)/)
 })
 
 test('near-accent, translucent or transparent paint, and unknown values fail closed', () => {
-  assert.throws(() => assertAtOperatorSheetPaint([{ elementRole: 'current-row', property: 'border-left-color', value: '#aeff2f' }]), /paint_value_not_allowed/)
-  assert.throws(() => assertAtOperatorSheetPaint([{ elementRole: 'current-row', property: 'border-left-color', value: 'rgba(173, 255, 47, 0.5)' }]), /paint_alpha_not_allowed/)
-  assert.throws(() => assertAtOperatorSheetPaint([{ elementRole: 'sheet', property: 'background-color', value: 'transparent' }]), /paint_alpha_not_allowed/)
-  assert.throws(() => assertAtOperatorSheetPaint([{ elementRole: 'sheet', property: 'background-color', value: 'color(display-p3 0 0 0)' }]), /paint_value_invalid/)
+  assert.throws(() => assertAtOperatorSheetPaint(paintEvidence([{ elementRole: 'current-row', property: 'border-left-color', value: '#aeff2f' }])), /paint_value_not_allowed/)
+  assert.throws(() => assertAtOperatorSheetPaint(paintEvidence([{ elementRole: 'current-row', property: 'border-left-color', value: 'rgba(173, 255, 47, 0.5)' }])), /paint_alpha_not_allowed/)
+  assert.throws(() => assertAtOperatorSheetPaint(paintEvidence([{ elementRole: 'sheet', property: 'background-color', value: 'transparent' }])), /paint_alpha_not_allowed/)
+  assert.throws(() => assertAtOperatorSheetPaint(paintEvidence([{ elementRole: 'sheet', property: 'background-color', value: 'color(display-p3 0 0 0)' }])), /paint_value_invalid/)
 })

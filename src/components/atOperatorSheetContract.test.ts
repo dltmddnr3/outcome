@@ -1,6 +1,8 @@
 import { describe, expect, it } from 'vitest'
 // @ts-expect-error This test reads the pinned source stylesheet; the browser bundle never imports Node built-ins.
 import { readFileSync } from 'node:fs'
+// @ts-expect-error This test independently pins the canonical digest; the browser bundle never imports Node built-ins.
+import { createHash } from 'node:crypto'
 import {
   AT_OPERATOR_SHEET_ACCENT_ALLOWED_POSITIONS,
   AT_OPERATOR_SHEET_ACCENT_FORBIDDEN_PROPERTIES,
@@ -9,6 +11,7 @@ import {
   AT_OPERATOR_SHEET_INITIAL_QA_FLAG,
   AT_OPERATOR_SHEET_MOBILE_REQUIRED_PLATFORM_IDS,
   AT_OPERATOR_SHEET_PALETTE,
+  AT_OPERATOR_SHEET_PAINT_ELEMENT_ROLES,
   AT_OPERATOR_SHEET_PLATFORM_RECORDS,
   AT_OPERATOR_SHEET_ROW_IDS,
   AT_OPERATOR_SHEET_ROW_STATES,
@@ -21,6 +24,10 @@ import {
 } from './atOperatorSheetContract'
 
 describe('AT Operator Sheet contract core', () => {
+  const goldenBytes = 643
+  const goldenSha256 = '5853e8d5fdb65e0c742e5c7a3f59219ca5e08e0d83c8fe81fc9d8e9f9393270f'
+  const digest = (value: string) => createHash('sha256').update(value, 'utf8').digest('hex')
+
   it('pins the exact R83 row order, state inventory, and initial QA-blocked state', () => {
     expect(AT_OPERATOR_SHEET_ROW_IDS).toEqual(['SC-01', 'SC-02', 'SC-03', 'SC-04', 'SC-05', 'SC-06', 'SC-07a', 'SC-07b', 'SC-08'])
     expect(AT_OPERATOR_SHEET_ROW_STATES).toEqual(['PENDING', 'IN_PROGRESS', 'RECORDED', 'NOT_RUN', 'NOT_APPLICABLE', 'SEALED'])
@@ -34,14 +41,38 @@ describe('AT Operator Sheet contract core', () => {
     expect([...encodeAtOperatorSheetRowStates(rows)]).toEqual([...new TextEncoder().encode(expected)])
   })
 
-  it('fails closed for missing, reordered, duplicate, unknown-state, QA-flag, and extra-field mutations', () => {
+  it('pins canonical bytes independently to the exact length, digest, and final LF', () => {
+    const serialized = serializeAtOperatorSheetRowStates(createInitialAtOperatorSheetRowStates())
+    expect(new TextEncoder().encode(serialized)).toHaveLength(goldenBytes)
+    expect(digest(serialized)).toBe(goldenSha256)
+    expect(serialized.charCodeAt(serialized.length - 1)).toBe(10)
+    expect(serialized.charCodeAt(serialized.length - 2)).not.toBe(10)
+  })
+
+  it('turns the independent golden comparison RED for a one-byte mutation', () => {
+    const serialized = serializeAtOperatorSheetRowStates(createInitialAtOperatorSheetRowStates())
+    const mutated = serialized.replace('SC-01', 'SC_01')
+    expect(new TextEncoder().encode(mutated)).toHaveLength(goldenBytes)
+    expect(digest(mutated)).not.toBe(goldenSha256)
+  })
+
+  it('fails closed with exact duplicate, unknown, missing, extra, and reorder reasons', () => {
     const rows = createInitialAtOperatorSheetRowStates()
-    expect(() => serializeAtOperatorSheetRowStates(rows.slice(0, -1))).toThrow('row_state_count_invalid:8')
-    expect(() => serializeAtOperatorSheetRowStates([rows[1], rows[0], ...rows.slice(2)])).toThrow('row_state_order_invalid:0:SC-02:SC-01')
-    expect(() => serializeAtOperatorSheetRowStates([rows[0], rows[0], ...rows.slice(2)])).toThrow('row_state_order_invalid:1:SC-01:SC-02')
-    expect(() => serializeAtOperatorSheetRowStates(rows.map((row, index) => index === 3 ? { ...row, rowState: 'DONE' } : row))).toThrow('row_state_value_invalid:SC-04:DONE')
-    expect(() => serializeAtOperatorSheetRowStates(rows.map((row, index) => index === 5 ? { ...row, qaFlag: 'PASS' } : row))).toThrow('row_state_qa_flag_invalid:SC-06:PASS')
-    expect(() => serializeAtOperatorSheetRowStates(rows.map((row, index) => index === 7 ? { ...row, extra: true } : row))).toThrow('row_state_shape_invalid:7')
+    const exactError = (candidate: unknown) => { try { serializeAtOperatorSheetRowStates(candidate) } catch (error) { return (error as Error).message } }
+    expect(exactError([rows[0], rows[0], ...rows.slice(2)])).toBe('row_state_duplicate_id:SC-01')
+    expect(exactError(rows.map((row, index) => index === 4 ? { ...row, row: 'SC-99' } : row))).toBe('row_state_unknown_id:4:SC-99')
+    expect(exactError(rows.map((row, index) => index === 2 ? { row: row.row, rowState: row.rowState } : row))).toBe('row_state_missing_keys:2:qaFlag')
+    expect(exactError(rows.map((row, index) => index === 2 ? { row: row.row } : row))).toBe('row_state_missing_keys:2:qaFlag,rowState')
+    expect(exactError(rows.map((row, index) => index === 7 ? { ...row, zeta: true, alpha: true } : row))).toBe('row_state_extra_keys:7:alpha,zeta')
+    expect(exactError([rows[1], rows[0], ...rows.slice(2)])).toBe('row_state_order_invalid:0:SC-02:SC-01')
+  })
+
+  it('retains exact arity, wrong-state, and QA-flag reasons', () => {
+    const rows = createInitialAtOperatorSheetRowStates()
+    const exactError = (candidate: unknown) => { try { serializeAtOperatorSheetRowStates(candidate) } catch (error) { return (error as Error).message } }
+    expect(exactError(rows.slice(0, -1))).toBe('row_state_count_invalid:8')
+    expect(exactError(rows.map((row, index) => index === 3 ? { ...row, rowState: 'DONE' } : row))).toBe('row_state_value_invalid:SC-04:DONE')
+    expect(exactError(rows.map((row, index) => index === 5 ? { ...row, qaFlag: 'PASS' } : row))).toBe('row_state_qa_flag_invalid:SC-06:PASS')
   })
 
   it('pins all platforms while requiring both mobile AT platforms and desktop-only macOS VoiceOver', () => {
@@ -65,6 +96,7 @@ describe('AT Operator Sheet contract core', () => {
     expect(AT_OPERATOR_SHEET_ACCENT_ALLOWED_POSITIONS).toEqual(['current-row:border-left-color', 'current-card:border-left-color', 'focused-control:outline-color', 'selected-input:border-color'])
     expect(AT_OPERATOR_SHEET_ACCENT_FORBIDDEN_PROPERTIES).toEqual(['background-color', 'background-image', 'box-shadow', 'fill'])
     expect(AT_OPERATOR_SHEET_BADGE_ACCENT_FORBIDDEN_PROPERTIES).toEqual(['color', 'background-color'])
+    expect(AT_OPERATOR_SHEET_PAINT_ELEMENT_ROLES).toEqual(['sheet', 'table', 'card', 'input-cell', 'badge', 'preview', 'current-row', 'current-card', 'focused-control', 'selected-input'])
     expect(AT_OPERATOR_SHEET_INITIAL_QA_FLAG).toBe('PROVISIONAL_QA_BLOCKED')
   })
 

@@ -3,7 +3,9 @@ import {
   AT_OPERATOR_SHEET_ACCENT_ALLOWED_POSITIONS,
   AT_OPERATOR_SHEET_MOBILE_REQUIRED_PLATFORM_IDS,
   AT_OPERATOR_SHEET_PALETTE,
+  AT_OPERATOR_SHEET_PAINT_ELEMENT_ROLES,
   AT_OPERATOR_SHEET_PLATFORM_RECORDS,
+  AT_OPERATOR_SHEET_SCOPE,
   atOperatorSheetMobileEvidencePrefix,
   serializeAtOperatorSheetRowStates,
 } from '../src/components/atOperatorSheetContract.ts'
@@ -58,6 +60,7 @@ export function assertAtOperatorSheetMobilePlatformEvidence(value) {
 const allowedProperties = new Set(['background-color', 'background-image', 'box-shadow', 'fill', 'color', 'border-left-color', 'border-color', 'outline-color'])
 const paintlessProperties = new Set(['background-image', 'box-shadow'])
 const accentAllowedPositions = new Set(AT_OPERATOR_SHEET_ACCENT_ALLOWED_POSITIONS)
+const paintElementRoles = new Set(AT_OPERATOR_SHEET_PAINT_ELEMENT_ROLES)
 const paletteColors = new Set(Object.values(AT_OPERATOR_SHEET_PALETTE).map((value) => value.toLowerCase()))
 const accent = AT_OPERATOR_SHEET_PALETTE['--oc-accent']
 
@@ -76,11 +79,25 @@ const parseColor = (input) => {
   return { hex: toHex(...channels), alpha }
 }
 
-export function assertAtOperatorSheetPaint(observations) {
+const assertPaintKeys = (value, expected, prefix, index) => {
+  const location = index === undefined ? '' : `:${index}`
+  if (!isRecord(value)) throw new Error(`${prefix}_record_invalid${location}`)
+  const actual = Object.keys(value)
+  const missing = expected.filter((key) => !actual.includes(key)).sort()
+  if (missing.length) throw new Error(`${prefix}_missing_keys${location}:${missing.join(',')}`)
+  const extra = actual.filter((key) => !expected.includes(key)).sort()
+  if (extra.length) throw new Error(`${prefix}_extra_keys${location}:${extra.join(',')}`)
+}
+
+export function assertAtOperatorSheetPaint(value) {
+  assertPaintKeys(value, ['scopeSelector', 'matchedScopeCount', 'observations'], 'paint_carrier')
+  if (value.scopeSelector !== AT_OPERATOR_SHEET_SCOPE) throw new Error(`paint_scope_mismatch:${String(value.scopeSelector)}:${AT_OPERATOR_SHEET_SCOPE}`)
+  if (!Number.isInteger(value.matchedScopeCount) || value.matchedScopeCount < 1) throw new Error(`paint_scope_census_invalid:${String(value.matchedScopeCount)}`)
+  const observations = value.observations
   if (!Array.isArray(observations) || observations.length === 0) throw new Error('paint_observations_empty')
   for (const [index, observation] of observations.entries()) {
-    assertExactKeys(observation, ['elementRole', 'property', 'value'], `paint_observation_shape_invalid:${index}`)
-    if (typeof observation.elementRole !== 'string' || observation.elementRole.length === 0) throw new Error(`paint_element_role_invalid:${index}`)
+    assertPaintKeys(observation, ['elementRole', 'property', 'value'], 'paint_observation', index)
+    if (!paintElementRoles.has(observation.elementRole)) throw new Error(`paint_element_role_unknown:${index}:${String(observation.elementRole)}`)
     if (!allowedProperties.has(observation.property)) throw new Error(`paint_property_invalid:${String(observation.property)}`)
     if (paintlessProperties.has(observation.property)) {
       if (observation.value !== 'none') throw new Error(`paint_value_not_allowed:${observation.elementRole}:${observation.property}:${observation.value}`)
