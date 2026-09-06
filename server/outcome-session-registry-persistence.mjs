@@ -35,19 +35,68 @@ const safePublicReason = (value) => typeof value === 'string' && SAFE_REASON.tes
 const sanitizedPublicText = (value) => value == null ? null : safePublicText(value) ? value : null
 const safePublicTime = (value) => isoTime(value) ? value : null
 const PRIVATE_ALIAS_SEGMENTS = new Set(['codex', 'openai', 'chatgpt', 'provider', 'anthropic', 'claude', 'google', 'gemini', 'session', 'sess', 'thread', 'task', 'turn', 'conversation', 'chat', 'run', 'message', 'msg', 'assistant', 'asst'])
+const defaultProcessIdentity = (pid) => {
+  try {
+    const value = execFileSync('ps', ['-p', String(pid), '-o', 'uid=', '-o', 'lstart='], { encoding: 'utf8', stdio: ['ignore', 'pipe', 'ignore'], timeout: 1000 }).trim()
+    return value ? value.replace(/\s+/g, ' ') : null
+  } catch { return null }
+}
+const DEFAULT_PORTS = Object.freeze({
+  fsyncFile: (descriptor) => fsyncSync(descriptor),
+  syncDirectory: (directoryPath) => {
+    const descriptor = openSync(directoryPath, 'r')
+    try { fsyncSync(descriptor) } finally { closeSync(descriptor) }
+  },
+  linkEntry: (existingPath, newPath) => linkSync(existingPath, newPath),
+  renameEntry: (oldPath, newPath) => renameSync(oldPath, newPath),
+  removeEntry: (entryPath, options) => options === undefined ? rmSync(entryPath) : rmSync(entryPath, options),
+  processIdentity: defaultProcessIdentity,
+})
+const environment = Object.freeze({ platform: process.platform, hasNoFollow: Number.isInteger(constants.O_NOFOLLOW) })
+const PORT_KEYS = new Set(Object.keys(DEFAULT_PORTS))
+let currentPorts = DEFAULT_PORTS
+let portGeneration = 0
+
+const deferredResourceCounts = () => {
+  const counts = { Timeout: 0, Immediate: 0 }
+  for (const type of process.getActiveResourcesInfo()) if (Object.hasOwn(counts, type)) counts[type] += 1
+  return counts
+}
+
+export function __withPorts(overrides, run) {
+  if (!overrides || typeof overrides !== 'object' || Array.isArray(overrides) || Object.keys(overrides).some((key) => !PORT_KEYS.has(key) || typeof overrides[key] !== 'function')) fail('test_ports_invalid_override')
+  if (typeof run !== 'function') fail('test_ports_invalid_override')
+  if (run.constructor?.name === 'AsyncFunction') fail('test_ports_async_unsupported')
+  const prior = currentPorts; const generation = ++portGeneration; let active = true
+  const wrapped = Object.fromEntries(Object.entries(overrides).map(([key, value]) => [key, (...args) => {
+    if (!active || generation !== portGeneration && currentPorts[key] !== wrapped[key]) fail('test_ports_escaped_scope')
+    return value(...args)
+  }]))
+  currentPorts = Object.freeze({ ...prior, ...wrapped })
+  const before = deferredResourceCounts(); let result; let caught; let threw = false
+  try {
+    result = run(currentPorts)
+    if ((typeof result === 'object' && result !== null || typeof result === 'function') && typeof result.then === 'function') fail('test_ports_async_unsupported')
+  } catch (error) { caught = error; threw = true } finally { currentPorts = prior; active = false }
+  if (threw) throw caught
+  const after = deferredResourceCounts()
+  if (after.Timeout > before.Timeout || after.Immediate > before.Immediate) fail('test_ports_deferred_work_detected')
+  return result
+}
+
 export const isPublicSessionAlias = (value) => {
   if (typeof value !== 'string' || value.length > 64) return false
   const segments = value.split('-')
   return segments.length >= 2 && segments.length <= 5 && segments.every((segment) => /^[a-z][a-z0-9]{0,23}$/.test(segment) && !PRIVATE_ALIAS_SEGMENTS.has(segment))
 }
-const exactPrivateMode = (metadata) => process.platform !== 'win32' && (metadata.mode & 0o777) === 0o600
+const exactPrivateMode = (metadata) => environment.platform !== 'win32' && (metadata.mode & 0o777) === 0o600
 const sameFile = (left, right) => left.dev === right.dev && left.ino === right.ino
 
 function readExactPrivateFile(path, errorCode = 'registry_unavailable') {
   let metadata; let descriptor
   try {
     metadata = lstatSync(path)
-    if (!metadata.isFile() || metadata.isSymbolicLink() || !exactPrivateMode(metadata) || !Number.isInteger(constants.O_NOFOLLOW)) fail(errorCode)
+    if (!metadata.isFile() || metadata.isSymbolicLink() || !exactPrivateMode(metadata) || !environment.hasNoFollow) fail(errorCode)
     descriptor = openSync(path, constants.O_RDONLY | constants.O_NOFOLLOW)
     if (!sameFile(metadata, fstatSync(descriptor))) fail(errorCode)
     return readFileSync(descriptor)
@@ -138,39 +187,40 @@ function validateRegistry(value) {
   return value
 }
 
-function atomicWrite(path, value) {
-  if (process.platform === 'win32' || !Number.isInteger(constants.O_NOFOLLOW)) fail('registry_unavailable')
+const bestEffortRemove = (path, options) => { try { currentPorts.removeEntry(path, options) } catch { /* deterministic residue */ } }
+
+function atomicWrite(path, value, assertOwnership) {
+  if (environment.platform === 'win32' || !environment.hasNoFollow) fail('registry_unavailable')
   mkdirSync(dirname(path), { recursive: true, mode: 0o700 })
   const temp = `${path}.tmp-${process.pid}-${randomUUID()}`
   const descriptor = openSync(temp, 'wx', 0o600)
   try {
     fchmodSync(descriptor, 0o600)
     writeFileSync(descriptor, `${JSON.stringify(value, null, 2)}\n`, 'utf8')
-    fsyncSync(descriptor)
+    try { currentPorts.fsyncFile(descriptor) } catch { bestEffortRemove(temp, { force: true }); fail('registry_durability_precommit_failed') }
   } finally { closeSync(descriptor) }
-  renameSync(temp, path)
-  const directory = openSync(dirname(path), 'r')
-  try { fsyncSync(directory) } finally { closeSync(directory) }
+  try { assertOwnership() } catch (error) { bestEffortRemove(temp, { force: true }); throw error }
+  try { currentPorts.renameEntry(temp, path) } catch { bestEffortRemove(temp, { force: true }); fail('registry_commit_indeterminate') }
+  try { currentPorts.syncDirectory(dirname(path)) } catch { fail('registry_commit_indeterminate') }
 }
 
 function atomicPublishNewRegistry(path, value) {
-  if (process.platform === 'win32' || !Number.isInteger(constants.O_NOFOLLOW)) fail('registry_unavailable')
+  if (environment.platform === 'win32' || !environment.hasNoFollow) fail('registry_unavailable')
   mkdirSync(dirname(path), { recursive: true, mode: 0o700 })
   const temp = `${path}.tmp-${process.pid}-${randomUUID()}`
   const descriptor = openSync(temp, 'wx', 0o600)
   try {
-    fchmodSync(descriptor, 0o600); writeFileSync(descriptor, `${JSON.stringify(value, null, 2)}\n`, 'utf8'); fsyncSync(descriptor)
+    fchmodSync(descriptor, 0o600); writeFileSync(descriptor, `${JSON.stringify(value, null, 2)}\n`, 'utf8')
+    try { currentPorts.fsyncFile(descriptor) } catch { bestEffortRemove(temp, { force: true }); fail('registry_durability_precommit_failed') }
   } finally { closeSync(descriptor) }
-  try { linkSync(temp, path) } catch (error) { rmSync(temp, { force: true }); if (error && typeof error === 'object' && error.code === 'EEXIST') fail('registry_exists'); fail('registry_unavailable') }
-  rmSync(temp, { force: true })
-  const directory = openSync(dirname(path), 'r'); try { fsyncSync(directory) } finally { closeSync(directory) }
-}
-
-const processIdentity = (pid) => {
-  try {
-    const value = execFileSync('ps', ['-p', String(pid), '-o', 'uid=', '-o', 'lstart='], { encoding: 'utf8', stdio: ['ignore', 'pipe', 'ignore'], timeout: 1000 }).trim()
-    return value ? value.replace(/\s+/g, ' ') : null
-  } catch { return null }
+  try { currentPorts.linkEntry(temp, path) } catch (error) {
+    bestEffortRemove(temp, { force: true })
+    if (error && typeof error === 'object' && error.code === 'EEXIST') fail('registry_exists')
+    if (error && typeof error === 'object' && ['EACCES', 'EPERM', 'EXDEV', 'EMLINK', 'EROFS'].includes(error.code)) fail('registry_publication_precommit_failed')
+    fail('registry_commit_indeterminate')
+  }
+  try { currentPorts.syncDirectory(dirname(path)) } catch { bestEffortRemove(temp, { force: true }); fail('registry_commit_indeterminate') }
+  try { currentPorts.removeEntry(temp, { force: true }) } catch { /* committed; residue is evidence */ }
 }
 const lockRef = (bytes) => createHash('sha256').update(bytes).digest('hex')
 const lockNow = (value = new Date()) => value instanceof Date ? value : new Date(value)
@@ -181,7 +231,7 @@ function inspectRegistryLock(path, options = {}) {
   let metadata
   try { metadata = lstatSync(lockPath) } catch (error) { return error && typeof error === 'object' && error.code === 'ENOENT' ? { state: 'clear', recoveryRef: null, ageSeconds: null } : { state: 'invalid', recoveryRef: null, ageSeconds: null } }
   const currentUid = typeof process.getuid === 'function' ? process.getuid() : null
-  if (!metadata.isFile() || metadata.isSymbolicLink() || !exactPrivateMode(metadata) || currentUid !== null && metadata.uid !== currentUid || !Number.isInteger(constants.O_NOFOLLOW)) return { state: 'invalid', recoveryRef: null, ageSeconds: null }
+  if (!metadata.isFile() || metadata.isSymbolicLink() || !exactPrivateMode(metadata) || currentUid !== null && metadata.uid !== currentUid || !environment.hasNoFollow) return { state: 'invalid', recoveryRef: null, ageSeconds: null }
   let descriptor; let bytes; let value
   try {
     descriptor = openSync(lockPath, constants.O_RDONLY | constants.O_NOFOLLOW)
@@ -192,23 +242,36 @@ function inspectRegistryLock(path, options = {}) {
   const recoveryRef = lockRef(bytes); const age = lockNow(options.now).getTime() - Date.parse(value?.created_at)
   if (!value || typeof value !== 'object' || Array.isArray(value) || !hasExactKeys(value, LOCK_KEYS, [...LOCK_KEYS]) || value.schema_version !== 1 || !Number.isInteger(value.owner_pid) || value.owner_pid < 1 || value.owner_uid !== currentUid || typeof value.process_start_identity !== 'string' || !value.process_start_identity || !isoTime(value.created_at) || !UUID.test(value.owner_nonce) || !Number.isFinite(age) || age < 0) return { state: 'invalid', recoveryRef, ageSeconds: null }
   const ageSeconds = Math.floor(age / 1000)
-  if (processIdentity(value.owner_pid) === value.process_start_identity) return { state: 'live', recoveryRef, ageSeconds }
+  const observedIdentity = currentPorts.processIdentity(value.owner_pid)
+  if (observedIdentity === value.process_start_identity) return { state: 'live', recoveryRef, ageSeconds }
   if (age < LOCK_STALE_MILLISECONDS) return { state: 'unconfirmed', recoveryRef, ageSeconds }
+  if (observedIdentity === null) return { state: 'identity_unavailable', recoveryRef, ageSeconds }
   return { state: 'orphaned', recoveryRef, ageSeconds }
 }
 
+function ownsLock(lockPath, ownership) {
+  try {
+    const value = JSON.parse(readExactPrivateFile(lockPath, 'registry_lock_ownership_lost').toString('utf8'))
+    const currentUid = typeof process.getuid === 'function' ? process.getuid() : null
+    return hasExactKeys(value, LOCK_KEYS, [...LOCK_KEYS]) && value.schema_version === 1 && value.owner_uid === currentUid && value.owner_pid === ownership.owner_pid && value.process_start_identity === ownership.process_start_identity && value.owner_nonce === ownership.owner_nonce && currentPorts.processIdentity(value.owner_pid) === ownership.process_start_identity
+  } catch { return false }
+}
+
 function withLock(path, operation) {
-  const lockPath = `${path}.lock`; const identity = processIdentity(process.pid)
+  const lockPath = `${path}.lock`; const identity = currentPorts.processIdentity(process.pid)
   if (!identity) fail('registry_lock_identity_unavailable')
   const candidatePath = `${lockPath}.candidate-${process.pid}-${randomUUID()}`
+  const ownership = { owner_pid: process.pid, process_start_identity: identity, owner_nonce: randomUUID() }
   const descriptor = openSync(candidatePath, 'wx', 0o600)
   try {
     fchmodSync(descriptor, 0o600)
-    writeFileSync(descriptor, `${JSON.stringify({ schema_version: 1, owner_pid: process.pid, owner_uid: typeof process.getuid === 'function' ? process.getuid() : null, process_start_identity: identity, created_at: new Date().toISOString(), owner_nonce: randomUUID() })}\n`, 'utf8'); fsyncSync(descriptor)
+    writeFileSync(descriptor, `${JSON.stringify({ schema_version: 1, owner_pid: ownership.owner_pid, owner_uid: typeof process.getuid === 'function' ? process.getuid() : null, process_start_identity: ownership.process_start_identity, created_at: new Date().toISOString(), owner_nonce: ownership.owner_nonce })}\n`, 'utf8')
+    try { currentPorts.fsyncFile(descriptor) } catch { bestEffortRemove(candidatePath, { force: true }); fail('registry_lock_unavailable') }
   } finally { closeSync(descriptor) }
-  try { linkSync(candidatePath, lockPath) } catch (error) { rmSync(candidatePath, { force: true }); if (error && typeof error === 'object' && error.code === 'EEXIST') fail('registry_busy'); fail('registry_lock_unavailable') }
-  rmSync(candidatePath, { force: true })
-  try { return operation() } finally { rmSync(lockPath, { force: true }) }
+  try { currentPorts.linkEntry(candidatePath, lockPath) } catch (error) { bestEffortRemove(candidatePath, { force: true }); if (error && typeof error === 'object' && error.code === 'EEXIST') fail('registry_busy'); fail('registry_lock_unavailable') }
+  bestEffortRemove(candidatePath, { force: true })
+  const assertOwnership = () => { if (!ownsLock(lockPath, ownership)) fail('registry_lock_ownership_lost') }
+  try { return operation(assertOwnership) } finally { if (ownsLock(lockPath, ownership)) bestEffortRemove(lockPath, { force: true }) }
 }
 
 export function createEmptyRegistry(path, projectIds) {
@@ -253,7 +316,7 @@ function appendEvent(registry, input, beforeVersion, afterVersion, extras = {}) 
 }
 
 export function mutateRegistry(path, input) {
-  return withLock(path, () => {
+  return withLock(path, (assertOwnership) => {
     const registry = loadRegistry(path); validateInput(registry, input)
     const current = currentFor(registry, input.projectId, input.role)
     const history = historyFor(registry, input.projectId, input.role)
@@ -290,7 +353,7 @@ export function mutateRegistry(path, input) {
       current.continuity_handoff_sha256 = input.handoffSha256; current.last_checkpoint_ref = input.checkpointRef; result = current
       appendEvent(registry, input, currentVersion, currentVersion, { handoff_sha256: input.handoffSha256, evidence_receipt_ref: input.checkpointRef })
     }
-    validateRegistry(registry); atomicWrite(path, registry)
+    validateRegistry(registry); atomicWrite(path, registry, assertOwnership)
     return clone(result)
   })
 }
@@ -332,12 +395,12 @@ export function recoverRegistryLock(path, { recoveryRef, now = new Date() } = {}
   if (typeof recoveryRef !== 'string' || recoveryRef !== diagnosis.recoveryRef) fail('registry_lock_changed')
   const lockPath = `${path}.lock`; const quarantine = `${lockPath}.recovery-${randomUUID()}`
   try {
-    renameSync(lockPath, quarantine)
+    currentPorts.renameEntry(lockPath, quarantine)
     if (lockRef(readExactPrivateFile(quarantine, 'registry_lock_changed')) !== recoveryRef) {
-      if (!directoryEntryExists(lockPath)) renameSync(quarantine, lockPath)
+      if (!directoryEntryExists(lockPath)) currentPorts.renameEntry(quarantine, lockPath)
       fail('registry_lock_changed')
     }
-    rmSync(quarantine)
+    currentPorts.removeEntry(quarantine)
   } catch (error) {
     if (error instanceof Error && error.message === 'registry_lock_changed') throw error
     fail('registry_lock_changed')

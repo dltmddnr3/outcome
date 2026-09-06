@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict'
 import test from 'node:test'
-import { mkdtempSync, writeFileSync } from 'node:fs'
+import { mkdtempSync, readFileSync, writeFileSync } from 'node:fs'
 import { join } from 'node:path'
 import { tmpdir } from 'node:os'
 import { createEmptyRegistry } from './outcome-session-registry-persistence.mjs'
@@ -45,12 +45,14 @@ test('CLI accepts locator only through private stdin and its serializable result
   assert.throws(() => runSessionCli(['assign', '--locator', 'argv-private'], ''), /locator_argv_forbidden/)
 })
 
-test('doctor exposes orphan lock state and exact-ref recovery without owner details', () => {
+test('doctor exposes identity-unavailable lock state and denies recovery without owner details', () => {
   const path = setup(); const lockPath = `${path}.lock`
   writeFileSync(lockPath, `${JSON.stringify({ schema_version: 1, owner_pid: 99_999_999, owner_uid: typeof process.getuid === 'function' ? process.getuid() : null, process_start_identity: 'missing process', created_at: '2026-08-27T00:00:00.000Z', owner_nonce: '33333333-3333-4333-8333-333333333333' })}\n`, { mode: 0o600 })
+  const before = readFileSync(lockPath)
   const diagnosis = runSessionControl({ registryPath: path, action: 'doctor', projectIds: ['outcome'] })
-  assert.equal(diagnosis.lock.state, 'orphaned')
+  assert.equal(diagnosis.lock.state, 'identity_unavailable')
   for (const field of ['owner_pid', 'owner_uid', 'process_start_identity', 'owner_nonce', lockPath]) assert.equal(JSON.stringify(diagnosis).includes(field), false)
-  assert.deepEqual(runSessionControl({ registryPath: path, action: 'recover-lock', recoveryRef: diagnosis.lock.recoveryRef }), { ok: true, recovered: true, action: 'recover-lock' })
-  assert.equal(runSessionControl({ registryPath: path, action: 'doctor', projectIds: ['outcome'] }).ok, true)
+  assert.throws(() => runSessionControl({ registryPath: path, action: 'recover-lock', recoveryRef: diagnosis.lock.recoveryRef }), /registry_lock_identity_unavailable/)
+  assert.deepEqual(readFileSync(lockPath), before)
+  assert.equal(runSessionControl({ registryPath: path, action: 'doctor', projectIds: ['outcome'] }).lock.state, 'identity_unavailable')
 })
