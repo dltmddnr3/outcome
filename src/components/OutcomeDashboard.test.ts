@@ -11,6 +11,7 @@ const stage = (overrides: Partial<PackageStage> = {}): PackageStage => ({ id: 's
 const github = (overrides: Partial<GithubConnector> = {}): GithubConnector => ({ adopted: true, required: false, state: 'connected', repository: 'owner/repo', remoteName: 'origin', defaultBranch: 'main', completionAuthority: false, localCandidate: { state: 'available', branch: 'main', ahead: 15, behind: 0, sync: 'ahead' }, published: { state: 'connected', repository: 'owner/repo', ref: 'origin/main', detail: 'published' }, checks: { state: 'unknown' }, release: { state: 'unknown' }, ...overrides })
 const project = (id: string, title: string): PackageProject => ({ status: 'valid', errors: [], observedAt: null, project: { id, name: title, outcome: `${title} outcome`, acceptanceAuthority: 'Cherry' }, connectors: { github: github() }, phases: [{ id: `${id}-phase`, title: 'Phase', purpose: 'Phase purpose', completion: null, scopes: [{ id: `${id}-scope`, title: 'Scope', purpose: 'Scope purpose', stages: [stage({ id: `${id}-stage` })] }] }], current: { phaseId: `${id}-phase`, scopeId: `${id}-scope`, stageId: `${id}-stage` }, next: null, bindings: [], now: { status: 'unbound', activity: null, observedAt: null, source: 'runtime_registry' }, progress: { available: false, reason: 'no_cross_stage_aggregate' } })
 const styles = readFileSync(new URL('../styles.css', import.meta.url), 'utf8')
+const dashboardSource = readFileSync(new URL('./OutcomeDashboard.tsx', import.meta.url), 'utf8')
 const declarationsFor = (css: string, selector: string) => css.split('}').flatMap((rule) => { const [selectors, body] = rule.split('{'); return selectors?.split(',').map((value) => value.trim()).includes(selector) ? [body ?? ''] : [] })
 const effectiveProperty = (css: string, selector: string, property: string) => declarationsFor(css, selector).flatMap((body) => [...body.matchAll(new RegExp(`(?:^|;)${property}:([^;]+)`, 'g'))].map((match) => match[1].trim())).at(-1)
 const luminance = (hex: string) => { const channels = hex.match(/[0-9a-f]{2}/gi)!.map((value) => Number.parseInt(value, 16) / 255).map((value) => value <= .04045 ? value / 12.92 : ((value + .055) / 1.055) ** 2.4); return .2126 * channels[0] + .7152 * channels[1] + .0722 * channels[2] }
@@ -577,5 +578,68 @@ describe('OUTCOME Package dashboard', () => {
     expect(context.current?.stage.id).toBe(current.id)
     expect(context.selected?.stage.id).toBe('historical-stage')
     expect(context.hierarchy.stageIndex).toBe(2)
+  })
+
+  describe('Stage I existing decision dialog regression specification', () => {
+    it('RS01 preserves all nine destination review rows in supplied order', () => {
+      const rows = ['복구', '정상 실패', '완료 판정', '제약', '비목표', '범위', '결과', '대상 사용자', '문제'].map((item, index) => ({ key: `adversarial-${index}`, item, value: `${item} 내용`, source: index % 2 === 0 ? '답변' as const : '미결' as const }))
+      const markup = renderToStaticMarkup(createElement(ApprovalInbox, { projection: modelV2(), reviewItem: { rows } }))
+      expect([...markup.matchAll(/data-review-item="([^"]+)"/g)].map((match) => match[1])).toEqual(rows.map((row) => row.key))
+    })
+
+    it('RS02 maps the supplied review rows directly without sorting or grouping', () => {
+      expect(dashboardSource).toContain('reviewRows.map((row) =>')
+      expect(dashboardSource).not.toMatch(/reviewRows\.(?:sort|toSorted|reduce|groupBy)\(/)
+    })
+
+    it('RS03 keeps one stable connected submitting status focus owner', () => {
+      expect(dashboardSource).toContain('const submittingStatusRef = useRef<HTMLParagraphElement | null>(null)')
+      expect(dashboardSource).toContain('ref={submittingStatusRef} id="oc-decision-review-status"')
+    })
+
+    it('RS04 exposes exactly one atomic polite pending status with the approved copy', () => {
+      expect(dashboardSource.match(/id="oc-decision-review-status"/g)).toHaveLength(1)
+      expect(dashboardSource).toContain('role="status" aria-live="polite" aria-atomic="true"')
+      expect(dashboardSource.match(/결정을 기록하고 있습니다\./g)).toHaveLength(1)
+    })
+
+    it('RS05 marks the open decision review busy only from pending state', () => {
+      expect(dashboardSource).toContain('className="oc-decision-review" role="alertdialog" aria-busy={pending}')
+    })
+
+    it('RS06 owns pending focus before disable and traps Tab Shift Tab and Escape', () => {
+      const focus = dashboardSource.indexOf('submittingStatusRef.current?.focus({ preventScroll: true })')
+      const disable = dashboardSource.indexOf('setPending(true)', focus)
+      expect(focus).toBeGreaterThan(-1)
+      expect(disable).toBeGreaterThan(focus)
+      expect(dashboardSource).toContain("if (event.key === 'Tab') { event.preventDefault(); submittingStatusRef.current?.focus({ preventScroll: true }) }")
+      expect(dashboardSource).toContain("else if (event.key === 'Escape') { event.preventDefault(); event.stopPropagation(); submittingStatusRef.current?.focus({ preventScroll: true }) }")
+      expect(dashboardSource).toContain('onKeyDown={handleDecisionReviewKeyDown}')
+    })
+
+    it('RS07 requests exact initiating-control focus restoration before success closes', () => {
+      expect(dashboardSource).toContain("await onDecision(stagedDecision); restoreTriggerFocus(); setStagedDecision(null); setNotice('기록됨 · 전달은 이 범위 밖')")
+      expect(dashboardSource).toContain('trigger?.isConnected && !trigger.disabled')
+    })
+
+    it('RS08 preserves revision rejection and restores before closing', () => {
+      expect(dashboardSource).toContain("if (!currentEvent) { restoreTriggerFocus(); setStagedDecision(null); setNotice('원본이 변경되었습니다. 결정을 다시 검토하세요.'); return }")
+    })
+
+    it('RS09 preserves failure notice and restores before closing', () => {
+      expect(dashboardSource).toContain("catch { restoreTriggerFocus(); setStagedDecision(null); setNotice('결정을 기록하지 못했습니다. 원본을 새로 확인하세요.') }")
+    })
+
+    it('RS10 preserves admission guards and one direct callback binding', () => {
+      expect(dashboardSource).toContain('if (!stagedDecision || !onDecision || pending || submittingRef.current) return')
+      expect(dashboardSource.match(/await onDecision\(stagedDecision\)/g)).toHaveLength(1)
+      expect(dashboardSource).toContain('submittingRef.current = true')
+      expect(dashboardSource).toContain('submittingRef.current = false')
+    })
+
+    it('RS11 gives only the status owner a visible focus indicator in decision styles', () => {
+      expect(effectiveProperty(styles, '#oc-decision-review-status:focus-visible', 'outline')).toBe('3px solid var(--oc-accent)')
+      expect(effectiveProperty(styles, '#oc-decision-review-status:focus-visible', 'outline-offset')).toBe('3px')
+    })
   })
 })
