@@ -1,6 +1,7 @@
 import assert from 'node:assert/strict'
-import { readFileSync, mkdtempSync, mkdirSync, writeFileSync, rmSync, symlinkSync } from 'node:fs'
-import { spawnSync } from 'node:child_process'
+import { chmodSync, copyFileSync, existsSync, lstatSync, readFileSync, mkdtempSync, mkdirSync, statSync, writeFileSync, rmSync, symlinkSync } from 'node:fs'
+import { spawn, spawnSync } from 'node:child_process'
+import { once } from 'node:events'
 import { tmpdir } from 'node:os'
 import { join, relative } from 'node:path'
 import { fileURLToPath } from 'node:url'
@@ -8,11 +9,122 @@ import { createHash } from 'node:crypto'
 import test from 'node:test'
 import ts from 'typescript'
 import { assertDecisionMutationResponse, assertMutationResponse } from './check-mutation-matrix.mjs'
+import { finalizeDeploymentSnapshot } from './finalize-stable-snapshot.mjs'
 
 const matrixSource = readFileSync(new URL('./check-mutation-matrix.mjs', import.meta.url), 'utf8')
 const redactionSource = readFileSync(new URL('./check-public-redaction.mjs', import.meta.url), 'utf8')
 const scopeSource = readFileSync(new URL('./check-scope.mjs', import.meta.url), 'utf8')
 const privateRoutes = ['/api/private/chat/timeline', '/api/private/chat/messages', '/api/private/bridge/admin/viewers/register', '/api/private/bridge/admin/viewers/revoke', '/api/private/bridge/admin/challenges/cleanup', '/api/private/bridge/admin/readiness']
+const repository = fileURLToPath(new URL('..', import.meta.url))
+const packageSource = JSON.parse(readFileSync(join(repository, 'snapshot/outcome-package-source.json'), 'utf8'))
+const matrixCarrier = (asset = 'index-test.js') => Buffer.from(`export default ${JSON.stringify(finalizeDeploymentSnapshot({ source: packageSource, commit: '1'.repeat(40), tree: '2'.repeat(40), asset }))}\n`)
+const runMatrix = (root) => spawnSync(process.execPath, ['scripts/check-mutation-matrix.mjs'], { cwd: root, encoding: 'utf8', timeout: 30_000, env: { ...process.env, OUTCOME_PUBLIC_URL: '' } })
+const carrierState = (path) => {
+  try {
+    const metadata = lstatSync(path)
+    return { exists: true, bytes: readFileSync(path), mode: metadata.mode & 0o7777 }
+  } catch (error) {
+    if (error?.code === 'ENOENT') return { exists: false }
+    throw error
+  }
+}
+
+const stageMutationMatrixRoot = () => {
+  const root = mkdtempSync(join(tmpdir(), 'outcome-mutation-matrix-'))
+  for (const directory of ['api', 'scripts', 'snapshot']) mkdirSync(join(root, directory))
+  copyFileSync(join(repository, 'api/index.mjs'), join(root, 'api/index.mjs'))
+  copyFileSync(join(repository, 'scripts/check-mutation-matrix.mjs'), join(root, 'scripts/check-mutation-matrix.mjs'))
+  copyFileSync(join(repository, 'snapshot/outcome-package-source.json'), join(root, 'snapshot/outcome-package-source.json'))
+  symlinkSync(join(repository, 'scripts/finalize-stable-snapshot.mjs'), join(root, 'scripts/finalize-stable-snapshot.mjs'))
+  symlinkSync(join(repository, 'server'), join(root, 'server'))
+  return root
+}
+
+test('carrier lifecycle: absent and exact synthetic crash residue leave no carrier', () => {
+  const absentRoot = stageMutationMatrixRoot()
+  const residueRoot = stageMutationMatrixRoot()
+  const repositoryCarrier = join(repository, 'api/deployment-snapshot.mjs')
+  const beforeRepositoryCarrier = carrierState(repositoryCarrier)
+  try {
+    const absent = runMatrix(absentRoot)
+    assert.equal(absent.error, undefined)
+    assert.equal(absent.status, 0, absent.stderr)
+    assert.match(absent.stdout, /stable private mutation 24\/24 rows verified/)
+    assert.equal(existsSync(join(absentRoot, 'api/deployment-snapshot.mjs')), false)
+
+    writeFileSync(join(residueRoot, 'api/deployment-snapshot.mjs'), matrixCarrier(), { mode: 0o600 })
+    const residue = runMatrix(residueRoot)
+    assert.equal(residue.error, undefined)
+    assert.equal(residue.status, 0, residue.stderr)
+    assert.equal(existsSync(join(residueRoot, 'api/deployment-snapshot.mjs')), false)
+    assert.deepEqual(carrierState(repositoryCarrier), beforeRepositoryCarrier)
+  } finally {
+    rmSync(absentRoot, { recursive: true, force: true })
+    rmSync(residueRoot, { recursive: true, force: true })
+  }
+})
+
+test('carrier lifecycle: arbitrary valid carrier is used without byte or special-mode writes', () => {
+  const root = stageMutationMatrixRoot()
+  const carrier = join(root, 'api/deployment-snapshot.mjs')
+  const bytes = matrixCarrier('index-existing.js')
+  try {
+    writeFileSync(carrier, bytes, { mode: 0o1640 })
+    chmodSync(carrier, 0o1640)
+    const result = runMatrix(root)
+    assert.equal(result.error, undefined)
+    assert.equal(result.status, 0, result.stderr)
+    assert.deepEqual(readFileSync(carrier), bytes)
+    assert.equal(statSync(carrier).mode & 0o7777, 0o1640)
+  } finally { rmSync(root, { recursive: true, force: true }) }
+})
+
+test('carrier lifecycle: symlink carrier is rejected without touching its target', () => {
+  const root = stageMutationMatrixRoot()
+  const target = join(root, 'carrier-target.mjs')
+  const targetBytes = matrixCarrier('index-symlink-target.js')
+  const carrier = join(root, 'api/deployment-snapshot.mjs')
+  try {
+    writeFileSync(target, targetBytes, { mode: 0o1640 })
+    chmodSync(target, 0o1640)
+    symlinkSync(target, carrier)
+    const result = runMatrix(root)
+    assert.equal(result.error, undefined)
+    assert.notEqual(result.status, 0)
+    assert.match(result.stderr, /matrix_carrier_ownership_uncertain/)
+    assert.equal(lstatSync(carrier).isSymbolicLink(), true)
+    assert.deepEqual(readFileSync(target), targetBytes)
+    assert.equal(statSync(target).mode & 0o7777, 0o1640)
+  } finally { rmSync(root, { recursive: true, force: true }) }
+})
+
+test('carrier lifecycle: concurrent create-once invocation refuses the second owner', async () => {
+  const root = stageMutationMatrixRoot()
+  const apiPath = join(root, 'api/index.mjs')
+  writeFileSync(apiPath, `${readFileSync(apiPath, 'utf8')}\nif (process.env.OUTCOME_MATRIX_TEST_HOLD === '1') Atomics.wait(new Int32Array(new SharedArrayBuffer(4)), 0, 0, 1500)\n`)
+  const first = spawn(process.execPath, ['scripts/check-mutation-matrix.mjs'], { cwd: root, stdio: ['ignore', 'pipe', 'pipe'], env: { ...process.env, OUTCOME_PUBLIC_URL: '', OUTCOME_MATRIX_TEST_HOLD: '1' } })
+  let stderr = ''
+  first.stderr.setEncoding('utf8')
+  first.stderr.on('data', (chunk) => { stderr += chunk })
+  try {
+    const lock = join(root, 'api/deployment-snapshot.mjs.matrix-lock')
+    const deadline = Date.now() + 5_000
+    while (!existsSync(lock) && first.exitCode === null && Date.now() < deadline) await new Promise((resolve) => setTimeout(resolve, 10))
+    assert.equal(existsSync(lock), true, stderr)
+    const second = runMatrix(root)
+    assert.equal(second.error, undefined)
+    assert.notEqual(second.status, 0)
+    assert.match(second.stderr, /matrix_carrier_busy/)
+    const [code, signal] = await once(first, 'exit')
+    assert.equal(signal, null)
+    assert.equal(code, 0, stderr)
+    assert.equal(existsSync(join(root, 'api/deployment-snapshot.mjs')), false)
+    assert.equal(existsSync(lock), false)
+  } finally {
+    if (first.exitCode === null) first.kill('SIGKILL')
+    rmSync(root, { recursive: true, force: true })
+  }
+})
 
 test('F3 complete scanner rejects CSRF literal syntax variants and preserves AF-1 controls', () => {
   const root = fileURLToPath(new URL('..', import.meta.url))

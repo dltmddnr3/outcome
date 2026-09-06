@@ -1,9 +1,12 @@
 import { once } from 'node:events'
-import { fileURLToPath } from 'node:url'
-import { handleStableHostRequest } from '../api/index.mjs'
+import { closeSync, constants, fstatSync, fsyncSync, ftruncateSync, lstatSync, openSync, readSync, rmSync, writeSync } from 'node:fs'
+import { createHash } from 'node:crypto'
+import { fileURLToPath, pathToFileURL } from 'node:url'
+import source from '../snapshot/outcome-package-source.json' with { type: 'json' }
 import { createAccountAccessService, createInMemoryAccountStore } from '../server/account-access.mjs'
 import { createOutcomeServer } from '../server/index.mjs'
 import { createDecisionRecordService, createInMemoryDecisionRecordStore } from '../server/outcome-decision-record.mjs'
+import { finalizeDeploymentSnapshot } from './finalize-stable-snapshot.mjs'
 
 const paths = ['/api/dashboard', '/api/dashboard/cherry-note', '/api/auth/login', '/api/auth/logout', '/api/private/config', '/api/private/workspace', '/api/unknown', '/cherry-note-dashboard']
 const privatePaths = ['/api/private/chat/timeline', '/api/private/chat/messages', '/api/private/bridge/admin/viewers/register', '/api/private/bridge/admin/viewers/revoke', '/api/private/bridge/admin/challenges/cleanup', '/api/private/bridge/admin/readiness']
@@ -11,6 +14,149 @@ const allowedPrivateRoute = 'GET /api/private/chat/timeline'
 const methods = ['POST', 'PUT', 'PATCH', 'DELETE']
 const rejectedDecisionMethods = ['GET', 'HEAD', 'OPTIONS', 'PUT', 'PATCH', 'DELETE']
 const canonicalBody = '{"error":"read_only"}'
+const carrierPath = fileURLToPath(new URL('../api/deployment-snapshot.mjs', import.meta.url))
+const carrierLockPath = `${carrierPath}.matrix-lock`
+const matrixCommit = '1'.repeat(40)
+const matrixTree = '2'.repeat(40)
+const matrixAsset = 'index-test.js'
+
+const sameFile = (left, right) => left.dev === right.dev && left.ino === right.ino
+const digest = (bytes) => createHash('sha256').update(bytes).digest('hex')
+const readDescriptor = (descriptor) => {
+  const bytes = Buffer.alloc(fstatSync(descriptor).size)
+  let offset = 0
+  while (offset < bytes.length) {
+    const count = readSync(descriptor, bytes, offset, bytes.length - offset, offset)
+    if (count === 0) throw new Error('matrix_carrier_read_incomplete')
+    offset += count
+  }
+  return bytes
+}
+const writeDescriptor = (descriptor, bytes) => {
+  ftruncateSync(descriptor, 0)
+  let offset = 0
+  while (offset < bytes.length) offset += writeSync(descriptor, bytes, offset, bytes.length - offset, offset)
+  fsyncSync(descriptor)
+}
+const assertDescriptorIdentity = (path, descriptor, identity, errorMessage) => {
+  const pathIdentity = lstatSync(path)
+  const descriptorIdentity = fstatSync(descriptor)
+  if (!pathIdentity.isFile() || pathIdentity.isSymbolicLink() || !sameFile(identity, descriptorIdentity) || !sameFile(pathIdentity, descriptorIdentity)) throw new Error(errorMessage)
+}
+const processIsAlive = (pid) => {
+  try { process.kill(pid, 0); return true } catch (error) {
+    if (error?.code === 'ESRCH') return false
+    return null
+  }
+}
+const acquireCarrierLock = () => {
+  const bytes = Buffer.from(`${JSON.stringify({ schemaVersion: 1, ownerPid: process.pid })}\n`, 'utf8')
+  const expectedDigest = digest(bytes)
+  const create = () => {
+    let descriptor
+    try {
+      descriptor = openSync(carrierLockPath, constants.O_CREAT | constants.O_EXCL | constants.O_RDWR | constants.O_NOFOLLOW, 0o600)
+      const identity = fstatSync(descriptor)
+      writeDescriptor(descriptor, bytes)
+      return { descriptor, identity, bytes, expectedDigest }
+    } catch (error) {
+      if (descriptor !== undefined) closeSync(descriptor)
+      throw error
+    }
+  }
+  try { return create() } catch (error) {
+    if (error?.code !== 'EEXIST') throw error
+  }
+
+  let descriptor
+  try {
+    const metadata = lstatSync(carrierLockPath)
+    if (!metadata.isFile() || metadata.isSymbolicLink() || (typeof process.getuid === 'function' && metadata.uid !== process.getuid())) throw new Error('matrix_carrier_lock_uncertain')
+    descriptor = openSync(carrierLockPath, constants.O_RDONLY | constants.O_NOFOLLOW)
+    const identity = fstatSync(descriptor)
+    if (!sameFile(metadata, identity) || !identity.isFile()) throw new Error('matrix_carrier_lock_uncertain')
+    const existingBytes = readDescriptor(descriptor)
+    let owner
+    try { owner = JSON.parse(existingBytes.toString('utf8')) } catch { throw new Error('matrix_carrier_lock_uncertain') }
+    if (!owner || Object.keys(owner).sort().join(',') !== 'ownerPid,schemaVersion' || owner.schemaVersion !== 1 || !Number.isInteger(owner.ownerPid) || owner.ownerPid < 1) throw new Error('matrix_carrier_lock_uncertain')
+    if (processIsAlive(owner.ownerPid) !== false) throw new Error('matrix_carrier_busy')
+    assertDescriptorIdentity(carrierLockPath, descriptor, identity, 'matrix_carrier_lock_uncertain')
+    if (digest(existingBytes) !== digest(readDescriptor(descriptor)) || !readDescriptor(descriptor).equals(existingBytes)) throw new Error('matrix_carrier_lock_uncertain')
+    rmSync(carrierLockPath)
+  } finally { if (descriptor !== undefined) closeSync(descriptor) }
+  try { return create() } catch (error) {
+    if (error?.code === 'EEXIST') throw new Error('matrix_carrier_busy')
+    throw error
+  }
+}
+const releaseCarrierLock = (lock) => {
+  try {
+    assertDescriptorIdentity(carrierLockPath, lock.descriptor, lock.identity, 'matrix_carrier_lock_ownership_lost')
+    const bytes = readDescriptor(lock.descriptor)
+    if (digest(bytes) !== lock.expectedDigest || !bytes.equals(lock.bytes)) throw new Error('matrix_carrier_lock_ownership_lost')
+    rmSync(carrierLockPath)
+  } finally { closeSync(lock.descriptor) }
+}
+const validateCarrierSnapshot = (snapshot, expected = {}) => {
+  const text = JSON.stringify(snapshot)
+  if (snapshot?.snapshot?.boundary !== 'deployment_snapshot' || snapshot.snapshot?.source !== 'sanitized_public_projection' || snapshot.snapshot?.liveSessionRelay !== false || !Array.isArray(snapshot.projects) || snapshot.projects.length < 2 || !/^[0-9a-f]{12}$/.test(snapshot.build?.commit ?? '') || !/^[0-9a-f]{12}$/.test(snapshot.build?.tree ?? '') || !/^index-[A-Za-z0-9_-]+\.js$/.test(snapshot.build?.asset ?? '')) throw new Error('matrix_carrier_shape_invalid')
+  if (expected.commit && snapshot.build.commit !== expected.commit.slice(0, 12) || expected.tree && snapshot.build.tree !== expected.tree.slice(0, 12) || expected.asset && snapshot.build.asset !== expected.asset) throw new Error('matrix_carrier_shape_invalid')
+  for (const pattern of [/\/Users\//, /\/tmp\//, /(?:session|thread|turn|task)[_-]?id/i, /\b[0-9a-f]{40}\b/i, /\b[0-9a-f]{64}\b/i, /(?:token|secret|password|authorization)\s*[:=]/i]) if (pattern.test(text)) throw new Error('matrix_carrier_disclosure_invalid')
+  for (const project of snapshot.projects) for (const phase of project.phases ?? []) for (const scope of phase.scopes ?? []) for (const stage of scope.stages ?? []) for (const gate of stage.gate?.gates ?? []) if (Object.hasOwn(gate, 'evidence')) throw new Error('matrix_carrier_gate_evidence_invalid')
+}
+const deterministicCarrier = () => {
+  const snapshot = finalizeDeploymentSnapshot({ source, commit: matrixCommit, tree: matrixTree, asset: matrixAsset })
+  validateCarrierSnapshot(snapshot, { commit: matrixCommit, tree: matrixTree, asset: matrixAsset })
+  return Buffer.from(`export default ${JSON.stringify(snapshot)}\n`, 'utf8')
+}
+const loadStableHostRequest = async () => {
+  if (!Number.isInteger(constants.O_NOFOLLOW)) throw new Error('matrix_carrier_nofollow_unavailable')
+  const carrier = deterministicCarrier()
+  const carrierDigest = digest(carrier)
+  const lock = acquireCarrierLock()
+  let descriptor
+  let taskOwned = false
+  let priorBytes
+  let priorMode
+  let identity
+  try {
+    let existing
+    try { existing = lstatSync(carrierPath) } catch (error) { if (error?.code !== 'ENOENT') throw error }
+    if (existing) {
+      if (!existing.isFile() || existing.isSymbolicLink()) throw new Error('matrix_carrier_ownership_uncertain')
+      descriptor = openSync(carrierPath, constants.O_RDONLY | constants.O_NOFOLLOW)
+      identity = fstatSync(descriptor)
+      if (!sameFile(existing, identity) || !identity.isFile()) throw new Error('matrix_carrier_ownership_uncertain')
+      priorBytes = readDescriptor(descriptor)
+      priorMode = identity.mode & 0o7777
+      taskOwned = digest(priorBytes) === carrierDigest && priorBytes.equals(carrier)
+    } else {
+      descriptor = openSync(carrierPath, constants.O_CREAT | constants.O_EXCL | constants.O_RDWR | constants.O_NOFOLLOW, 0o600)
+      identity = fstatSync(descriptor)
+      taskOwned = true
+      writeDescriptor(descriptor, carrier)
+    }
+    assertDescriptorIdentity(carrierPath, descriptor, identity, 'matrix_carrier_ownership_lost')
+    if (digest(readDescriptor(descriptor)) !== digest(priorBytes ?? carrier) || !readDescriptor(descriptor).equals(priorBytes ?? carrier)) throw new Error('matrix_carrier_ownership_lost')
+    const snapshotModule = await import(`${pathToFileURL(carrierPath).href}?matrix-validation=${digest(priorBytes ?? carrier)}`)
+    validateCarrierSnapshot(snapshotModule.default)
+    const module = await import('../api/index.mjs')
+    if (typeof module.handleStableHostRequest !== 'function') throw new Error('matrix_stable_handler_unavailable')
+    return module.handleStableHostRequest
+  } finally {
+    try {
+      if (descriptor !== undefined) {
+        try {
+          assertDescriptorIdentity(carrierPath, descriptor, identity, 'matrix_carrier_ownership_lost')
+          const finalBytes = readDescriptor(descriptor)
+          const expectedBytes = priorBytes ?? carrier
+          if (digest(finalBytes) !== digest(expectedBytes) || !finalBytes.equals(expectedBytes) || (fstatSync(descriptor).mode & 0o7777) !== priorMode && priorMode !== undefined) throw new Error('matrix_carrier_ownership_lost')
+          if (taskOwned) rmSync(carrierPath)
+        } finally { closeSync(descriptor) }
+      }
+    } finally { releaseCarrierLock(lock) }
+  }
+}
 
 const isCanonicalReadOnly = (text) => {
   try { return JSON.stringify(JSON.parse(text)) === canonicalBody } catch { return false }
@@ -63,7 +209,8 @@ export async function checkMutationMatrix(base, label, fetchImpl = fetch) {
   return { count, apiBodies, emptyPageBodies, decisionRows }
 }
 
-export function checkStablePrivateMutationMatrix(handler = handleStableHostRequest) {
+export function checkStablePrivateMutationMatrix(handler) {
+  if (typeof handler !== 'function') throw new Error('stable handler is required')
   let count = 0
   for (const path of privatePaths) for (const method of methods) {
     const response = handler({ method, pathname: path })
@@ -75,6 +222,7 @@ export function checkStablePrivateMutationMatrix(handler = handleStableHostReque
 }
 
 if (process.argv[1] === fileURLToPath(import.meta.url)) {
+  const handleStableHostRequest = await loadStableHostRequest()
   const publicServer = createOutcomeServer({ publicReadOnly: true })
   publicServer.listen(0, '127.0.0.1'); await once(publicServer, 'listening')
   try {
@@ -86,7 +234,7 @@ if (process.argv[1] === fileURLToPath(import.meta.url)) {
     const stable = handleStableHostRequest({ method, pathname: '/api/private/decisions' })
     assertDecisionMutationResponse({ method, status: stable.status, text: JSON.stringify(stable.body) })
   }
-  checkStablePrivateMutationMatrix()
+  checkStablePrivateMutationMatrix(handleStableHostRequest)
 
   const privateUnavailable = createOutcomeServer({ publicReadOnly: false, password: 'private-test-password', secret: 'private-test-secret-that-is-long-enough' })
   privateUnavailable.listen(0, '127.0.0.1'); await once(privateUnavailable, 'listening')
