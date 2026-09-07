@@ -27,6 +27,19 @@ test('adapter is default-off and does not touch the process boundary', () => {
   let calls = 0; assert.equal(createCodexQueueAdapter({ registryPath: registry(), spawnProcess: () => { calls += 1 } }), null); assert.equal(calls, 0)
 })
 
+test('transport rechecks binding status and freshness immediately before spawn', async () => {
+  for (const mode of ['stale', 'expired', 'future']) {
+    const path = registry(); let calls = 0, clock = now
+    const adapter = createCodexQueueAdapter({ enabled:true, registryPath:path, now:()=>clock, spawnProcess:()=>{ calls++ } })
+    const binding = await adapter.bindingResolver({project_id:'outcome',role:'planner'})
+    if (mode === 'stale') mutateRegistry(path,{action:'observe',projectId:'outcome',role:'planner',expectedVersion:1,actorClass:'observer',reasonClass:'test_stale',occurredAt:now,observedAt:now,status:'stale'})
+    if (mode === 'expired') clock = '2026-09-03T01:16:00.000Z'
+    if (mode === 'future') clock = '2026-09-03T00:59:00.000Z'
+    assert.deepEqual(await adapter.transport({destination:binding.destination,message:'ordinary',correlation_id:'message-0123456789abcdef'}),{delivery:'delivery_unknown'})
+    assert.equal(calls,0)
+  }
+})
+
 test('response reader uses only opaque current binding and never dispatches work', async () => {
   let reads=0,spawns=0
   const correlation_id='message-0123456789abcdef', message='question'

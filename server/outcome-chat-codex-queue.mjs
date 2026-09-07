@@ -56,6 +56,12 @@ export function createCodexQueueAdapter({ enabled = false, registryPath, spawnPr
       const locator = destinations.get(request.destination)
       if (!locator || invoked.has(request.destination) || typeof request.message !== 'string' || !request.message.trim() || /[\u0000-\u0008\u000b\u000c\u000e-\u001f\u007f]/.test(request.message) || [...request.message].length > 4_000 || Buffer.byteLength(request.message) > 16_000 || !CORRELATION.test(request.correlation_id)) return unknown
       invoked.add(request.destination)
+      try {
+        const expected = bindings.get(request.destination)
+        const rows = loadRegistry(registryPath).bindings.filter(row => row.project_id === expected.projectId && row.role === 'planner' && !['replaced','revoked'].includes(row.status))
+        const row = rows[0], clock = Date.parse(now()), observed = Date.parse(row?.observed_at ?? row?.bound_at)
+        if (rows.length !== 1 || !CURRENT.has(row.status) || row.binding_version !== expected.version || row.locator_ref !== locator || !Number.isFinite(clock) || !Number.isFinite(observed) || observed > clock || clock - observed > maxFreshMs) return unknown
+      } catch { return unknown }
       return new Promise((resolve) => {
         let child, settled = false, timer, output = Buffer.alloc(0), killed = false
         const kill = () => { if (killed || !child) return; killed = true; try { child.kill('SIGTERM') } catch {} }
