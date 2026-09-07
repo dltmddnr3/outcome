@@ -160,6 +160,24 @@ test('rejects private locator-like snapshot unit identities before scope-change 
   }
 })
 
+test('rejects all seven credential and camelCase locator unit identities before projection', () => {
+  const identities = ['GATES.md#token-secret', 'GATES.md#secret', 'GATES.md#password', 'GATES.md#authorization', 'GATES.md#api-key', 'GATES.md#sessionId123', 'GATES.md#taskId123']
+  let callbacks = 0
+  for (const unitId of identities) {
+    const unitIds = [unitId]
+    const row = { closed: 0, total: 1, unmapped: 0, denominator_sha256: denominator(unitIds), unit_ids: unitIds }
+    const body = { observed_at: '2026-09-06T12:00:00.000Z', source_ref: 'evidence/snapshot.json', denominator_sha256: row.denominator_sha256, nodes: { outcome: row } }
+    const tracking = { ...base, snapshots: [{ snapshot_id: outcomeSnapshotId(body), ...body }] }
+    assert.throws(() => resultView(project, tracking), /work_tracking_invalid/, unitId)
+    assert.equal(JSON.stringify({ rejected: true }).includes(unitId), false, unitId)
+  }
+  const accessor = structuredClone(base)
+  Object.defineProperty(accessor.snapshots, '0', { enumerable: true, get() { callbacks += 1; return null } })
+  accessor.snapshots.length = 1
+  assert.throws(() => resultView(project, accessor), /work_tracking_invalid/)
+  assert.equal(callbacks, 0)
+})
+
 test('rejects accessor and Proxy snapshot unit identities without executing caller code', () => {
   const row = { closed: 0, total: 1, unmapped: 0, denominator_sha256: denominator(['GATES.md#G1']), unit_ids: ['GATES.md#G1'] }
   const body = { observed_at: '2026-09-06T12:00:00.000Z', source_ref: 'evidence/snapshot.json', denominator_sha256: row.denominator_sha256, nodes: { outcome: row } }

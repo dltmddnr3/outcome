@@ -44,6 +44,21 @@ describe('OUTCOME Package dashboard', () => {
     expect(markup).toContain('data-completion-authority="false"')
     expect(markup).not.toContain('100%')
   })
+  it('nine zero-denominator phase 4 and phase 5 nodes expose truthful accessible names at all target viewports', () => {
+    const ids = ['outcome-phase-4', 'outcome-phase-4-project-creation', 'outcome-phase-4-role-sessions', 'outcome-phase-4-linked-chat', 'outcome-phase-4-full-development', 'outcome-phase-5', 'outcome-phase-5-destination', 'outcome-phase-5-question-200', 'outcome-phase-5-composition']
+    const links = { source: { href: '#result-node-outcome', action: null, label: '출처 보기' }, usable_result: { href: '#result-node-outcome', action: null, label: '사용 가능한 결과 보기' }, planner_conversation: { href: null, action: 'planner_conversation', label: 'Planner 대화 보기' } } as ResultView['links']
+    const makeNode = (id: string, closed = 0, total = 0): ResultView['hierarchy'] => ({ id, kind: 'phase', title: id, outcome: '사용 가능한 결과', acceptance: { closed, total, unmapped: total === 0 ? 1 : 0, partial: total === 0, label: total === 0 ? '완료 조건 미연결 · 전체 완료율 아님' : '근거 닫힘', unit_ids: total === 0 ? [] : ['GATES.md#G1', 'GATES.md#G2'], denominator_sha256: 'a'.repeat(64), weight: 1, completion_authority: false }, work: { initial_hours: null, actual_hours: null, remaining_hours: null, planned_finish_at: null, latest_forecast: null, provenance: {} }, comparison: { yesterday: null, current: { observed_at: '2026-09-07T00:00:00.000Z', closed, total, unmapped: total === 0 ? 1 : 0, denominator_sha256: 'a'.repeat(64) }, today_delta: null, message: null }, timeline: [], links, children: [] })
+    const hierarchy = makeNode('outcome', 1, 2)
+    hierarchy.kind = 'project'; hierarchy.children = [...ids.map((id) => makeNode(id)), makeNode('truthful-nonzero', 1, 2)]
+    const view = { schema_version: 1, observed_at: '2026-09-07T00:00:00.000Z', calendar: { plan_started_at: null, planned_finish_at: null, source_ref: null }, hierarchy, links, completion_authority: false } as ResultView
+    for (const viewport of ['1440x900', '1024x768', '390x844', '320x568']) {
+      const markup = renderToStaticMarkup(createElement('div', { 'data-viewport': viewport }, createElement(OutcomeResultView, { view })))
+      expect(markup.match(/aria-label="근거 닫힘 0\/0"/g) ?? [], viewport).toHaveLength(0)
+      expect(markup.match(/aria-label="완료 조건 미연결 · 전체 완료율 아님"/g) ?? [], viewport).toHaveLength(9)
+      expect(markup, viewport).toContain('aria-label="근거 닫힘 1/2"')
+      expect(markup, viewport).toContain('data-completion-authority="false"')
+    }
+  })
   it('Planner 이동은 같은 대화 패널의 Planner 필터를 선택하고 제목에 포커스한다', () => {
     let clicked = 0; let focused = 0; let tabIndex = 0
     const heading = { focus() { focused += 1 }, get tabIndex() { return tabIndex }, set tabIndex(value) { tabIndex = value } }
