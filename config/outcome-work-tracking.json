@@ -1,0 +1,18 @@
+{
+  "schema_version": 1,
+  "project_id": "outcome",
+  "observed_at": "2026-09-07T00:00:00+09:00",
+  "calendar": {
+    "plan_started_at": "2026-09-04T07:55:25+09:00",
+    "planned_finish_at": "2026-09-18T07:55:25+09:00",
+    "source_ref": "docs/MVP_14_DAY_EXECUTION_PLAN.md"
+  },
+  "nodes": {},
+  "snapshots": [],
+  "links": {
+    "source": "#result-node-outcome",
+    "usable_result": "#result-node-outcome",
+    "planner_conversation": "planner"
+  },
+  "completion_authority": false
+}

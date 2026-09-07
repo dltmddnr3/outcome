@@ -52,9 +52,9 @@ function registryFixture(ids = ['alpha', 'beta', 'gamma']) {
 test('project registry default config preserves Cherry Note and OUTCOME through the validated loader', () => {
   const definitions = loadProjectRegistry({ repositoryRoot: resolve('.') })
   assert.equal(definitions.length, 2)
-  assert.deepEqual(definitions.map(({ contractFile, mapFile, sessionsFile }) => [contractFile, mapFile, sessionsFile]), [
-    ['OUTCOME_CONTRACT.md', 'OUTCOME_MAP.md', 'OUTCOME_SESSIONS.md'],
-    ['docs/OUTCOME_CONTRACT.md', 'docs/OUTCOME_MAP.md', 'docs/OUTCOME_SESSIONS.md'],
+  assert.deepEqual(definitions.map(({ contractFile, mapFile, sessionsFile, workTrackingFile }) => [contractFile, mapFile, sessionsFile, workTrackingFile]), [
+    ['OUTCOME_CONTRACT.md', 'OUTCOME_MAP.md', 'OUTCOME_SESSIONS.md', null],
+    ['docs/OUTCOME_CONTRACT.md', 'docs/OUTCOME_MAP.md', 'docs/OUTCOME_SESSIONS.md', 'config/outcome-work-tracking.json'],
   ])
   assert.equal(definitions.every(({ root }) => isAbsolute(root)), true)
 })
@@ -86,6 +86,9 @@ test('registry rejects empty malformed schema duplicate entries project IDs abso
     [{ schema_version: 1, projects: [{ ...valid.projects[0], contract_file: '/tmp/CONTRACT.md' }] }, /project_registry_document_absolute/],
     [{ schema_version: 1, projects: [{ ...valid.projects[0], map_file: '../MAP.md' }] }, /project_registry_document_traversal/],
     [{ schema_version: 1, projects: [{ ...valid.projects[0], sessions_file: '../SESSIONS.md' }] }, /project_registry_document_traversal/],
+    [{ schema_version: 1, projects: [{ ...valid.projects[0], work_tracking_file: '../tracking.json', work_tracking_source_refs: ['docs/PLAN.md'] }] }, /project_registry_document_traversal/],
+    [{ schema_version: 1, projects: [{ ...valid.projects[0], work_tracking_file: 'tracking.json' }] }, /project_registry_entry_invalid/],
+    [{ schema_version: 1, projects: [{ ...valid.projects[0], work_tracking_file: 'tracking.json', work_tracking_source_refs: ['docs/A.md', 'docs/A.md'] }] }, /project_registry_entry_invalid/],
   ]
   for (const [index, [body, expected]] of cases.entries()) { const path = join(value.repositoryRoot, `invalid-${index}.json`); writeFileSync(path, JSON.stringify(body)); assert.throws(() => loadProjectRegistry({ environment: { OUTCOME_PROJECT_REGISTRY: path }, repositoryRoot: value.repositoryRoot }), expected) }
   writeFileSync(value.registryPath, ''); assert.throws(() => loadProjectRegistry({ environment: { OUTCOME_PROJECT_REGISTRY: value.registryPath }, repositoryRoot: value.repositoryRoot }), /project_registry_json_invalid/)
@@ -111,6 +114,17 @@ test('tracked portfolio browser registry is worktree-contained and yields three 
 })
 
 test('valid package parses contract map and referenced gates', () => { const model = fixture(); assert.equal(model.errors.length, 0); assert.equal(model.phases[0].scopes[0].stages[0].gate.total, 2) })
+test('configured work tracking projects a non-authoritative result view and malformed input fails closed', () => {
+  const root = mkdtempSync(join(tmpdir(), 'outcome-result-package-')); mkdirSync(join(root, 'docs')); mkdirSync(join(root, 'config'))
+  writeFileSync(join(root, 'docs/OUTCOME_CONTRACT.md'), contract); writeFileSync(join(root, 'docs/OUTCOME_MAP.md'), map()); writeFileSync(join(root, 'docs/GATES_STAGE.md'), '- [x] G1: first\n- [ ] G2: second')
+  const tracking = { schema_version: 1, project_id: 'demo', observed_at: '2026-09-07T03:00:00.000Z', calendar: { plan_started_at: null, planned_finish_at: null, source_ref: null }, nodes: {}, snapshots: [], links: { source: '#result-node-demo', usable_result: '#result-node-stage-one', planner_conversation: 'planner' }, completion_authority: false }
+  writeFileSync(join(root, 'config/tracking.json'), JSON.stringify(tracking))
+  const valid = buildPackageModel({ root, contractFile: 'docs/OUTCOME_CONTRACT.md', mapFile: 'docs/OUTCOME_MAP.md', workTrackingFile: 'config/tracking.json', workTrackingSourceRefs: ['docs/PLAN.md'], now: new Date('2026-09-07T06:00:00.000Z') })
+  assert.equal(valid.status, 'valid'); assert.equal(valid.resultView.hierarchy.acceptance.total, 2); assert.equal(valid.resultView.completion_authority, false)
+  writeFileSync(join(root, 'config/tracking.json'), JSON.stringify({ ...tracking, completion_authority: true }))
+  const invalid = buildPackageModel({ root, contractFile: 'docs/OUTCOME_CONTRACT.md', mapFile: 'docs/OUTCOME_MAP.md', workTrackingFile: 'config/tracking.json', workTrackingSourceRefs: ['docs/PLAN.md'], now: new Date('2026-09-07T06:00:00.000Z') })
+  assert.equal(invalid.status, 'unknown'); assert.equal(invalid.resultView, null); assert.ok(invalid.errors.includes('work_tracking_invalid'))
+})
 test('missing optional sessions companion keeps Package valid and projects four setup-required roles', () => {
   const model = fixture({ sessionsText: null })
   assert.equal(model.status, 'valid')

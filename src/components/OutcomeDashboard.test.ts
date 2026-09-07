@@ -3,7 +3,7 @@ import { renderToStaticMarkup } from 'react-dom/server'
 import { describe, expect, it } from 'vitest'
 // @ts-expect-error The test runtime provides this Node built-in; the browser bundle never imports this file.
 import { readFileSync } from 'node:fs'
-import { ApprovalInbox, OutcomeDashboard, approvalInboxProjection, axisStateLabel, bindingHeroLabel, bindingObservationLabel, collapsedStageCount, currentHierarchy, defaultHierarchySelection, deriveScopeState, deriveStageRailState, desktopConversationBreakpoint, detailContentPolicy, entityStateLabel, findStage, gateGroupPresentation, gateProgress, githubEvidenceItems, heroGateEvidence, hierarchyIsExploring, hierarchyPlacement, meaningfulGateGroups, mobileHierarchyLevels, mobileWorkspaceTabs, nextStageOptionIndex, nowPresentation, projectHeroModel, resolveHierarchySelection, selectedGateCount, selectedStageContext, selectHierarchyPhase, selectHierarchyScope, selectLiveBinding, selectProject, snapshotPresentation, sourceStateLabel, stageDetailSemantics, structuralPhaseModel, structureStatusLabel, summarizeStage, timingPresentation, workspaceManagementItems, type Binding, type GithubConnector, type PackageProject, type PackageStage } from './OutcomeDashboard'
+import { ApprovalInbox, OutcomeDashboard, OutcomeResultView, approvalInboxProjection, axisStateLabel, bindingHeroLabel, bindingObservationLabel, collapsedStageCount, currentHierarchy, defaultHierarchySelection, deriveScopeState, deriveStageRailState, desktopConversationBreakpoint, detailContentPolicy, entityStateLabel, findStage, focusPlannerConversation, gateGroupPresentation, gateProgress, githubEvidenceItems, heroGateEvidence, hierarchyIsExploring, hierarchyPlacement, meaningfulGateGroups, mobileHierarchyLevels, mobileWorkspaceTabs, nextStageOptionIndex, nowPresentation, projectHeroModel, resolveHierarchySelection, selectedGateCount, selectedStageContext, selectHierarchyPhase, selectHierarchyScope, selectLiveBinding, selectProject, snapshotPresentation, sourceStateLabel, stageDetailSemantics, structuralPhaseModel, structureStatusLabel, summarizeStage, timingPresentation, workspaceManagementItems, type Binding, type GithubConnector, type OutcomeDashboardData, type PackageProject, type PackageStage, type ResultView } from './OutcomeDashboard'
 import { activityLabelKo, axisLabelKo, gatePresentation, groupPresentation, hierarchyLabels, loginErrorPresentation, phasePresentation, projectOutcomePresentation, roleLabel, stagePresentation } from './outcomeKorean'
 import type { PrivateModelV2Projection } from '../lib/api'
 
@@ -24,6 +24,34 @@ const visualViolations = (css: string) => [
 const modelV2 = (overrides: Partial<PrivateModelV2Projection> = {}): PrivateModelV2Projection => ({ schemaVersion: 1, modelVersion: 2, project: { id: 'outcome', label: 'OUTCOME' }, destination: { id: 'destination-one', label: 'Cherry 판단 경계' }, remainingAcceptanceGap: { remaining: 1, total: 4 }, now: { observedAt: '2026-09-04T02:00:00.000Z', state: 'ready' }, readyBoundaryLabels: [], nextActionLabel: null, cherryActionLabel: null, state: 'ready', events: [], ...overrides })
 
 describe('OUTCOME Package dashboard', () => {
+  it('renders the collected OUTCOME result view end to end without a blank application shell', async () => {
+    // @ts-expect-error Node ESM boundary is exercised only by the test runner.
+    const { collectOutcomePackages, projectPublicPackages } = await import('../../server/outcome-package.mjs')
+    const collected = projectPublicPackages(collectOutcomePackages({ repositoryRoot: new URL('../..', import.meta.url).pathname, now: new Date('2026-09-07T06:00:00.000Z') }))
+    const initialData = { ...collected, build: { repository: 'OUTCOME', ref: 'candidate', commit: null, tree: null, asset: null, runtimeNowPinned: false as const } } as OutcomeDashboardData
+    const markup = renderToStaticMarkup(createElement(OutcomeDashboard, { onUnauthorized: () => undefined, initialData }))
+    expect(markup).toContain('id="oc-result-view"')
+    expect(markup).toContain('id="result-node-outcome"')
+    expect(markup).toContain('결과물·진척·시간')
+  })
+  it('결과물 뷰는 전체와 하위 계층에 같은 근거·시간·일자 구조를 펼쳐 보여준다', () => {
+    const node = { id: 'outcome', kind: 'project', title: 'OUTCOME', outcome: '사용 가능한 결과', acceptance: { closed: 1, total: 2, unmapped: 1, partial: true, label: '부분 분모 · 전체 완료율 아님', unit_ids: ['GATES.md#G1', 'GATES.md#G2'], denominator_sha256: 'a'.repeat(64), weight: 1, completion_authority: false }, work: { initial_hours: null, actual_hours: null, remaining_hours: null, planned_finish_at: '2026-09-18T07:55:25+09:00', latest_forecast: null, provenance: { planned_finish_at: { source_ref: 'docs/PLAN.md', observed_at: '2026-09-07T00:00:00+09:00' } } }, comparison: { yesterday: null, current: { observed_at: '2026-09-07T00:00:00+09:00', closed: 1, total: 2, unmapped: 1, denominator_sha256: 'a'.repeat(64) }, today_delta: null, message: '이 날짜 이전의 비교 기록 없음' }, timeline: [{ type: 'current', observed_at: '2026-09-07T00:00:00+09:00', closed: 1, total: 2, unmapped: 1 }], links: { source: { href: '#result-node-outcome', action: null, label: '출처 보기' }, usable_result: { href: '#result-node-outcome', action: null, label: '사용 가능한 결과 보기' }, planner_conversation: { href: null, action: 'planner_conversation', label: 'Planner 대화 보기' } }, children: [] }
+    const value = { schema_version: 1, observed_at: '2026-09-07T00:00:00+09:00', calendar: { plan_started_at: null, planned_finish_at: '2026-09-18T07:55:25+09:00', source_ref: 'docs/PLAN.md' }, hierarchy: node, links: node.links, completion_authority: false } as ResultView
+    const markup = renderToStaticMarkup(createElement(OutcomeResultView, { view: value, onPlannerNavigate: () => undefined }))
+    for (const text of ['결과물·진척·시간', '부분 분모 · 전체 완료율 아님', '최초 예상', '실제 작업', '남은 예상 범위', '계획 마감', '최신 완료 예측', '전일 누적', '당일 변화', '현재 누적', '이 날짜 이전의 비교 기록 없음', '미확정', 'Planner 대화 보기']) expect(markup).toContain(text)
+    expect(markup).toContain('data-completion-authority="false"')
+    expect(markup).not.toContain('100%')
+  })
+  it('Planner 이동은 같은 대화 패널의 Planner 필터를 선택하고 제목에 포커스한다', () => {
+    let clicked = 0; let focused = 0; let tabIndex = 0
+    const heading = { focus() { focused += 1 }, get tabIndex() { return tabIndex }, set tabIndex(value) { tabIndex = value } }
+    const planner = { textContent: 'Planner', click() { clicked += 1 } }
+    const panel = { querySelectorAll: () => [{ textContent: '전체', click() {} }, planner], querySelector: (selector: string) => selector === '#planner-conversation-title' ? heading : null }
+    const root = { querySelector: (selector: string) => selector === '#oc-planner-conversation' ? panel : null }
+    expect(focusPlannerConversation(root as unknown as Document)).toBe(true)
+    expect({ clicked, focused, tabIndex }).toEqual({ clicked: 1, focused: 1, tabIndex: -1 })
+    expect(focusPlannerConversation({ querySelector: () => null } as unknown as Document)).toBe(false)
+  })
   it('uses a neutral completed map node with one internal point accent no larger than 8px', () => {
     expect(effectiveProperty(styles, '.oc-map-column button[role=option]>i.complete', 'background')).toBe('#151a15')
     expect(effectiveProperty(styles, '.oc-map-column button[role=option]>i.complete::after', 'width')).toBe('7px')

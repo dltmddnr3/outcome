@@ -7,6 +7,7 @@ import YAML from 'yaml'
 import { sanitizeEvidenceText, sanitizeRemotePayload } from './cherry-note-dashboard.mjs'
 import { isPublicSessionAlias, loadRegistry, publicRegistryProjection } from './outcome-session-registry-persistence.mjs'
 import { applyOutcomeModelV2Pilot } from './outcome-model-v2.mjs'
+import { projectOutcomeResultView } from './outcome-result-view-projection.mjs'
 
 const ROLES = ['planner', 'builder', 'ux_product_qa', 'release_audit']
 const STABLE_ID = /^[a-z0-9]+(?:-[a-z0-9]+)*$/
@@ -220,7 +221,7 @@ function bindingViews(projectId, registry, now, staleAfterSeconds, setupRequired
   })
 }
 
-export function buildPackageModel({ root, contractFile, mapFile, sessionsFile = null, bindingRegistry = [], gitEvidence, now = new Date(), staleAfterSeconds = 900 }) {
+export function buildPackageModel({ root, contractFile, mapFile, sessionsFile = null, workTrackingFile = null, workTrackingSourceRefs = null, bindingRegistry = [], gitEvidence, now = new Date(), staleAfterSeconds = 900 }) {
   const contractPath = resolve(root, contractFile)
   const mapPath = resolve(root, mapFile)
   const contractText = safeRead(contractPath)
@@ -237,7 +238,7 @@ export function buildPackageModel({ root, contractFile, mapFile, sessionsFile = 
   const sessions = parseSessionsManifest(sessionsText, contract.projectId); errors.push(...sessions.errors)
   const reconciliationErrors = reconcileSessions(contract.projectId, bindingRegistry, sessions); errors.push(...reconciliationErrors)
   const reconciledRegistry = reconciliationErrors.length ? { bindings: [], error: 'registry_conflict' } : bindingRegistry
-  if (!map) return { status: 'unknown', errors: [...new Set(errors)], project: { id: contract.projectId ?? 'unknown', name: contract.projectName ?? 'Unknown project', outcome: contract.outcome }, phases: [], bindings: bindingViews(contract.projectId, reconciledRegistry, now, staleAfterSeconds, sessions.setupRequired), now: { status: 'unbound', activity: null }, progress: { available: false } }
+  if (!map) return { status: 'unknown', errors: [...new Set(errors)], project: { id: contract.projectId ?? 'unknown', name: contract.projectName ?? 'Unknown project', outcome: contract.outcome }, phases: [], bindings: bindingViews(contract.projectId, reconciledRegistry, now, staleAfterSeconds, sessions.setupRequired), now: { status: 'unbound', activity: null }, progress: { available: false }, resultView: null }
   if (contract.projectId !== map.project_id) errors.push('project_reference_mismatch')
   const github = parseGithubConnector(map.source_connectors?.github, gitEvidence ?? readLocalGitEvidence(root, map.source_connectors?.github))
   const allIds = [map.project_id]
@@ -287,15 +288,25 @@ export function buildPackageModel({ root, contractFile, mapFile, sessionsFile = 
   const builder = bindings.find((item) => item.role === 'builder')
   const evidenceTimes = stages.map((item) => item.stage.gate.observedAt).filter(Boolean).map(Date.parse).filter(Number.isFinite)
   const evidenceObservedAt = evidenceTimes.length ? new Date(Math.max(...evidenceTimes)).toISOString() : null
-  const conflict = errors.some((error) => error.includes('conflict') || error.includes('mismatch') || error.includes('duplicate'))
-  return {
-    status: conflict ? 'conflict' : errors.length ? 'unknown' : 'valid', errors: [...new Set(errors)], observedAt: evidenceObservedAt, sourceFreshness: { state: evidenceObservedAt ? 'observed' : 'unknown', observedAt: evidenceObservedAt },
+  const model = {
+    status: 'valid', errors, observedAt: evidenceObservedAt, sourceFreshness: { state: evidenceObservedAt ? 'observed' : 'unknown', observedAt: evidenceObservedAt },
     project: { id: map.project_id, name: map.project_title ?? map.title ?? contract.projectName, outcome: map.project_purpose ?? contract.outcome, acceptanceAuthority: contract.acceptanceAuthority }, phases, connectors: { github },
     current: current ? { phaseId: current.phase.id, scopeId: current.scope.id, stageId: current.stage.id } : null,
     next: next ? { phaseId: next.phase.id, scopeId: next.scope.id, stageId: next.stage.id } : null,
     bindings, now: builder && !['unbound', 'setup_required', 'registry_unavailable', 'registry_conflict'].includes(builder.status) ? { status: builder.status, activity: builder.activity, observedAt: builder.observedAt, source: 'builder_binding' } : { status: builder?.status ?? 'unbound', activity: null, observedAt: null, source: 'runtime_registry' },
     progress: { available: false, reason: 'no_cross_stage_aggregate' },
   }
+  model.resultView = null
+  if (workTrackingFile) {
+    try {
+      const tracking = JSON.parse(readFileSync(resolve(root, workTrackingFile), 'utf8'))
+      model.resultView = projectOutcomeResultView(model, tracking, { observedAtCutoff: now.toISOString() }, workTrackingSourceRefs)
+    } catch { errors.push('work_tracking_invalid') }
+  }
+  const conflict = errors.some((error) => error.includes('conflict') || error.includes('mismatch') || error.includes('duplicate'))
+  model.status = conflict ? 'conflict' : errors.length ? 'unknown' : 'valid'
+  model.errors = [...new Set(errors)]
+  return model
 }
 
 const registryError = (code) => { throw new Error(code) }
@@ -313,12 +324,15 @@ export function loadProjectRegistry({ environment = process.env, repositoryRoot 
     if (!entry || typeof entry !== 'object' || Array.isArray(entry) || !['root', 'contract_file', 'map_file'].every((key) => typeof entry[key] === 'string' && entry[key].trim())) registryError('project_registry_entry_invalid')
     const root = resolve(repositoryRoot, entry.root)
     if (entry.sessions_file != null && (typeof entry.sessions_file !== 'string' || !entry.sessions_file.trim())) registryError('project_registry_entry_invalid')
-    const documents = [entry.contract_file, entry.map_file, ...(entry.sessions_file ? [entry.sessions_file] : [])]
+    if (entry.work_tracking_file != null && (typeof entry.work_tracking_file !== 'string' || !entry.work_tracking_file.trim())) registryError('project_registry_entry_invalid')
+    if (entry.work_tracking_file != null && (!Array.isArray(entry.work_tracking_source_refs) || entry.work_tracking_source_refs.length === 0 || entry.work_tracking_source_refs.some((source) => typeof source !== 'string' || !source || source !== source.trim()) || new Set(entry.work_tracking_source_refs).size !== entry.work_tracking_source_refs.length)) registryError('project_registry_entry_invalid')
+    if (entry.work_tracking_file == null && entry.work_tracking_source_refs != null) registryError('project_registry_entry_invalid')
+    const documents = [entry.contract_file, entry.map_file, ...(entry.sessions_file ? [entry.sessions_file] : []), ...(entry.work_tracking_file ? [entry.work_tracking_file] : [])]
     if (documents.some(isAbsolute)) registryError('project_registry_document_absolute')
     const documentPaths = documents.map((document) => resolve(root, document))
     if (documentPaths.some((documentPath) => !insideRoot(root, documentPath))) registryError('project_registry_document_traversal')
     const [contractPath, mapPath] = documentPaths
-    const definition = { root, contractFile: entry.contract_file, mapFile: entry.map_file, sessionsFile: entry.sessions_file ?? null }
+    const definition = { root, contractFile: entry.contract_file, mapFile: entry.map_file, sessionsFile: entry.sessions_file ?? null, workTrackingFile: entry.work_tracking_file ?? null, workTrackingSourceRefs: entry.work_tracking_source_refs ?? null }
     const fingerprint = JSON.stringify([root, contractPath, mapPath])
     if (fingerprints.has(fingerprint)) registryError('project_registry_duplicate_entry')
     fingerprints.add(fingerprint)

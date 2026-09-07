@@ -11,7 +11,11 @@
       "root": ".",
       "contract_file": "docs/OUTCOME_CONTRACT.md",
       "map_file": "docs/OUTCOME_MAP.md",
-      "sessions_file": "docs/OUTCOME_SESSIONS.md"
+      "sessions_file": "docs/OUTCOME_SESSIONS.md",
+      "work_tracking_file": "config/outcome-work-tracking.json",
+      "work_tracking_source_refs": [
+        "docs/MVP_14_DAY_EXECUTION_PLAN.md"
+      ]
     }
   ]
 }
