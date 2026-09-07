@@ -21,7 +21,7 @@ const VERDICTS = new Set(['PASS', 'FAIL', 'SAFE_HOLD'])
 const TRUE_CHERRY_BOUNDARIES = new Set(['user_value', 'external_authority', 'cost', 'acceptance', 'deployment', 'release'])
 const TECHNICAL_BOUNDARIES = new Set(['source_revision', 'delivery_unknown', 'envelope_renewal', 'generic_blocker'])
 const PRIVATE_KEY = /(?:credential|password|secret|token|raw[_-]?(?:prompt|result)|registry|locator|thread|session|turn|provider[_-]?(?:id|ref|payload))/i
-const PRIVATE_VALUE = /(?:^|[\s=:])(?:token|secret|password|credential)\s*=|(?:^|[\s=:])(?:registry|provider)[_-]?(?:payload|id|ref)?\s*=|(?:^|[\s=:])(?:\/(?:Users|home|tmp|private)(?:\/|$)|\/var\/folders(?:\/|$)|[A-Za-z]:\\|\\\\[^\\\s]+\\)|raw[_-]?(?:prompt|result)|private[_-]?(?:registry|locator)|\b(?:task|thread|session|turn|provider)[_:-][a-z0-9._-]{4,}\b|\b(?:[0-9a-f]{40}|[0-9a-f]{64})\b/i
+const PRIVATE_VALUE = /(?:^|[\s=:])(?:token|secret|password|credential)\s*=|(?:^|[\s=:])(?:registry|provider)[_-]?(?:payload|id|ref)?\s*=|(?:^|[\s=:])(?:\/(?:Users|home|tmp|private)(?:\/|$)|\/var\/folders(?:\/|$)|[A-Za-z]:\\|\\\\[^\\\s]+\\)|raw[_-]?(?:prompt|result)|private[_-]?(?:registry|locator)|\b(?:task|thread|session|turn|provider)(?:[_:][a-z0-9._-]{4,}|-(?=[a-z0-9._-]*\d)[a-z0-9._-]{4,})\b|\b(?:[0-9a-f]{40}|[0-9a-f]{64})\b/i
 
 const fail = (code) => { throw new Error(`execution_loop_${code}`) }
 const exact = (value, keys, code = 'invalid_shape') => {

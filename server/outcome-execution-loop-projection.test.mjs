@@ -37,6 +37,16 @@ test('projects at most one exact item and keeps every shared fact explicit', () 
   assert.equal(Object.isFrozen(rows[0].ownerInstruction), true)
 })
 
+test('product vocabulary with session and provider hyphens remains public-safe', () => {
+  const stageId = 'outcome-stage-phase3-private-session-registry'
+  const rows = projectExecutionLoopItems(input({
+    currentStageId: stageId,
+    predicates: [predicate({ stageId, title: 'provider-neutral auth와 session-expired 상태를 검증한다' })],
+  }))
+  assert.equal(rows.length, 1)
+  assert.equal(rows[0].missing.value, 'B1 · provider-neutral auth와 session-expired 상태를 검증한다')
+})
+
 test('activity alone changes no evidence progress review or completion fact', () => {
   const quiet = projectExecutionLoopItems(input({ events: [event({ status: 'observed' })] }))[0]
   const active = projectExecutionLoopItems(input({ events: [event({ status: 'active' })] }))[0]
