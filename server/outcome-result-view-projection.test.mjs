@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict'
 import { createHash } from 'node:crypto'
 import test from 'node:test'
-import { outcomeSnapshotId, projectOutcomeResultView } from './outcome-result-view-projection.mjs'
+import { outcomeSnapshotId, projectOutcomeCurrentSource, projectOutcomeResultView } from './outcome-result-view-projection.mjs'
 
 const stage = (id, sourceRef, gates) => ({ id, title: id, purpose: `${id} result`, gate: { available: Boolean(sourceRef), sourceRef, gates, total: gates.length, closed: gates.filter((gate) => gate.closed).length } })
 const project = {
@@ -25,6 +25,84 @@ const cutoff = { observedAtCutoff: '2026-09-07T06:00:00.000Z' }
 const sourceRefs = ['docs/MVP_14_DAY_EXECUTION_PLAN.md', 'docs/WORK.md', 'docs/FORECAST.md', 'evidence/snapshot-before.json', 'evidence/snapshot-current.json', 'evidence/snapshot-old.json', 'evidence/node-local.json', 'evidence/snapshot.json']
 const resultView = (sourceProject, tracking, options = cutoff, refs = sourceRefs) => projectOutcomeResultView(sourceProject, tracking, options, refs)
 const denominator = (unitIds) => createHash('sha256').update(JSON.stringify(unitIds)).digest('hex')
+const primaryIds = ['D1', 'D2', 'A1', 'A2', 'A3', 'A4', 'Q1', 'B1', 'B2', 'B3', 'Q2', 'A5', 'C1']
+const currentSourceProject = {
+  project: { id: 'outcome', name: 'OUTCOME', outcome: 'usable result' }, status: 'valid', errors: [], observedAt: '2026-09-03T10:42:15.806Z', sourceFreshness: { state: 'observed', observedAt: '2026-09-03T10:42:15.806Z' },
+  current: { phaseId: 'outcome-phase-2', scopeId: 'outcome-phase-2-account-service', stageId: 'outcome-stage-account-access-hosted-identity-preview' }, next: null,
+  phases: [
+    { id: 'outcome-phase-2', title: 'Phase 2', purpose: 'history', scopes: [{ id: 'outcome-phase-2-account-service', title: 'Account', purpose: 'history', stages: [stage('outcome-stage-account-access-hosted-identity-preview', 'GATES_PHASE2_ACCOUNT_ACCESS_HOSTED_IDENTITY_PREVIEW.md', ['P1', 'P2', 'P3', 'P4', 'P5', 'P6'].map((id, index) => ({ id, closed: index < 5 })))] }] },
+    { id: 'outcome-phase-3', title: 'Phase 3', purpose: 'compatibility', scopes: [{ id: 'outcome-phase-3-evidence-continuity', title: 'Continuity', purpose: 'compatibility', stages: [stage('outcome-stage-phase3-cherry-acceptance', 'GATES_PHASE3_EXISTING_SESSION_OPERATIONS_CHERRY_ACCEPTANCE.md', [{ id: 'C1', closed: false }])] }] },
+    { id: 'outcome-phase-5', title: 'Phase 5', purpose: 'primary', scopes: [{ id: 'outcome-phase-5-composition', title: 'Beyond fixed sessions', purpose: 'primary', stages: [stage('outcome-milestone-model-v2-local-default-projection', 'GATES_OUTCOME_MODEL_V2_LOCAL_DEFAULT_AND_SERVICE_PROJECTION.md', primaryIds.slice(2, 6).map((id) => ({ id, closed: true })))] }] },
+  ],
+}
+const currentMap = { active_workstream: { canonical_stage_id: 'outcome-milestone-model-v2-local-default-projection', canonical_gate_id: 'B1-B3' }, phases: [{ id: 'outcome-phase-5', scopes: [{ id: 'outcome-phase-5-composition', stages: [{ id: 'outcome-milestone-model-v2-local-default-projection', gates_file: 'GATES_OUTCOME_MODEL_V2_LOCAL_DEFAULT_AND_SERVICE_PROJECTION.md#A1-A4-Q1-B1-B3-Q2-A5-C1' }] }] }] }
+const currentGateText = `Status: **MODEL V2 13/13 CHERRY ACCEPTED · ACTIVATION UNPERFORMED**\n\n${primaryIds.map((id) => `- [x] ${id}: ${id} evidence`).join('\n')}`
+const currentMapText = '- Primary implementation target: `outcome-milestone-model-v2-local-default-projection · Slice A A1-A4 OPEN`.\n- Current: `outcome-phase-3 / outcome-phase-3-evidence-continuity / outcome-stage-phase3-cherry-acceptance · OPEN`\n- Future: Phase 3은 source facts로 실행 Gate `38/43`이다.'
+const currentSource = (captured_at = '2026-09-07T05:00:00.000Z') => ({ map: currentMap, map_text: currentMapText, gate_text: currentGateText, captured_at, map_updated_at: '2026-08-31 KST', gate_observed_at: '2026-09-03T09:55:56.978Z' })
+const currentTracking = { ...base, observed_at: '2026-09-07T03:00:00.000Z', nodes: {}, snapshots: [] }
+const projectCurrent = (source = currentSource()) => projectOutcomeCurrentSource(currentSourceProject, currentTracking, cutoff, sourceRefs, source)
+
+test('selects the sole Phase 5 current source and exact 13-unit evidence denominator while separating compatibility and history', () => {
+  const corrected = projectCurrent()
+  assert.deepEqual(corrected.current, { phaseId: 'outcome-phase-5', scopeId: 'outcome-phase-5-composition', stageId: 'outcome-milestone-model-v2-local-default-projection' })
+  const source = corrected.resultView.source_projection
+  assert.deepEqual(source.primary.acceptance.unit_ids, primaryIds.map((id) => `GATES_OUTCOME_MODEL_V2_LOCAL_DEFAULT_AND_SERVICE_PROJECTION.md#${id}`))
+  assert.deepEqual({ closed: source.primary.acceptance.closed, total: source.primary.acceptance.total, unmapped: source.primary.acceptance.unmapped }, { closed: 13, total: 13, unmapped: 0 })
+  assert.deepEqual({ label: source.compatibility.label, closed: source.compatibility.closed, total: source.compatibility.total }, { label: 'compatibility', closed: 38, total: 43 })
+  assert.deepEqual({ label: source.historical[0].label, closed: source.historical[0].closed, total: source.historical[0].total }, { label: 'historical', closed: 5, total: 6 })
+  assert.equal(corrected.status, 'conflict')
+  assert.equal(source.conflicts[0].map_value, 'Slice A A1-A4 OPEN')
+  assert.equal(source.completion_authority, false)
+  assert.equal(corrected.resultView.completion_authority, false)
+})
+
+test('capture time never changes source identity denominator closure or evidence observation time', () => {
+  const first = projectCurrent(currentSource('2026-09-07T05:00:00.000Z'))
+  const second = projectCurrent(currentSource('2026-09-07T06:00:00.000Z'))
+  assert.deepEqual(second.current, first.current)
+  assert.deepEqual(second.resultView.source_projection.primary, first.resultView.source_projection.primary)
+  assert.equal(second.resultView.source_projection.evidence_observed_at, first.resultView.source_projection.evidence_observed_at)
+  assert.notEqual(second.resultView.source_projection.captured_at, first.resultView.source_projection.captured_at)
+})
+
+test('current source correction keeps all unsourced work forecast and history facts unknown', () => {
+  const view = projectCurrent().resultView
+  const phase = view.hierarchy.children.find((row) => row.id === 'outcome-phase-5')
+  const milestone = phase.children[0].children[0]
+  for (const node of [view.hierarchy, phase, phase.children[0], milestone]) {
+    assert.equal(node.work.initial_hours, null)
+    assert.equal(node.work.actual_hours, null)
+    assert.equal(node.work.remaining_hours, null)
+    assert.equal(node.work.latest_forecast, null)
+    assert.equal(node.comparison.yesterday, null)
+    assert.equal(node.comparison.today_delta, null)
+  }
+})
+
+test('current source correction fails closed on denominator source and observation ambiguity', () => {
+  const variants = [
+    { ...currentSource(), gate_text: currentGateText.replace('- [x] C1:', '- [x] C2:') },
+    { ...currentSource(), gate_text: `${currentGateText}\n- [x] X1: extra` },
+    { ...currentSource(), gate_text: currentGateText.replace('- [x] C1:', '- [ ] C1:') },
+    { ...currentSource(), gate_text: currentGateText.replace('D1 evidence', 'token=private') },
+    { ...currentSource(), map: { ...currentMap, phases: [...currentMap.phases, currentMap.phases[0]] } },
+    { ...currentSource(), map_text: currentMapText.replace('38/43', '13/13') },
+    { ...currentSource(), captured_at: 'not-a-time' },
+    { ...currentSource(), map_updated_at: 'token=private' },
+    { ...currentSource(), gate_observed_at: 'not-a-time' },
+    { ...currentSource(), gate_observed_at: '2026-09-08T09:55:56.978Z' },
+  ]
+  for (const source of variants) assert.throws(() => projectCurrent(source), /current_source_projection_invalid/)
+})
+
+test('current source correction rejects accessors and Proxies without executing hostile code', () => {
+  let reads = 0
+  const accessor = currentSource(); Object.defineProperty(accessor, 'gate_text', { enumerable: true, get() { reads += 1; return currentGateText } })
+  assert.throws(() => projectCurrent(accessor), /current_source_projection_invalid/); assert.equal(reads, 0)
+  let traps = 0
+  const proxy = new Proxy(currentSource(), { get() { traps += 1; return undefined }, ownKeys() { traps += 1; return [] } })
+  assert.throws(() => projectCurrent(proxy), /current_source_projection_invalid/); assert.equal(traps, 0)
+})
 
 test('deduplicates acceptance identities and unions descendant denominators', () => {
   const view = resultView(project, base)

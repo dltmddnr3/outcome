@@ -36,6 +36,20 @@ describe('OUTCOME Package dashboard', () => {
     expect(markup).toContain('완료 조건 미연결 · 전체 완료율 아님')
     expect(markup).not.toContain('<b>0/0</b><small>근거 닫힘</small>')
   })
+  it('opens the sealed Phase 5 primary while keeping compatibility and historical evidence non-authoritative', () => {
+    const source = JSON.parse(readFileSync(new URL('../../snapshot/outcome-package-source.json', import.meta.url), 'utf8'))
+    const sealed = { ...source, build: { repository: 'OUTCOME', ref: 'candidate', commit: null, tree: null, asset: null, runtimeNowPinned: false as const } } as OutcomeDashboardData
+    const outcome = sealed.projects.find((item) => item.project.id === 'outcome')!
+    expect(defaultHierarchySelection(outcome)).toEqual({ phaseId: 'outcome-phase-5', scopeId: 'outcome-phase-5-composition', stageId: 'outcome-milestone-model-v2-local-default-projection' })
+    const markup = renderToStaticMarkup(createElement(OutcomeDashboard, { onUnauthorized: () => undefined, initialData: sealed }))
+    expect(markup).toContain('data-current-phase-id="outcome-phase-5"')
+    expect(markup).toContain('data-selected-phase-id="outcome-phase-5"')
+    expect(markup).toContain('data-current-stage-id="outcome-milestone-model-v2-local-default-projection"')
+    expect(markup).toContain('<b>13/13</b><small>근거 닫힘</small>')
+    expect(markup).toContain('class="oc-v1-compatibility"')
+    expect(markup).toContain('원본 충돌')
+    expect(markup).toContain('data-completion-authority="false"')
+  })
   it('결과물 뷰는 전체와 하위 계층에 같은 근거·시간·일자 구조를 펼쳐 보여준다', () => {
     const node = { id: 'outcome', kind: 'project', title: 'OUTCOME', outcome: '사용 가능한 결과', acceptance: { closed: 1, total: 2, unmapped: 1, partial: true, label: '부분 분모 · 전체 완료율 아님', unit_ids: ['GATES.md#G1', 'GATES.md#G2'], denominator_sha256: 'a'.repeat(64), weight: 1, completion_authority: false }, work: { initial_hours: null, actual_hours: null, remaining_hours: null, planned_finish_at: '2026-09-18T07:55:25+09:00', latest_forecast: null, provenance: { planned_finish_at: { source_ref: 'docs/PLAN.md', observed_at: '2026-09-07T00:00:00+09:00' } } }, comparison: { yesterday: null, current: { observed_at: '2026-09-07T00:00:00+09:00', closed: 1, total: 2, unmapped: 1, denominator_sha256: 'a'.repeat(64) }, today_delta: null, message: '이 날짜 이전의 비교 기록 없음' }, timeline: [{ type: 'current', observed_at: '2026-09-07T00:00:00+09:00', closed: 1, total: 2, unmapped: 1 }], links: { source: { href: '#result-node-outcome', action: null, label: '출처 보기' }, usable_result: { href: '#result-node-outcome', action: null, label: '사용 가능한 결과 보기' }, planner_conversation: { href: null, action: 'planner_conversation', label: 'Planner 대화 보기' } }, children: [] }
     const value = { schema_version: 1, observed_at: '2026-09-07T00:00:00+09:00', calendar: { plan_started_at: null, planned_finish_at: '2026-09-18T07:55:25+09:00', source_ref: 'docs/PLAN.md' }, hierarchy: node, links: node.links, completion_authority: false } as ResultView

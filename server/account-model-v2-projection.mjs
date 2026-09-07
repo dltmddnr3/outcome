@@ -93,8 +93,20 @@ const validateSourceContract = (source) => {
   if (source.now !== undefined) assertKeys(source.now, new Set(['status', 'activity', 'observedAt', 'source']))
   if (source.progress !== undefined) assertKeys(source.progress, new Set(['available', 'reason']))
   if (source.resultView !== undefined && source.resultView !== null) {
-    assertKeys(source.resultView, new Set(['schema_version', 'observed_at', 'calendar', 'hierarchy', 'links', 'completion_authority']))
+    assertKeys(source.resultView, new Set(['schema_version', 'observed_at', 'calendar', 'hierarchy', 'links', 'source_projection', 'completion_authority']))
     if (source.resultView.schema_version !== 1 || source.resultView.completion_authority !== false || source.resultView.hierarchy?.id !== source.project.id || source.resultView.hierarchy?.kind !== 'project' || !Array.isArray(source.resultView.hierarchy?.children)) throw new Error('account_model_v2_result_view_invalid')
+    if (source.resultView.source_projection !== undefined) {
+      const context = source.resultView.source_projection
+      assertKeys(context, new Set(['captured_at', 'source_updated_at', 'evidence_observed_at', 'primary', 'compatibility', 'historical', 'conflicts', 'completion_authority']))
+      assertKeys(context.primary, new Set(['destination_id', 'compatibility_workstream_id', 'milestone_id', 'gate_ref', 'acceptance']))
+      assertKeys(context.primary.acceptance, new Set(['closed', 'total', 'unmapped', 'unit_ids', 'label']))
+      assertKeys(context.compatibility, new Set(['phase_id', 'scope_id', 'stage_id', 'closed', 'total', 'label']))
+      if (!Array.isArray(context.historical) || context.historical.length !== 1 || !Array.isArray(context.conflicts) || context.conflicts.length !== 1) throw new Error('account_model_v2_result_view_invalid')
+      assertKeys(context.historical[0], new Set(['phase_id', 'stage_id', 'closed', 'total', 'label']))
+      assertKeys(context.conflicts[0], new Set(['code', 'map_value', 'gate_value']))
+      const expectedIds = ['D1', 'D2', 'A1', 'A2', 'A3', 'A4', 'Q1', 'B1', 'B2', 'B3', 'Q2', 'A5', 'C1'].map((id) => `GATES_OUTCOME_MODEL_V2_LOCAL_DEFAULT_AND_SERVICE_PROJECTION.md#${id}`)
+      if (context.completion_authority !== false || !Number.isFinite(Date.parse(context.captured_at)) || !/^\d{4}-\d{2}-\d{2} KST$/.test(context.source_updated_at) || !Number.isFinite(Date.parse(context.evidence_observed_at)) || Date.parse(context.evidence_observed_at) > Date.parse(context.captured_at) || context.primary.destination_id !== 'outcome-phase-5' || context.primary.compatibility_workstream_id !== 'outcome-phase-5-composition' || context.primary.milestone_id !== 'outcome-milestone-model-v2-local-default-projection' || context.primary.gate_ref !== 'GATES_OUTCOME_MODEL_V2_LOCAL_DEFAULT_AND_SERVICE_PROJECTION.md' || context.primary.acceptance.closed !== 13 || context.primary.acceptance.total !== 13 || context.primary.acceptance.unmapped !== 0 || context.primary.acceptance.label !== '근거 닫힘 · 완료 판정 권한 없음' || JSON.stringify(context.primary.acceptance.unit_ids) !== JSON.stringify(expectedIds) || context.compatibility.phase_id !== 'outcome-phase-3' || context.compatibility.scope_id !== 'outcome-phase-3-evidence-continuity' || context.compatibility.stage_id !== 'outcome-stage-phase3-cherry-acceptance' || context.compatibility.closed !== 38 || context.compatibility.total !== 43 || context.compatibility.label !== 'compatibility' || context.historical[0].phase_id !== 'outcome-phase-2' || context.historical[0].stage_id !== 'outcome-stage-account-access-hosted-identity-preview' || context.historical[0].closed !== 5 || context.historical[0].total !== 6 || context.historical[0].label !== 'historical' || context.conflicts[0].code !== 'map_primary_narrative_stale' || context.conflicts[0].map_value !== 'Slice A A1-A4 OPEN' || context.conflicts[0].gate_value !== '13/13 evidence closure') throw new Error('account_model_v2_result_view_invalid')
+    }
   }
   if (source.sourceFreshness !== undefined) assertKeys(source.sourceFreshness, new Set(['state', 'observedAt']))
   for (const event of source.events ?? []) {

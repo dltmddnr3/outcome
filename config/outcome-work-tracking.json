@@ -16,7 +16,7 @@
       "source_ref": null,
       "observed_at": null
     },
-    "outcome-phase-2": {
+    "outcome-phase-5": {
       "initial_hours": null,
       "actual_hours": null,
       "remaining_hours": null,
@@ -24,7 +24,7 @@
       "source_ref": null,
       "observed_at": null
     },
-    "outcome-phase-2-account-service": {
+    "outcome-phase-5-composition": {
       "initial_hours": null,
       "actual_hours": null,
       "remaining_hours": null,
@@ -32,7 +32,7 @@
       "source_ref": null,
       "observed_at": null
     },
-    "outcome-stage-account-access-hosted-identity-preview": {
+    "outcome-milestone-model-v2-local-default-projection": {
       "initial_hours": null,
       "actual_hours": null,
       "remaining_hours": null,
@@ -41,30 +41,7 @@
       "observed_at": null
     }
   },
-  "snapshots": [
-    {
-      "snapshot_id": "snapshot-3803fb6c21efa93da8a2ab54",
-      "observed_at": "2026-09-07T20:22:20+09:00",
-      "source_ref": "GATES_PHASE2_ACCOUNT_ACCESS_HOSTED_IDENTITY_PREVIEW.md",
-      "denominator_sha256": "f14e4275b67ffd9914fcbac9dc5dbd45fd7a5fe40c85f5b79b8f76092901b163",
-      "nodes": {
-        "outcome-stage-account-access-hosted-identity-preview": {
-          "closed": 5,
-          "total": 6,
-          "unmapped": 0,
-          "denominator_sha256": "f14e4275b67ffd9914fcbac9dc5dbd45fd7a5fe40c85f5b79b8f76092901b163",
-          "unit_ids": [
-            "GATES_PHASE2_ACCOUNT_ACCESS_HOSTED_IDENTITY_PREVIEW.md#P1",
-            "GATES_PHASE2_ACCOUNT_ACCESS_HOSTED_IDENTITY_PREVIEW.md#P2",
-            "GATES_PHASE2_ACCOUNT_ACCESS_HOSTED_IDENTITY_PREVIEW.md#P3",
-            "GATES_PHASE2_ACCOUNT_ACCESS_HOSTED_IDENTITY_PREVIEW.md#P4",
-            "GATES_PHASE2_ACCOUNT_ACCESS_HOSTED_IDENTITY_PREVIEW.md#P5",
-            "GATES_PHASE2_ACCOUNT_ACCESS_HOSTED_IDENTITY_PREVIEW.md#P6"
-          ]
-        }
-      }
-    }
-  ],
+  "snapshots": [],
   "links": {
     "source": "#result-node-outcome",
     "usable_result": "#result-node-outcome",

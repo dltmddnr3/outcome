@@ -2,7 +2,13 @@ import { createHash } from 'node:crypto'
 import { types as utilTypes } from 'node:util'
 
 const INVALID = 'work_tracking_invalid'
+const CURRENT_SOURCE_INVALID = 'current_source_projection_invalid'
 const HASH = /^[a-f0-9]{64}$/
+const PRIMARY_DESTINATION_ID = 'outcome-phase-5'
+const PRIMARY_WORKSTREAM_ID = 'outcome-phase-5-composition'
+const PRIMARY_MILESTONE_ID = 'outcome-milestone-model-v2-local-default-projection'
+const PRIMARY_GATE_REF = 'GATES_OUTCOME_MODEL_V2_LOCAL_DEFAULT_AND_SERVICE_PROJECTION.md'
+const PRIMARY_GATE_IDS = Object.freeze(['D1', 'D2', 'A1', 'A2', 'A3', 'A4', 'Q1', 'B1', 'B2', 'B3', 'Q2', 'A5', 'C1'])
 const NODE_RANGE_FIELDS = ['initial_hours', 'actual_hours', 'remaining_hours']
 const NODE_KEYS = new Set([...NODE_RANGE_FIELDS, 'latest_forecast', 'source_ref', 'observed_at'])
 const exactObject = (value) => value && typeof value === 'object' && !Array.isArray(value)
@@ -11,10 +17,12 @@ const iso = (value) => typeof value === 'string' && ISO_INSTANT.test(value) && N
 const stable = (value) => Array.isArray(value) ? `[${value.map(stable).join(',')}]` : exactObject(value) ? `{${Object.keys(value).sort().map((key) => `${JSON.stringify(key)}:${stable(value[key])}`).join(',')}}` : JSON.stringify(value)
 const sha256 = (value) => createHash('sha256').update(stable(value)).digest('hex')
 const fail = () => { throw new Error(INVALID) }
+const failCurrentSource = () => { throw new Error(CURRENT_SOURCE_INVALID) }
 const range = (value) => value === null || Array.isArray(value) && value.length === 2 && value.every((item) => typeof item === 'number' && Number.isFinite(item) && item >= 0) && value[0] <= value[1]
 const safeSourceRef = (value) => typeof value === 'string' && value.length > 0 && value.length <= 240 && !value.includes('..') && !value.startsWith('/') && !/[\u0000-\u001f]|\b[0-9a-f]{8}-[0-9a-f-]{27,}\b|\b[0-9a-f]{40,64}\b|raw_(?:prompt|result)|(?:session|thread|task|turn)_id|(?:token|secret|password|authorization|api[_-]?key|locator)\s*[:=]/i.test(value)
 const ACCEPTANCE_UNIT_ID = /^[A-Za-z0-9][A-Za-z0-9._-]{0,159}#[A-Za-z0-9][A-Za-z0-9._-]{0,79}$/
 const PRIVATE_UNIT_LOCATOR = /(?:^|[#._-])(?:task|thread|session|turn)(?:(?:[_-](?:id[_-]?)?)|Id)?[0-9a-z]{3,}(?:$|[._-])|(?:^|#)(?:token|secret|password|authorization|api[-_]?key)(?:$|[._-])/i
+const PRIVATE_SOURCE_TEXT = /(?:\/Users\/|\b[0-9a-f]{8}-[0-9a-f-]{27,}\b|(?:token|secret|password|authorization|api[_-]?key|locator|(?:session|thread|task|turn)_id)\s*[:=])/i
 const safeAcceptanceUnitId = (value) => typeof value === 'string' && safeSourceRef(value) && ACCEPTANCE_UNIT_ID.test(value) && !PRIVATE_UNIT_LOCATOR.test(value)
 const exactDenseArray = (value) => Array.isArray(value) && Object.getOwnPropertyNames(value).length === value.length + 1 && Object.getOwnPropertyNames(value).every((key, index) => index === value.length ? key === 'length' : key === String(index))
 const nodeAnchor = (value) => typeof value === 'string' ? value.match(/^#result-node-([a-z0-9]+(?:-[a-z0-9]+)*)$/)?.[1] ?? null : null
@@ -38,6 +46,69 @@ function assertPassiveData(value, seen = new Set()) {
 export function outcomeSnapshotId(snapshot) {
   const { snapshot_id: _id, ...content } = snapshot
   return `snapshot-${sha256(content).slice(0, 24)}`
+}
+
+const one = (rows) => rows.length === 1 ? rows[0] : failCurrentSource()
+const checkedGateRows = (markdown) => [...markdown.matchAll(/^- \[([ xX])\]\s+([A-Z]+\d+):\s*(.+)$/gm)].map((match) => ({ id: match[2], title: match[3].trim(), closed: match[1].toLowerCase() === 'x' }))
+
+export function projectOutcomeCurrentSource(project, tracking, options, allowedSourceRefs, source) {
+  try { assertPassiveData(project); assertPassiveData(source) } catch { failCurrentSource() }
+  if (!exactKeys(source, new Set(['map', 'map_text', 'gate_text', 'captured_at', 'map_updated_at', 'gate_observed_at']))) failCurrentSource()
+  if (!exactObject(source.map) || typeof source.map_text !== 'string' || typeof source.gate_text !== 'string' || !iso(source.captured_at) || typeof source.map_updated_at !== 'string' || !/^\d{4}-\d{2}-\d{2} KST$/.test(source.map_updated_at) || !iso(source.gate_observed_at) || Date.parse(source.gate_observed_at) > Date.parse(source.captured_at)) failCurrentSource()
+  const active = source.map.active_workstream
+  if (!exactObject(active) || active.canonical_stage_id !== PRIMARY_MILESTONE_ID) failCurrentSource()
+  const phase = one((source.map.phases ?? []).filter((row) => row?.id === PRIMARY_DESTINATION_ID))
+  const scope = one((phase.scopes ?? []).filter((row) => row?.id === PRIMARY_WORKSTREAM_ID))
+  const milestone = one((scope.stages ?? []).filter((row) => row?.id === PRIMARY_MILESTONE_ID))
+  const [gateRef] = String(milestone.gates_file ?? '').split('#', 1)
+  if (gateRef !== PRIMARY_GATE_REF) failCurrentSource()
+
+  const gates = checkedGateRows(source.gate_text)
+  if (gates.length !== PRIMARY_GATE_IDS.length || new Set(gates.map((gate) => gate.id)).size !== PRIMARY_GATE_IDS.length || gates.some((gate, index) => gate.id !== PRIMARY_GATE_IDS[index] || gate.closed !== true || PRIVATE_SOURCE_TEXT.test(gate.title))) failCurrentSource()
+  if (!/Status:\s*\*\*MODEL V2 13\/13 CHERRY ACCEPTED\b/.test(source.gate_text)) failCurrentSource()
+  const staleNarrative = source.map_text.match(/Primary implementation target:\s*`[^`]*Slice A A1-A4 OPEN`/)?.[0] ?? null
+  const compatibility = source.map_text.match(/Current:\s*`(outcome-phase-3 \/ outcome-phase-3-evidence-continuity \/ outcome-stage-phase3-cherry-acceptance) · OPEN`/)?.[1] ?? null
+  const compatibilityCount = source.map_text.match(/Phase 3은[^\n]*실행 Gate `38\/43`/) ? { closed: 38, total: 43 } : null
+  if (!staleNarrative || !compatibility || !compatibilityCount) failCurrentSource()
+
+  const projected = structuredClone(project)
+  const projectedPhase = one(projected.phases.filter((row) => row.id === PRIMARY_DESTINATION_ID))
+  const projectedScope = one(projectedPhase.scopes.filter((row) => row.id === PRIMARY_WORKSTREAM_ID))
+  const projectedMilestone = one(projectedScope.stages.filter((row) => row.id === PRIMARY_MILESTONE_ID))
+  projectedMilestone.gate = {
+    gates: gates.map((gate) => ({ id: gate.id, title: `${gate.id} · canonical Gate evidence closure`, closed: gate.closed, stageId: PRIMARY_MILESTONE_ID, groupCode: gate.id.match(/^[A-Z]+/)?.[0] ?? 'GATE', groupLabel: null, proves: null, evidence: null })),
+    groups: [], total: PRIMARY_GATE_IDS.length, closed: PRIMARY_GATE_IDS.length, available: true,
+    sourceRef: PRIMARY_GATE_REF, observedAt: source.gate_observed_at,
+  }
+  projectedMilestone.state = 'complete'
+  projectedMilestone.sourceState = 'present'
+  projected.current = { phaseId: PRIMARY_DESTINATION_ID, scopeId: PRIMARY_WORKSTREAM_ID, stageId: PRIMARY_MILESTONE_ID }
+  projected.next = null
+  projected.status = 'conflict'
+  projected.conflict = true
+  projected.errors = [...new Set([...(projected.errors ?? []), 'source_projection_conflict:map_primary_narrative_stale'])]
+
+  const historicalPhase = one(projected.phases.filter((row) => row.id === 'outcome-phase-2'))
+  const historicalStage = one(historicalPhase.scopes.flatMap((row) => row.stages).filter((row) => row.id === 'outcome-stage-account-access-hosted-identity-preview'))
+  if (historicalStage.gate.closed !== 5 || historicalStage.gate.total !== 6) failCurrentSource()
+  const sourceProjection = {
+    captured_at: source.captured_at,
+    source_updated_at: source.map_updated_at,
+    evidence_observed_at: source.gate_observed_at,
+    primary: {
+      destination_id: PRIMARY_DESTINATION_ID,
+      compatibility_workstream_id: PRIMARY_WORKSTREAM_ID,
+      milestone_id: PRIMARY_MILESTONE_ID,
+      gate_ref: PRIMARY_GATE_REF,
+      acceptance: { closed: 13, total: 13, unmapped: 0, unit_ids: gates.map((gate) => `${PRIMARY_GATE_REF}#${gate.id}`), label: '근거 닫힘 · 완료 판정 권한 없음' },
+    },
+    compatibility: { phase_id: 'outcome-phase-3', scope_id: 'outcome-phase-3-evidence-continuity', stage_id: 'outcome-stage-phase3-cherry-acceptance', closed: 38, total: 43, label: 'compatibility' },
+    historical: [{ phase_id: 'outcome-phase-2', stage_id: historicalStage.id, closed: 5, total: 6, label: 'historical' }],
+    conflicts: [{ code: 'map_primary_narrative_stale', map_value: 'Slice A A1-A4 OPEN', gate_value: '13/13 evidence closure' }],
+    completion_authority: false,
+  }
+  projected.resultView = projectOutcomeResultView(projected, tracking, options, allowedSourceRefs, sourceProjection)
+  return projected
 }
 
 function validateWorkTracking(project, value, options, allowedSourceRefs) {
@@ -140,7 +211,7 @@ function timelineFor(node, comparison) {
   return timeline
 }
 
-export function projectOutcomeResultView(project, tracking, options, allowedSourceRefs) {
+export function projectOutcomeResultView(project, tracking, options, allowedSourceRefs, sourceProjection = undefined) {
   validateWorkTracking(project, tracking, options, allowedSourceRefs)
   const calendar = { ...tracking.calendar, observed_at: tracking.observed_at }
   const makeStage = (stage) => {
@@ -180,5 +251,5 @@ export function projectOutcomeResultView(project, tracking, options, allowedSour
   }
   const attachLinks = (node) => { node.links = links; for (const child of node.children) attachLinks(child) }
   attachLinks(root)
-  return { schema_version: 1, observed_at: tracking.observed_at, calendar: tracking.calendar, hierarchy: root, links, completion_authority: false }
+  return { schema_version: 1, observed_at: tracking.observed_at, calendar: tracking.calendar, hierarchy: root, links, ...(sourceProjection === undefined ? {} : { source_projection: sourceProjection }), completion_authority: false }
 }

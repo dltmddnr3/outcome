@@ -103,6 +103,29 @@ test('accepts the separate non-authoritative result-view projection only at its 
   ]) assert.throws(() => createAccountModelV2Projection({ ...source, resultView }, { observedAt }), /account_model_v2_(?:result_view_invalid|unexpected_key)/)
 })
 
+test('accepts only the exact current-source context and keeps its authority false', () => {
+  const source = project()
+  const unitIds = ['D1', 'D2', 'A1', 'A2', 'A3', 'A4', 'Q1', 'B1', 'B2', 'B3', 'Q2', 'A5', 'C1'].map((id) => `GATES_OUTCOME_MODEL_V2_LOCAL_DEFAULT_AND_SERVICE_PROJECTION.md#${id}`)
+  const context = {
+    captured_at: observedAt, source_updated_at: '2026-08-31 KST', evidence_observed_at: observedAt,
+    primary: { destination_id: 'outcome-phase-5', compatibility_workstream_id: 'outcome-phase-5-composition', milestone_id: 'outcome-milestone-model-v2-local-default-projection', gate_ref: 'GATES_OUTCOME_MODEL_V2_LOCAL_DEFAULT_AND_SERVICE_PROJECTION.md', acceptance: { closed: 13, total: 13, unmapped: 0, unit_ids: unitIds, label: '근거 닫힘 · 완료 판정 권한 없음' } },
+    compatibility: { phase_id: 'outcome-phase-3', scope_id: 'outcome-phase-3-evidence-continuity', stage_id: 'outcome-stage-phase3-cherry-acceptance', closed: 38, total: 43, label: 'compatibility' },
+    historical: [{ phase_id: 'outcome-phase-2', stage_id: 'outcome-stage-account-access-hosted-identity-preview', closed: 5, total: 6, label: 'historical' }],
+    conflicts: [{ code: 'map_primary_narrative_stale', map_value: 'Slice A A1-A4 OPEN', gate_value: '13/13 evidence closure' }], completion_authority: false,
+  }
+  source.resultView = { schema_version: 1, observed_at: observedAt, calendar: {}, hierarchy: { id: 'outcome', kind: 'project', children: [] }, links: {}, source_projection: context, completion_authority: false }
+  assert.equal(createAccountModelV2Projection(source, { observedAt }).modelVersion, 2)
+  for (const invalid of [
+    { ...context, completion_authority: true },
+    { ...context, primary: { ...context.primary, acceptance: { ...context.primary.acceptance, total: 12 } } },
+    { ...context, compatibility: { ...context.compatibility, closed: 13 } },
+    { ...context, historical: [{ ...context.historical[0], label: 'current' }] },
+    { ...context, source_updated_at: 'token=private' },
+    { ...context, conflicts: [{ ...context.conflicts[0], map_value: 'locator=private' }] },
+    { ...context, unexpected: true },
+  ]) assert.throws(() => createAccountModelV2Projection({ ...source, resultView: { ...source.resultView, source_projection: invalid } }, { observedAt }), /account_model_v2_(?:result_view_invalid|unexpected_key|private_value)/)
+})
+
 test('accepts current public binding metadata while keeping its key boundary closed', () => {
   const binding = { role: 'planner', status: 'registry_conflict', activity: null, boundAt: null, observedAt: null, freshness: 'unknown', bindingVersion: 0, historyCount: 0, phaseId: null, scopeId: null, stageId: null, rotating: false, hasPredecessor: false, history: [] }
   assert.equal(createAccountModelV2Projection({ ...project(), bindings: [binding] }, { observedAt }).modelVersion, 2)

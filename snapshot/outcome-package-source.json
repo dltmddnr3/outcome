@@ -1,6 +1,6 @@
 {
   "schemaVersion": 2,
-  "observedAt": "2026-09-07T11:24:26.844Z",
+  "observedAt": "2026-09-07T12:23:21.492Z",
   "projects": [
     {
       "status": "conflict",
@@ -1699,12 +1699,13 @@
         "sessions_registry_conflict:planner",
         "sessions_registry_conflict:builder",
         "sessions_registry_conflict:ux_product_qa",
-        "sessions_registry_conflict:release_audit"
+        "sessions_registry_conflict:release_audit",
+        "source_projection_conflict:map_primary_narrative_stale"
       ],
-      "observedAt": "2026-09-07T08:33:09.382Z",
+      "observedAt": "2026-09-07T12:04:48.533Z",
       "sourceFreshness": {
         "state": "observed",
-        "observedAt": "2026-09-07T08:33:09.382Z"
+        "observedAt": "2026-09-07T12:04:48.533Z"
       },
       "project": {
         "id": "outcome",
@@ -1810,7 +1811,7 @@
                     "closed": 7,
                     "available": true,
                     "sourceRef": "GATES.md",
-                    "observedAt": "2026-09-07T08:33:09.363Z"
+                    "observedAt": "2026-09-07T12:04:48.510Z"
                   },
                   "sourceState": "present",
                   "state": "complete",
@@ -1956,7 +1957,7 @@
                     "closed": 12,
                     "available": true,
                     "sourceRef": "GATES.md",
-                    "observedAt": "2026-09-07T08:33:09.363Z"
+                    "observedAt": "2026-09-07T12:04:48.510Z"
                   },
                   "sourceState": "present",
                   "state": "complete",
@@ -2098,7 +2099,7 @@
                     "closed": 10,
                     "available": true,
                     "sourceRef": "GATES_OUTCOME_MVP.md",
-                    "observedAt": "2026-09-07T08:33:09.365Z"
+                    "observedAt": "2026-09-07T12:04:48.512Z"
                   },
                   "sourceState": "present",
                   "state": "complete",
@@ -2181,7 +2182,7 @@
                     "closed": 5,
                     "available": true,
                     "sourceRef": "GATES_OUTCOME_MVP.md",
-                    "observedAt": "2026-09-07T08:33:09.365Z"
+                    "observedAt": "2026-09-07T12:04:48.512Z"
                   },
                   "sourceState": "present",
                   "state": "complete",
@@ -2273,7 +2274,7 @@
                     "closed": 6,
                     "available": true,
                     "sourceRef": "GATES_OUTCOME_MVP.md",
-                    "observedAt": "2026-09-07T08:33:09.365Z"
+                    "observedAt": "2026-09-07T12:04:48.512Z"
                   },
                   "sourceState": "present",
                   "state": "complete",
@@ -2354,7 +2355,7 @@
                     "closed": 4,
                     "available": true,
                     "sourceRef": "GATES_OUTCOME_MVP.md",
-                    "observedAt": "2026-09-07T08:33:09.365Z"
+                    "observedAt": "2026-09-07T12:04:48.512Z"
                   },
                   "sourceState": "present",
                   "state": "complete",
@@ -2428,7 +2429,7 @@
                     "closed": 4,
                     "available": true,
                     "sourceRef": "GATES_OUTCOME_MVP.md",
-                    "observedAt": "2026-09-07T08:33:09.365Z"
+                    "observedAt": "2026-09-07T12:04:48.512Z"
                   },
                   "sourceState": "present",
                   "state": "complete",
@@ -2484,7 +2485,7 @@
                     "closed": 2,
                     "available": true,
                     "sourceRef": "GATES_OUTCOME_MVP.md",
-                    "observedAt": "2026-09-07T08:33:09.365Z"
+                    "observedAt": "2026-09-07T12:04:48.512Z"
                   },
                   "sourceState": "present",
                   "state": "complete",
@@ -2589,7 +2590,7 @@
                     "closed": 6,
                     "available": true,
                     "sourceRef": "GATES_PHASE2_STABLE_SNAPSHOT_HOST.md",
-                    "observedAt": "2026-09-07T08:33:09.375Z"
+                    "observedAt": "2026-09-07T12:04:48.525Z"
                   },
                   "sourceState": "present",
                   "state": "complete",
@@ -2688,7 +2689,7 @@
                     "closed": 6,
                     "available": true,
                     "sourceRef": "GATES_PHASE2_PROJECT_PORTFOLIO_FOUNDATION.md",
-                    "observedAt": "2026-09-07T08:33:09.375Z"
+                    "observedAt": "2026-09-07T12:04:48.525Z"
                   },
                   "sourceState": "present",
                   "state": "complete",
@@ -2787,7 +2788,7 @@
                     "closed": 6,
                     "available": true,
                     "sourceRef": "GATES_PHASE2_ACCOUNT_ACCESS_DEFINITION.md",
-                    "observedAt": "2026-09-07T08:33:09.368Z"
+                    "observedAt": "2026-09-07T12:04:48.516Z"
                   },
                   "sourceState": "present",
                   "state": "complete",
@@ -2897,7 +2898,7 @@
                     "closed": 8,
                     "available": true,
                     "sourceRef": "GATES_PHASE2_ACCOUNT_ACCESS_IMPLEMENTATION.md",
-                    "observedAt": "2026-09-07T08:33:09.369Z"
+                    "observedAt": "2026-09-07T12:04:48.517Z"
                   },
                   "sourceState": "present",
                   "state": "complete",
@@ -2971,7 +2972,7 @@
                     "closed": 4,
                     "available": true,
                     "sourceRef": "GATES_PHASE2_ACCOUNT_ACCESS_UX_PRODUCT_QA.md",
-                    "observedAt": "2026-09-07T08:33:09.373Z"
+                    "observedAt": "2026-09-07T12:04:48.521Z"
                   },
                   "sourceState": "present",
                   "state": "complete",
@@ -3045,7 +3046,7 @@
                     "closed": 4,
                     "available": true,
                     "sourceRef": "GATES_PHASE2_ACCOUNT_ACCESS_RELEASE_AUDIT.md",
-                    "observedAt": "2026-09-07T08:33:09.372Z"
+                    "observedAt": "2026-09-07T12:04:48.520Z"
                   },
                   "sourceState": "present",
                   "state": "complete",
@@ -3137,7 +3138,7 @@
                     "closed": 6,
                     "available": true,
                     "sourceRef": "GATES_PHASE2_ACCOUNT_ACCESS_HOSTED_PREVIEW_PREPARATION.md",
-                    "observedAt": "2026-09-07T08:33:09.369Z"
+                    "observedAt": "2026-09-07T12:04:48.517Z"
                   },
                   "sourceState": "present",
                   "state": "complete",
@@ -3283,7 +3284,7 @@
                     "closed": 12,
                     "available": true,
                     "sourceRef": "GATES_PHASE2_ACCOUNT_ACCESS_HOSTED_PREVIEW_CODE_READINESS.md",
-                    "observedAt": "2026-09-07T08:33:09.369Z"
+                    "observedAt": "2026-09-07T12:04:48.517Z"
                   },
                   "sourceState": "present",
                   "state": "complete",
@@ -3375,7 +3376,7 @@
                     "closed": 5,
                     "available": true,
                     "sourceRef": "GATES_PHASE2_ACCOUNT_ACCESS_HOSTED_IDENTITY_PREVIEW.md",
-                    "observedAt": "2026-09-07T08:33:09.368Z"
+                    "observedAt": "2026-09-07T12:04:48.516Z"
                   },
                   "sourceState": "present",
                   "state": "active",
@@ -3476,7 +3477,7 @@
                     "closed": 7,
                     "available": true,
                     "sourceRef": "GATES_PHASE2_ACCOUNT_ONLY_PRIVATE_PROJECT_PREVIEW.md",
-                    "observedAt": "2026-09-07T08:33:09.373Z"
+                    "observedAt": "2026-09-07T12:04:48.522Z"
                   },
                   "sourceState": "present",
                   "state": "complete",
@@ -3577,7 +3578,7 @@
                     "closed": 0,
                     "available": true,
                     "sourceRef": "GATES_PHASE2_ACCOUNT_ACCESS_HOSTED_DATA_PREVIEW.md",
-                    "observedAt": "2026-09-07T08:33:09.368Z"
+                    "observedAt": "2026-09-07T12:04:48.516Z"
                   },
                   "sourceState": "present",
                   "state": "queued",
@@ -3651,7 +3652,7 @@
                     "closed": 0,
                     "available": true,
                     "sourceRef": "GATES_PHASE2_ACCOUNT_ACCESS_HOSTED_PREVIEW_UX_PRODUCT_QA.md",
-                    "observedAt": "2026-09-07T08:33:09.369Z"
+                    "observedAt": "2026-09-07T12:04:48.517Z"
                   },
                   "sourceState": "present",
                   "state": "locked",
@@ -3725,7 +3726,7 @@
                     "closed": 0,
                     "available": true,
                     "sourceRef": "GATES_PHASE2_ACCOUNT_ACCESS_HOSTED_PREVIEW_RELEASE_AUDIT.md",
-                    "observedAt": "2026-09-07T08:33:09.369Z"
+                    "observedAt": "2026-09-07T12:04:48.517Z"
                   },
                   "sourceState": "present",
                   "state": "locked",
@@ -3799,7 +3800,7 @@
                     "closed": 0,
                     "available": true,
                     "sourceRef": "GATES_PHASE2_ACCOUNT_ACCESS_CHERRY_ACCEPTANCE.md",
-                    "observedAt": "2026-09-07T08:33:09.368Z"
+                    "observedAt": "2026-09-07T12:04:48.516Z"
                   },
                   "sourceState": "present",
                   "state": "locked",
@@ -3891,7 +3892,7 @@
                     "closed": 0,
                     "available": true,
                     "sourceRef": "GATES_PHASE2_ACCOUNT_ACCESS_PRODUCTION_RESOURCE_PREPARATION.md",
-                    "observedAt": "2026-09-07T08:33:09.372Z"
+                    "observedAt": "2026-09-07T12:04:48.520Z"
                   },
                   "sourceState": "present",
                   "state": "locked",
@@ -3965,7 +3966,7 @@
                     "closed": 0,
                     "available": true,
                     "sourceRef": "GATES_PHASE2_ACCOUNT_ACCESS_PRODUCTION_UX_PRODUCT_QA.md",
-                    "observedAt": "2026-09-07T08:33:09.372Z"
+                    "observedAt": "2026-09-07T12:04:48.520Z"
                   },
                   "sourceState": "present",
                   "state": "locked",
@@ -4039,7 +4040,7 @@
                     "closed": 0,
                     "available": true,
                     "sourceRef": "GATES_PHASE2_ACCOUNT_ACCESS_PRODUCTION_RELEASE_AUDIT.md",
-                    "observedAt": "2026-09-07T08:33:09.372Z"
+                    "observedAt": "2026-09-07T12:04:48.520Z"
                   },
                   "sourceState": "present",
                   "state": "locked",
@@ -4113,7 +4114,7 @@
                     "closed": 0,
                     "available": true,
                     "sourceRef": "GATES_PHASE2_ACCOUNT_ACCESS_PRODUCTION_CHERRY_ACCEPTANCE.md",
-                    "observedAt": "2026-09-07T08:33:09.371Z"
+                    "observedAt": "2026-09-07T12:04:48.519Z"
                   },
                   "sourceState": "present",
                   "state": "locked",
@@ -4205,7 +4206,7 @@
                     "closed": 0,
                     "available": true,
                     "sourceRef": "GATES_PHASE2_ACCOUNT_ACCESS_PRODUCTION_ACTIVATION.md",
-                    "observedAt": "2026-09-07T08:33:09.371Z"
+                    "observedAt": "2026-09-07T12:04:48.519Z"
                   },
                   "sourceState": "present",
                   "state": "locked",
@@ -4310,7 +4311,7 @@
                     "closed": 6,
                     "available": true,
                     "sourceRef": "GATES_PHASE3_CODEX_ADAPTER_TECHNICAL_SPIKE.md",
-                    "observedAt": "2026-09-07T08:33:09.376Z"
+                    "observedAt": "2026-09-07T12:04:48.526Z"
                   },
                   "sourceState": "present",
                   "state": "complete",
@@ -4402,7 +4403,7 @@
                     "closed": 6,
                     "available": true,
                     "sourceRef": "GATES_PHASE3_PRIVATE_SESSION_REGISTRY.md",
-                    "observedAt": "2026-09-07T08:33:09.382Z"
+                    "observedAt": "2026-09-07T12:04:48.533Z"
                   },
                   "sourceState": "present",
                   "state": "complete",
@@ -4501,7 +4502,7 @@
                     "closed": 5,
                     "available": true,
                     "sourceRef": "GATES_PHASE3_MULTI_PC_OBSERVATION_RELAY.md",
-                    "observedAt": "2026-09-07T08:33:09.378Z"
+                    "observedAt": "2026-09-07T12:04:48.528Z"
                   },
                   "sourceState": "present",
                   "state": "queued",
@@ -4609,7 +4610,7 @@
                     "closed": 0,
                     "available": true,
                     "sourceRef": "GATES_PHASE3_PLANNER_WORK_ROUTING.md",
-                    "observedAt": "2026-09-07T08:33:09.382Z"
+                    "observedAt": "2026-09-07T12:04:48.533Z"
                   },
                   "sourceState": "present",
                   "state": "locked",
@@ -4708,7 +4709,7 @@
                     "closed": 0,
                     "available": true,
                     "sourceRef": "GATES_PHASE3_EVIDENCE_CONTINUITY.md",
-                    "observedAt": "2026-09-07T08:33:09.376Z"
+                    "observedAt": "2026-09-07T12:04:48.527Z"
                   },
                   "sourceState": "present",
                   "state": "locked",
@@ -4782,7 +4783,7 @@
                     "closed": 0,
                     "available": true,
                     "sourceRef": "GATES_PHASE3_EXISTING_SESSION_OPERATIONS_QA.md",
-                    "observedAt": "2026-09-07T08:33:09.377Z"
+                    "observedAt": "2026-09-07T12:04:48.527Z"
                   },
                   "sourceState": "present",
                   "state": "locked",
@@ -4856,7 +4857,7 @@
                     "closed": 0,
                     "available": true,
                     "sourceRef": "GATES_PHASE3_EXISTING_SESSION_OPERATIONS_RELEASE_AUDIT.md",
-                    "observedAt": "2026-09-07T08:33:09.377Z"
+                    "observedAt": "2026-09-07T12:04:48.528Z"
                   },
                   "sourceState": "present",
                   "state": "locked",
@@ -4930,7 +4931,7 @@
                     "closed": 0,
                     "available": true,
                     "sourceRef": "GATES_PHASE3_EXISTING_SESSION_OPERATIONS_CHERRY_ACCEPTANCE.md",
-                    "observedAt": "2026-09-07T08:33:09.377Z"
+                    "observedAt": "2026-09-07T12:04:48.527Z"
                   },
                   "sourceState": "present",
                   "state": "locked",
@@ -5001,7 +5002,340 @@
               "id": "outcome-phase-5-composition",
               "title": "Beyond fixed sessions",
               "purpose": "고정된 세션보다 더 많은 역할·도구·실행 단위를 Outcome에 맞게 구성한다.",
-              "stages": []
+              "stages": [
+                {
+                  "id": "outcome-milestone-model-v2-pilot",
+                  "title": "Outcome Graph v2 live pilot",
+                  "purpose": "stable destination semantics, dynamic execution and deterministic current projection을 한 local canary로 접합한다.",
+                  "dependsOn": [],
+                  "expectedDurationMinutes": null,
+                  "gatePurpose": "Outcome Graph v2 live pilot acceptance checklist",
+                  "gate": {
+                    "gates": [
+                      {
+                        "id": "P1",
+                        "stageId": "outcome-milestone-model-v2-pilot",
+                        "title": "P1 · canonical Gate evidence",
+                        "closed": true,
+                        "groupCode": "P",
+                        "groupLabel": null,
+                        "proves": null
+                      },
+                      {
+                        "id": "P2",
+                        "stageId": "outcome-milestone-model-v2-pilot",
+                        "title": "P2 · canonical Gate evidence",
+                        "closed": true,
+                        "groupCode": "P",
+                        "groupLabel": null,
+                        "proves": null
+                      },
+                      {
+                        "id": "P3",
+                        "stageId": "outcome-milestone-model-v2-pilot",
+                        "title": "P3 · canonical Gate evidence",
+                        "closed": true,
+                        "groupCode": "P",
+                        "groupLabel": null,
+                        "proves": null
+                      },
+                      {
+                        "id": "P4",
+                        "stageId": "outcome-milestone-model-v2-pilot",
+                        "title": "P4 · canonical Gate evidence",
+                        "closed": true,
+                        "groupCode": "P",
+                        "groupLabel": null,
+                        "proves": null
+                      },
+                      {
+                        "id": "P5",
+                        "stageId": "outcome-milestone-model-v2-pilot",
+                        "title": "P5 · canonical Gate evidence",
+                        "closed": true,
+                        "groupCode": "P",
+                        "groupLabel": null,
+                        "proves": null
+                      },
+                      {
+                        "id": "P6",
+                        "stageId": "outcome-milestone-model-v2-pilot",
+                        "title": "P6 · canonical Gate evidence",
+                        "closed": true,
+                        "groupCode": "P",
+                        "groupLabel": null,
+                        "proves": null
+                      },
+                      {
+                        "id": "P7",
+                        "stageId": "outcome-milestone-model-v2-pilot",
+                        "title": "P7 · canonical Gate evidence",
+                        "closed": true,
+                        "groupCode": "P",
+                        "groupLabel": null,
+                        "proves": null
+                      },
+                      {
+                        "id": "P8",
+                        "stageId": "outcome-milestone-model-v2-pilot",
+                        "title": "P8 · canonical Gate evidence",
+                        "closed": true,
+                        "groupCode": "P",
+                        "groupLabel": null,
+                        "proves": null
+                      },
+                      {
+                        "id": "S1",
+                        "stageId": "outcome-milestone-model-v2-pilot",
+                        "title": "S1 · canonical Gate evidence",
+                        "closed": true,
+                        "groupCode": "S",
+                        "groupLabel": null,
+                        "proves": null
+                      },
+                      {
+                        "id": "S2",
+                        "stageId": "outcome-milestone-model-v2-pilot",
+                        "title": "S2 · canonical Gate evidence",
+                        "closed": true,
+                        "groupCode": "S",
+                        "groupLabel": null,
+                        "proves": null
+                      },
+                      {
+                        "id": "S3",
+                        "stageId": "outcome-milestone-model-v2-pilot",
+                        "title": "S3 · canonical Gate evidence",
+                        "closed": true,
+                        "groupCode": "S",
+                        "groupLabel": null,
+                        "proves": null
+                      },
+                      {
+                        "id": "S4",
+                        "stageId": "outcome-milestone-model-v2-pilot",
+                        "title": "S4 · canonical Gate evidence",
+                        "closed": true,
+                        "groupCode": "S",
+                        "groupLabel": null,
+                        "proves": null
+                      },
+                      {
+                        "id": "C1",
+                        "stageId": "outcome-milestone-model-v2-pilot",
+                        "title": "C1 · canonical Gate evidence",
+                        "closed": true,
+                        "groupCode": "C",
+                        "groupLabel": null,
+                        "proves": null
+                      },
+                      {
+                        "id": "C2",
+                        "stageId": "outcome-milestone-model-v2-pilot",
+                        "title": "C2 · canonical Gate evidence",
+                        "closed": true,
+                        "groupCode": "C",
+                        "groupLabel": null,
+                        "proves": null
+                      },
+                      {
+                        "id": "C3",
+                        "stageId": "outcome-milestone-model-v2-pilot",
+                        "title": "C3 · canonical Gate evidence",
+                        "closed": true,
+                        "groupCode": "C",
+                        "groupLabel": null,
+                        "proves": null
+                      }
+                    ],
+                    "groups": [
+                      {
+                        "code": "P",
+                        "name": "P",
+                        "sourceName": "P",
+                        "total": 8,
+                        "closed": 8
+                      },
+                      {
+                        "code": "S",
+                        "name": "S",
+                        "sourceName": "S",
+                        "total": 4,
+                        "closed": 4
+                      },
+                      {
+                        "code": "C",
+                        "name": "C",
+                        "sourceName": "C",
+                        "total": 3,
+                        "closed": 3
+                      }
+                    ],
+                    "total": 15,
+                    "closed": 15,
+                    "available": true,
+                    "sourceRef": "GATES_OUTCOME_MODEL_V2.md",
+                    "observedAt": "2026-09-03T09:55:56.978Z"
+                  },
+                  "sourceState": "present",
+                  "state": "complete",
+                  "axes": {
+                    "implementation": "not_sourced",
+                    "test": "not_sourced",
+                    "evidence": "evidence_closed",
+                    "independentQa": "not_sourced",
+                    "cherryAcceptance": "not_sourced",
+                    "release": "not_sourced"
+                  }
+                },
+                {
+                  "id": "outcome-milestone-model-v2-local-default-projection",
+                  "title": "Model v2 local default and product projection",
+                  "purpose": "selective context를 사용하는 v2 기본 실행을 실제 작업으로 증명하고 그 projection을 OUTCOME 서비스의 기본 사용자 경험으로 제공한다.",
+                  "dependsOn": [
+                    "outcome-milestone-model-v2-pilot"
+                  ],
+                  "expectedDurationMinutes": null,
+                  "gatePurpose": "Model v2 local default and product projection acceptance checklist",
+                  "gate": {
+                    "gates": [
+                      {
+                        "id": "D1",
+                        "title": "D1 · canonical Gate evidence closure",
+                        "closed": true,
+                        "stageId": "outcome-milestone-model-v2-local-default-projection",
+                        "groupCode": "D",
+                        "groupLabel": null,
+                        "proves": null
+                      },
+                      {
+                        "id": "D2",
+                        "title": "D2 · canonical Gate evidence closure",
+                        "closed": true,
+                        "stageId": "outcome-milestone-model-v2-local-default-projection",
+                        "groupCode": "D",
+                        "groupLabel": null,
+                        "proves": null
+                      },
+                      {
+                        "id": "A1",
+                        "title": "A1 · canonical Gate evidence closure",
+                        "closed": true,
+                        "stageId": "outcome-milestone-model-v2-local-default-projection",
+                        "groupCode": "A",
+                        "groupLabel": null,
+                        "proves": null
+                      },
+                      {
+                        "id": "A2",
+                        "title": "A2 · canonical Gate evidence closure",
+                        "closed": true,
+                        "stageId": "outcome-milestone-model-v2-local-default-projection",
+                        "groupCode": "A",
+                        "groupLabel": null,
+                        "proves": null
+                      },
+                      {
+                        "id": "A3",
+                        "title": "A3 · canonical Gate evidence closure",
+                        "closed": true,
+                        "stageId": "outcome-milestone-model-v2-local-default-projection",
+                        "groupCode": "A",
+                        "groupLabel": null,
+                        "proves": null
+                      },
+                      {
+                        "id": "A4",
+                        "title": "A4 · canonical Gate evidence closure",
+                        "closed": true,
+                        "stageId": "outcome-milestone-model-v2-local-default-projection",
+                        "groupCode": "A",
+                        "groupLabel": null,
+                        "proves": null
+                      },
+                      {
+                        "id": "Q1",
+                        "title": "Q1 · canonical Gate evidence closure",
+                        "closed": true,
+                        "stageId": "outcome-milestone-model-v2-local-default-projection",
+                        "groupCode": "Q",
+                        "groupLabel": null,
+                        "proves": null
+                      },
+                      {
+                        "id": "B1",
+                        "title": "B1 · canonical Gate evidence closure",
+                        "closed": true,
+                        "stageId": "outcome-milestone-model-v2-local-default-projection",
+                        "groupCode": "B",
+                        "groupLabel": null,
+                        "proves": null
+                      },
+                      {
+                        "id": "B2",
+                        "title": "B2 · canonical Gate evidence closure",
+                        "closed": true,
+                        "stageId": "outcome-milestone-model-v2-local-default-projection",
+                        "groupCode": "B",
+                        "groupLabel": null,
+                        "proves": null
+                      },
+                      {
+                        "id": "B3",
+                        "title": "B3 · canonical Gate evidence closure",
+                        "closed": true,
+                        "stageId": "outcome-milestone-model-v2-local-default-projection",
+                        "groupCode": "B",
+                        "groupLabel": null,
+                        "proves": null
+                      },
+                      {
+                        "id": "Q2",
+                        "title": "Q2 · canonical Gate evidence closure",
+                        "closed": true,
+                        "stageId": "outcome-milestone-model-v2-local-default-projection",
+                        "groupCode": "Q",
+                        "groupLabel": null,
+                        "proves": null
+                      },
+                      {
+                        "id": "A5",
+                        "title": "A5 · canonical Gate evidence closure",
+                        "closed": true,
+                        "stageId": "outcome-milestone-model-v2-local-default-projection",
+                        "groupCode": "A",
+                        "groupLabel": null,
+                        "proves": null
+                      },
+                      {
+                        "id": "C1",
+                        "title": "C1 · canonical Gate evidence closure",
+                        "closed": true,
+                        "stageId": "outcome-milestone-model-v2-local-default-projection",
+                        "groupCode": "C",
+                        "groupLabel": null,
+                        "proves": null
+                      }
+                    ],
+                    "groups": [],
+                    "total": 13,
+                    "closed": 13,
+                    "available": true,
+                    "sourceRef": "GATES_OUTCOME_MODEL_V2_LOCAL_DEFAULT_AND_SERVICE_PROJECTION.md",
+                    "observedAt": "2026-09-03T09:55:56.978Z"
+                  },
+                  "sourceState": "present",
+                  "state": "complete",
+                  "axes": {
+                    "implementation": "not_sourced",
+                    "test": "not_sourced",
+                    "evidence": "evidence_closed",
+                    "independentQa": "not_sourced",
+                    "cherryAcceptance": "not_sourced",
+                    "release": "not_sourced"
+                  }
+                }
+              ]
             }
           ]
         }
@@ -5017,8 +5351,8 @@
           "completionAuthority": false,
           "localCandidate": {
             "state": "available",
-            "branch": "codex/outcome-s1-result-view-data-20260907",
-            "ahead": 357,
+            "branch": "codex/outcome-s005-current-source-correction-20260907",
+            "ahead": 358,
             "behind": 0,
             "sync": "ahead"
           },
@@ -5037,15 +5371,11 @@
         }
       },
       "current": {
-        "phaseId": "outcome-phase-2",
-        "scopeId": "outcome-phase-2-account-service",
-        "stageId": "outcome-stage-account-access-hosted-identity-preview"
+        "phaseId": "outcome-phase-5",
+        "scopeId": "outcome-phase-5-composition",
+        "stageId": "outcome-milestone-model-v2-local-default-projection"
       },
-      "next": {
-        "phaseId": "outcome-phase-2",
-        "scopeId": "outcome-phase-2-account-service",
-        "stageId": "outcome-stage-account-access-hosted-data-preview"
-      },
+      "next": null,
       "bindings": [
         {
           "role": "planner",
@@ -9332,14 +9662,202 @@
                   "kind": "scope",
                   "title": "Beyond fixed sessions",
                   "outcome": "고정된 세션보다 더 많은 역할·도구·실행 단위를 Outcome에 맞게 구성한다.",
-                  "children": [],
+                  "children": [
+                    {
+                      "id": "outcome-milestone-model-v2-pilot",
+                      "kind": "stage",
+                      "title": "Outcome Graph v2 live pilot",
+                      "outcome": "stable destination semantics, dynamic execution and deterministic current projection을 한 local canary로 접합한다.",
+                      "children": [],
+                      "acceptance": {
+                        "closed": 15,
+                        "total": 15,
+                        "unmapped": 0,
+                        "partial": false,
+                        "label": "근거 닫힘",
+                        "unit_ids": [
+                          "GATES_OUTCOME_MODEL_V2.md#C1",
+                          "GATES_OUTCOME_MODEL_V2.md#C2",
+                          "GATES_OUTCOME_MODEL_V2.md#C3",
+                          "GATES_OUTCOME_MODEL_V2.md#P1",
+                          "GATES_OUTCOME_MODEL_V2.md#P2",
+                          "GATES_OUTCOME_MODEL_V2.md#P3",
+                          "GATES_OUTCOME_MODEL_V2.md#P4",
+                          "GATES_OUTCOME_MODEL_V2.md#P5",
+                          "GATES_OUTCOME_MODEL_V2.md#P6",
+                          "GATES_OUTCOME_MODEL_V2.md#P7",
+                          "GATES_OUTCOME_MODEL_V2.md#P8",
+                          "GATES_OUTCOME_MODEL_V2.md#S1",
+                          "GATES_OUTCOME_MODEL_V2.md#S2",
+                          "GATES_OUTCOME_MODEL_V2.md#S3",
+                          "GATES_OUTCOME_MODEL_V2.md#S4"
+                        ],
+                        "denominator_sha256": "[immutable artifact]",
+                        "weight": 1,
+                        "completion_authority": false
+                      },
+                      "work": {
+                        "initial_hours": null,
+                        "actual_hours": null,
+                        "remaining_hours": null,
+                        "planned_finish_at": null,
+                        "latest_forecast": null,
+                        "provenance": {}
+                      },
+                      "comparison": {
+                        "yesterday": null,
+                        "current": {
+                          "observed_at": "2026-09-07T20:22:20+09:00",
+                          "closed": 15,
+                          "total": 15,
+                          "unmapped": 0,
+                          "denominator_sha256": "[immutable artifact]"
+                        },
+                        "today_delta": null,
+                        "message": "이 날짜 이전의 비교 기록 없음"
+                      },
+                      "timeline": [
+                        {
+                          "type": "current",
+                          "observed_at": "2026-09-07T20:22:20+09:00",
+                          "closed": 15,
+                          "total": 15,
+                          "unmapped": 0
+                        }
+                      ],
+                      "links": {
+                        "source": {
+                          "href": "#result-node-outcome",
+                          "action": null,
+                          "label": "출처 보기"
+                        },
+                        "usable_result": {
+                          "href": "#result-node-outcome",
+                          "action": null,
+                          "label": "사용 가능한 결과 보기"
+                        },
+                        "planner_conversation": {
+                          "href": null,
+                          "action": "planner_conversation",
+                          "label": "Planner 대화 보기"
+                        }
+                      }
+                    },
+                    {
+                      "id": "outcome-milestone-model-v2-local-default-projection",
+                      "kind": "stage",
+                      "title": "Model v2 local default and product projection",
+                      "outcome": "selective context를 사용하는 v2 기본 실행을 실제 작업으로 증명하고 그 projection을 OUTCOME 서비스의 기본 사용자 경험으로 제공한다.",
+                      "children": [],
+                      "acceptance": {
+                        "closed": 13,
+                        "total": 13,
+                        "unmapped": 0,
+                        "partial": false,
+                        "label": "근거 닫힘",
+                        "unit_ids": [
+                          "GATES_OUTCOME_MODEL_V2_LOCAL_DEFAULT_AND_SERVICE_PROJECTION.md#A1",
+                          "GATES_OUTCOME_MODEL_V2_LOCAL_DEFAULT_AND_SERVICE_PROJECTION.md#A2",
+                          "GATES_OUTCOME_MODEL_V2_LOCAL_DEFAULT_AND_SERVICE_PROJECTION.md#A3",
+                          "GATES_OUTCOME_MODEL_V2_LOCAL_DEFAULT_AND_SERVICE_PROJECTION.md#A4",
+                          "GATES_OUTCOME_MODEL_V2_LOCAL_DEFAULT_AND_SERVICE_PROJECTION.md#A5",
+                          "GATES_OUTCOME_MODEL_V2_LOCAL_DEFAULT_AND_SERVICE_PROJECTION.md#B1",
+                          "GATES_OUTCOME_MODEL_V2_LOCAL_DEFAULT_AND_SERVICE_PROJECTION.md#B2",
+                          "GATES_OUTCOME_MODEL_V2_LOCAL_DEFAULT_AND_SERVICE_PROJECTION.md#B3",
+                          "GATES_OUTCOME_MODEL_V2_LOCAL_DEFAULT_AND_SERVICE_PROJECTION.md#C1",
+                          "GATES_OUTCOME_MODEL_V2_LOCAL_DEFAULT_AND_SERVICE_PROJECTION.md#D1",
+                          "GATES_OUTCOME_MODEL_V2_LOCAL_DEFAULT_AND_SERVICE_PROJECTION.md#D2",
+                          "GATES_OUTCOME_MODEL_V2_LOCAL_DEFAULT_AND_SERVICE_PROJECTION.md#Q1",
+                          "GATES_OUTCOME_MODEL_V2_LOCAL_DEFAULT_AND_SERVICE_PROJECTION.md#Q2"
+                        ],
+                        "denominator_sha256": "[immutable artifact]",
+                        "weight": 1,
+                        "completion_authority": false
+                      },
+                      "work": {
+                        "initial_hours": null,
+                        "actual_hours": null,
+                        "remaining_hours": null,
+                        "planned_finish_at": null,
+                        "latest_forecast": null,
+                        "provenance": {}
+                      },
+                      "comparison": {
+                        "yesterday": null,
+                        "current": {
+                          "observed_at": "2026-09-07T20:22:20+09:00",
+                          "closed": 13,
+                          "total": 13,
+                          "unmapped": 0,
+                          "denominator_sha256": "[immutable artifact]"
+                        },
+                        "today_delta": null,
+                        "message": "이 날짜 이전의 비교 기록 없음"
+                      },
+                      "timeline": [
+                        {
+                          "type": "current",
+                          "observed_at": "2026-09-07T20:22:20+09:00",
+                          "closed": 13,
+                          "total": 13,
+                          "unmapped": 0
+                        }
+                      ],
+                      "links": {
+                        "source": {
+                          "href": "#result-node-outcome",
+                          "action": null,
+                          "label": "출처 보기"
+                        },
+                        "usable_result": {
+                          "href": "#result-node-outcome",
+                          "action": null,
+                          "label": "사용 가능한 결과 보기"
+                        },
+                        "planner_conversation": {
+                          "href": null,
+                          "action": "planner_conversation",
+                          "label": "Planner 대화 보기"
+                        }
+                      }
+                    }
+                  ],
                   "acceptance": {
-                    "closed": 0,
-                    "total": 0,
-                    "unmapped": 1,
-                    "partial": true,
-                    "label": "완료 조건 미연결 · 전체 완료율 아님",
-                    "unit_ids": [],
+                    "closed": 28,
+                    "total": 28,
+                    "unmapped": 0,
+                    "partial": false,
+                    "label": "근거 닫힘",
+                    "unit_ids": [
+                      "GATES_OUTCOME_MODEL_V2.md#C1",
+                      "GATES_OUTCOME_MODEL_V2.md#C2",
+                      "GATES_OUTCOME_MODEL_V2.md#C3",
+                      "GATES_OUTCOME_MODEL_V2.md#P1",
+                      "GATES_OUTCOME_MODEL_V2.md#P2",
+                      "GATES_OUTCOME_MODEL_V2.md#P3",
+                      "GATES_OUTCOME_MODEL_V2.md#P4",
+                      "GATES_OUTCOME_MODEL_V2.md#P5",
+                      "GATES_OUTCOME_MODEL_V2.md#P6",
+                      "GATES_OUTCOME_MODEL_V2.md#P7",
+                      "GATES_OUTCOME_MODEL_V2.md#P8",
+                      "GATES_OUTCOME_MODEL_V2.md#S1",
+                      "GATES_OUTCOME_MODEL_V2.md#S2",
+                      "GATES_OUTCOME_MODEL_V2.md#S3",
+                      "GATES_OUTCOME_MODEL_V2.md#S4",
+                      "GATES_OUTCOME_MODEL_V2_LOCAL_DEFAULT_AND_SERVICE_PROJECTION.md#A1",
+                      "GATES_OUTCOME_MODEL_V2_LOCAL_DEFAULT_AND_SERVICE_PROJECTION.md#A2",
+                      "GATES_OUTCOME_MODEL_V2_LOCAL_DEFAULT_AND_SERVICE_PROJECTION.md#A3",
+                      "GATES_OUTCOME_MODEL_V2_LOCAL_DEFAULT_AND_SERVICE_PROJECTION.md#A4",
+                      "GATES_OUTCOME_MODEL_V2_LOCAL_DEFAULT_AND_SERVICE_PROJECTION.md#A5",
+                      "GATES_OUTCOME_MODEL_V2_LOCAL_DEFAULT_AND_SERVICE_PROJECTION.md#B1",
+                      "GATES_OUTCOME_MODEL_V2_LOCAL_DEFAULT_AND_SERVICE_PROJECTION.md#B2",
+                      "GATES_OUTCOME_MODEL_V2_LOCAL_DEFAULT_AND_SERVICE_PROJECTION.md#B3",
+                      "GATES_OUTCOME_MODEL_V2_LOCAL_DEFAULT_AND_SERVICE_PROJECTION.md#C1",
+                      "GATES_OUTCOME_MODEL_V2_LOCAL_DEFAULT_AND_SERVICE_PROJECTION.md#D1",
+                      "GATES_OUTCOME_MODEL_V2_LOCAL_DEFAULT_AND_SERVICE_PROJECTION.md#D2",
+                      "GATES_OUTCOME_MODEL_V2_LOCAL_DEFAULT_AND_SERVICE_PROJECTION.md#Q1",
+                      "GATES_OUTCOME_MODEL_V2_LOCAL_DEFAULT_AND_SERVICE_PROJECTION.md#Q2"
+                    ],
                     "denominator_sha256": "[immutable artifact]",
                     "weight": 1,
                     "completion_authority": false
@@ -9356,9 +9874,9 @@
                     "yesterday": null,
                     "current": {
                       "observed_at": "2026-09-07T20:22:20+09:00",
-                      "closed": 0,
-                      "total": 0,
-                      "unmapped": 1,
+                      "closed": 28,
+                      "total": 28,
+                      "unmapped": 0,
                       "denominator_sha256": "[immutable artifact]"
                     },
                     "today_delta": null,
@@ -9368,9 +9886,9 @@
                     {
                       "type": "current",
                       "observed_at": "2026-09-07T20:22:20+09:00",
-                      "closed": 0,
-                      "total": 0,
-                      "unmapped": 1
+                      "closed": 28,
+                      "total": 28,
+                      "unmapped": 0
                     }
                   ],
                   "links": {
@@ -9393,12 +9911,41 @@
                 }
               ],
               "acceptance": {
-                "closed": 0,
-                "total": 0,
-                "unmapped": 3,
+                "closed": 28,
+                "total": 28,
+                "unmapped": 2,
                 "partial": true,
-                "label": "완료 조건 미연결 · 전체 완료율 아님",
-                "unit_ids": [],
+                "label": "부분 분모 · 전체 완료율 아님",
+                "unit_ids": [
+                  "GATES_OUTCOME_MODEL_V2.md#C1",
+                  "GATES_OUTCOME_MODEL_V2.md#C2",
+                  "GATES_OUTCOME_MODEL_V2.md#C3",
+                  "GATES_OUTCOME_MODEL_V2.md#P1",
+                  "GATES_OUTCOME_MODEL_V2.md#P2",
+                  "GATES_OUTCOME_MODEL_V2.md#P3",
+                  "GATES_OUTCOME_MODEL_V2.md#P4",
+                  "GATES_OUTCOME_MODEL_V2.md#P5",
+                  "GATES_OUTCOME_MODEL_V2.md#P6",
+                  "GATES_OUTCOME_MODEL_V2.md#P7",
+                  "GATES_OUTCOME_MODEL_V2.md#P8",
+                  "GATES_OUTCOME_MODEL_V2.md#S1",
+                  "GATES_OUTCOME_MODEL_V2.md#S2",
+                  "GATES_OUTCOME_MODEL_V2.md#S3",
+                  "GATES_OUTCOME_MODEL_V2.md#S4",
+                  "GATES_OUTCOME_MODEL_V2_LOCAL_DEFAULT_AND_SERVICE_PROJECTION.md#A1",
+                  "GATES_OUTCOME_MODEL_V2_LOCAL_DEFAULT_AND_SERVICE_PROJECTION.md#A2",
+                  "GATES_OUTCOME_MODEL_V2_LOCAL_DEFAULT_AND_SERVICE_PROJECTION.md#A3",
+                  "GATES_OUTCOME_MODEL_V2_LOCAL_DEFAULT_AND_SERVICE_PROJECTION.md#A4",
+                  "GATES_OUTCOME_MODEL_V2_LOCAL_DEFAULT_AND_SERVICE_PROJECTION.md#A5",
+                  "GATES_OUTCOME_MODEL_V2_LOCAL_DEFAULT_AND_SERVICE_PROJECTION.md#B1",
+                  "GATES_OUTCOME_MODEL_V2_LOCAL_DEFAULT_AND_SERVICE_PROJECTION.md#B2",
+                  "GATES_OUTCOME_MODEL_V2_LOCAL_DEFAULT_AND_SERVICE_PROJECTION.md#B3",
+                  "GATES_OUTCOME_MODEL_V2_LOCAL_DEFAULT_AND_SERVICE_PROJECTION.md#C1",
+                  "GATES_OUTCOME_MODEL_V2_LOCAL_DEFAULT_AND_SERVICE_PROJECTION.md#D1",
+                  "GATES_OUTCOME_MODEL_V2_LOCAL_DEFAULT_AND_SERVICE_PROJECTION.md#D2",
+                  "GATES_OUTCOME_MODEL_V2_LOCAL_DEFAULT_AND_SERVICE_PROJECTION.md#Q1",
+                  "GATES_OUTCOME_MODEL_V2_LOCAL_DEFAULT_AND_SERVICE_PROJECTION.md#Q2"
+                ],
                 "denominator_sha256": "[immutable artifact]",
                 "weight": 1,
                 "completion_authority": false
@@ -9415,9 +9962,9 @@
                 "yesterday": null,
                 "current": {
                   "observed_at": "2026-09-07T20:22:20+09:00",
-                  "closed": 0,
-                  "total": 0,
-                  "unmapped": 3,
+                  "closed": 28,
+                  "total": 28,
+                  "unmapped": 2,
                   "denominator_sha256": "[immutable artifact]"
                 },
                 "today_delta": null,
@@ -9427,9 +9974,9 @@
                 {
                   "type": "current",
                   "observed_at": "2026-09-07T20:22:20+09:00",
-                  "closed": 0,
-                  "total": 0,
-                  "unmapped": 3
+                  "closed": 28,
+                  "total": 28,
+                  "unmapped": 2
                 }
               ],
               "links": {
@@ -9452,9 +9999,9 @@
             }
           ],
           "acceptance": {
-            "closed": 131,
-            "total": 201,
-            "unmapped": 7,
+            "closed": 159,
+            "total": 229,
+            "unmapped": 6,
             "partial": true,
             "label": "부분 분모 · 전체 완료율 아님",
             "unit_ids": [
@@ -9477,6 +10024,34 @@
               "GATES.md#R7",
               "GATES.md#R8",
               "GATES.md#R9",
+              "GATES_OUTCOME_MODEL_V2.md#C1",
+              "GATES_OUTCOME_MODEL_V2.md#C2",
+              "GATES_OUTCOME_MODEL_V2.md#C3",
+              "GATES_OUTCOME_MODEL_V2.md#P1",
+              "GATES_OUTCOME_MODEL_V2.md#P2",
+              "GATES_OUTCOME_MODEL_V2.md#P3",
+              "GATES_OUTCOME_MODEL_V2.md#P4",
+              "GATES_OUTCOME_MODEL_V2.md#P5",
+              "GATES_OUTCOME_MODEL_V2.md#P6",
+              "GATES_OUTCOME_MODEL_V2.md#P7",
+              "GATES_OUTCOME_MODEL_V2.md#P8",
+              "GATES_OUTCOME_MODEL_V2.md#S1",
+              "GATES_OUTCOME_MODEL_V2.md#S2",
+              "GATES_OUTCOME_MODEL_V2.md#S3",
+              "GATES_OUTCOME_MODEL_V2.md#S4",
+              "GATES_OUTCOME_MODEL_V2_LOCAL_DEFAULT_AND_SERVICE_PROJECTION.md#A1",
+              "GATES_OUTCOME_MODEL_V2_LOCAL_DEFAULT_AND_SERVICE_PROJECTION.md#A2",
+              "GATES_OUTCOME_MODEL_V2_LOCAL_DEFAULT_AND_SERVICE_PROJECTION.md#A3",
+              "GATES_OUTCOME_MODEL_V2_LOCAL_DEFAULT_AND_SERVICE_PROJECTION.md#A4",
+              "GATES_OUTCOME_MODEL_V2_LOCAL_DEFAULT_AND_SERVICE_PROJECTION.md#A5",
+              "GATES_OUTCOME_MODEL_V2_LOCAL_DEFAULT_AND_SERVICE_PROJECTION.md#B1",
+              "GATES_OUTCOME_MODEL_V2_LOCAL_DEFAULT_AND_SERVICE_PROJECTION.md#B2",
+              "GATES_OUTCOME_MODEL_V2_LOCAL_DEFAULT_AND_SERVICE_PROJECTION.md#B3",
+              "GATES_OUTCOME_MODEL_V2_LOCAL_DEFAULT_AND_SERVICE_PROJECTION.md#C1",
+              "GATES_OUTCOME_MODEL_V2_LOCAL_DEFAULT_AND_SERVICE_PROJECTION.md#D1",
+              "GATES_OUTCOME_MODEL_V2_LOCAL_DEFAULT_AND_SERVICE_PROJECTION.md#D2",
+              "GATES_OUTCOME_MODEL_V2_LOCAL_DEFAULT_AND_SERVICE_PROJECTION.md#Q1",
+              "GATES_OUTCOME_MODEL_V2_LOCAL_DEFAULT_AND_SERVICE_PROJECTION.md#Q2",
               "GATES_OUTCOME_MVP.md#A1",
               "GATES_OUTCOME_MVP.md#A2",
               "GATES_OUTCOME_MVP.md#A3",
@@ -9681,9 +10256,9 @@
             "yesterday": null,
             "current": {
               "observed_at": "2026-09-07T20:22:20+09:00",
-              "closed": 131,
-              "total": 201,
-              "unmapped": 7,
+              "closed": 159,
+              "total": 229,
+              "unmapped": 6,
               "denominator_sha256": "[immutable artifact]"
             },
             "today_delta": null,
@@ -9693,9 +10268,9 @@
             {
               "type": "current",
               "observed_at": "2026-09-07T20:22:20+09:00",
-              "closed": 131,
-              "total": 201,
-              "unmapped": 7
+              "closed": 159,
+              "total": 229,
+              "unmapped": 6
             }
           ],
           "links": {
@@ -9733,8 +10308,66 @@
             "label": "Planner 대화 보기"
           }
         },
+        "source_projection": {
+          "captured_at": "2026-09-07T12:23:21.492Z",
+          "source_updated_at": "2026-08-31 KST",
+          "evidence_observed_at": "2026-09-03T09:55:56.978Z",
+          "primary": {
+            "destination_id": "outcome-phase-5",
+            "compatibility_workstream_id": "outcome-phase-5-composition",
+            "milestone_id": "outcome-milestone-model-v2-local-default-projection",
+            "gate_ref": "GATES_OUTCOME_MODEL_V2_LOCAL_DEFAULT_AND_SERVICE_PROJECTION.md",
+            "acceptance": {
+              "closed": 13,
+              "total": 13,
+              "unmapped": 0,
+              "unit_ids": [
+                "GATES_OUTCOME_MODEL_V2_LOCAL_DEFAULT_AND_SERVICE_PROJECTION.md#D1",
+                "GATES_OUTCOME_MODEL_V2_LOCAL_DEFAULT_AND_SERVICE_PROJECTION.md#D2",
+                "GATES_OUTCOME_MODEL_V2_LOCAL_DEFAULT_AND_SERVICE_PROJECTION.md#A1",
+                "GATES_OUTCOME_MODEL_V2_LOCAL_DEFAULT_AND_SERVICE_PROJECTION.md#A2",
+                "GATES_OUTCOME_MODEL_V2_LOCAL_DEFAULT_AND_SERVICE_PROJECTION.md#A3",
+                "GATES_OUTCOME_MODEL_V2_LOCAL_DEFAULT_AND_SERVICE_PROJECTION.md#A4",
+                "GATES_OUTCOME_MODEL_V2_LOCAL_DEFAULT_AND_SERVICE_PROJECTION.md#Q1",
+                "GATES_OUTCOME_MODEL_V2_LOCAL_DEFAULT_AND_SERVICE_PROJECTION.md#B1",
+                "GATES_OUTCOME_MODEL_V2_LOCAL_DEFAULT_AND_SERVICE_PROJECTION.md#B2",
+                "GATES_OUTCOME_MODEL_V2_LOCAL_DEFAULT_AND_SERVICE_PROJECTION.md#B3",
+                "GATES_OUTCOME_MODEL_V2_LOCAL_DEFAULT_AND_SERVICE_PROJECTION.md#Q2",
+                "GATES_OUTCOME_MODEL_V2_LOCAL_DEFAULT_AND_SERVICE_PROJECTION.md#A5",
+                "GATES_OUTCOME_MODEL_V2_LOCAL_DEFAULT_AND_SERVICE_PROJECTION.md#C1"
+              ],
+              "label": "근거 닫힘 · 완료 판정 권한 없음"
+            }
+          },
+          "compatibility": {
+            "phase_id": "outcome-phase-3",
+            "scope_id": "outcome-phase-3-evidence-continuity",
+            "stage_id": "outcome-stage-phase3-cherry-acceptance",
+            "closed": 38,
+            "total": 43,
+            "label": "compatibility"
+          },
+          "historical": [
+            {
+              "phase_id": "outcome-phase-2",
+              "stage_id": "outcome-stage-account-access-hosted-identity-preview",
+              "closed": 5,
+              "total": 6,
+              "label": "historical"
+            }
+          ],
+          "conflicts": [
+            {
+              "code": "map_primary_narrative_stale",
+              "map_value": "Slice A A1-A4 OPEN",
+              "gate_value": "13/13 evidence closure"
+            }
+          ],
+          "completion_authority": false
+        },
         "completion_authority": false
-      }
+      },
+      "conflict": true
     }
   ],
   "modelV2": {
@@ -9756,7 +10389,7 @@
         "projection": {
           "schema_version": 2,
           "source_revision": "[immutable artifact]",
-          "observed_at": "2026-09-07T11:24:26.844Z",
+          "observed_at": "2026-09-07T12:23:21.492Z",
           "primary_destination": null,
           "ready_frontier": [],
           "progress": {
@@ -12129,7 +12762,7 @@
         "projection": {
           "schema_version": 2,
           "source_revision": "[immutable artifact]",
-          "observed_at": "2026-09-07T11:24:26.844Z",
+          "observed_at": "2026-09-07T12:23:21.492Z",
           "primary_destination": "outcome-phase-2",
           "ready_frontier": [
             "outcome-stage-account-access-hosted-identity-preview",
@@ -12160,7 +12793,7 @@
   },
   "snapshot": {
     "boundary": "deployment_snapshot",
-    "capturedAt": "2026-09-07T11:24:26.844Z",
+    "capturedAt": "2026-09-07T12:23:21.492Z",
     "source": "sanitized_public_projection",
     "liveSessionRelay": false,
     "refreshBehavior": "new_deployment_required"
