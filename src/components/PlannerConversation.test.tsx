@@ -1,8 +1,17 @@
 import { renderToStaticMarkup } from 'react-dom/server'
 import { describe, expect, it } from 'vitest'
 import { PlannerConversation, roleChatFilters, roleChatFixtureStates, type RoleChatFilter, type RoleChatFixtureState } from './PlannerConversation'
-import { resolveConversationCredential, validatePrivateTimeline } from './PlannerConversation'
+import { isComposerSubmitShortcut, resolveConversationCredential, validatePrivateTimeline } from './PlannerConversation'
 import type { PrivateChatEvent } from '../lib/api'
+
+describe('composer IME boundary', () => {
+  it('sends only explicit shortcuts outside composition', () => {
+    const event = { key: 'Enter', metaKey: false, ctrlKey: true, isComposing: false }
+    expect(isComposerSubmitShortcut(event)).toBe(true)
+    expect(isComposerSubmitShortcut({ ...event, ctrlKey: false, metaKey: true })).toBe(true)
+    for (const change of [{ isComposing: true }, { keyCode: 229 }, { ctrlKey: false }, { key: 'a' }]) expect(isComposerSubmitShortcut({ ...event, ...change })).toBe(false)
+  })
+})
 
 describe('live timeline validation', () => {
   const answer: PrivateChatEvent = { event_id: 'event-0000000000000001', sequence: 1, observed_at: '2026-09-08T00:00:00.000Z', kind: 'assistant_message', state: 'completed', correlation_id: 'message-0000000000000001', payload: { private_content: { text: 'Planner 답변' } } }

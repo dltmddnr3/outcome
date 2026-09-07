@@ -29,6 +29,9 @@ const fixturePresentation: Record<RoleChatFixtureState, { label: string; detail:
 export function createMessageIdempotencyKey(random = (bytes: Uint8Array) => crypto.getRandomValues(bytes)) { return `message-${[...random(new Uint8Array(8))].map((value) => value.toString(16).padStart(2, '0')).join('')}` }
 export function sensitiveContentHint(value: string) { const text = value.normalize('NFKC'); return /(?:\b(?:bearer|basic)\s+\S+|-----BEGIN .*PRIVATE KEY-----|\b(?:api[_ -]?key|token|secret|password|authorization|credential)\s*[:=]\s*\S+|\b(?:sk|pk|ghp|github_pat|xox[baprs]|vercel|sb_secret|sk_live)[-_][A-Za-z0-9_-]{8,})/i.test(text) }
 export function boundedComposerDraft(current: string, next: string) { return [...next].length <= 4_000 ? next : current }
+export function isComposerSubmitShortcut(event: { key: string; metaKey: boolean; ctrlKey: boolean; isComposing: boolean; keyCode?: number }) {
+  return event.key === 'Enter' && (event.metaKey || event.ctrlKey) && !event.isComposing && event.keyCode !== 229
+}
 const chatKinds = new Set(['user_message', 'assistant_message', 'commentary', 'plan', 'tool_call', 'tool_result', 'file_change', 'diff', 'test_result', 'approval_request', 'waiting_user', 'error', 'connection'])
 const chatStates = new Set(['queued', 'responding', 'tool_running', 'verifying', 'waiting_approval', 'waiting_user', 'completed', 'failed', 'cancelled', 'reconnecting'])
 export function validatePrivateTimeline(events: PrivateChatEvent[]) {
@@ -84,7 +87,7 @@ export function PlannerConversation({ events, plannerBound = false, onSend, fixt
   }, [fixtureState, onSend, refresh])
   const submit = async () => {
     const message = draft.trim()
-    if (pending.current || !writable || !message || [...draft].length > 4_000) return
+    if (pending.current || !writable || !message || [...draft].length > 4_000 || sensitiveContentHint(draft)) return
     if (injectedWritable) { onSend!(message); setDraft(''); return }
     if (!csrf) return
     if (!submission.current || submission.current.text !== draft) submission.current = { text: draft, key: createMessageIdempotencyKey() }
@@ -103,7 +106,7 @@ export function PlannerConversation({ events, plannerBound = false, onSend, fixt
     finally { if (generation === authGeneration.current) { pending.current = false; textarea.current?.focus() } }
   }
   const onSubmit = (event: FormEvent) => { event.preventDefault(); void submit() }
-  const onKeyDown = (event: KeyboardEvent<HTMLTextAreaElement>) => { if (event.key === 'Enter' && (event.metaKey || event.ctrlKey)) { event.preventDefault(); void submit() } }
+  const onKeyDown = (event: KeyboardEvent<HTMLTextAreaElement>) => { if (isComposerSubmitShortcut(event.nativeEvent)) { event.preventDefault(); void submit() } }
   const overLimit = [...draft].length > 4_000, sensitive = sensitiveContentHint(draft), disabled = !writable || pending.current || !draft.trim() || overLimit || sensitive
   return <section className="planner-conversation" aria-labelledby="planner-conversation-title" data-observed-events={events.length} data-chat-availability={availability} data-role-chat-state={fixtureState} data-fixture-boundary={fixture || fixtureTimeline ? 'non-production' : undefined}>
     <header><div><span>프로젝트 대화 · 단일 관측 스트림</span><h2 id="planner-conversation-title">Planner conversation</h2></div><strong>{writable ? 'Planner 연결됨' : '읽기 전용'}</strong></header>
