@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict'
 import { readFileSync } from 'node:fs'
 import test from 'node:test'
-import { assertDashboardMeasurement, assertMobileHierarchyFlowMeasurement, assertSourceContextMeasurement, assertSourceGroupOccurrences, resolveRoleDisclosureTargets, sourceLabeledGroupStageKeys } from './browser-assertions.mjs'
+import { assertDashboardMeasurement, assertMobileHierarchyFlowMeasurement, assertRawAccessibilityLiterals, assertSourceContextMeasurement, assertSourceGroupOccurrences, measureRawAccessibilityLiterals, resolveRoleDisclosureTargets, sourceContextRawAxLiterals, sourceLabeledGroupStageKeys } from './browser-assertions.mjs'
 
 const passingMeasurement = () => ({
   documentOverflow: 0, clippedDescendants: [], ellipsisTruncation: [], viewportEscape: [], siblingIntersections: [], roleDescendantIntersections: [], roleStatusOverflow: [], undersizedText: [], lowContrastText: [], undersizedControls: [], unexpectedEnglish: [], translationFallback: [], activeAnimationCount: 0, heroHeight: 352,
@@ -20,6 +20,29 @@ test('source context browser contract fails closed for a missing or substituted 
   assert.throws(() => assertSourceContextMeasurement('desktop/outcome', true, { ...passingSourceContext(), compatibility: 'outcome-phase-3:39\/43' }), /compatibility=/)
   assert.throws(() => assertSourceContextMeasurement('desktop/outcome', true, { ...passingSourceContext(), text: passingSourceContext().text.replace('Slice A A1-A4 OPEN', 'generic conflict') }), /text-missing=Map · Slice A A1-A4 OPEN/)
   assert.throws(() => assertSourceContextMeasurement('desktop/cherry-note', false, { count: 1 }), /fabricated/)
+})
+
+test('raw accessibility measurement calls Chrome full AX directly and finds all exact literals', async () => {
+  const commands = []; let detached = 0
+  const session = { async send(command) { commands.push(command); return { nodes: sourceContextRawAxLiterals.map((value) => ({ name: { value } })) } }, async detach() { detached += 1 } }
+  const page = { context: () => ({ newCDPSession: async (target) => { assert.equal(target, page); return session } }) }
+  const result = await measureRawAccessibilityLiterals(page)
+  assert.deepEqual(commands, ['Accessibility.getFullAXTree'])
+  assert.equal(detached, 1)
+  assert.doesNotThrow(() => assertRawAccessibilityLiterals('raw-ax', result))
+})
+
+test('raw accessibility assertion rejects fragmented AX nodes and DOM-derived substitutes', () => {
+  const fragmented = { protocol: 'Accessibility.getFullAXTree', nodeCount: 4, present: sourceContextRawAxLiterals.filter((literal) => literal !== '38/43'), missing: ['38/43'] }
+  assert.throws(() => assertRawAccessibilityLiterals('raw-ax', fragmented), /missing=38\/43/)
+  assert.throws(() => assertRawAccessibilityLiterals('dom-stub', { ...fragmented, protocol: 'DOM.textContent', present: sourceContextRawAxLiterals, missing: [] }), /protocol=DOM\.textContent/)
+})
+
+test('raw accessibility implementation has no DOM-derived fallback path', () => {
+  const source = readFileSync(new URL('./browser-assertions.mjs', import.meta.url), 'utf8')
+  const body = source.match(/export async function measureRawAccessibilityLiterals[\s\S]*?\n}\n\nexport function assertRawAccessibilityLiterals/)?.[0] ?? ''
+  assert.match(body, /session\.send\('Accessibility\.getFullAXTree'\)/)
+  assert.doesNotMatch(body, /textContent|ariaSnapshot|locator\(|page\.evaluate/)
 })
 
 test('nested summary role rows resolve the accessible title and status targets', () => {

@@ -50,6 +50,23 @@ export async function measureSourceContext(page) {
   })
 }
 
+export const sourceContextRawAxLiterals = ['현재 primary · Phase 5', '13/13', 'compatibility · Phase 3', '38/43', 'historical · Phase 2', '5/6', 'Map · Slice A A1-A4 OPEN', 'Gate · 13/13 evidence closure', '캡처 시각', '2026-09-07T12:23:21.492Z', '원본 갱신', '2026-08-31 KST', '근거 관측', '2026-09-03T09:55:56.978Z', 'completionAuthority=false', '프로젝트 완료나 Cherry 수용을 승인하지 않습니다.']
+
+export async function measureRawAccessibilityLiterals(page, literals = sourceContextRawAxLiterals) {
+  const session = await page.context().newCDPSession(page)
+  try {
+    const { nodes } = await session.send('Accessibility.getFullAXTree')
+    const values = nodes.flatMap((node) => [node.name?.value, node.description?.value, node.value?.value, ...(node.properties ?? []).map((property) => property.value?.value)]).filter((value) => typeof value === 'string')
+    const present = literals.filter((literal) => values.some((value) => value.includes(literal)))
+    return { protocol: 'Accessibility.getFullAXTree', nodeCount: nodes.length, present, missing: literals.filter((literal) => !present.includes(literal)) }
+  } finally { await session.detach() }
+}
+
+export function assertRawAccessibilityLiterals(name, result, literals = sourceContextRawAxLiterals) {
+  const missing = literals.filter((literal) => !result.present.includes(literal))
+  if (result.protocol !== 'Accessibility.getFullAXTree' || result.nodeCount < 1 || result.missing.length || missing.length) throw new Error(`${name}: raw full AX failed protocol=${result.protocol} nodes=${result.nodeCount} missing=${[...new Set([...result.missing, ...missing])].join('|') || 'none'}`)
+}
+
 async function focusContrast(page, selector) {
   const target = page.locator(selector); await target.focus()
   return target.evaluate((element) => {
@@ -235,7 +252,7 @@ async function assertSplitWorkbenchContract(page, name) {
 }
 
 export async function verifyAllDashboardStates(page, viewportName) {
-  await page.getByRole('heading', { name: '프로젝트 여정', exact: true }).waitFor(); await assertWorkspaceSidebarContract(page, viewportName); await assertSplitWorkbenchContract(page, viewportName); const projectButtons = page.locator('.oc-project-select')
+  await page.getByRole('heading', { name: '프로젝트 여정', exact: true }).waitFor(); const initialSourceContext = await measureSourceContext(page); if (initialSourceContext.count) { assertSourceContextMeasurement(viewportName, true, initialSourceContext); assertRawAccessibilityLiterals(viewportName, await measureRawAccessibilityLiterals(page)) }; await assertWorkspaceSidebarContract(page, viewportName); await assertSplitWorkbenchContract(page, viewportName); const projectButtons = page.locator('.oc-project-select')
   const payload = await page.evaluate(async () => { const response = await fetch('/api/dashboard', { headers: { accept: 'application/json' } }); if (!response.ok) throw new Error(`dashboard payload ${response.status}`); return (await response.json()).dashboard })
   const projectCount = payload.projects?.length ?? 0; if (projectCount < 1 || await projectButtons.count() !== projectCount || await page.locator('.oc-project-menu').count() !== projectCount) throw new Error(`${viewportName}: project switch/menu count does not match payload (${await projectButtons.count()}/${await page.locator('.oc-project-menu').count()}/${projectCount})`)
   await ensureGlobalNavigationOpen(page); const search = page.locator('.oc-project-search input'); const secondName = payload.projects[Math.min(1, projectCount - 1)].project.name; await search.fill(secondName); if (await projectButtons.count() !== 1 || (await projectButtons.first().textContent())?.includes(secondName) !== true) throw new Error(`${viewportName}: project search did not filter loaded projects`); await search.fill('__no_matching_project__'); if (!await page.getByText('일치하는 프로젝트가 없습니다.', { exact: true }).isVisible()) throw new Error(`${viewportName}: project search empty state missing`); await search.fill(''); if (await projectButtons.count() !== projectCount) throw new Error(`${viewportName}: clearing project search did not restore payload projects`)

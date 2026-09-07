@@ -111,10 +111,10 @@ function ResultSourceContext({ source }: { source: ResultSourceProjection }) {
   const conflict = source.conflicts[0]
   return <section className="oc-result-node" role="region" aria-labelledby="oc-source-context-title" data-source-context="true" data-completion-authority={String(source.completion_authority)} data-source-primary={`${source.primary.destination_id}:${source.primary.acceptance.closed}/${source.primary.acceptance.total}`} data-source-compatibility={`${source.compatibility.phase_id}:${source.compatibility.closed}/${source.compatibility.total}`} data-source-historical={`${historical.phase_id}:${historical.closed}/${historical.total}`} data-source-conflict={`${conflict.map_value}|${conflict.gate_value}`}>
     <div className="oc-result-node__body"><h3 id="oc-source-context-title">원본 맥락 · 비권한 참조</h3>
-      <dl className="oc-result-work"><div><dt>현재 primary · Phase 5</dt><dd>{source.primary.acceptance.closed}/{source.primary.acceptance.total}</dd></div><div><dt>{source.compatibility.label} · Phase 3</dt><dd>{source.compatibility.closed}/{source.compatibility.total}</dd></div><div><dt>{historical.label} · Phase 2</dt><dd>{historical.closed}/{historical.total}</dd></div></dl>
-      <p className="oc-result-message" role="status">원본 충돌 · Map · {conflict.map_value} · Gate · {conflict.gate_value}</p>
+      <dl className="oc-result-work"><div><dt>현재 primary · Phase 5</dt><dd>{`${source.primary.acceptance.closed}/${source.primary.acceptance.total}`}</dd></div><div><dt>{source.compatibility.label} · Phase 3</dt><dd>{`${source.compatibility.closed}/${source.compatibility.total}`}</dd></div><div><dt>{historical.label} · Phase 2</dt><dd>{`${historical.closed}/${historical.total}`}</dd></div></dl>
+      <p className="oc-result-message" role="status">원본 충돌 · <span>{`Map · ${conflict.map_value}`}</span> · <span>{`Gate · ${conflict.gate_value}`}</span></p>
       <dl className="oc-result-delta"><div><dt>캡처 시각</dt><dd>{source.captured_at}</dd></div><div><dt>원본 갱신</dt><dd>{source.source_updated_at}</dd></div><div><dt>근거 관측</dt><dd>{source.evidence_observed_at}</dd></div></dl>
-      <p>completionAuthority={String(source.completion_authority)} · 이 원본 맥락은 프로젝트 완료나 Cherry 수용을 승인하지 않습니다.</p>
+      <p><span>{`completionAuthority=${String(source.completion_authority)}`}</span> · 이 원본 맥락은 프로젝트 완료나 Cherry 수용을 승인하지 않습니다.</p>
     </div>
   </section>
 }
