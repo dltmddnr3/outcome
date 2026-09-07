@@ -174,11 +174,18 @@ export function projectExecutionLoopItems(value) {
 
   let itemState = 'ready'
   let reviewResult = fact('missing', null, null, 'review_missing')
+  let reviewRework = null
   if (contract?.review) {
     if (!contract.review.artifactRef || !contract.review.evidenceRef) {
       reviewResult = fact('safe_hold', null, contract.review.sourceRef, 'review_evidence_missing')
       itemState = 'safe_hold'
-    } else reviewResult = fact('known', `${roleLabel(contract.review.authority)} · ${contract.review.verdict} · ${contract.review.artifactRef} · ${contract.review.evidenceRef}`, contract.review.sourceRef)
+    } else {
+      reviewResult = fact('known', `${roleLabel(contract.review.authority)} · ${contract.review.verdict} · ${contract.review.artifactRef} · ${contract.review.evidenceRef}`, contract.review.sourceRef)
+      if (contract.review.verdict !== 'PASS') {
+        itemState = 'safe_hold'
+        reviewRework = fact('safe_hold', contract.review.verdict === 'SAFE_HOLD' ? '안전 보류 · 교정 또는 대체 경로 확인 필요' : '검수 실패 · 교정 또는 대체 경로 확인 필요', contract.review.sourceRef, contract.review.verdict === 'SAFE_HOLD' ? 'review_safe_hold_rework_required' : 'review_fail_rework_required')
+      }
+    }
   } else if (correlatedEvent?.type === 'result_observed') {
     reviewResult = fact('safe_hold', null, `event:${correlatedEvent.id}:${correlatedEvent.sequence}`, 'review_evidence_missing')
     itemState = 'safe_hold'
@@ -197,7 +204,7 @@ export function projectExecutionLoopItems(value) {
     }
   }
 
-  let reworkState = fact('not_applicable', '교정 또는 대체 경로 없음', null)
+  let reworkState = reviewRework ?? fact('not_applicable', '교정 또는 대체 경로 없음', null)
   if (contract?.rework) {
     const row = contract.rework
     if (row.identicalFailureCount <= 1 && row.correction && !row.fallback) reworkState = fact('known', `${row.pathIdentity} · 1회 한정 교정 · ${row.correction}`, row.sourceRef)

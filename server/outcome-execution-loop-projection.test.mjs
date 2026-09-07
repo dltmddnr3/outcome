@@ -60,8 +60,42 @@ test('terminal result without artifact evidence is safe hold and cannot imply co
   const value = projectExecutionLoopItems(input({ events: [event({ type: 'result_observed', status: 'observed' })], contract: contract({ review }) }))[0]
   assert.equal(value.state, 'safe_hold')
   assert.deepEqual(value.reviewResult, { state: 'safe_hold', value: null, sourceRef: 'review:qa-one', reasonCode: 'review_evidence_missing' })
+  assert.equal(value.reworkState.state, 'not_applicable')
   assert.equal(JSON.stringify(value).includes('완료'), false)
   assert.equal(JSON.stringify(value).includes('started successor'), false)
+})
+
+test('evidence-backed SAFE_HOLD review forces an explicit item and rework hold', () => {
+  const review = { verdict: 'SAFE_HOLD', authority: 'ux_product_qa', artifactRef: 'artifact:candidate-one', evidenceRef: 'evidence:qa-one', sourceRef: 'review:qa-one' }
+  const value = projectExecutionLoopItems(input({
+    events: [event({ type: 'result_observed', status: 'safe_hold' })],
+    contract: contract({
+      checked: { label: 'B1 고정 근거 확인', sourceRef: 'evidence:builder-one' },
+      receipt: { state: 'received', sourceRef: 'dispatch:event-builder-1', destinationEvidenceRef: 'destination:receipt-one' },
+      review,
+      rework: null,
+    }),
+  }))[0]
+  assert.equal(value.state, 'safe_hold')
+  assert.deepEqual(value.reviewResult, { state: 'known', value: 'UX & Product QA · SAFE_HOLD · artifact:candidate-one · evidence:qa-one', sourceRef: 'review:qa-one', reasonCode: null })
+  assert.deepEqual(value.reworkState, { state: 'safe_hold', value: '안전 보류 · 교정 또는 대체 경로 확인 필요', sourceRef: 'review:qa-one', reasonCode: 'review_safe_hold_rework_required' })
+  assert.equal(value.completionAuthority, false)
+})
+
+test('evidence-backed FAIL and SAFE_HOLD mismatch remain explicit fail-closed rework boundaries', () => {
+  for (const [verdict, status, reasonCode] of [
+    ['FAIL', 'failed', 'review_fail_rework_required'],
+    ['SAFE_HOLD', 'observed', 'review_safe_hold_rework_required'],
+  ]) {
+    const review = { verdict, authority: 'release_audit', artifactRef: 'artifact:candidate-one', evidenceRef: 'evidence:audit-one', sourceRef: 'review:audit-one' }
+    const value = projectExecutionLoopItems(input({ events: [event({ type: 'result_observed', status })], contract: contract({ review }) }))[0]
+    assert.equal(value.state, 'safe_hold')
+    assert.equal(value.reviewResult.value, `Release Audit · ${verdict} · artifact:candidate-one · evidence:audit-one`)
+    assert.equal(value.reworkState.state, 'safe_hold')
+    assert.equal(value.reworkState.sourceRef, 'review:audit-one')
+    assert.equal(value.reworkState.reasonCode, reasonCode)
+    assert.match(value.reworkState.value, /교정 또는 대체 경로 확인 필요/)
+  }
 })
 
 test('evidence-backed PASS names the checkpoint and eligible successor only as not started', () => {
@@ -71,6 +105,9 @@ test('evidence-backed PASS names the checkpoint and eligible successor only as n
   assert.equal(value.reviewResult.value, 'UX & Product QA · PASS · artifact:candidate-one · evidence:qa-one')
   assert.equal(value.nextCheckpoint.value, 'Release Audit 근거 · Release Audit · A1 감사 · 시작되지 않음')
   assert.equal(value.receiptState.value, '전달 상태 확인 불가')
+  assert.equal(value.state, 'ready')
+  assert.equal(value.reworkState.state, 'not_applicable')
+  assert.equal(JSON.stringify(value).includes('완료'), false)
   assert.equal(value.completionAuthority, false)
 })
 
