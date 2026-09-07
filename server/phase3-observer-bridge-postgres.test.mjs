@@ -1,5 +1,7 @@
 import assert from 'node:assert/strict'
-import { readFile } from 'node:fs/promises'
+import { readFile, mkdtemp, rm } from 'node:fs/promises'
+import { tmpdir } from 'node:os'
+import { join } from 'node:path'
 import test from 'node:test'
 import { PGlite } from '@electric-sql/pglite'
 import { computeTombstoneCoverageDigest, createObserverBridgeDurableV2Repository, createObserverBridgePostgresAdapter, OBSERVER_BRIDGE_EFFECTIVE_ROLE, OBSERVER_BRIDGE_POSTGRES_FUTURE_SKEW_MS, ObserverBridgePostgresError } from './phase3-observer-bridge-postgres.mjs'
@@ -363,6 +365,31 @@ test('viewer bootstrap preserves an existing schema-v2 row and advances its ordi
     assert.deepEqual((await db.query("select schema_version::int schema_version,durable_revision::int durable_revision from outcome_private.bridge_schema_versions where workspace_id='workspace-main'")).rows, [{ schema_version: 2, durable_revision: 8 }])
     assert.equal(Number((await db.query("select count(*)::int count from outcome_private.bridge_schema_versions where workspace_id='workspace-main'")).rows[0].count), 1)
   } finally { await db.close() }
+})
+
+test('V2 viewer readiness and idempotency survive closing and reopening the database', async () => {
+  const directory = await mkdtemp(join(tmpdir(), 'outcome-observer-restart-'))
+  let db
+  try {
+    db = await PGlite.create(directory)
+    await db.exec("create role anon nologin; create role authenticated nologin; create schema auth; create function auth.jwt() returns jsonb language sql stable as $$ select '{}'::jsonb $$;")
+    for (const url of [foundationUrl, migrationUrl, migrationV2Url, bootstrapV2Url]) await db.exec(await readFile(url, 'utf8'))
+    await db.exec("insert into outcome_private.workspaces(id,state) values ('workspace-main','active'); insert into outcome_private.projects(id,package_id,state) values ('project-outcome','outcome','active'); insert into outcome_private.project_bindings(workspace_id,project_id,state) values ('workspace-main','project-outcome','active');")
+    const first = createObserverBridgeDurableV2Repository({ with_transaction: transactionPort(db) })
+    const viewer = { account_ref: digest('a'), workspace_id: 'workspace-main', project_id: 'project-outcome', viewer_ref: 'viewer_workstation_01', viewer_class: 'workstation', idempotency_digest: digest('b'), fingerprint: digest('c'), created_at: AT }
+    await first.registerViewer(viewer)
+    await first.registerViewer({ ...viewer, viewer_ref: 'viewer_remote_device_01', viewer_class: 'remote_device', idempotency_digest: digest('d'), fingerprint: digest('e') })
+    await db.close()
+    db = await PGlite.create(directory)
+    const restarted = createObserverBridgeDurableV2Repository({ with_transaction: transactionPort(db) })
+    assert.deepEqual(await restarted.readiness(viewer), { status: 'ready', active_viewer_count: 2, active_viewer_class_count: 2 })
+    assert.deepEqual(await restarted.registerViewer(viewer), { status: 'viewer_registered', revision: 1, ledger_revision: 2 })
+    assert.equal(Number((await db.query("select durable_revision from outcome_private.bridge_schema_versions where workspace_id='workspace-main'")).rows[0].durable_revision), 2)
+    assert.deepEqual(await restarted.readiness({ ...viewer, account_ref: digest('f') }), { status: 'not_ready', active_viewer_count: 0, active_viewer_class_count: 0 })
+  } finally {
+    if (db && !db.closed) await db.close()
+    await rm(directory, { recursive: true, force: true })
+  }
 })
 
 test('viewer bootstrap never repairs an incompatible existing schema row before strict validation', async () => {
