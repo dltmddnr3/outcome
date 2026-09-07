@@ -10,6 +10,7 @@ import {
   createClerkBackendGateway,
   createHostedIdentityRuntime,
   createSealedPackageStore,
+  hostedAuthorizedParties,
   readHostedDataConfiguration,
   readHostedIdentityConfiguration,
   safeClerkAuthReason,
@@ -102,6 +103,33 @@ test('official backend adapter verifies an explicit token with pinned secret and
     const invalid = createClerkBackendGateway({ environment: identityEnvironment, clerkClientFactory: clerkClientFactory(), tokenVerifier })
     await assert.rejects(() => invalid.verifySession(token), (error) => error.code === 'authentication_required' && error.status === 401 && error.sdkReason === reason)
   }
+})
+
+test('preview verification adds only the exact Vercel deployment and branch origins', async () => {
+  const previewEnvironment = {
+    ...identityEnvironment,
+    VERCEL_ENV: 'preview',
+    VERCEL_URL: 'outcome-deployment.vercel.app',
+    VERCEL_BRANCH_URL: 'outcome-git-branch.vercel.app',
+    VERCEL_PROJECT_PRODUCTION_URL: 'outcome-production.vercel.app',
+  }
+  assert.deepEqual(hostedAuthorizedParties(previewEnvironment), [
+    'https://preview.invalid',
+    'https://outcome-deployment.vercel.app',
+    'https://outcome-git-branch.vercel.app',
+  ])
+  assert.deepEqual(hostedAuthorizedParties({ ...previewEnvironment, VERCEL_ENV: 'production' }), ['https://preview.invalid'])
+  assert.deepEqual(hostedAuthorizedParties({ ...previewEnvironment, VERCEL_URL: 'attacker.invalid/path', VERCEL_BRANCH_URL: '*.vercel.app' }), ['https://preview.invalid'])
+
+  const verifierCalls = []
+  const gateway = createClerkBackendGateway({
+    environment: previewEnvironment,
+    clerkClientFactory: clerkClientFactory(),
+    tokenVerifier: async (token, options) => { verifierCalls.push({ token, options }); return claims() },
+  })
+  assert.equal((await gateway.verifySession('sdk-valid')).subject, owner)
+  assert.deepEqual(verifierCalls[0].options.authorizedParties, hostedAuthorizedParties(previewEnvironment))
+  assert.deepEqual(gateway.authenticationOptions.authorizedParties, hostedAuthorizedParties(previewEnvironment))
 })
 
 test('identity-only account mode exposes publishable key, verifies owner, serves exactly the sealed projects, and never mints session cookies', async () => {

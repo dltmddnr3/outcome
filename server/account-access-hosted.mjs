@@ -45,6 +45,26 @@ export const HOSTED_PREVIEW_ENV = Object.freeze({ ...HOSTED_IDENTITY_ENV, ...HOS
 const readBindings = (environment, inventory = HOSTED_PREVIEW_ENV) => Object.fromEntries(Object.entries(inventory).map(([key, name]) => [key, typeof environment?.[name] === 'string' ? environment[name].trim() : '']))
 const validHttps = (value) => { try { return new URL(value).protocol === 'https:' } catch { return false } }
 
+const exactVercelPreviewOrigin = (value) => {
+  if (typeof value !== 'string' || !/^[a-z0-9](?:[a-z0-9-]*[a-z0-9])?(?:\.[a-z0-9](?:[a-z0-9-]*[a-z0-9])?)*$/.test(value) || !value.endsWith('.vercel.app')) return null
+  try {
+    const url = new URL(`https://${value}`)
+    return url.hostname === value && url.origin === `https://${value}` && url.pathname === '/' && !url.search && !url.hash ? url.origin : null
+  } catch { return null }
+}
+
+export function hostedAuthorizedParties(environment = {}) {
+  const configuredOrigin = readBindings(environment, HOSTED_IDENTITY_ENV).privateAllowedOrigin
+  const parties = [configuredOrigin]
+  if (environment?.VERCEL_ENV === 'preview') {
+    for (const name of ['VERCEL_URL', 'VERCEL_BRANCH_URL']) {
+      const origin = exactVercelPreviewOrigin(environment?.[name])
+      if (origin && !parties.includes(origin)) parties.push(origin)
+    }
+  }
+  return parties
+}
+
 export function readHostedIdentityConfiguration(environment = {}) {
   const value = readBindings(environment, HOSTED_IDENTITY_ENV)
   const complete = value.privateSurfaceEnabled === '1'
@@ -105,13 +125,14 @@ const clerkIdentity = async ({ client, claims }) => {
 export function createClerkBackendGateway({ environment = {}, clerkClientFactory = createClerkClient, tokenVerifier = verifyToken } = {}) {
   if (!readHostedIdentityConfiguration(environment).enabled || typeof clerkClientFactory !== 'function' || typeof tokenVerifier !== 'function') throw new Error('hosted_identity_configuration_missing')
   const bindings = readBindings(environment, HOSTED_IDENTITY_ENV)
+  const authorizedParties = hostedAuthorizedParties(environment)
   const client = clerkClientFactory({ secretKey: bindings.clerkSecretKey, publishableKey: bindings.clerkPublishableKey })
   if (!client?.sessions?.getSession || !client?.sessions?.revokeSession || !client?.sessions?.getSessionList) throw new Error('clerk_runtime_invalid')
   const authenticate = async (token) => {
     if (!token) return null
     let verifiedClaims
     try {
-      verifiedClaims = await tokenVerifier(token, { secretKey: bindings.clerkSecretKey, authorizedParties: [bindings.privateAllowedOrigin] })
+      verifiedClaims = await tokenVerifier(token, { secretKey: bindings.clerkSecretKey, authorizedParties })
     } catch (cause) {
       if (!(cause instanceof TokenVerificationError)) throw cause
       const error = accountError('authentication_required', 401)
@@ -122,7 +143,7 @@ export function createClerkBackendGateway({ environment = {}, clerkClientFactory
     return clerkIdentity({ client, claims: verifiedClaims })
   }
   return {
-    authenticationOptions: { acceptsToken: 'session_token', authorizedParties: [bindings.privateAllowedOrigin] },
+    authenticationOptions: { acceptsToken: 'session_token', authorizedParties },
     verifySession: authenticate,
     revokeSession: ({ sessionId }) => client.sessions.revokeSession(sessionId),
     async revokeAllSessions({ subject }) {
