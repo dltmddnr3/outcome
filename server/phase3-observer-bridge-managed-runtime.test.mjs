@@ -45,6 +45,38 @@ test('managed V2 environment names and deployment-owned Preview origin are exact
   ]) assert.equal(readManagedObserverBridgeConfiguration({ ...environment(), ...change }).valid, false)
 })
 
+test('shared pooler requires exact runtime role, project, endpoint and strict TLS', async () => {
+  const ref = 'abcdefghijklmnopqrst'
+  const url = `postgresql://outcome_bridge_runtime.${ref}:synthetic@aws-0-ap-northeast-2.pooler.supabase.com:6543/postgres`
+  const config = { ...environment(), OUTCOME_SUPABASE_URL: `https://${ref}.supabase.co`, [MANAGED_OBSERVER_BRIDGE_ENV.databaseUrl]: url }
+  assert.equal(readManagedObserverBridgeConfiguration(config).valid, true)
+  for (const invalid of [
+    url.replace(ref, 'z'.repeat(20)),
+    url.replace('outcome_bridge_runtime', 'postgres'),
+    url.replace('pooler.supabase.com', 'pooler.supabase.com.evil.invalid'),
+    url.replace(':6543/', ':5432/'),
+    url.replace('/postgres', '/other'),
+    `${url}?sslmode=disable`, `${url}?options=anything`, `${url}#fragment`,
+    url.replace(':synthetic@', ':@'), url.replace(':synthetic@', ':%ZZ@'),
+  ]) assert.equal(readManagedObserverBridgeConfiguration({ ...config, [MANAGED_OBSERVER_BRIDGE_ENV.databaseUrl]: invalid }).valid, false)
+  for (const origin of ['', 'https://evil.invalid', `https://${ref}.supabase.co/path`]) {
+    assert.equal(readManagedObserverBridgeConfiguration({ ...config, OUTCOME_SUPABASE_URL: origin }).valid, false)
+  }
+  let options
+  class Pool {
+    constructor(value) { options = value }
+    async connect() { throw new Error('configuration test must not connect') }
+  }
+  const runtime = await createManagedObserverBridgeRuntimeFactory({ environment: config, driverLoader: async () => ({ Pool }) })({
+    accountRuntime: { service: { resolveBridgeAuthority() {} } },
+    capabilities: { projectionEnrollment: true, ingestion: true },
+  })
+  assert.ok(runtime)
+  assert.equal(options.connectionString, url)
+  assert.equal(options.ssl.rejectUnauthorized, true)
+  assert.equal(options.ssl.ca, databaseCaPem)
+})
+
 test('Preview origin rejects hostile environment shapes without executing accessors or proxy traps', () => {
   let hits = 0
   const accessor = { VERCEL_URL: 'preview.vercel.app' }

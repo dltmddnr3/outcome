@@ -2,6 +2,7 @@ import { createHash, randomBytes, X509Certificate } from 'node:crypto'
 import { isProxy } from 'node:util/types'
 import { createHostedObserverBridgeError } from './phase3-observer-bridge-hosted.mjs'
 import { createObserverBridgeDurableV2Repository, ObserverBridgePostgresError } from './phase3-observer-bridge-postgres.mjs'
+import { readOutcomeSupabaseProjectRef } from './outcome-chat-database-url.mjs'
 
 export const MANAGED_OBSERVER_BRIDGE_ENV = Object.freeze({
   databaseUrl: 'OUTCOME_OBSERVER_BRIDGE_V2_DATABASE_URL',
@@ -112,7 +113,14 @@ function parseConfiguration(environment) {
   try {
     const database = new URL(databaseUrl)
     const origin = new URL(allowedOrigin)
-    if (!['postgres:', 'postgresql:'].includes(database.protocol) || database.username !== 'outcome_bridge_runtime' || !database.password || !database.hostname || database.pathname.length <= 1) return null
+    if (!['postgres:', 'postgresql:'].includes(database.protocol) || !database.password || !database.hostname || database.pathname.length <= 1) return null
+    if (database.username !== 'outcome_bridge_runtime') {
+      const projectRef = readOutcomeSupabaseProjectRef(ownString(environment, 'OUTCOME_SUPABASE_URL'))
+      if (!projectRef || database.username !== `outcome_bridge_runtime.${projectRef}`
+        || !/^aws-0-[a-z0-9]+(?:-[a-z0-9]+)*\.pooler\.supabase\.com$/.test(database.hostname)
+        || database.port !== '6543' || database.pathname !== '/postgres' || database.search || database.hash
+        || decodeURIComponent(database.password).length === 0) return null
+    }
     if ([...database.searchParams.keys()].some((name) => DATABASE_URL_TLS_PARAMETERS.has(name.toLowerCase()))) return null
     if (origin.protocol !== 'https:' || origin.origin !== allowedOrigin || origin.username || origin.password || origin.pathname !== '/' || origin.search || origin.hash) return null
   } catch { return null }
