@@ -15,6 +15,7 @@ const projection = (overrides: Partial<PrivateModelV2Projection> = {}): PrivateM
   cherryActionLabel: '후보 화면을 확인한다',
   state: 'ready',
   events: [],
+  executionLoopItems: [],
   ...overrides,
 })
 
@@ -28,6 +29,28 @@ describe('Current Projection presentation contract', () => {
       return index
     }, -1)
     for (const value of ['내가 원하는 결과에 도달하기', '2 / 5', 'B2 workspace UI', 'B2 UI를 독립 검증한다', '후보 화면을 확인한다']) expect(html).toContain(value)
+    expect(html).toContain('data-completion-authority="false"')
+  })
+
+  it('renders all eight correlated facts in one semantic definition list without an approval control', () => {
+    const fact = (state: 'known' | 'missing' | 'unknown' | 'safe_hold' | 'not_applicable', value: string | null, sourceRef: string | null, reasonCode: string | null) => ({ state, value, sourceRef, reasonCode })
+    const executionLoopItems = [{
+      itemId: 'execution-item-b1', state: 'ready' as const,
+      checked: fact('missing', null, 'gate:B1', 'checked_evidence_missing'),
+      missing: fact('known', 'B1 · 서버 근거를 확인한다', 'gate:B1', null),
+      ownerInstruction: fact('known', 'Builder · 서버 근거 영수증 · B1 근거 고정', 'instruction:builder:b1', null),
+      receiptState: fact('unknown', '전달 상태 확인 불가', 'dispatch:event-builder-1', 'destination_evidence_missing'),
+      nextCheckpoint: fact('known', 'B1 불변 근거', 'gate:B1', null),
+      reviewResult: fact('missing', null, null, 'review_missing'),
+      reworkState: fact('not_applicable', '교정 또는 대체 경로 없음', null, null),
+      cherryBoundary: null,
+      completionAuthority: false as const,
+    }]
+    const html = renderToStaticMarkup(<CurrentProjection projection={projection({ executionLoopItems })} />)
+    for (const label of ['확인한 근거', '미이행', '담당자 지시', '수신·착수', '다음 확인', '검수 결과', '보완·대체 경로', 'Cherry 결정']) expect(html).toContain(label)
+    for (const value of ['B1 · 서버 근거를 확인한다', 'Builder · 서버 근거 영수증 · B1 근거 고정', '전달 상태 확인 불가', '검수 근거 없음', 'Cherry 결정 없음']) expect(html).toContain(value)
+    expect(html).toContain('<dl')
+    expect(html).not.toContain('<button')
     expect(html).toContain('data-completion-authority="false"')
   })
 
