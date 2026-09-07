@@ -85,6 +85,30 @@ test('minimal legacy project fails safe to no active work without client calcula
   assert.deepEqual(projection.remainingAcceptanceGap, { remaining: 0, total: 0 })
 })
 
+test('accepts the separate non-authoritative result-view projection only at its exact root boundary', () => {
+  const source = project()
+  source.resultView = {
+    schema_version: 1,
+    observed_at: observedAt,
+    calendar: {},
+    hierarchy: { id: 'outcome', kind: 'project', children: [] },
+    links: {},
+    completion_authority: false,
+  }
+  assert.equal(createAccountModelV2Projection(source, { observedAt }).modelVersion, 2)
+  for (const resultView of [
+    { ...source.resultView, completion_authority: true },
+    { ...source.resultView, hierarchy: { ...source.resultView.hierarchy, id: 'forged' } },
+    { ...source.resultView, unexpected: true },
+  ]) assert.throws(() => createAccountModelV2Projection({ ...source, resultView }, { observedAt }), /account_model_v2_(?:result_view_invalid|unexpected_key)/)
+})
+
+test('accepts current public binding metadata while keeping its key boundary closed', () => {
+  const binding = { role: 'planner', status: 'registry_conflict', activity: null, boundAt: null, observedAt: null, freshness: 'unknown', bindingVersion: 0, historyCount: 0, phaseId: null, scopeId: null, stageId: null, rotating: false, hasPredecessor: false, history: [] }
+  assert.equal(createAccountModelV2Projection({ ...project(), bindings: [binding] }, { observedAt }).modelVersion, 2)
+  assert.throws(() => createAccountModelV2Projection({ ...project(), bindings: [{ ...binding, unexpected: true }] }, { observedAt }), /account_model_v2_unexpected_key/)
+})
+
 test('all seven server-owned states are independently reachable without conflation', () => {
   const variants = [
     ['loading', { ...project(), loading: true }],

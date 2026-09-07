@@ -27,7 +27,7 @@ describe('OUTCOME Package dashboard', () => {
   it('renders the collected OUTCOME result view end to end without a blank application shell', async () => {
     // @ts-expect-error Node ESM boundary is exercised only by the test runner.
     const { collectOutcomePackages, projectPublicPackages } = await import('../../server/outcome-package.mjs')
-    const collected = projectPublicPackages(collectOutcomePackages({ repositoryRoot: new URL('../..', import.meta.url).pathname, now: new Date('2026-09-07T06:00:00.000Z') }))
+    const collected = projectPublicPackages(collectOutcomePackages({ repositoryRoot: new URL('../..', import.meta.url).pathname, now: new Date('2026-09-07T12:00:00.000Z') }))
     const initialData = { ...collected, build: { repository: 'OUTCOME', ref: 'candidate', commit: null, tree: null, asset: null, runtimeNowPinned: false as const } } as OutcomeDashboardData
     const markup = renderToStaticMarkup(createElement(OutcomeDashboard, { onUnauthorized: () => undefined, initialData }))
     expect(markup).toContain('id="oc-result-view"')

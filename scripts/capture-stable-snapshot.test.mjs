@@ -1,5 +1,6 @@
 import assert from 'node:assert/strict'
 import test from 'node:test'
+import sealedSource from '../snapshot/outcome-package-source.json' with { type: 'json' }
 import { buildStableSnapshot } from './capture-stable-snapshot.mjs'
 
 const capturedAt = '2026-08-25T10:00:00.000Z'
@@ -50,4 +51,15 @@ test('post-merge public projection sanitizes prohibited fields and raw Gate evid
   const text = JSON.stringify(snapshot)
   assert.doesNotMatch(text, /\/Users\/|private-value|private raw evidence/)
   assert.equal(Object.hasOwn(snapshot.projects[0].phases[0].scopes[0].stages[0].gate.gates[0], 'evidence'), false)
+})
+
+test('sealed deployment source carries the current OUTCOME result-view baseline', () => {
+  const outcome = sealedSource.projects.find((project) => project.project.id === 'outcome')
+  assert.ok(outcome?.resultView)
+  assert.equal(outcome.resultView.hierarchy.id, 'outcome')
+  assert.equal(outcome.resultView.hierarchy.work.initial_hours, null)
+  assert.equal(outcome.resultView.hierarchy.work.actual_hours, null)
+  assert.equal(outcome.resultView.hierarchy.work.remaining_hours, null)
+  assert.equal(outcome.resultView.hierarchy.comparison.message, '이 날짜 이전의 비교 기록 없음')
+  assert.equal(outcome.resultView.completion_authority, false)
 })

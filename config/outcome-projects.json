@@ -14,7 +14,8 @@
       "sessions_file": "docs/OUTCOME_SESSIONS.md",
       "work_tracking_file": "config/outcome-work-tracking.json",
       "work_tracking_source_refs": [
-        "docs/MVP_14_DAY_EXECUTION_PLAN.md"
+        "docs/MVP_14_DAY_EXECUTION_PLAN.md",
+        "GATES_PHASE2_ACCOUNT_ACCESS_HOSTED_IDENTITY_PREVIEW.md"
       ]
     }
   ]

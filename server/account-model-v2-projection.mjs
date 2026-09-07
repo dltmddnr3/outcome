@@ -10,7 +10,7 @@ const PRIVATE_VALUE = /(?:^|[\s=:])(?:token|secret|password|credential)\s*=|(?:^
 const EVENT_PRIVATE_VALUE = /(?:^|[\s=:])(?:token|secret|password|credential)\s*=|(?:^|[\s=:])(?:registry|provider)[_-]?(?:payload|id|ref)?\s*=|(?:^|[\s=:])(?:\/(?:Users|home|tmp|private)(?:\/|$)|\/var\/folders(?:\/|$)|[A-Za-z]:\\|\\\\[^\\\s]+\\)|raw[_-]?(?:prompt|result)|private[_-]?(?:registry|locator)|\b(?:task|thread|session|turn)[_-][a-z0-9_-]{4,}\b|\b(?:[0-9a-f]{40}|[0-9a-f]{64})\b|\b[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}\b/i
 const PLAIN = Object.getPrototypeOf({})
 const STATE_HINTS = Object.freeze(['loading', 'stale', 'conflict', 'blocked', 'delivery_unknown'])
-const ROOT_KEYS = new Set(['project', 'current', 'phases', 'events', 'executionLoop', 'observedAt', 'bindings', 'connectors', 'errors', 'next', 'now', 'progress', 'sourceFreshness', 'status', ...STATE_HINTS])
+const ROOT_KEYS = new Set(['project', 'current', 'phases', 'events', 'executionLoop', 'observedAt', 'bindings', 'connectors', 'errors', 'next', 'now', 'progress', 'resultView', 'sourceFreshness', 'status', ...STATE_HINTS])
 const EVENT_TYPES = new Set(['work_observed', 'result_observed', 'boundary_observed'])
 const EVENT_STATUSES = new Set(['observed', 'active', 'blocked', 'delivery_unknown', 'failed', 'rejected', 'safe_hold'])
 const EVENT_ROLES = new Set(['planner', 'builder', 'ux_product_qa', 'release_audit'])
@@ -92,6 +92,10 @@ const validateSourceContract = (source) => {
   if (source.next !== undefined && source.next !== null) assertKeys(source.next, new Set(['phaseId', 'scopeId', 'stageId']))
   if (source.now !== undefined) assertKeys(source.now, new Set(['status', 'activity', 'observedAt', 'source']))
   if (source.progress !== undefined) assertKeys(source.progress, new Set(['available', 'reason']))
+  if (source.resultView !== undefined && source.resultView !== null) {
+    assertKeys(source.resultView, new Set(['schema_version', 'observed_at', 'calendar', 'hierarchy', 'links', 'completion_authority']))
+    if (source.resultView.schema_version !== 1 || source.resultView.completion_authority !== false || source.resultView.hierarchy?.id !== source.project.id || source.resultView.hierarchy?.kind !== 'project' || !Array.isArray(source.resultView.hierarchy?.children)) throw new Error('account_model_v2_result_view_invalid')
+  }
   if (source.sourceFreshness !== undefined) assertKeys(source.sourceFreshness, new Set(['state', 'observedAt']))
   for (const event of source.events ?? []) {
     assertKeys(event, new Set(['id', 'sequence', 'predicateId', 'role', 'type', 'summary', 'observedAt', 'status']))
@@ -105,7 +109,7 @@ const validateSourceContract = (source) => {
     if (typeof event.observedAt !== 'string' || !Number.isFinite(Date.parse(event.observedAt))) throw new Error('account_model_v2_event_time_invalid')
     safeEventSummary(event.summary)
   }
-  for (const binding of source.bindings ?? []) assertKeys(binding, new Set(['role', 'status', 'activity', 'boundAt', 'observedAt', 'freshness', 'historyCount', 'stageId']))
+  for (const binding of source.bindings ?? []) assertKeys(binding, new Set(['role', 'status', 'activity', 'boundAt', 'observedAt', 'freshness', 'bindingVersion', 'historyCount', 'phaseId', 'scopeId', 'stageId', 'rotating', 'hasPredecessor', 'history']))
   if (source.connectors !== undefined) {
     assertKeys(source.connectors, new Set(['github']))
     if (source.connectors.github !== undefined) {
