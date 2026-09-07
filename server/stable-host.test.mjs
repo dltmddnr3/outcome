@@ -117,6 +117,18 @@ test('chat route contains hostile thrown values without reading status or exposi
   assert.equal(reads, 0)
 })
 
+test('chat POST accepts exact trusted Preview origin but rejects lookalikes and Production Preview claims', async () => {
+ const configured='https://preview.invalid',csrf='synthetic-chat-csrf-value';
+ for(const [mode,requestOrigin,status] of [['preview','https://outcome-test.vercel.app',202],['preview','https://outcome-test.vercel.app.evil.invalid',403],['preview','https://other.vercel.app',403],['production','https://outcome-test.vercel.app',403],['preview',configured,202]]){
+  let calls=0;
+  const handler=createStableHostRequestHandler({environment:{...identityEnvironment,VERCEL_ENV:mode,VERCEL_URL:'outcome-test.vercel.app'},
+   runtimeFactory:async()=>({allowedOrigin:configured,publishableKey:'pk_test_boundary',service:{readWorkspace(){},authenticate(){},resolveBridgeAuthority:async()=>({account_ref:'account-test',workspace_id:'workspace-test',project_ids:['outcome']})}}),
+   chatRuntimeFactory:async()=>({allowedOrigin:configured,csrfSecret:csrf,sendEnabled:true,rateLimit:()=>({allowed:true}),createService:()=>({submitPlannerMessage:async()=>{calls++;return {accepted:true,sequence:1,event_id:'event-0000000000000001',dispatch_state:'not_invoked',delivery:'delivery_unknown',execution_started:false,result_attached:false,evidence_attached:false}}})})});
+  const r=await handler({method:'POST',pathname:'/api/private/chat/messages',headers:{origin:requestOrigin,'content-type':'application/json','x-outcome-csrf':csrf,'idempotency-key':'message-0000000000000001'},body:JSON.stringify({project_id:'outcome',message:'hello'})});
+  assert.equal(r.status,status);assert.equal(calls,status===202?1:0);
+ }
+})
+
 test('chat route authenticates server scope and forwards explicit send permission only', async () => {
   for (const enabled of [false, true]) {
     let submissions = 0

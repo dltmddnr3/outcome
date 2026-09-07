@@ -2,7 +2,7 @@ import snapshot from './deployment-snapshot.mjs'
 import { privateAccessPublicConfig } from '../server/account-access-api.mjs'
 import { handlePrivateAccessRequest } from '../server/account-access-api.mjs'
 import { AccountAccessError } from '../server/account-access.mjs'
-import { HOSTED_IDENTITY_ENV, createHostedIdentityRuntime, readHostedIdentityConfiguration, safeClerkAuthReason } from '../server/account-access-hosted.mjs'
+import { HOSTED_IDENTITY_ENV, createHostedIdentityRuntime, readHostedIdentityConfiguration, safeClerkAuthReason, hostedAuthorizedParties } from '../server/account-access-hosted.mjs'
 import { handleHostedObserverBridgeRequest, handleHostedObserverBridgeAdminRequest } from '../server/phase3-observer-bridge-api.mjs'
 import { createObserverBridgeRuntimeControl } from '../server/phase3-observer-bridge-runtime.mjs'
 import { createManagedObserverBridgeRuntimeFactory } from '../server/phase3-observer-bridge-managed-runtime.mjs'
@@ -129,6 +129,7 @@ const privateSessionDiagnostic = (logger, input, error, configuredOrigin) => {
 export function createStableHostRequestHandler({ environment = process.env, runtimeFactory = createHostedIdentityRuntime, bridgeRuntimeFactory, chatRuntimeFactory, clerkClientFactory, clerkTokenVerifier, logger } = {}) {
   const configured = readHostedIdentityConfiguration(environment).enabled
   const configuredOrigin = typeof environment?.[HOSTED_IDENTITY_ENV.privateAllowedOrigin] === 'string' ? environment[HOSTED_IDENTITY_ENV.privateAllowedOrigin].trim() : ''
+  const chatOrigins = hostedAuthorizedParties(environment)
   const validRuntime = (value) => value?.allowedOrigin === configuredOrigin
     && typeof value?.publishableKey === 'string'
     && value.publishableKey.length > 0
@@ -210,7 +211,9 @@ export function createStableHostRequestHandler({ environment = process.env, runt
         const chat = await chatRuntimePromise
         if (!chat || chat.allowedOrigin !== configuredOrigin || typeof chat.csrfSecret !== 'string' || chat.csrfSecret.length < 16 || typeof chat.createService !== 'function' || typeof chat.rateLimit !== 'function') return result(503, { error: 'chat_unavailable' })
         const service = chat.createService(authority.workspace_id)
-        const owner = { authenticated: true, actor: 'cherry_owner', allowed_origin: chat.allowedOrigin, csrf: chat.csrfSecret, workspace_id: authority.workspace_id, account_ref: authority.account_ref, project_ids: ['outcome'] }
+        const requestOrigin = header(headers, 'origin')
+        const allowedChatOrigin = chatOrigins.includes(requestOrigin) ? requestOrigin : chat.allowedOrigin
+        const owner = { authenticated: true, actor: 'cherry_owner', allowed_origin: allowedChatOrigin, csrf: chat.csrfSecret, workspace_id: authority.workspace_id, account_ref: authority.account_ref, project_ids: ['outcome'] }
         const chatHeaders = Object.fromEntries(['content-type', 'origin', 'x-outcome-csrf', 'idempotency-key'].map(name => [name, String(header(headers, name))]).filter(([, value]) => value))
         return await handlePrivateChatRequest({ method, url: pathname, headers: chatHeaders, rawBody: Buffer.isBuffer(body) ? body.toString('utf8') : body, service, owner, rateLimit: chat.rateLimit, sendEnabled: chat.sendEnabled === true })
       } catch {
