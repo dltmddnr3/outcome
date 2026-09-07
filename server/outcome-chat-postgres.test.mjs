@@ -4,6 +4,38 @@ import { readFile } from 'node:fs/promises'
 import { PGlite } from '@electric-sql/pglite'
 import { createOutcomeChatPostgresRepository } from './outcome-chat-postgres.mjs'
 
+test('Preview foundation three-row bootstrap enables chat and transaction rollback leaves no data', async () => {
+  const db = await PGlite.create('memory://')
+  try {
+    await db.exec("create role anon nologin; create role authenticated nologin; create schema auth; create function auth.jwt() returns jsonb language sql stable as $$ select '{}'::jsonb $$;")
+    for (const name of ['202608250001_account_access_foundation.sql','20260827000756_observer_bridge.sql','20260901082821_observer_bridge_durable_v2.sql','20260902100000_observer_bridge_workspace_bootstrap_v2.sql','20260903030000_outcome_chat_durable_relay.sql','20260907152652_outcome_chat_planner_responses.sql']) {
+      await db.exec(await readFile(new URL(`../supabase/migrations/${name}`, import.meta.url), 'utf8'))
+    }
+    const repository = createOutcomeChatPostgresRepository({ transact: operation => db.transaction(async tx => {
+      await tx.exec('set local role outcome_chat_backend')
+      return operation({ query: (sql, params) => tx.query(sql, params) })
+    }) })
+    const input = { workspace_id:'account-only-preview', project_id:'outcome', binding_version:3,
+      idempotency_key:'message-0000000000000001', request_fingerprint:'a'.repeat(64),
+      message:'synthetic bootstrap rehearsal', observed_at:'2026-09-08T00:00:00.000Z' }
+    await assert.rejects(repository.reserve(input), /foreign key/)
+    const rolledBack = new Error('intentional synthetic rollback')
+    await assert.rejects(db.transaction(async tx => {
+      await tx.exec("insert into outcome_private.workspaces(id,state) values('account-only-preview','active'); insert into outcome_private.projects(id,package_id,state) values('outcome','outcome','active'); insert into outcome_private.project_bindings(workspace_id,project_id,state) values('account-only-preview','outcome','active');")
+      await tx.exec('set local role outcome_chat_backend')
+      const scoped = createOutcomeChatPostgresRepository({ transact: operation => operation({query:(sql,params)=>tx.query(sql,params)}) })
+      const reserved = await scoped.reserve(input)
+      assert.equal(reserved.accepted, true)
+      assert.equal(reserved.execution_started, false)
+      assert.equal((await scoped.timeline({workspace_id:input.workspace_id,project_id:'outcome',binding_version:3,after_sequence:0})).length, 1)
+      throw rolledBack
+    }), error => error === rolledBack)
+    for (const table of ['workspaces','projects','project_bindings','workspace_memberships','chat_streams','chat_messages']) {
+      assert.equal((await db.query(`select count(*)::int as count from outcome_private.${table}`)).rows[0].count, 0)
+    }
+  } finally { await db.close() }
+})
+
 test('exact migration chain enforces chat role, RLS and public access boundaries', async () => {
   const db = await PGlite.create('memory://')
   try {
