@@ -540,6 +540,7 @@ body:has(.account-workspace){min-width:0}
 
 @media(max-width:759px){
   .oc-hero,.oc-workbench{border-right:0;border-left:0;border-radius:0}
+  .oc-hero .oc-warning{margin-inline:0;min-width:0;overflow-wrap:anywhere}
   .oc-workbench{margin-bottom:16px;overflow:visible}
   .oc-hierarchy-sticky{position:static;z-index:auto;top:auto}
   .oc-workbench .oc-hierarchy-sticky{position:static;z-index:auto;top:auto}
