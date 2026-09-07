@@ -1,11 +1,25 @@
 import assert from 'node:assert/strict'
 import { readFileSync } from 'node:fs'
 import test from 'node:test'
-import { assertDashboardMeasurement, assertMobileHierarchyFlowMeasurement, assertSourceGroupOccurrences, resolveRoleDisclosureTargets, sourceLabeledGroupStageKeys } from './browser-assertions.mjs'
+import { assertDashboardMeasurement, assertMobileHierarchyFlowMeasurement, assertSourceContextMeasurement, assertSourceGroupOccurrences, resolveRoleDisclosureTargets, sourceLabeledGroupStageKeys } from './browser-assertions.mjs'
 
 const passingMeasurement = () => ({
   documentOverflow: 0, clippedDescendants: [], ellipsisTruncation: [], viewportEscape: [], siblingIntersections: [], roleDescendantIntersections: [], roleStatusOverflow: [], undersizedText: [], lowContrastText: [], undersizedControls: [], unexpectedEnglish: [], translationFallback: [], activeAnimationCount: 0, heroHeight: 352,
   pageHeading: true, sequentialHeadings: true, compactHero: true, roleGeometry: true, heroGeometry: true, mobileMapFirstFold: true, mobileDomOrder: true, mobileHierarchyTruth: true, workspaceSidebarTruth: true, workbenchTruth: true, wideCanvasTruth: true, gateDetailsTruth: true, refinedVisualSystemTruth: true, currentStageActionTruth: true, singleProgressRailTruth: true, phaseNavigationUniqueTruth: true, currentSelectionDistinctionTruth: true, folderHierarchyTruth: true, phaseCurrentMarkerTruth: true, phaseLabelsFull: true, phaseBandTruth: true, phaseOptionTitlesFull: true, desktopPhaseListFirstFold: true, liveSemantics: true, structureTruth: true, phaseCompletionTruth: true, stagePositionTruth: true, snapshotHeroTruth: true, oneMapSurface: true, roving: true, desktopColumns: true, mobileDrill: true, gateCountTruth: true, gaugeTruth: true, explorationTruth: true, groupTruth: true, singleStaleNowSignal: true, snapshotBadgeTextTruth: true, technicalCollapsed: true, technicalEvidence: true, noFabricatedProgress: true, firstFold: true,
+})
+
+const passingSourceContext = () => ({ count: 1, visibleCount: 1, role: 'region', accessibleName: '원본 맥락 · 비권한 참조', completionAuthority: 'false', primary: 'outcome-phase-5:13/13', compatibility: 'outcome-phase-3:38/43', historical: 'outcome-phase-2:5/6', conflict: 'Slice A A1-A4 OPEN|13/13 evidence closure', text: '원본 맥락 · 비권한 참조 현재 primary · Phase 5 13/13 compatibility · Phase 3 38/43 historical · Phase 2 5/6 원본 충돌 · Map · Slice A A1-A4 OPEN · Gate · 13/13 evidence closure 캡처 시각 2026-09-07T12:23:21.492Z 원본 갱신 2026-08-31 KST 근거 관측 2026-09-03T09:55:56.978Z completionAuthority=false · 이 원본 맥락은 프로젝트 완료나 Cherry 수용을 승인하지 않습니다.' })
+
+test('source context browser contract requires exact visible DOM and accessible source distinctions', () => {
+  assert.doesNotThrow(() => assertSourceContextMeasurement('desktop/outcome', true, passingSourceContext()))
+  assert.doesNotThrow(() => assertSourceContextMeasurement('desktop/cherry-note', false, { count: 0 }))
+})
+
+test('source context browser contract fails closed for a missing or substituted decisive value', () => {
+  assert.throws(() => assertSourceContextMeasurement('desktop/outcome', true, { ...passingSourceContext(), count: 0 }), /count=0/)
+  assert.throws(() => assertSourceContextMeasurement('desktop/outcome', true, { ...passingSourceContext(), compatibility: 'outcome-phase-3:39\/43' }), /compatibility=/)
+  assert.throws(() => assertSourceContextMeasurement('desktop/outcome', true, { ...passingSourceContext(), text: passingSourceContext().text.replace('Slice A A1-A4 OPEN', 'generic conflict') }), /text-missing=Map · Slice A A1-A4 OPEN/)
+  assert.throws(() => assertSourceContextMeasurement('desktop/cherry-note', false, { count: 1 }), /fabricated/)
 })
 
 test('nested summary role rows resolve the accessible title and status targets', () => {

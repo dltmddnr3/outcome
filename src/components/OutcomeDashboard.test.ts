@@ -49,6 +49,21 @@ describe('OUTCOME Package dashboard', () => {
     expect(markup).toContain('class="oc-v1-compatibility"')
     expect(markup).toContain('원본 충돌')
     expect(markup).toContain('data-completion-authority="false"')
+    expect(markup.match(/data-source-context="true"/g) ?? []).toHaveLength(1)
+    expect(markup).toContain('aria-labelledby="oc-source-context-title"')
+    for (const text of ['현재 primary · Phase 5', '13/13', 'compatibility · Phase 3', '38/43', 'historical · Phase 2', '5/6', 'Map · Slice A A1-A4 OPEN', 'Gate · 13/13 evidence closure', '캡처 시각', '2026-09-07T12:23:21.492Z', '원본 갱신', '2026-08-31 KST', '근거 관측', '2026-09-03T09:55:56.978Z', 'completionAuthority=false', '프로젝트 완료나 Cherry 수용을 승인하지 않습니다.']) expect(markup).toContain(text)
+    expect(markup).toContain('data-source-primary="outcome-phase-5:13/13"')
+    expect(markup).toContain('data-source-compatibility="outcome-phase-3:38/43"')
+    expect(markup).toContain('data-source-historical="outcome-phase-2:5/6"')
+    expect(markup).toContain('data-source-conflict="Slice A A1-A4 OPEN|13/13 evidence closure"')
+  })
+  it('preserves the existing result view without fabricating source context when source_projection is absent', () => {
+    const source = JSON.parse(readFileSync(new URL('../../snapshot/outcome-package-source.json', import.meta.url), 'utf8'))
+    const view = { ...source.projects.find((item: PackageProject) => item.project.id === 'outcome')!.resultView, source_projection: undefined } as ResultView
+    const markup = renderToStaticMarkup(createElement(OutcomeResultView, { view }))
+    expect(markup).toContain('id="oc-result-view"')
+    expect(markup).not.toContain('data-source-context="true"')
+    expect(markup).not.toContain('id="oc-source-context-title"')
   })
   it('결과물 뷰는 전체와 하위 계층에 같은 근거·시간·일자 구조를 펼쳐 보여준다', () => {
     const node = { id: 'outcome', kind: 'project', title: 'OUTCOME', outcome: '사용 가능한 결과', acceptance: { closed: 1, total: 2, unmapped: 1, partial: true, label: '부분 분모 · 전체 완료율 아님', unit_ids: ['GATES.md#G1', 'GATES.md#G2'], denominator_sha256: 'a'.repeat(64), weight: 1, completion_authority: false }, work: { initial_hours: null, actual_hours: null, remaining_hours: null, planned_finish_at: '2026-09-18T07:55:25+09:00', latest_forecast: null, provenance: { planned_finish_at: { source_ref: 'docs/PLAN.md', observed_at: '2026-09-07T00:00:00+09:00' } } }, comparison: { yesterday: null, current: { observed_at: '2026-09-07T00:00:00+09:00', closed: 1, total: 2, unmapped: 1, denominator_sha256: 'a'.repeat(64) }, today_delta: null, message: '이 날짜 이전의 비교 기록 없음' }, timeline: [{ type: 'current', observed_at: '2026-09-07T00:00:00+09:00', closed: 1, total: 2, unmapped: 1 }], links: { source: { href: '#result-node-outcome', action: null, label: '출처 보기' }, usable_result: { href: '#result-node-outcome', action: null, label: '사용 가능한 결과 보기' }, planner_conversation: { href: null, action: 'planner_conversation', label: 'Planner 대화 보기' } }, children: [] }
