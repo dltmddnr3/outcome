@@ -106,19 +106,23 @@ function ResultNodeDetails({ node, depth = 0, onPlannerNavigate }: { node: Resul
     </div>
   </details>
 }
-function ResultSourceContext({ source }: { source: ResultSourceProjection }) {
+function ResultSourceContext({ source, hierarchy }: { source: ResultSourceProjection; hierarchy: ResultNode }) {
   const historical = source.historical[0]
   const conflict = source.conflicts[0]
+  const matches = hierarchy.children.filter((node) => node.kind === 'phase' && node.id === source.compatibility.phase_id)
+  const current = matches.length === 1 ? matches[0].acceptance : null
+  const differs = current && (current.closed !== source.compatibility.closed || current.total !== source.compatibility.total)
   return <section className="oc-result-node" role="region" aria-labelledby="oc-source-context-title" data-source-context="true" data-completion-authority={String(source.completion_authority)} data-source-primary={`${source.primary.destination_id}:${source.primary.acceptance.closed}/${source.primary.acceptance.total}`} data-source-compatibility={`${source.compatibility.phase_id}:${source.compatibility.closed}/${source.compatibility.total}`} data-source-historical={`${historical.phase_id}:${historical.closed}/${historical.total}`} data-source-conflict={`${conflict.map_value}|${conflict.gate_value}`}>
     <div className="oc-result-node__body"><h3 id="oc-source-context-title">원본 맥락 · 비권한 참조</h3>
       <dl className="oc-result-work"><div><dt>현재 primary · Phase 5</dt><dd>{`${source.primary.acceptance.closed}/${source.primary.acceptance.total}`}</dd></div><div><dt>{source.compatibility.label} · Phase 3</dt><dd>{`${source.compatibility.closed}/${source.compatibility.total}`}</dd></div><div><dt>{historical.label} · Phase 2</dt><dd>{`${historical.closed}/${historical.total}`}</dd></div></dl>
       <p className="oc-result-message" role="status">원본 충돌 · <span>{`Map · ${conflict.map_value}`}</span> · <span>{`Gate · ${conflict.gate_value}`}</span></p>
+      {differs && <p className="oc-result-message" role="status">{`Phase 3 집계 차이 · Map 문서 기록 ${source.compatibility.closed}/${source.compatibility.total} · 현재 후보의 연결 Gate 집계 ${current.closed}/${current.total}. 문서 기록을 현재 후보의 검증 완료율로 사용하지 않습니다.`}</p>}
       <dl className="oc-result-delta"><div><dt>캡처 시각</dt><dd>{source.captured_at}</dd></div><div><dt>원본 갱신</dt><dd>{source.source_updated_at}</dd></div><div><dt>근거 관측</dt><dd>{source.evidence_observed_at}</dd></div></dl>
       <p><span>{`completionAuthority=${String(source.completion_authority)}`}</span> · 이 원본 맥락은 프로젝트 완료나 Cherry 수용을 승인하지 않습니다.</p>
     </div>
   </section>
 }
-export function OutcomeResultView({ view, onPlannerNavigate }: { view: ResultView; onPlannerNavigate?: () => void }) { return <section id="oc-result-view" className="oc-result-view" aria-labelledby="oc-result-view-title" data-completion-authority="false"><header><div><small>SUZN-OUTCOME-005 · 읽기 전용</small><h2 id="oc-result-view-title">결과물·진척·시간</h2></div><span>관측 {resultDate(view.observed_at)}</span></header><p>막대는 연결된 완료 조건의 근거 닫힘만 나타내며, 프로젝트 완료나 Cherry 수용을 의미하지 않습니다.</p>{view.source_projection && <ResultSourceContext source={view.source_projection} />}<ResultNodeDetails node={view.hierarchy} onPlannerNavigate={onPlannerNavigate} /></section> }
+export function OutcomeResultView({ view, onPlannerNavigate }: { view: ResultView; onPlannerNavigate?: () => void }) { return <section id="oc-result-view" className="oc-result-view" aria-labelledby="oc-result-view-title" data-completion-authority="false"><header><div><small>SUZN-OUTCOME-005 · 읽기 전용</small><h2 id="oc-result-view-title">결과물·진척·시간</h2></div><span>관측 {resultDate(view.observed_at)}</span></header><p>막대는 연결된 완료 조건의 근거 닫힘만 나타내며, 프로젝트 완료나 Cherry 수용을 의미하지 않습니다.</p>{view.source_projection && <ResultSourceContext source={view.source_projection} hierarchy={view.hierarchy} />}<ResultNodeDetails node={view.hierarchy} onPlannerNavigate={onPlannerNavigate} /></section> }
 
 const APPROVAL_UNKNOWN = '알 수 없음'
 const blockerStatuses = new Set<PrivateModelV2Event['status']>(['blocked', 'failed', 'rejected', 'safe_hold'])

@@ -57,6 +57,19 @@ describe('OUTCOME Package dashboard', () => {
     expect(markup).toContain('data-source-historical="outcome-phase-2:5/6"')
     expect(markup).toContain('data-source-conflict="Slice A A1-A4 OPEN|13/13 evidence closure"')
   })
+  it('distinguishes Map narrative counts from candidate Gate counts without rewriting either', () => {
+    const source = JSON.parse(readFileSync(new URL('../../snapshot/outcome-package-source.json', import.meta.url), 'utf8'))
+    const view = source.projects.find((item: PackageProject) => item.project.id === 'outcome').resultView as ResultView
+    const phase = view.hierarchy.children.find(node => node.id === 'outcome-phase-3')!
+    phase.acceptance.closed = 17
+    phase.acceptance.total = 43
+    const markup = renderToStaticMarkup(createElement(OutcomeResultView, { view }))
+    expect(markup).toContain('Map 문서 기록 38/43 · 현재 후보의 연결 Gate 집계 17/43')
+    expect(markup).toContain('문서 기록을 현재 후보의 검증 완료율로 사용하지 않습니다.')
+    expect(view.source_projection!.compatibility.closed).toBe(38)
+    phase.acceptance.closed = 38
+    expect(renderToStaticMarkup(createElement(OutcomeResultView, { view }))).not.toContain('Phase 3 집계 차이')
+  })
   it('preserves the existing result view without fabricating source context when source_projection is absent', () => {
     const source = JSON.parse(readFileSync(new URL('../../snapshot/outcome-package-source.json', import.meta.url), 'utf8'))
     const view = { ...source.projects.find((item: PackageProject) => item.project.id === 'outcome')!.resultView, source_projection: undefined } as ResultView
