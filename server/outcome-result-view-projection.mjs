@@ -13,6 +13,10 @@ const sha256 = (value) => createHash('sha256').update(stable(value)).digest('hex
 const fail = () => { throw new Error(INVALID) }
 const range = (value) => value === null || Array.isArray(value) && value.length === 2 && value.every((item) => typeof item === 'number' && Number.isFinite(item) && item >= 0) && value[0] <= value[1]
 const safeSourceRef = (value) => typeof value === 'string' && value.length > 0 && value.length <= 240 && !value.includes('..') && !value.startsWith('/') && !/[\u0000-\u001f]|\b[0-9a-f]{8}-[0-9a-f-]{27,}\b|\b[0-9a-f]{40,64}\b|raw_(?:prompt|result)|(?:session|thread|task|turn)_id|(?:token|secret|password|authorization|api[_-]?key|locator)\s*[:=]/i.test(value)
+const ACCEPTANCE_UNIT_ID = /^[A-Za-z0-9][A-Za-z0-9._-]{0,159}#[A-Za-z0-9][A-Za-z0-9._-]{0,79}$/
+const PRIVATE_UNIT_LOCATOR = /(?:^|[#._-])(?:task|thread|session|turn)(?:[_-](?:id[_-]?)?)?[0-9a-f]{3,}(?:$|[._-])/i
+const safeAcceptanceUnitId = (value) => typeof value === 'string' && safeSourceRef(value) && ACCEPTANCE_UNIT_ID.test(value) && !PRIVATE_UNIT_LOCATOR.test(value)
+const exactDenseArray = (value) => Array.isArray(value) && Object.getOwnPropertyNames(value).length === value.length + 1 && Object.getOwnPropertyNames(value).every((key, index) => index === value.length ? key === 'length' : key === String(index))
 const nodeAnchor = (value) => typeof value === 'string' ? value.match(/^#result-node-([a-z0-9]+(?:-[a-z0-9]+)*)$/)?.[1] ?? null : null
 const exactKeys = (value, keys) => exactObject(value) && Object.keys(value).length === keys.size && Object.keys(value).every((key) => keys.has(key))
 function assertPassiveData(value, seen = new Set()) {
@@ -67,14 +71,19 @@ function validateWorkTracking(project, value, options, allowedSourceRefs) {
   for (const snapshot of value.snapshots) {
     if (!exactKeys(snapshot, new Set(['snapshot_id', 'observed_at', 'source_ref', 'denominator_sha256', 'nodes'])) || !iso(snapshot.observed_at) || Date.parse(snapshot.observed_at) > cutoff || !sourceAllowed(snapshot.source_ref) || !HASH.test(snapshot.denominator_sha256) || !exactObject(snapshot.nodes) || snapshot.snapshot_id !== outcomeSnapshotId(snapshot) || snapshotIds.has(snapshot.snapshot_id)) fail()
     snapshotIds.add(snapshot.snapshot_id)
-    for (const row of Object.values(snapshot.nodes)) if (!exactKeys(row, new Set(['closed', 'total', 'unmapped', 'denominator_sha256', 'unit_ids'])) || !Number.isInteger(row.closed) || !Number.isInteger(row.total) || !Number.isInteger(row.unmapped) || row.closed < 0 || row.total < 0 || row.closed > row.total || row.unmapped < 0 || !HASH.test(row.denominator_sha256) || !Array.isArray(row.unit_ids) || row.unit_ids.some((id) => typeof id !== 'string')) fail()
+    for (const row of Object.values(snapshot.nodes)) {
+      if (!exactKeys(row, new Set(['closed', 'total', 'unmapped', 'denominator_sha256', 'unit_ids'])) || !Number.isInteger(row.closed) || !Number.isInteger(row.total) || !Number.isInteger(row.unmapped) || row.closed < 0 || row.total < 0 || row.closed > row.total || row.unmapped < 0 || !HASH.test(row.denominator_sha256) || !exactDenseArray(row.unit_ids)) fail()
+      if (row.unit_ids.some((id) => !safeAcceptanceUnitId(id)) || row.unit_ids.some((id, index) => index > 0 && row.unit_ids[index - 1] >= id) || row.total !== row.unit_ids.length || row.denominator_sha256 !== sha256(row.unit_ids)) fail()
+    }
   }
 }
 
 const acceptance = (unitMap, unmapped) => {
   const unitIds = [...unitMap.keys()].sort()
   const closed = unitIds.filter((id) => unitMap.get(id)).length
-  return { closed, total: unitIds.length, unmapped, partial: unmapped > 0, label: unmapped > 0 ? '부분 분모 · 전체 완료율 아님' : '근거 닫힘', unit_ids: unitIds, denominator_sha256: sha256(unitIds), weight: 1, completion_authority: false }
+  const partial = unmapped > 0
+  const label = partial ? unitIds.length === 0 ? '완료 조건 미연결 · 전체 완료율 아님' : '부분 분모 · 전체 완료율 아님' : '근거 닫힘'
+  return { closed, total: unitIds.length, unmapped, partial, label, unit_ids: unitIds, denominator_sha256: sha256(unitIds), weight: 1, completion_authority: false }
 }
 
 const directWork = (node, calendar, root) => {
@@ -145,8 +154,9 @@ export function projectOutcomeResultView(project, tracking, options, allowedSour
     return { node, units }
   }
   const combine = (id, kind, title, outcome, childRows, root = false) => {
-    const units = new Map(); let unmapped = 0
+    const units = new Map(); let unmapped = childRows.length === 0 ? 1 : 0
     for (const row of childRows) { for (const [key, closed] of row.units) units.set(key, units.get(key) === true || closed); unmapped += row.node.acceptance.unmapped }
+    if (units.size === 0 && unmapped === 0) unmapped = 1
     const node = { id, kind, title, outcome, children: childRows.map((row) => row.node), acceptance: acceptance(units, unmapped), work: null }
     node.work = aggregateWork(directWork(tracking.nodes[id], calendar, root), node.children)
     return { node, units }

@@ -1,4 +1,5 @@
 import assert from 'node:assert/strict'
+import { createHash } from 'node:crypto'
 import test from 'node:test'
 import { outcomeSnapshotId, projectOutcomeResultView } from './outcome-result-view-projection.mjs'
 
@@ -23,6 +24,7 @@ const base = {
 const cutoff = { observedAtCutoff: '2026-09-07T06:00:00.000Z' }
 const sourceRefs = ['docs/MVP_14_DAY_EXECUTION_PLAN.md', 'docs/WORK.md', 'docs/FORECAST.md', 'evidence/snapshot-before.json', 'evidence/snapshot-current.json', 'evidence/snapshot-old.json', 'evidence/node-local.json', 'evidence/snapshot.json']
 const resultView = (sourceProject, tracking, options = cutoff, refs = sourceRefs) => projectOutcomeResultView(sourceProject, tracking, options, refs)
+const denominator = (unitIds) => createHash('sha256').update(JSON.stringify(unitIds)).digest('hex')
 
 test('deduplicates acceptance identities and unions descendant denominators', () => {
   const view = resultView(project, base)
@@ -46,6 +48,28 @@ test('known 100 percent plus an unmapped descendant stays partial and non-author
   assert.equal(view.hierarchy.acceptance.partial, true)
   assert.equal(view.hierarchy.acceptance.label.includes('전체 완료율 아님'), true)
   assert.equal(view.hierarchy.acceptance.completion_authority, false)
+})
+
+test('empty structural nodes stay unknown partial and propagate unmapped coverage', () => {
+  const emptyProject = {
+    project: { id: 'outcome', name: 'OUTCOME', outcome: 'usable result' },
+    phases: [
+      { id: 'phase-no-scopes', title: 'No scopes', purpose: 'unknown phase result', scopes: [] },
+      { id: 'phase-empty-scope', title: 'Empty scope phase', purpose: 'unknown phase result', scopes: [{ id: 'scope-no-stages', title: 'No stages', purpose: 'unknown scope result', stages: [] }] },
+    ],
+  }
+  const view = resultView(emptyProject, base)
+  const [noScopes, emptyScopePhase] = view.hierarchy.children
+  const emptyScope = emptyScopePhase.children[0]
+  for (const node of [noScopes, emptyScopePhase, emptyScope]) {
+    assert.equal(node.acceptance.total, 0)
+    assert.equal(node.acceptance.unmapped, 1)
+    assert.equal(node.acceptance.partial, true)
+    assert.equal(node.acceptance.label, '완료 조건 미연결 · 전체 완료율 아님')
+    assert.equal(node.acceptance.completion_authority, false)
+  }
+  assert.equal(view.hierarchy.acceptance.unmapped, 2)
+  assert.equal(view.hierarchy.acceptance.label, '완료 조건 미연결 · 전체 완료율 아님')
 })
 
 test('keeps unsourced work facts unknown and preserves only sourced calendar dates', () => {
@@ -99,7 +123,9 @@ test('computes dated delta only across the same denominator', () => {
 })
 
 test('fails closed on denominator drift and emits a dated scope change', () => {
-  const source = { observed_at: '2026-09-06T12:00:00.000Z', source_ref: 'evidence/snapshot-old.json', denominator_sha256: 'a'.repeat(64), nodes: { outcome: { closed: 1, total: 2, unmapped: 0, denominator_sha256: 'a'.repeat(64), unit_ids: ['GATES.md#G1', 'GATES.md#G2'] } } }
+  const oldUnitIds = ['GATES.md#G1', 'GATES.md#G2']
+  const oldDenominator = denominator(oldUnitIds)
+  const source = { observed_at: '2026-09-06T12:00:00.000Z', source_ref: 'evidence/snapshot-old.json', denominator_sha256: oldDenominator, nodes: { outcome: { closed: 1, total: 2, unmapped: 0, denominator_sha256: oldDenominator, unit_ids: oldUnitIds } } }
   const snapshots = [{ snapshot_id: outcomeSnapshotId(source), ...source }]
   const view = resultView(project, { ...base, snapshots })
   assert.equal(view.hierarchy.comparison.today_delta, null)
@@ -107,6 +133,47 @@ test('fails closed on denominator drift and emits a dated scope change', () => {
   assert.equal(view.hierarchy.timeline.at(-1).type, 'scope_change')
   assert.deepEqual(view.hierarchy.timeline.at(-1).old_unit_ids, ['GATES.md#G1', 'GATES.md#G2'])
   assert.deepEqual(view.hierarchy.timeline.at(-1).new_unit_ids, ['GATES.md#G1', 'GATES.md#G2', 'GATES.md#G3'])
+})
+
+test('rejects snapshot rows whose total identities and denominator are not mutually canonical', () => {
+  const current = resultView(project, base).hierarchy.acceptance
+  const forgedIds = [...current.unit_ids]
+  forgedIds[0] = 'GATES.md#FORGED'
+  const rows = [
+    { closed: 1, total: forgedIds.length, unmapped: 1, denominator_sha256: current.denominator_sha256, unit_ids: forgedIds },
+    { closed: 1, total: current.unit_ids.length + 1, unmapped: 1, denominator_sha256: current.denominator_sha256, unit_ids: current.unit_ids },
+    { closed: 1, total: current.unit_ids.length, unmapped: 1, denominator_sha256: current.denominator_sha256, unit_ids: [...current.unit_ids].reverse() },
+    { closed: 1, total: current.unit_ids.length + 1, unmapped: 1, denominator_sha256: denominator([...current.unit_ids, current.unit_ids[0]].sort()), unit_ids: [...current.unit_ids, current.unit_ids[0]].sort() },
+  ]
+  for (const row of rows) {
+    const body = { observed_at: '2026-09-06T12:00:00.000Z', source_ref: 'evidence/snapshot.json', denominator_sha256: row.denominator_sha256, nodes: { outcome: row } }
+    assert.throws(() => resultView(project, { ...base, snapshots: [{ snapshot_id: outcomeSnapshotId(body), ...body }] }), /work_tracking_invalid/)
+  }
+})
+
+test('rejects private locator-like snapshot unit identities before scope-change projection', () => {
+  for (const unitId of ['/Users/private/task/thread-123', 'GATES.md#thread-123', 'GATES.md#session-456', 'GATES.md#550e8400-e29b-41d4-a716-446655440000', 'GATES.md#token=secret']) {
+    const unitIds = [unitId]
+    const row = { closed: 0, total: 1, unmapped: 0, denominator_sha256: denominator(unitIds), unit_ids: unitIds }
+    const body = { observed_at: '2026-09-06T12:00:00.000Z', source_ref: 'evidence/snapshot.json', denominator_sha256: row.denominator_sha256, nodes: { outcome: row } }
+    assert.throws(() => resultView(project, { ...base, snapshots: [{ snapshot_id: outcomeSnapshotId(body), ...body }] }), /work_tracking_invalid/)
+  }
+})
+
+test('rejects accessor and Proxy snapshot unit identities without executing caller code', () => {
+  const row = { closed: 0, total: 1, unmapped: 0, denominator_sha256: denominator(['GATES.md#G1']), unit_ids: ['GATES.md#G1'] }
+  const body = { observed_at: '2026-09-06T12:00:00.000Z', source_ref: 'evidence/snapshot.json', denominator_sha256: row.denominator_sha256, nodes: { outcome: row } }
+  const snapshot = { snapshot_id: outcomeSnapshotId(body), ...body }
+  let reads = 0
+  const accessorSnapshot = structuredClone(snapshot)
+  Object.defineProperty(accessorSnapshot.nodes.outcome.unit_ids, '0', { enumerable: true, get() { reads += 1; return 'GATES.md#G1' } })
+  assert.throws(() => resultView(project, { ...base, snapshots: [accessorSnapshot] }), /work_tracking_invalid/)
+  assert.equal(reads, 0)
+  let traps = 0
+  const proxySnapshot = structuredClone(snapshot)
+  proxySnapshot.nodes.outcome.unit_ids = new Proxy(proxySnapshot.nodes.outcome.unit_ids, { get() { traps += 1; return undefined }, ownKeys() { traps += 1; return [] } })
+  assert.throws(() => resultView(project, { ...base, snapshots: [proxySnapshot] }), /work_tracking_invalid/)
+  assert.equal(traps, 0)
 })
 
 test('rejects fabricated, malformed, private, and authority-bearing tracking inputs', () => {
@@ -148,7 +215,7 @@ test('keeps delta node-local when only a sibling denominator changes', () => {
     observed_at: '2026-09-06T12:00:00.000Z', source_ref: 'evidence/node-local.json', denominator_sha256: 'b'.repeat(64),
     nodes: {
       [stableNode.id]: { closed: 0, total: stableNode.acceptance.total, unmapped: 0, denominator_sha256: stableNode.acceptance.denominator_sha256, unit_ids: stableNode.acceptance.unit_ids },
-      [changedNode.id]: { closed: 0, total: 1, unmapped: 0, denominator_sha256: 'c'.repeat(64), unit_ids: ['GATES.md#OLD'] },
+      [changedNode.id]: { closed: 0, total: 1, unmapped: 0, denominator_sha256: denominator(['GATES.md#OLD']), unit_ids: ['GATES.md#OLD'] },
     },
   }
   const snapshot = { snapshot_id: outcomeSnapshotId(snapshotSource), ...snapshotSource }
