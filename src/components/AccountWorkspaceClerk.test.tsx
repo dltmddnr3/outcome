@@ -100,26 +100,29 @@ describe('Clerk browser session boundary', () => {
     expect(hostedGoogleSsoParameters).toEqual({ strategy: 'oauth_google', redirectCallbackUrl: '/workspace/sso-callback', redirectUrl: '/workspace' })
   })
 
-  it('opens the documented popup synchronously and finalizes a completed Google sign-in', async () => {
-    const lock = { current: false }
-    let opened = false
-    const popup = { close: vi.fn(), closed: false } as unknown as Window
+  it('finalizes an already completed Google sign-in without opening or replaying OAuth', async () => {
+    const lock = { current: false }, openPopup = vi.fn()
     const navigate = vi.fn()
     const finalize = vi.fn().mockImplementation(async ({ navigate: finalizeNavigate }) => {
-      expect(opened).toBe(true)
       expect(finalizeNavigate).toBe(navigate)
       return { error: null }
     })
-    const sso = vi.fn().mockImplementation(async (parameters) => {
-      expect(opened).toBe(true)
-      expect(parameters).toEqual({ ...hostedGoogleSsoParameters, popup })
-      return { error: null }
-    })
+    const sso = vi.fn()
     const signIn = { status: 'complete', sso, finalize }
-    await expect(attemptHostedGoogleSignIn(signIn, lock, () => { opened = true; return popup }, navigate)).resolves.toBe('complete')
-    expect(sso).toHaveBeenCalledOnce()
+    await expect(attemptHostedGoogleSignIn(signIn, lock, openPopup, navigate)).resolves.toBe('complete')
+    expect(openPopup).not.toHaveBeenCalled()
+    expect(sso).not.toHaveBeenCalled()
     expect(finalize).toHaveBeenCalledOnce()
-    expect(popup.close).toHaveBeenCalledOnce()
+    expect(lock.current).toBe(false)
+  })
+
+  it('opens the documented popup synchronously for a fresh Google sign-in', async () => {
+    const lock = { current: false }, popup = { close: vi.fn(), closed: false } as unknown as Window
+    const signIn = { status: 'needs_identifier', sso: vi.fn().mockImplementation(async (parameters) => {
+      expect(parameters).toEqual({ ...hostedGoogleSsoParameters, popup }); signIn.status = 'complete'; return { error: null }
+    }), finalize: vi.fn().mockResolvedValue({ error: null }) }
+    await expect(attemptHostedGoogleSignIn(signIn, lock, () => popup, vi.fn())).resolves.toBe('complete')
+    expect(signIn.sso).toHaveBeenCalledOnce(); expect(signIn.finalize).toHaveBeenCalledOnce(); expect(popup.close).toHaveBeenCalledOnce()
   })
 
   it('fails safely for absent, blocked-popup, rejected, thrown, and incomplete Google starts', async () => {

@@ -64,6 +64,11 @@ export async function attemptHostedGoogleSignIn(signIn: HostedGoogleSignIn | nul
   if (lock.current) return 'ignored'
   if (!signIn) return 'unavailable'
   lock.current = true
+  if (signIn.status === 'complete') {
+    try { return (await signIn.finalize({ navigate })).error ? 'failed' : 'complete' }
+    catch { return 'failed' }
+    finally { lock.current = false }
+  }
   const popup = openPopup()
   if (!popup) { lock.current = false; return 'popup_blocked' }
   try {
