@@ -2,10 +2,12 @@ import assert from 'node:assert/strict'
 import { readFile } from 'node:fs/promises'
 import test from 'node:test'
 import { PGlite } from '@electric-sql/pglite'
-import { computeTombstoneCoverageDigest, createObserverBridgePostgresAdapter, OBSERVER_BRIDGE_EFFECTIVE_ROLE, OBSERVER_BRIDGE_POSTGRES_FUTURE_SKEW_MS, ObserverBridgePostgresError } from './phase3-observer-bridge-postgres.mjs'
+import { computeTombstoneCoverageDigest, createObserverBridgeDurableV2Repository, createObserverBridgePostgresAdapter, OBSERVER_BRIDGE_EFFECTIVE_ROLE, OBSERVER_BRIDGE_POSTGRES_FUTURE_SKEW_MS, ObserverBridgePostgresError } from './phase3-observer-bridge-postgres.mjs'
 
 const foundationUrl = new URL('../supabase/migrations/202608250001_account_access_foundation.sql', import.meta.url)
 const migrationUrl = new URL('../supabase/migrations/20260827000756_observer_bridge.sql', import.meta.url)
+const migrationV2Url = new URL('../supabase/migrations/20260901082821_observer_bridge_durable_v2.sql', import.meta.url)
+const bootstrapV2Url = new URL('../supabase/migrations/20260902100000_observer_bridge_workspace_bootstrap_v2.sql', import.meta.url)
 const AT = '2026-08-27T00:00:00.000Z'
 const EXPIRES = '2026-08-27T00:01:00.000Z'
 const digest = (character) => character.repeat(64)
@@ -266,6 +268,145 @@ test('Option A uses one dedicated backend role and no mutable GUC authority', as
   assert.doesNotMatch(migration, /current_setting\s*\(\s*'outcome\.bridge\./i)
   assert.match(migration, /create role outcome_bridge_backend nologin nobypassrls/i)
   assert.doesNotMatch(migration, /create role outcome_bridge_(?:ingest|operations)/i)
+})
+
+test('durable v2 migration owns schema version, encrypted recovery, viewer, replay and rate contracts', async () => {
+  const migration = await readFile(migrationV2Url, 'utf8')
+  assert.match(migration, /alter role outcome_bridge_backend noinherit/i)
+  assert.match(migration, /create role outcome_bridge_runtime login noinherit/i)
+  assert.match(migration, /grant outcome_bridge_backend to outcome_bridge_runtime/i)
+  assert.match(migration, /completion_request_digest/i)
+  assert.match(migration, /completion_certificate_ciphertext/i)
+  assert.match(migration, /completion_recovery_key_version/i)
+  assert.match(migration, /response_ledger_revision/i)
+  assert.match(migration, /bridge_viewer_registrations/i)
+  assert.match(migration, /bridge_rate_windows/i)
+  assert.match(migration, /force row level security/i)
+  assert.match(migration, /revoke select on outcome_private\.bridge_projections from authenticated/i)
+  assert.match(migration, /schema_version\s*=\s*2/i)
+  assert.doesNotMatch(migration, /security definer|password\s+['"]/i)
+})
+
+test('empty v1 migrates to v2 with exact roles, forced RLS and no direct runtime or authenticated grants', async () => {
+  const db = await PGlite.create('memory://')
+  try {
+    await db.exec("create role anon nologin; create role authenticated nologin; create schema auth; create function auth.jwt() returns jsonb language sql stable as $$ select '{}'::jsonb $$;")
+    await db.exec(await readFile(foundationUrl, 'utf8'))
+    await db.exec(await readFile(migrationUrl, 'utf8'))
+    await db.exec(await readFile(migrationV2Url, 'utf8'))
+    assert.deepEqual((await db.query("select rolname,rolinherit,rolcanlogin,rolbypassrls from pg_roles where rolname like 'outcome_bridge_%' order by rolname")).rows, [
+      { rolname: 'outcome_bridge_backend', rolinherit: false, rolcanlogin: false, rolbypassrls: false },
+      { rolname: 'outcome_bridge_runtime', rolinherit: false, rolcanlogin: true, rolbypassrls: false },
+    ])
+    assert.equal(Number((await db.query("select count(*)::int count from pg_auth_members m join pg_roles member on member.oid=m.member join pg_roles granted on granted.oid=m.roleid where member.rolname='outcome_bridge_runtime' and granted.rolname='outcome_bridge_backend'")).rows[0].count), 1)
+    const flags = (await db.query("select relname,relrowsecurity,relforcerowsecurity from pg_class join pg_namespace on pg_namespace.oid=pg_class.relnamespace where nspname='outcome_private' and relname in ('bridge_viewer_registrations','bridge_rate_windows') order by relname")).rows
+    assert.equal(flags.length, 2)
+    assert.equal(flags.every((row) => row.relrowsecurity && row.relforcerowsecurity), true)
+    const forbidden = (await db.query("select grantee,table_name,privilege_type from information_schema.role_table_grants where table_schema='outcome_private' and table_name like 'bridge_%' and grantee in ('anon','authenticated','outcome_bridge_runtime')")).rows
+    assert.deepEqual(forbidden, [])
+  } finally { await db.close() }
+})
+
+test('workspace bootstrap migration grants only backend INSERT and leaves the schema ledger empty', async () => {
+  const migration = await readFile(bootstrapV2Url, 'utf8')
+  assert.match(migration, /^begin;/)
+  assert.match(migration, /grant insert on outcome_private\.bridge_schema_versions to outcome_bridge_backend/i)
+  assert.doesNotMatch(migration, /security\s+definer|create\s+(?:or\s+replace\s+)?function|insert\s+into|update\s+outcome_private\.bridge_schema_versions|delete\s+from/i)
+  const db = await PGlite.create('memory://')
+  try {
+    await db.exec("create role anon nologin; create role authenticated nologin; create schema auth; create function auth.jwt() returns jsonb language sql stable as $$ select '{}'::jsonb $$;")
+    for (const url of [foundationUrl, migrationUrl, migrationV2Url, bootstrapV2Url]) await db.exec(await readFile(url, 'utf8'))
+    const backend = (await db.query("select privilege_type from information_schema.role_table_grants where table_schema='outcome_private' and table_name='bridge_schema_versions' and grantee='outcome_bridge_backend' order by privilege_type")).rows.map(({ privilege_type }) => privilege_type)
+    assert.deepEqual(backend, ['INSERT', 'SELECT', 'UPDATE'])
+    const forbidden = (await db.query("select grantee,privilege_type from information_schema.role_table_grants where table_schema='outcome_private' and table_name='bridge_schema_versions' and grantee in ('PUBLIC','anon','authenticated','outcome_bridge_runtime')")).rows
+    assert.deepEqual(forbidden, [])
+    assert.deepEqual((await db.query("select relrowsecurity,relforcerowsecurity from pg_class join pg_namespace on pg_namespace.oid=pg_class.relnamespace where nspname='outcome_private' and relname='bridge_schema_versions'")).rows, [{ relrowsecurity: true, relforcerowsecurity: true }])
+    assert.equal(Number((await db.query('select count(*)::int count from outcome_private.bridge_schema_versions')).rows[0].count), 0)
+  } finally { await db.close() }
+})
+
+test('first authorized viewer registration bootstraps one strict schema-v2 row and replays without revision drift', async () => {
+  const db = await PGlite.create('memory://')
+  try {
+    await db.exec("create role anon nologin; create role authenticated nologin; create schema auth; create function auth.jwt() returns jsonb language sql stable as $$ select '{}'::jsonb $$;")
+    for (const url of [foundationUrl, migrationUrl, migrationV2Url, bootstrapV2Url]) await db.exec(await readFile(url, 'utf8'))
+    await db.exec(`
+      insert into outcome_private.workspaces(id,state) values ('workspace-main','active');
+      insert into outcome_private.projects(id,package_id,state) values ('project-outcome','outcome','active');
+      insert into outcome_private.project_bindings(workspace_id,project_id,state) values ('workspace-main','project-outcome','active');
+    `)
+    const repository = createObserverBridgeDurableV2Repository({ with_transaction: transactionPort(db) })
+    const workstation = { account_ref: digest('a'), workspace_id: 'workspace-main', project_id: 'project-outcome', viewer_ref: 'viewer_workstation_01', viewer_class: 'workstation', idempotency_digest: digest('b'), fingerprint: digest('c'), created_at: AT }
+    assert.deepEqual(await repository.registerViewer(workstation), { status: 'viewer_registered', revision: 1, ledger_revision: 1 })
+    assert.deepEqual(await repository.registerViewer(workstation), { status: 'viewer_registered', revision: 1, ledger_revision: 1 })
+    const remote = { ...workstation, viewer_ref: 'viewer_remote_device_01', viewer_class: 'remote_device', idempotency_digest: digest('d'), fingerprint: digest('e') }
+    assert.deepEqual(await repository.registerViewer(remote), { status: 'viewer_registered', revision: 2, ledger_revision: 2 })
+    assert.deepEqual((await db.query("select schema_version::int schema_version,durable_revision::int durable_revision,updated_at from outcome_private.bridge_schema_versions where workspace_id='workspace-main'")).rows, [{ schema_version: 2, durable_revision: 2, updated_at: new Date(AT) }])
+    assert.equal(Number((await db.query("select count(*)::int count from outcome_private.bridge_schema_versions where workspace_id='workspace-main'")).rows[0].count), 1)
+  } finally { await db.close() }
+})
+
+test('viewer bootstrap preserves an existing schema-v2 row and advances its ordinary durable revision', async () => {
+  const db = await PGlite.create('memory://')
+  try {
+    await db.exec("create role anon nologin; create role authenticated nologin; create schema auth; create function auth.jwt() returns jsonb language sql stable as $$ select '{}'::jsonb $$;")
+    for (const url of [foundationUrl, migrationUrl, migrationV2Url, bootstrapV2Url]) await db.exec(await readFile(url, 'utf8'))
+    await db.exec(`
+      insert into outcome_private.workspaces(id,state) values ('workspace-main','active');
+      insert into outcome_private.projects(id,package_id,state) values ('project-outcome','outcome','active');
+      insert into outcome_private.project_bindings(workspace_id,project_id,state) values ('workspace-main','project-outcome','active');
+      insert into outcome_private.bridge_schema_versions(workspace_id,schema_version,durable_revision,updated_at) values ('workspace-main',2,7,'2026-08-26T00:00:00.000Z');
+    `)
+    const repository = createObserverBridgeDurableV2Repository({ with_transaction: transactionPort(db) })
+    const viewer = { account_ref: digest('a'), workspace_id: 'workspace-main', project_id: 'project-outcome', viewer_ref: 'viewer_workstation_01', viewer_class: 'workstation', idempotency_digest: digest('b'), fingerprint: digest('c'), created_at: AT }
+    assert.deepEqual(await repository.registerViewer(viewer), { status: 'viewer_registered', revision: 8, ledger_revision: 8 })
+    assert.deepEqual((await db.query("select schema_version::int schema_version,durable_revision::int durable_revision from outcome_private.bridge_schema_versions where workspace_id='workspace-main'")).rows, [{ schema_version: 2, durable_revision: 8 }])
+    assert.equal(Number((await db.query("select count(*)::int count from outcome_private.bridge_schema_versions where workspace_id='workspace-main'")).rows[0].count), 1)
+  } finally { await db.close() }
+})
+
+test('viewer bootstrap never repairs an incompatible existing schema row before strict validation', async () => {
+  const calls = []
+  const withTransaction = async (context, operation) => {
+    assert.deepEqual(context, { effective_role: OBSERVER_BRIDGE_EFFECTIVE_ROLE })
+    return operation({ query: async (sql, params) => {
+      calls.push({ sql, params })
+      if (sql.startsWith('select schema_version,durable_revision')) return { rows: [{ schema_version: 1, durable_revision: 9 }] }
+      return { rows: [] }
+    } })
+  }
+  const repository = createObserverBridgeDurableV2Repository({ with_transaction: withTransaction })
+  const viewer = { account_ref: digest('a'), workspace_id: 'workspace-main', project_id: 'project-outcome', viewer_ref: 'viewer_workstation_01', viewer_class: 'workstation', idempotency_digest: digest('b'), fingerprint: digest('c'), created_at: AT }
+  await expectCode(() => repository.registerViewer(viewer), 'schema_mismatch')
+  assert.equal(calls.length, 2)
+  assert.match(calls[0].sql, /values\(\$1,2,0,\$2\) on conflict\(workspace_id\) do nothing/)
+  assert.deepEqual(calls[0].params, ['workspace-main', AT])
+  assert.equal(calls.some(({ sql }) => sql.startsWith('update ') || sql.includes('bridge_viewer_registrations')), false)
+})
+
+test('workspace bootstrap migration fails closed when backend has a forbidden privilege', async () => {
+  const db = await PGlite.create('memory://')
+  try {
+    await db.exec("create role anon nologin; create role authenticated nologin; create schema auth; create function auth.jwt() returns jsonb language sql stable as $$ select '{}'::jsonb $$;")
+    for (const url of [foundationUrl, migrationUrl, migrationV2Url]) await db.exec(await readFile(url, 'utf8'))
+    await db.exec('grant delete on outcome_private.bridge_schema_versions to outcome_bridge_backend')
+    const migration = await readFile(bootstrapV2Url, 'utf8')
+    await assert.rejects(() => db.exec(migration), /outcome_bridge_backend_bootstrap_privilege_drift/)
+    await db.exec('rollback')
+    assert.equal((await db.query("select has_table_privilege('outcome_bridge_backend','outcome_private.bridge_schema_versions','delete') allowed")).rows[0].allowed, true)
+    assert.equal((await db.query("select has_table_privilege('outcome_bridge_backend','outcome_private.bridge_schema_versions','insert') allowed")).rows[0].allowed, false)
+  } finally { await db.close() }
+})
+
+test('nonempty incompatible v1 challenge state fails migration without deleting or upgrading it', async () => {
+  const db = await createDatabase()
+  try {
+    const migration = await readFile(migrationV2Url, 'utf8')
+    await assert.rejects(() => db.exec(migration), /outcome_bridge_v1_incompatible_rows/)
+    await db.exec('rollback')
+    assert.equal(Number((await db.query('select count(*)::int count from outcome_private.bridge_enrollment_challenges')).rows[0].count), 1)
+    assert.deepEqual((await db.query('select distinct schema_version from outcome_private.bridge_schema_versions')).rows.map((row) => Number(row.schema_version)), [1])
+  } finally { await db.close() }
 })
 
 test('restore rejects caller assertion when no immutable manifest or tombstone exists', async () => {

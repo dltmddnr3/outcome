@@ -4,7 +4,7 @@ import { generateKeyPairSync, sign } from 'node:crypto'
 import { createContext, runInContext } from 'node:vm'
 import { createHostedObserverBridge, canonicalEnrollmentBytes, canonicalHostedRequestBytes, HostedObserverBridgeError } from './phase3-observer-bridge-hosted.mjs'
 import { canonicalObserverBridgeBytes } from './phase3-observer-bridge.mjs'
-import { handleHostedObserverBridgeRequest } from './phase3-observer-bridge-api.mjs'
+import { handleHostedObserverBridgeAdminRequest, handleHostedObserverBridgeRequest } from './phase3-observer-bridge-api.mjs'
 
 const BASE = Date.parse('2026-08-27T00:00:00.000Z')
 const binding = { workspace_id: 'workspace_main', project_id: 'outcome', role: 'builder', binding_version: 1, source_ref: 'source_alpha_01' }
@@ -20,6 +20,80 @@ const service = () => createHostedObserverBridge({
   now: () => BASE, random_bytes: (length) => Buffer.alloc(length, 7),
 })
 const call = (bridge, input) => handleHostedObserverBridgeRequest({ bridge, allowed_origin: 'https://preview.example', csrf_secret: 'csrf-safe-value', ...input })
+
+test('private admin route surface exposes exactly four bounded operations', async () => {
+  const calls = []
+  const admin = {
+    registerViewer(value) { calls.push(['registerViewer', value]); return { status: 'viewer_registered', revision: 1, ledger_revision: 1 } },
+    revokeViewer(value) { calls.push(['revokeViewer', value]); return { status: 'viewer_revoked', revision: 2, ledger_revision: 2 } },
+    cleanupExpiredChallenges(value) { calls.push(['cleanupExpiredChallenges', value]); return { status: 'challenge_cleanup', cleared_count: 0 } },
+    readiness(value) { calls.push(['readiness', value]); return { status: 'ready', active_viewer_count: 2, active_viewer_class_count: 2 } },
+  }
+  const common = { admin, allowed_origin: 'https://preview.example', csrf_secret: 'csrf-safe-value', token: 'owner-token' }
+  const postHeaders = { 'content-type': 'application/json', origin: 'https://preview.example', 'x-outcome-csrf': 'csrf-safe-value' }
+  const cases = [
+    ['/api/private/bridge/admin/viewers/register', 'POST', 'registerViewer', { workspace_id: 'workspace-main', project_id: 'project-outcome', viewer_ref: 'viewer_workstation_01', viewer_class: 'workstation', idempotency_key: 'viewer-register-01', expected_schema_revision: 2 }],
+    ['/api/private/bridge/admin/viewers/revoke', 'POST', 'revokeViewer', { workspace_id: 'workspace-main', project_id: 'project-outcome', viewer_ref: 'viewer_workstation_01', expected_revision: 1, idempotency_key: 'viewer-revoke-01' }],
+    ['/api/private/bridge/admin/challenges/cleanup', 'POST', 'cleanupExpiredChallenges', { project_id: 'project-outcome', before: '2026-09-02T00:00:00.000Z', limit: 100 }],
+  ]
+  for (const [path, method, operation, body] of cases) {
+    const actual = await handleHostedObserverBridgeAdminRequest({ ...common, method, path, headers: postHeaders, rawBody: JSON.stringify(body), query: {} })
+    assert.equal(actual.status, 200)
+    assert.equal(calls.at(-1)[0], operation)
+    assert.equal(calls.at(-1)[1].token, 'owner-token')
+  }
+  const readiness = await handleHostedObserverBridgeAdminRequest({ ...common, method: 'GET', path: '/api/private/bridge/admin/readiness', headers: {}, query: { workspace_id: 'workspace-main', project_id: 'project-outcome' } })
+  assert.equal(readiness.status, 200)
+  assert.equal(calls.at(-1)[0], 'readiness')
+})
+
+test('private admin routes fail closed across auth boundary body query method and hostile admin shapes', async () => {
+  let calls = 0
+  let traps = 0
+  const admin = {
+    registerViewer() { calls += 1; return { status: 'viewer_registered', revision: 1, ledger_revision: 1 } },
+    revokeViewer() { calls += 1; return { status: 'viewer_revoked', revision: 2, ledger_revision: 2 } },
+    cleanupExpiredChallenges() { calls += 1; return { status: 'challenge_cleanup', cleared_count: 0 } },
+    readiness() { calls += 1; return { status: 'ready', active_viewer_count: 2, active_viewer_class_count: 2 } },
+  }
+  const path = '/api/private/bridge/admin/viewers/register'
+  const body = JSON.stringify({ workspace_id: 'workspace-main', project_id: 'project-outcome', viewer_ref: 'viewer_workstation_01', viewer_class: 'workstation', idempotency_key: 'viewer-register-01', expected_schema_revision: 2 })
+  const valid = { admin, allowed_origin: 'https://preview.example', csrf_secret: 'csrf-safe-value', token: 'owner-token', method: 'POST', path, headers: { 'content-type': 'application/json', origin: 'https://preview.example', 'x-outcome-csrf': 'csrf-safe-value' }, rawBody: body, query: {} }
+  for (const change of [
+    { headers: { ...valid.headers, origin: 'https://attacker.example' } },
+    { headers: { ...valid.headers, 'x-outcome-csrf': 'wrong' } },
+    { headers: { ...valid.headers, 'content-type': 'text/plain' } },
+    { rawBody: body.replace(/}$/, ',"token":"client"}') },
+    { rawBody: body.replace(/}$/, ',"project_id":"duplicate"}') },
+    { query: { project_id: 'project-outcome' } },
+  ]) assert.notEqual((await handleHostedObserverBridgeAdminRequest({ ...valid, ...change })).status, 200)
+  for (const [method, candidate] of [['GET', path], ['PUT', path], ['POST', '/api/private/bridge/admin/unknown']]) {
+    assert.notEqual((await handleHostedObserverBridgeAdminRequest({ ...valid, method, path: candidate })).status, 200)
+  }
+  assert.deepEqual(await handleHostedObserverBridgeAdminRequest({ ...valid, admin: null }), { status: 404, body: { error: 'bridge_unavailable' } })
+  const hostile = new Proxy(admin, {
+    get() { traps += 1; throw new Error('private getter') },
+    getOwnPropertyDescriptor() { traps += 1; throw new Error('private descriptor') },
+  })
+  assert.deepEqual(await handleHostedObserverBridgeAdminRequest({ ...valid, admin: hostile }), { status: 503, body: { error: 'bridge_unavailable' } })
+  assert.equal(traps, 0)
+  assert.equal(calls, 0)
+  assert.deepEqual(await handleHostedObserverBridgeAdminRequest({ ...valid, rawBody: JSON.stringify({ padding: 'x'.repeat(32_769) }) }), { status: 400, body: { error: 'body_too_large' } })
+  assert.deepEqual(await handleHostedObserverBridgeAdminRequest({ ...valid, method: 'GET', path: '/api/private/bridge/admin/readiness', headers: {}, rawBody: undefined, query: { workspace_id: 'workspace-main', project_id: 'project-outcome', __duplicate__: true } }), { status: 400, body: { error: 'bad_request' } })
+})
+
+test('private admin response and rejection details remain finite and secret-free', async () => {
+  const common = { allowed_origin: 'https://preview.example', csrf_secret: 'csrf-safe-value', token: 'owner-token', method: 'GET', path: '/api/private/bridge/admin/readiness', headers: {}, query: { workspace_id: 'workspace-main', project_id: 'project-outcome' } }
+  for (const readiness of [
+    () => ({ status: 'ready', active_viewer_count: 2, active_viewer_class_count: 2, private_ref: 'leak' }),
+    () => ({ status: 'ready', active_viewer_count: Number.MAX_SAFE_INTEGER + 1, active_viewer_class_count: 2 }),
+    () => { throw new Error('private database and token detail') },
+  ]) {
+    const actual = await handleHostedObserverBridgeAdminRequest({ ...common, admin: { readiness } })
+    assert.deepEqual(actual, { status: 503, body: { error: 'bridge_unavailable' } })
+    assert.doesNotMatch(JSON.stringify(actual), /private|database|token|ref/i)
+  }
+})
 
 const seamCases = [
   { name: 'projection', path: '/api/private/bridge/projection', method: 'GET', bridgeMethod: 'read', status: 200, headers: {}, query: {} },

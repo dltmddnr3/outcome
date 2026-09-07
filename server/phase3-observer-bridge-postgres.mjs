@@ -1,5 +1,6 @@
 import { isProxy } from 'node:util/types'
-import { createHash, randomBytes } from 'node:crypto'
+import { createCipheriv, createDecipheriv, createHash, createPublicKey, randomBytes, verify as verifySignature } from 'node:crypto'
+import { canonicalEnrollmentBytes, canonicalHostedRequestBytes } from './phase3-observer-bridge-hosted.mjs'
 
 const ROLES = new Set(['planner', 'builder', 'ux_product_qa', 'release_audit'])
 const STATUS_CODES = new Set(['작업 준비 중', '구현 진행 중', '테스트 실행 중', '검수 진행 중', '결과 정리 중', '응답 대기 중'])
@@ -298,4 +299,231 @@ export function createObserverBridgePostgresAdapter(options = {}) {
       })
     },
   })
+}
+
+const V2_REPOSITORY_METHODS = Object.freeze(['createEnrollment', 'completeEnrollment', 'ingest', 'read', 'revokeSource', 'registerViewer', 'revokeViewer', 'cleanupExpiredChallenges', 'readiness'])
+
+export function createObserverBridgeDurableV2Repository({ with_transaction: withTransaction, new_row_id: newRowId = createOpaqueLedgerId } = {}) {
+  if (typeof withTransaction !== 'function' || isProxy(withTransaction) || typeof newRowId !== 'function' || isProxy(newRowId)) fail('configuration_invalid')
+  let busy = false
+  const transact = async (operation) => {
+    if (busy) fail('reentrant_operation')
+    busy = true
+    try {
+      return await withTransaction(Object.freeze({ effective_role: OBSERVER_BRIDGE_EFFECTIVE_ROLE }), async (candidate) => {
+        const client = ownRecord(candidate, new Set(['query']), new Set(['query']), 'storage_unavailable')
+        if (typeof client.query !== 'function' || isProxy(client.query)) fail('storage_unavailable')
+        return operation(client)
+      })
+    } catch (error) { mapDatabaseError(error) } finally { busy = false }
+  }
+  const schema = async (client, workspaceId, lock = true) => {
+    const row = (await client.query(`select schema_version,durable_revision from outcome_private.bridge_schema_versions where workspace_id=$1${lock ? ' for update' : ''}`, [workspaceId])).rows?.[0]
+    if (!row || Number(row.schema_version) !== 2 || !nonNegative(Number(row.durable_revision))) fail('schema_mismatch')
+    return Number(row.durable_revision)
+  }
+  const advance = async (client, workspaceId, current, at) => {
+    const row = (await client.query('update outcome_private.bridge_schema_versions set durable_revision=$2,updated_at=$3 where workspace_id=$1 and durable_revision=$4 returning durable_revision', [workspaceId, current + 1, at, current])).rows?.[0]
+    if (!row) fail('revision_conflict')
+    return Number(row.durable_revision)
+  }
+  const cleanup = async (client, workspaceId, before, limit = 100) => {
+    const result = await client.query(`with expired as (
+      select challenge_digest from outcome_private.bridge_enrollment_challenges
+      where workspace_id=$1 and expires_at <= $2 and challenge_ref is not null
+      order by expires_at,challenge_digest limit $3 for update skip locked
+    ) update outcome_private.bridge_enrollment_challenges challenge
+      set challenge_ref=null,challenge_nonce=null,state=case when state='pending' then 'expired' else state end,revision=revision+1
+      from expired where challenge.challenge_digest=expired.challenge_digest returning challenge.challenge_digest`, [workspaceId, before, limit])
+    return result.rows?.length ?? 0
+  }
+  const audit = (client, value, action, reason, revision, at) => client.query('insert into outcome_private.bridge_audit(audit_id,workspace_id,project_id,role,binding_version,source_ref,source_version,action_code,reason_code,revision,occurred_at) values($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11)', [newRowId(), value.workspace_id, value.project_id, value.role, value.binding_version, value.source_ref ?? null, value.source_version ?? null, action, reason, revision, at])
+
+  const repository = {
+    async createEnrollment(value) {
+      return transact(async (client) => {
+        const current = await schema(client, value.workspace_id)
+        await cleanup(client, value.workspace_id, value.issued_at)
+        const prior = (await client.query('select project_id,role,binding_version,source_ref,source_version,key_version,enrollment_mode,challenge_ref,challenge_nonce,expires_at,idempotency_digest from outcome_private.bridge_enrollment_challenges where workspace_id=$1 and idempotency_digest=$2 for update', [value.workspace_id, value.idempotency_digest])).rows?.[0]
+        if (prior) {
+          if (prior.project_id !== value.project_id || prior.role !== value.role || Number(prior.binding_version) !== value.binding_version || prior.source_ref !== value.source_ref || prior.enrollment_mode !== value.mode) fail('idempotency_conflict')
+          if (!prior.challenge_ref || Date.parse(prior.expires_at) <= Date.parse(value.issued_at)) fail('enrollment_conflict')
+          return { status: 'challenge_created', challenge_ref: prior.challenge_ref, challenge_nonce: prior.challenge_nonce, expires_at: new Date(prior.expires_at).toISOString(), source_version: Number(prior.source_version), key_version: Number(prior.key_version), ledger_revision: current }
+        }
+        const active = (await client.query("select source_version,active_key_version from outcome_private.bridge_sources where workspace_id=$1 and project_id=$2 and role=$3 and binding_version=$4 and source_ref=$5 and state='active' for update", [value.workspace_id, value.project_id, value.role, value.binding_version, value.source_ref])).rows?.[0]
+        if (value.mode === 'rotate' && !active) fail('access_denied')
+        if (value.mode === 'enroll' && active) fail('enrollment_conflict')
+        const sourceVersion = value.mode === 'rotate' ? Number(active.source_version) : 1
+        const keyVersion = value.mode === 'rotate' ? Number(active.active_key_version) + 1 : 1
+        await client.query("insert into outcome_private.bridge_enrollment_challenges(workspace_id,project_id,role,binding_version,source_ref,source_version,key_version,challenge_digest,idempotency_digest,state,issued_at,expires_at,revision,challenge_ref,challenge_nonce,enrollment_mode) values($1,$2,$3,$4,$5,$6,$7,$8,$9,'pending',$10,$11,1,$12,$13,$14)", [value.workspace_id, value.project_id, value.role, value.binding_version, value.source_ref, sourceVersion, keyVersion, value.challenge_digest, value.idempotency_digest, value.issued_at, value.expires_at, value.challenge_ref, value.challenge_nonce, value.mode])
+        const next = await advance(client, value.workspace_id, current, value.issued_at)
+        await audit(client, { ...value, source_ref: null, source_version: null }, 'challenge_created', 'ok', next, value.issued_at)
+        return { status: 'challenge_created', challenge_ref: value.challenge_ref, challenge_nonce: value.challenge_nonce, expires_at: value.expires_at, source_version: sourceVersion, key_version: keyVersion, ledger_revision: next }
+      })
+    },
+    async completeEnrollment(value) {
+      return transact(async (client) => {
+        const challenge = (await client.query('select * from outcome_private.bridge_enrollment_challenges where challenge_digest=$1 for update', [value.challenge_digest])).rows?.[0]
+        if (!challenge) fail('enrollment_invalid')
+        const current = await schema(client, challenge.workspace_id)
+        await cleanup(client, challenge.workspace_id, value.completed_at)
+        let publicKey
+        let publicKeyDigest
+        let proof
+        try {
+          const keyBytes = Buffer.from(value.public_key_spki, 'base64url')
+          proof = Buffer.from(value.proof_signature, 'base64url')
+          publicKey = createPublicKey({ key: keyBytes, format: 'der', type: 'spki' })
+          if (publicKey.asymmetricKeyType !== 'ed25519' || keyBytes.toString('base64url') !== value.public_key_spki || proof.length !== 64 || proof.toString('base64url') !== value.proof_signature) fail('enrollment_invalid')
+          publicKeyDigest = sha256(keyBytes)
+        } catch (error) { if (error instanceof ObserverBridgePostgresError) throw error; fail('enrollment_invalid') }
+        const requestDigest = sha256(Buffer.from(`OUTCOME_OBSERVER_BRIDGE_COMPLETION_V1\0${value.challenge_digest}\0${publicKeyDigest}\0${value.proof_signature}`))
+        if (challenge.state === 'consumed') {
+          if (challenge.completion_request_digest !== requestDigest || !challenge.completion_certificate_ciphertext) fail('enrollment_conflict')
+          try {
+            const aad = Buffer.from(`OUTCOME_OBSERVER_BRIDGE_COMPLETION_AAD_V1\0${challenge.workspace_id}\0${challenge.project_id}\0${challenge.role}\0${challenge.binding_version}\0${challenge.source_ref}\0${challenge.challenge_digest}\0${requestDigest}`)
+            const decipher = createDecipheriv('aes-256-gcm', value.recovery_key, Buffer.from(challenge.completion_certificate_nonce))
+            decipher.setAAD(aad); decipher.setAuthTag(Buffer.from(challenge.completion_certificate_tag))
+            const certificateRef = Buffer.concat([decipher.update(Buffer.from(challenge.completion_certificate_ciphertext)), decipher.final()]).toString('utf8')
+            if (!privateRef(certificateRef)) fail('storage_unavailable')
+            return { status: 'source_active', recovered: true, certificate_ref: certificateRef, role: challenge.role, binding_version: Number(challenge.binding_version), source_version: Number(challenge.completion_source_version), key_version: Number(challenge.completion_key_version), ledger_revision: Number(challenge.completion_ledger_revision) }
+          } catch (error) { if (error instanceof ObserverBridgePostgresError) throw error; fail('storage_unavailable') }
+        }
+        if (challenge.state !== 'pending' || Date.parse(challenge.expires_at) <= Date.parse(value.completed_at) || !challenge.challenge_ref || !challenge.challenge_nonce) fail('enrollment_invalid')
+        if (challenge.challenge_ref !== value.challenge_ref) fail('enrollment_invalid')
+        const enrollmentBytes = canonicalEnrollmentBytes({ workspace_id: challenge.workspace_id, project_id: challenge.project_id, role: challenge.role, binding_version: Number(challenge.binding_version), source_ref: challenge.source_ref, source_version: Number(challenge.source_version), key_version: Number(challenge.key_version), mode: challenge.enrollment_mode, challenge_ref: challenge.challenge_ref, challenge_nonce: challenge.challenge_nonce, public_key_spki: value.public_key_spki })
+        if (!verifySignature(null, enrollmentBytes, publicKey, proof)) fail('enrollment_invalid')
+        const sourceVersion = Number(challenge.source_version); const keyVersion = Number(challenge.key_version)
+        const certificateRef = `certificate_${randomBytes(18).toString('base64url')}`
+        const certificateDigest = sha256(certificateRef)
+        const certificateNonce = randomBytes(12)
+        const aad = Buffer.from(`OUTCOME_OBSERVER_BRIDGE_COMPLETION_AAD_V1\0${challenge.workspace_id}\0${challenge.project_id}\0${challenge.role}\0${challenge.binding_version}\0${challenge.source_ref}\0${challenge.challenge_digest}\0${requestDigest}`)
+        const cipher = createCipheriv('aes-256-gcm', value.recovery_key, certificateNonce)
+        cipher.setAAD(aad)
+        const certificateCiphertext = Buffer.concat([cipher.update(certificateRef, 'utf8'), cipher.final()])
+        const certificateTag = cipher.getAuthTag()
+        if (challenge.enrollment_mode === 'rotate') {
+          const source = (await client.query("select active_key_version,revision from outcome_private.bridge_sources where workspace_id=$1 and project_id=$2 and role=$3 and binding_version=$4 and source_ref=$5 and source_version=$6 and state='active' for update", [challenge.workspace_id, challenge.project_id, challenge.role, challenge.binding_version, challenge.source_ref, sourceVersion])).rows?.[0]
+          if (!source || Number(source.active_key_version) + 1 !== keyVersion) fail('revision_conflict')
+          await client.query("update outcome_private.bridge_source_keys set state='replaced' where workspace_id=$1 and project_id=$2 and role=$3 and binding_version=$4 and source_ref=$5 and source_version=$6 and state='active'", [challenge.workspace_id, challenge.project_id, challenge.role, challenge.binding_version, challenge.source_ref, sourceVersion])
+          await client.query('update outcome_private.bridge_enrollment_challenges set completion_certificate_ciphertext=null,completion_certificate_nonce=null,completion_certificate_tag=null,completion_request_digest=null,completion_recovery_key_version=null,completion_source_version=null,completion_key_version=null,completion_ledger_revision=null where workspace_id=$1 and project_id=$2 and role=$3 and binding_version=$4 and source_ref=$5 and source_version=$6 and state=\'consumed\'', [challenge.workspace_id, challenge.project_id, challenge.role, challenge.binding_version, challenge.source_ref, sourceVersion])
+          await client.query("update outcome_private.bridge_sources set active_key_version=$7,certificate_digest=$8,revision=revision+1,updated_at=$9 where workspace_id=$1 and project_id=$2 and role=$3 and binding_version=$4 and source_ref=$5 and source_version=$6 and state='active'", [challenge.workspace_id, challenge.project_id, challenge.role, challenge.binding_version, challenge.source_ref, sourceVersion, keyVersion, certificateDigest, value.completed_at])
+        } else {
+          await client.query('insert into outcome_private.bridge_source_scopes(workspace_id,project_id,role,binding_version,source_ref,source_version,created_at) values($1,$2,$3,$4,$5,$6,$7)', [challenge.workspace_id, challenge.project_id, challenge.role, challenge.binding_version, challenge.source_ref, sourceVersion, value.completed_at])
+          await client.query("insert into outcome_private.bridge_sources(workspace_id,project_id,role,binding_version,source_ref,source_version,active_key_version,certificate_digest,state,revision,created_at,updated_at) values($1,$2,$3,$4,$5,$6,$7,$8,'active',1,$9,$9)", [challenge.workspace_id, challenge.project_id, challenge.role, challenge.binding_version, challenge.source_ref, sourceVersion, keyVersion, certificateDigest, value.completed_at])
+        }
+        await client.query("insert into outcome_private.bridge_source_keys(workspace_id,project_id,role,binding_version,source_ref,source_version,key_version,public_key_spki,public_key_digest,state,created_at) values($1,$2,$3,$4,$5,$6,$7,$8,$9,'active',$10)", [challenge.workspace_id, challenge.project_id, challenge.role, challenge.binding_version, challenge.source_ref, sourceVersion, keyVersion, value.public_key_spki, publicKeyDigest, value.completed_at])
+        const next = await advance(client, challenge.workspace_id, current, value.completed_at)
+        await client.query("update outcome_private.bridge_enrollment_challenges set state='consumed',consumed_at=$3,revision=revision+1,completion_request_digest=$4,completion_certificate_ciphertext=$5,completion_certificate_nonce=$6,completion_certificate_tag=$7,completion_recovery_key_version=1,completion_source_version=$8,completion_key_version=$9,completion_ledger_revision=$10 where workspace_id=$1 and challenge_digest=$2 and state='pending'", [challenge.workspace_id, value.challenge_digest, value.completed_at, requestDigest, certificateCiphertext, certificateNonce, certificateTag, sourceVersion, keyVersion, next])
+        await client.query("insert into outcome_private.bridge_projections(workspace_id,project_id,role,binding_version,source_ref,source_version,status_code,freshness_class,observed_time_class,ledger_revision,accepted_count,conflict_count,durable_revision,cache_revision,updated_at) values($1,$2,$3,$4,$5,$6,null,'unknown','unavailable',0,0,0,$7,$7,$8) on conflict(workspace_id,project_id,role,binding_version) do update set source_ref=excluded.source_ref,source_version=excluded.source_version,status_code=null,freshness_class='unknown',observed_time_class='unavailable',durable_revision=$7,cache_revision=$7,updated_at=$8", [challenge.workspace_id, challenge.project_id, challenge.role, challenge.binding_version, challenge.source_ref, sourceVersion, next, value.completed_at])
+        await audit(client, { ...challenge, source_version: sourceVersion }, challenge.enrollment_mode === 'rotate' ? 'source_rotated' : 'source_activated', 'ok', next, value.completed_at)
+        return { status: 'source_active', recovered: false, certificate_ref: certificateRef, role: challenge.role, binding_version: Number(challenge.binding_version), source_version: sourceVersion, key_version: keyVersion, ledger_revision: next }
+      })
+    },
+    async ingest(value) {
+      return transact(async (client) => {
+        const current = await schema(client, value.workspace_id)
+        const source = (await client.query("select * from outcome_private.bridge_sources where workspace_id=$1 and certificate_digest=$2 and state='active' for update", [value.workspace_id, value.certificate_digest])).rows?.[0]
+        if (!source) fail('access_denied')
+        const keyRow = (await client.query("select public_key_spki from outcome_private.bridge_source_keys where workspace_id=$1 and project_id=$2 and role=$3 and binding_version=$4 and source_ref=$5 and source_version=$6 and key_version=$7 and state='active'", [source.workspace_id, source.project_id, source.role, source.binding_version, source.source_ref, source.source_version, source.active_key_version])).rows?.[0]
+        if (!keyRow) fail('access_denied')
+        let publicKey; let signature
+        try { publicKey = createPublicKey({ key: Buffer.from(keyRow.public_key_spki, 'base64url'), format: 'der', type: 'spki' }); signature = Buffer.from(value.request_signature, 'base64url') } catch { fail('signature_invalid') }
+        const requestBytes = canonicalHostedRequestBytes({ certificate_ref: value.certificate_ref, request_id: value.request_id, nonce: value.nonce, event: value.event })
+        if (signature.length !== 64 || !verifySignature(null, requestBytes, publicKey, signature)) fail('signature_invalid')
+        const requestDigest = sha256(Buffer.concat([requestBytes, Buffer.from(value.request_signature)]))
+        const nonceDigest = sha256(value.nonce)
+        const eventDigest = sha256(Buffer.from(JSON.stringify(value.event)))
+        const prior = (await client.query('select event_digest,response_ledger_revision from outcome_private.bridge_request_replay where workspace_id=$1 and request_digest=$2', [value.workspace_id, requestDigest])).rows?.[0]
+        if (prior) {
+          if (prior.event_digest !== eventDigest) fail('request_conflict')
+          return { status: 'duplicate', ledger_revision: Number(prior.response_ledger_revision), sequence: value.event.sequence }
+        }
+        const rate = (await client.query('select window_started_at,request_count,revision from outcome_private.bridge_rate_windows where workspace_id=$1 and certificate_digest=$2 for update', [value.workspace_id, value.certificate_digest])).rows?.[0]
+        let requestCount = 1; let rateRevision = 1
+        if (rate && Date.parse(value.received_at) - Date.parse(rate.window_started_at) < 60_000) {
+          if (Number(rate.request_count) >= 60) fail('rate_limited')
+          requestCount = Number(rate.request_count) + 1; rateRevision = Number(rate.revision) + 1
+        }
+        const last = (await client.query('select sequence from outcome_private.bridge_events where workspace_id=$1 and project_id=$2 and role=$3 and binding_version=$4 and source_ref=$5 and source_version=$6 order by sequence desc limit 1', [source.workspace_id, source.project_id, source.role, source.binding_version, source.source_ref, source.source_version])).rows?.[0]
+        if (value.event.sequence !== Number(last?.sequence ?? 0) + 1) fail('sequence_conflict')
+        const next = current + 1
+        await client.query('insert into outcome_private.bridge_request_replay(workspace_id,project_id,role,binding_version,source_ref,source_version,key_version,request_digest,nonce_digest,event_digest,outcome_code,expires_at,created_at,response_ledger_revision) values($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,\'accepted\',$11,$12,$13)', [source.workspace_id, source.project_id, source.role, source.binding_version, source.source_ref, source.source_version, source.active_key_version, requestDigest, nonceDigest, eventDigest, value.event.expires_at, value.received_at, next])
+        await client.query('insert into outcome_private.bridge_events(event_id,workspace_id,project_id,role,binding_version,source_ref,source_version,key_version,sequence,ledger_revision,status_code,observed_at,expires_at,event_digest,signature_class,created_at) values($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,\'ed25519_verified\',$15)', [newRowId(), source.workspace_id, source.project_id, source.role, source.binding_version, source.source_ref, source.source_version, source.active_key_version, value.event.sequence, next, value.event.status_code, value.event.observed_at, value.event.expires_at, eventDigest, value.received_at])
+        await client.query('insert into outcome_private.bridge_rate_windows(workspace_id,certificate_digest,window_started_at,request_count,revision) values($1,$2,$3,$4,$5) on conflict(workspace_id,certificate_digest) do update set window_started_at=excluded.window_started_at,request_count=excluded.request_count,revision=excluded.revision', [value.workspace_id, value.certificate_digest, rate && Date.parse(value.received_at) - Date.parse(rate.window_started_at) < 60_000 ? rate.window_started_at : value.received_at, requestCount, rateRevision])
+        await client.query("update outcome_private.bridge_projections set status_code=$5,freshness_class='fresh',observed_time_class='current',ledger_revision=$6,accepted_count=accepted_count+1,durable_revision=$6,cache_revision=$6,updated_at=$7 where workspace_id=$1 and project_id=$2 and role=$3 and binding_version=$4", [source.workspace_id, source.project_id, source.role, source.binding_version, value.event.status_code, next, value.received_at])
+        await advance(client, value.workspace_id, current, value.received_at)
+        await audit(client, source, 'event_accepted', 'ok', next, value.received_at)
+        return { status: 'accepted', ledger_revision: next, sequence: value.event.sequence }
+      })
+    },
+    async read(value) {
+      return transact(async (client) => {
+        await schema(client, value.workspace_id, false)
+        const viewer = (await client.query("select revision from outcome_private.bridge_viewer_registrations where workspace_id=$1 and project_id=$2 and account_ref=$3 and viewer_ref=$4 and viewer_class=$5 and state='active'", [value.workspace_id, value.project_id, value.account_ref, value.viewer_ref, value.viewer_class])).rows?.[0]
+        if (!viewer) fail('access_denied')
+        const projection = (await client.query('select status_code,freshness_class,observed_time_class,ledger_revision,accepted_count,conflict_count,updated_at from outcome_private.bridge_projections where workspace_id=$1 and project_id=$2', [value.workspace_id, value.project_id])).rows?.[0]
+        return { status: 'projection_read', viewer_revision: Number(viewer.revision), projection: projection ? { ...projection, ledger_revision: Number(projection.ledger_revision), accepted_count: Number(projection.accepted_count), conflict_count: Number(projection.conflict_count), updated_at: new Date(projection.updated_at).toISOString() } : null }
+      })
+    },
+    async revokeSource(value) {
+      return transact(async (client) => {
+        const current = await schema(client, value.workspace_id)
+        const source = (await client.query("update outcome_private.bridge_sources set state='revoked',revision=revision+1,updated_at=$3 where workspace_id=$1 and certificate_digest=$2 and state='active' and revision=$4 returning *", [value.workspace_id, value.certificate_digest, value.revoked_at, value.expected_revision])).rows?.[0]
+        if (!source) fail('revision_conflict')
+        await client.query("update outcome_private.bridge_source_keys set state='revoked',revoked_at=$7 where workspace_id=$1 and project_id=$2 and role=$3 and binding_version=$4 and source_ref=$5 and source_version=$6 and state='active'", [source.workspace_id, source.project_id, source.role, source.binding_version, source.source_ref, source.source_version, value.revoked_at])
+        await client.query('delete from outcome_private.bridge_rate_windows where workspace_id=$1 and certificate_digest=$2', [value.workspace_id, value.certificate_digest])
+        await client.query('update outcome_private.bridge_enrollment_challenges set completion_certificate_ciphertext=null,completion_certificate_nonce=null,completion_certificate_tag=null,completion_request_digest=null,completion_recovery_key_version=null,completion_source_version=null,completion_key_version=null,completion_ledger_revision=null where workspace_id=$1 and project_id=$2 and role=$3 and binding_version=$4 and source_ref=$5 and source_version=$6', [source.workspace_id, source.project_id, source.role, source.binding_version, source.source_ref, source.source_version])
+        const next = await advance(client, value.workspace_id, current, value.revoked_at)
+        await audit(client, source, 'source_revoked', 'revoked', next, value.revoked_at)
+        return { status: 'source_revoked', ledger_revision: next }
+      })
+    },
+    async registerViewer(value) {
+      return transact(async (client) => {
+        await client.query(
+          'insert into outcome_private.bridge_schema_versions(workspace_id,schema_version,durable_revision,updated_at) values($1,2,0,$2) on conflict(workspace_id) do nothing',
+          [value.workspace_id, value.created_at],
+        )
+        const current = await schema(client, value.workspace_id)
+        await cleanup(client, value.workspace_id, value.created_at)
+        const prior = (await client.query('select * from outcome_private.bridge_viewer_registrations where workspace_id=$1 and project_id=$2 and account_ref=$3 and registration_idempotency_digest=$4 for update', [value.workspace_id, value.project_id, value.account_ref, value.idempotency_digest])).rows?.[0]
+        if (prior) {
+          if (prior.registration_fingerprint !== value.fingerprint) fail('idempotency_conflict')
+          return { status: prior.state === 'active' ? 'viewer_registered' : 'viewer_revoked', revision: Number(prior.revision), ledger_revision: current }
+        }
+        const next = await advance(client, value.workspace_id, current, value.created_at)
+        await client.query("insert into outcome_private.bridge_viewer_registrations(workspace_id,project_id,account_ref,viewer_ref,viewer_class,state,registration_idempotency_digest,registration_fingerprint,revision,created_at) values($1,$2,$3,$4,$5,'active',$6,$7,$8,$9)", [value.workspace_id, value.project_id, value.account_ref, value.viewer_ref, value.viewer_class, value.idempotency_digest, value.fingerprint, next, value.created_at])
+        return { status: 'viewer_registered', revision: next, ledger_revision: next }
+      })
+    },
+    async revokeViewer(value) {
+      return transact(async (client) => {
+        const current = await schema(client, value.workspace_id)
+        await cleanup(client, value.workspace_id, value.revoked_at)
+        const row = (await client.query('select * from outcome_private.bridge_viewer_registrations where workspace_id=$1 and project_id=$2 and account_ref=$3 and viewer_ref=$4 for update', [value.workspace_id, value.project_id, value.account_ref, value.viewer_ref])).rows?.[0]
+        if (!row) fail('access_denied')
+        if (row.state === 'revoked') {
+          if (row.revocation_idempotency_digest !== value.idempotency_digest || row.revocation_fingerprint !== value.fingerprint) fail('idempotency_conflict')
+          return { status: 'viewer_revoked', revision: Number(row.revision), ledger_revision: current }
+        }
+        if (Number(row.revision) !== value.expected_revision) fail('revision_conflict')
+        const next = await advance(client, value.workspace_id, current, value.revoked_at)
+        await client.query("update outcome_private.bridge_viewer_registrations set state='revoked',revoked_at=$5,revocation_idempotency_digest=$6,revocation_fingerprint=$7,revision=$8 where workspace_id=$1 and project_id=$2 and account_ref=$3 and viewer_ref=$4", [value.workspace_id, value.project_id, value.account_ref, value.viewer_ref, value.revoked_at, value.idempotency_digest, value.fingerprint, next])
+        return { status: 'viewer_revoked', revision: next, ledger_revision: next }
+      })
+    },
+    async cleanupExpiredChallenges(value) {
+      return transact(async (client) => ({ status: 'challenge_cleanup', cleared_count: await cleanup(client, value.workspace_id, value.before, value.limit) }))
+    },
+    async readiness(value) {
+      return transact(async (client) => {
+        await schema(client, value.workspace_id, false)
+        const row = (await client.query("select count(*)::int count,count(distinct viewer_class)::int classes from outcome_private.bridge_viewer_registrations where workspace_id=$1 and project_id=$2 and account_ref=$3 and state='active'", [value.workspace_id, value.project_id, value.account_ref])).rows?.[0]
+        return { status: Number(row?.count) === 2 && Number(row?.classes) === 2 ? 'ready' : 'not_ready', active_viewer_count: Number(row?.count ?? 0), active_viewer_class_count: Number(row?.classes ?? 0) }
+      })
+    },
+  }
+  if (Reflect.ownKeys(repository).length !== V2_REPOSITORY_METHODS.length) fail('configuration_invalid')
+  return Object.freeze(repository)
 }

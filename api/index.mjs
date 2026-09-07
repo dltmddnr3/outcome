@@ -3,8 +3,9 @@ import { privateAccessPublicConfig } from '../server/account-access-api.mjs'
 import { handlePrivateAccessRequest } from '../server/account-access-api.mjs'
 import { AccountAccessError } from '../server/account-access.mjs'
 import { HOSTED_IDENTITY_ENV, createHostedIdentityRuntime, readHostedIdentityConfiguration, safeClerkAuthReason } from '../server/account-access-hosted.mjs'
-import { handleHostedObserverBridgeRequest } from '../server/phase3-observer-bridge-api.mjs'
+import { handleHostedObserverBridgeRequest, handleHostedObserverBridgeAdminRequest } from '../server/phase3-observer-bridge-api.mjs'
 import { createObserverBridgeRuntimeControl } from '../server/phase3-observer-bridge-runtime.mjs'
+import { createManagedObserverBridgeRuntimeFactory } from '../server/phase3-observer-bridge-managed-runtime.mjs'
 import { handlePrivateChatRequest } from '../server/outcome-chat-api.mjs'
 import { createOutcomeChatHostedRuntimeFactory } from '../server/outcome-chat-hosted-runtime.mjs'
 
@@ -38,6 +39,12 @@ const BRIDGE_PROJECTION_ENROLLMENT_PATHS = new Set([
   '/api/private/bridge/sources/rotate',
 ])
 const BRIDGE_INGESTION_PATHS = new Set(['/api/private/bridge/events'])
+const BRIDGE_ADMIN_PATHS = new Set([
+  '/api/private/bridge/admin/readiness',
+  '/api/private/bridge/admin/viewers/register',
+  '/api/private/bridge/admin/viewers/revoke',
+  '/api/private/bridge/admin/challenges/cleanup',
+])
 const BRIDGE_OWNER_PATHS = new Set([
   '/api/private/bridge/enrollments',
   '/api/private/bridge/sources/revoke',
@@ -130,7 +137,7 @@ export function createStableHostRequestHandler({ environment = process.env, runt
   let runtimePromise
   let chatRuntimePromise
   const selectedChatRuntimeFactory = chatRuntimeFactory ?? createOutcomeChatHostedRuntimeFactory({ environment })
-  const bridgeControl = createObserverBridgeRuntimeControl({ environment, runtimeFactory: bridgeRuntimeFactory })
+  const bridgeControl = createObserverBridgeRuntimeControl({ environment, runtimeFactory: bridgeRuntimeFactory ?? createManagedObserverBridgeRuntimeFactory({ environment }) })
   const selectedRuntime = async () => {
     if (!configured || typeof runtimeFactory !== 'function') return null
     runtimePromise ??= Promise.resolve().then(() => runtimeFactory({ environment, sealedSnapshot: snapshot, clerkClientFactory, tokenVerifier: clerkTokenVerifier })).then((value) => validRuntime(value) ? value : null).catch(() => null)
@@ -143,18 +150,30 @@ export function createStableHostRequestHandler({ environment = process.env, runt
       const location = bridgeLocation(pathname)
       const projectionEnrollment = BRIDGE_PROJECTION_ENROLLMENT_PATHS.has(location.path)
       const ingestion = BRIDGE_INGESTION_PATHS.has(location.path)
-      if ((!projectionEnrollment && !ingestion)
+      const admin = BRIDGE_ADMIN_PATHS.has(location.path)
+      if ((!projectionEnrollment && !ingestion && !admin)
         || (projectionEnrollment && !bridgeControl.configuration.projectionEnrollmentEnabled)
-        || (ingestion && !bridgeControl.configuration.ingestionEnabled)) return bridgeUnavailable()
+        || (ingestion && !bridgeControl.configuration.ingestionEnabled)
+        || (admin && (!bridgeControl.configuration.projectionEnrollmentEnabled || !bridgeControl.configuration.ingestionEnabled))) return bridgeUnavailable()
       const hosted = await selectedRuntime()
       if (!hosted) return bridgeUnavailable()
       const bridgeRuntime = await bridgeControl.select(hosted)
       if (!bridgeRuntime) return bridgeUnavailable()
+      if (admin) {
+        try {
+          return await handleHostedObserverBridgeAdminRequest({
+            admin: bridgeRuntime.admin, allowed_origin: bridgeRuntime.allowedOrigin,
+            csrf_secret: bridgeRuntime.csrfSecret, method, path: location.path,
+            headers: selectedHeaders(headers), rawBody: body,
+            token: privateSessionToken(headers), query: location.query,
+          })
+        } catch { return result(503, { error: 'bridge_unavailable' }) }
+      }
       const companion = ['/api/private/bridge/enrollments/complete', '/api/private/bridge/events'].includes(location.path)
       let authContext = null
       if ((location.path === '/api/private/bridge/projection' && method === 'GET') || (BRIDGE_OWNER_PATHS.has(location.path) && method === 'POST')) {
         try {
-          authContext = await hosted.service.authenticate(privateSessionToken(headers))
+          authContext = await hosted.service.resolveBridgeAuthority({ token: privateSessionToken(headers) })
         } catch (error) {
           return error?.code === 'authentication_unavailable' ? result(503, { error: 'bridge_unavailable' }) : bridgeUnavailable()
         }

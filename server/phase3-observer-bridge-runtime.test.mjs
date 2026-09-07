@@ -18,8 +18,8 @@ const validRuntime = () => ({ bridge: validBridge(), allowedOrigin: 'https://pre
 
 test('default disabled configuration is names-only and both capabilities are false', () => {
   assert.deepEqual(Object.values(OBSERVER_BRIDGE_RUNTIME_ENV), [
-    'OUTCOME_OBSERVER_BRIDGE_PROJECTION_ENROLLMENT_ENABLED',
-    'OUTCOME_OBSERVER_BRIDGE_INGESTION_ENABLED',
+    'OUTCOME_OBSERVER_BRIDGE_V2_PROJECTION_ENROLLMENT_ENABLED',
+    'OUTCOME_OBSERVER_BRIDGE_V2_INGESTION_ENABLED',
   ])
   assert.deepEqual(readObserverBridgeRuntimeConfiguration({ unrelated: 'secret-value' }), {
     valid: true,

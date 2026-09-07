@@ -132,8 +132,8 @@ test('chat route authenticates server scope and forwards explicit send permissio
 })
 const bridgeEnvironment = (projectionEnrollment = '1', ingestion = '1') => ({
   ...identityEnvironment,
-  OUTCOME_OBSERVER_BRIDGE_PROJECTION_ENROLLMENT_ENABLED: projectionEnrollment,
-  OUTCOME_OBSERVER_BRIDGE_INGESTION_ENABLED: ingestion,
+  OUTCOME_OBSERVER_BRIDGE_V2_PROJECTION_ENROLLMENT_ENABLED: projectionEnrollment,
+  OUTCOME_OBSERVER_BRIDGE_V2_INGESTION_ENABLED: ingestion,
 })
 const accountRuntimeFactory = async () => ({
   allowedOrigin: 'https://preview.invalid',
@@ -144,6 +144,10 @@ const accountRuntimeFactory = async () => ({
       return Object.freeze({ subject: 'synthetic-owner', issuedAt: 1, expiresAt: 2 })
     },
     async readWorkspace() {},
+    async resolveBridgeAuthority({ token }) {
+      if (token !== 'server-valid') throw new AccountAccessError('authentication_required', 401)
+      return { account_ref: 'synthetic-owner', workspace_id: 'workspace_test', project_ids: ['outcome'] }
+    },
   },
 })
 const bridgeStub = (calls, maximumBytes = 32_768) => ({
@@ -162,6 +166,30 @@ const stableBridgeCases = [
   { path: '/api/private/bridge/sources/rotate', method: 'POST', bridgeMethod: 'createEnrollment', headers: { 'content-type': 'application/json', origin: 'https://preview.invalid', 'x-outcome-csrf': 'synthetic-csrf-value', authorization: 'Bearer server-valid' }, body: Buffer.from('{}') },
   { path: '/api/private/bridge/events', method: 'POST', bridgeMethod: 'ingest', headers: { 'content-type': 'application/json' }, body: Buffer.from('{}') },
 ]
+
+test('managed admin readiness reaches the runtime only with both V2 capabilities and forwards server token', async () => {
+  for (const flags of [['0', '0'], ['1', '0'], ['0', '1'], ['1', '1']]) {
+    let calls = 0
+    const handler = createStableHostRequestHandler({
+      environment: bridgeEnvironment(...flags), runtimeFactory: accountRuntimeFactory,
+      bridgeRuntimeFactory: async () => ({
+        bridge: bridgeStub([]), allowedOrigin: 'https://preview.invalid', csrfSecret: 'synthetic-csrf-value',
+        admin: {
+          registerViewer() {}, revokeViewer() {}, cleanupExpiredChallenges() {},
+          async readiness(input) {
+            calls++
+            assert.deepEqual(input, { workspace_id: 'workspace_test', project_id: 'outcome', token: 'server-valid' })
+            return { status: 'not_ready', active_viewer_count: 0, active_viewer_class_count: 0 }
+          },
+        },
+      }),
+    })
+    const response = await handler({ pathname: '/api/private/bridge/admin/readiness?workspace_id=workspace_test&project_id=outcome', headers: { authorization: 'Bearer server-valid' } })
+    const enabled = flags.every(flag => flag === '1')
+    assert.equal(response.status, enabled ? 200 : 404)
+    assert.equal(calls, enabled ? 1 : 0)
+  }
+})
 const stableFixedStatuses = {
   unavailable: 404, access_denied: 404, auth_unavailable: 503,
   enrollment_invalid: 409, enrollment_conflict: 409, idempotency_conflict: 409,
@@ -356,7 +384,7 @@ test('default disabled bridge routes are finite unavailable and preserve non-bri
 })
 
 test('partial malformed configuration and factory throw reject invalid are cached unavailable', async () => {
-  const partial = { ...identityEnvironment, OUTCOME_OBSERVER_BRIDGE_PROJECTION_ENROLLMENT_ENABLED: '1' }
+  const partial = { ...identityEnvironment, OUTCOME_OBSERVER_BRIDGE_V2_PROJECTION_ENROLLMENT_ENABLED: '1' }
   const malformed = bridgeEnvironment('true', '0')
   for (const environment of [partial, malformed]) {
     let calls = 0
@@ -513,7 +541,7 @@ test('server auth context defeats spoof attempts for owner and viewer routes', a
   })
   assert.deepEqual(projection, { status: 200, body: { projections: [] } })
   assert.equal(calls[0][0], 'read')
-  assert.equal(calls[0][1].auth_context.subject, 'synthetic-owner')
+  assert.deepEqual(calls[0][1].auth_context, { account_ref: 'synthetic-owner', workspace_id: 'workspace_test', project_ids: ['outcome'] })
   assert.equal(Object.hasOwn(calls[0][1], 'token'), false)
 
   const headers = { 'content-type': 'application/json', origin: 'https://preview.invalid', 'x-outcome-csrf': 'synthetic-csrf-value', authorization: 'Bearer server-valid' }
@@ -522,7 +550,7 @@ test('server auth context defeats spoof attempts for owner and viewer routes', a
   assert.equal(calls.filter(([name]) => name === 'createEnrollment').length, 0)
   const valid = await bridgeRequest({ method: 'POST', pathname: '/api/private/bridge/enrollments', headers, body: Buffer.from('{"workspace_id":"workspace_main"}') })
   assert.equal(valid.status, 201)
-  assert.equal(calls.at(-1)[1].auth_context.subject, 'synthetic-owner')
+  assert.deepEqual(calls.at(-1)[1].auth_context, { account_ref: 'synthetic-owner', workspace_id: 'workspace_test', project_ids: ['outcome'] })
 })
 
 test('companion ambient authority is removed and never authenticated', async () => {
