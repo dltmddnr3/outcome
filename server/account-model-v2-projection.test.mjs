@@ -12,14 +12,16 @@ const event = (overrides = {}) => ({ id: 'event-planner-1', sequence: 1, role: '
 
 test('authorized project projection is versioned, deterministic and exact-allowlisted', () => {
   const projection = createAccountModelV2Projection(project(), { observedAt })
-  assert.deepEqual(Object.keys(projection), ['schemaVersion', 'modelVersion', 'project', 'destination', 'remainingAcceptanceGap', 'now', 'readyBoundaryLabels', 'nextActionLabel', 'cherryActionLabel', 'state', 'events'])
+  assert.deepEqual(Object.keys(projection), ['schemaVersion', 'modelVersion', 'project', 'destination', 'remainingAcceptanceGap', 'now', 'readyBoundaryLabels', 'nextActionLabel', 'cherryActionLabel', 'state', 'events', 'executionLoopItems'])
   assert.deepEqual(projection.project, { id: 'outcome', label: 'OUTCOME' })
   assert.deepEqual(projection.destination, { id: 'destination-one', label: 'Destination' })
   assert.deepEqual(projection.remainingAcceptanceGap, { remaining: 1, total: 1 })
   assert.deepEqual(projection.now, { observedAt, state: 'ready' })
   assert.deepEqual(projection.readyBoundaryLabels, ['Milestone'])
   assert.equal(projection.nextActionLabel, null)
-  assert.equal(projection.cherryActionLabel, '차단 원인의 해결 방향을 결정한다')
+  assert.equal(projection.cherryActionLabel, null)
+  assert.equal(projection.executionLoopItems.length, 1)
+  assert.equal(projection.executionLoopItems[0].missing.value, 'B1 · Server projection')
   assert.equal(projection.modelVersion, 2)
   assert.equal(JSON.stringify(projection), JSON.stringify(createAccountModelV2Projection(project(), { observedAt })))
   assert.deepEqual(ACCOUNT_MODEL_V2_STATES, ['loading', 'stale', 'conflict', 'blocked', 'delivery_unknown', 'no_active_work', 'ready'])
@@ -34,11 +36,30 @@ test('keeps the source revision server-private while binding it to the exact pro
 
 test('server-owned action labels are closed, Korean, and omit unknown values', () => {
   assert.equal(accountModelV2NextActionLabel('verify-coherent-slice'), '일관된 Q2 화면을 독립 검증한다')
-  assert.equal(accountModelV2CherryActionLabel('resolve_blocker'), '차단 원인의 해결 방향을 결정한다')
+  for (const value of ['renew_mission_envelope', 'resolve_source_revision', 'review_no_outcome_delta', 'resolve_blocker']) assert.equal(accountModelV2CherryActionLabel(value), null)
+  assert.equal(accountModelV2CherryActionLabel('accept_user_result'), '사용자 결과를 수용할지 결정한다')
   for (const value of ['unknown-action', '검증한다', null, undefined]) {
     assert.equal(accountModelV2NextActionLabel(value), null)
     assert.equal(accountModelV2CherryActionLabel(value), null)
   }
+})
+
+test('projects one exact correlated execution-loop item from server-owned source facts', () => {
+  const source = project()
+  source.current.stageId = 'milestone-one'
+  source.events = [event({ role: 'builder', predicateId: 'B1', status: 'observed' })]
+  source.executionLoop = {
+    predicateId: 'B1', eventId: 'event-planner-1', checked: null,
+    ownerInstruction: { owner: 'builder', deliverable: '서버 근거 영수증', completionCondition: 'B1 근거 고정', sourceRef: 'instruction:builder:b1' },
+    receipt: { state: 'accepted', sourceRef: 'dispatch:event-planner-1', destinationEvidenceRef: null },
+    nextCheckpoint: { label: 'B1 불변 근거', sourceRef: 'gate:B1', eligibleSuccessor: null },
+    review: null, rework: null, cherryBoundary: null,
+  }
+  const projection = createAccountModelV2Projection(source, { observedAt })
+  assert.equal(projection.executionLoopItems.length, 1)
+  assert.equal(projection.executionLoopItems[0].ownerInstruction.value, 'Builder · 서버 근거 영수증 · B1 근거 고정')
+  assert.equal(projection.executionLoopItems[0].receiptState.reasonCode, 'destination_evidence_missing')
+  assert.equal(JSON.stringify(projection).includes(accountModelV2SourceRevision(projection)), false)
 })
 
 test('milestone display labels omit schema-valid slugs without replacing approved human titles', () => {

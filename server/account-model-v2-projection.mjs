@@ -1,6 +1,7 @@
 import { createHash } from 'node:crypto'
 import { isProxy } from 'node:util/types'
 import { projectOutcomeV2, translateV1Package } from './outcome-model-v2.mjs'
+import { projectExecutionLoopItems } from './outcome-execution-loop-projection.mjs'
 
 export const ACCOUNT_MODEL_V2_STATES = Object.freeze(['loading', 'stale', 'conflict', 'blocked', 'delivery_unknown', 'no_active_work', 'ready'])
 
@@ -9,7 +10,7 @@ const PRIVATE_VALUE = /(?:^|[\s=:])(?:token|secret|password|credential)\s*=|(?:^
 const EVENT_PRIVATE_VALUE = /(?:^|[\s=:])(?:token|secret|password|credential)\s*=|(?:^|[\s=:])(?:registry|provider)[_-]?(?:payload|id|ref)?\s*=|(?:^|[\s=:])(?:\/(?:Users|home|tmp|private)(?:\/|$)|\/var\/folders(?:\/|$)|[A-Za-z]:\\|\\\\[^\\\s]+\\)|raw[_-]?(?:prompt|result)|private[_-]?(?:registry|locator)|\b(?:task|thread|session|turn)[_-][a-z0-9_-]{4,}\b|\b(?:[0-9a-f]{40}|[0-9a-f]{64})\b|\b[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}\b/i
 const PLAIN = Object.getPrototypeOf({})
 const STATE_HINTS = Object.freeze(['loading', 'stale', 'conflict', 'blocked', 'delivery_unknown'])
-const ROOT_KEYS = new Set(['project', 'current', 'phases', 'events', 'observedAt', 'bindings', 'connectors', 'errors', 'next', 'now', 'progress', 'sourceFreshness', 'status', ...STATE_HINTS])
+const ROOT_KEYS = new Set(['project', 'current', 'phases', 'events', 'executionLoop', 'observedAt', 'bindings', 'connectors', 'errors', 'next', 'now', 'progress', 'sourceFreshness', 'status', ...STATE_HINTS])
 const EVENT_TYPES = new Set(['work_observed', 'result_observed', 'boundary_observed'])
 const EVENT_STATUSES = new Set(['observed', 'active', 'blocked', 'delivery_unknown', 'failed', 'rejected', 'safe_hold'])
 const EVENT_ROLES = new Set(['planner', 'builder', 'ux_product_qa', 'release_audit'])
@@ -17,12 +18,7 @@ const NEXT_ACTION_LABELS = Object.freeze({
   'verify-coherent-slice': '일관된 Q2 화면을 독립 검증한다',
   'work-q1-independent-qa': 'Q1 결과를 독립 검증한다',
 })
-const CHERRY_ACTION_LABELS = Object.freeze({
-  renew_mission_envelope: '작업 권한 범위를 다시 승인한다',
-  resolve_source_revision: '최신 원본 기준을 선택한다',
-  review_no_outcome_delta: '사용자 결과 변화가 없는 작업을 검토한다',
-  resolve_blocker: '차단 원인의 해결 방향을 결정한다',
-})
+const CHERRY_ACTION_LABELS = Object.freeze({ accept_user_result: '사용자 결과를 수용할지 결정한다' })
 const SOURCE_REVISIONS = new WeakMap()
 
 const materialize = (value, seen = new WeakSet()) => {
@@ -59,6 +55,7 @@ const materialize = (value, seen = new WeakSet()) => {
 }
 
 const safeId = (value) => typeof value === 'string' && /^[a-z0-9]+(?:-[a-z0-9]+)*$/.test(value) ? value : null
+const safeCorrelationId = (value) => typeof value === 'string' && /^[A-Za-z0-9][A-Za-z0-9._-]{0,79}$/.test(value) ? value : null
 const safeActionCode = (value) => typeof value === 'string' && /^[a-z0-9]+(?:[_-][a-z0-9]+)*$/.test(value) ? value : null
 const safeText = (value) => {
   if (typeof value !== 'string' || !value.trim() || PRIVATE_VALUE.test(value)) throw new Error('account_model_v2_public_text_invalid')
@@ -97,12 +94,13 @@ const validateSourceContract = (source) => {
   if (source.progress !== undefined) assertKeys(source.progress, new Set(['available', 'reason']))
   if (source.sourceFreshness !== undefined) assertKeys(source.sourceFreshness, new Set(['state', 'observedAt']))
   for (const event of source.events ?? []) {
-    assertKeys(event, new Set(['id', 'sequence', 'role', 'type', 'summary', 'observedAt', 'status']))
+    assertKeys(event, new Set(['id', 'sequence', 'predicateId', 'role', 'type', 'summary', 'observedAt', 'status']))
     if (!safeEventId(event.id)) throw new Error('account_model_v2_event_id_invalid')
     if (!Number.isSafeInteger(event.sequence) || event.sequence < 1) throw new Error('account_model_v2_event_sequence_invalid')
     if (!EVENT_ROLES.has(event.role)) throw new Error('account_model_v2_event_role_invalid')
     if (!EVENT_TYPES.has(event.type)) throw new Error('account_model_v2_event_type_invalid')
     if (!EVENT_STATUSES.has(event.status)) throw new Error('account_model_v2_event_status_invalid')
+    if (event.predicateId !== undefined && event.predicateId !== null && !safeCorrelationId(event.predicateId)) throw new Error('account_model_v2_event_predicate_invalid')
     if (event.status === 'active' && event.type !== 'work_observed') throw new Error('account_model_v2_event_active_invalid')
     if (typeof event.observedAt !== 'string' || !Number.isFinite(Date.parse(event.observedAt))) throw new Error('account_model_v2_event_time_invalid')
     safeEventSummary(event.summary)
@@ -173,6 +171,28 @@ export function createAccountModelV2Projection(value, { observedAt } = {}) {
     const normalized = Object.freeze({ id: event.id, sequence: event.sequence, role: event.role, type: event.type, summary: safeEventSummary(event.summary), observedAt: new Date(event.observedAt).toISOString(), status: event.status, completionAuthority: false })
     return normalized
   }).sort((left, right) => left.sequence - right.sequence)
+  const sourceStages = (source.phases ?? []).flatMap((phase) => (phase.scopes ?? []).flatMap((scope) => scope.stages ?? []))
+  const currentStageId = source.current?.stageId ?? (sourceStages.length === 1 ? sourceStages[0].id : null)
+  const executionLoopItems = projectExecutionLoopItems({
+    currentStageId,
+    predicates: sourceStages.flatMap((stage) => (stage.gate?.gates ?? []).map((gate) => ({
+      id: gate.id,
+      stageId: gate.stageId ?? stage.id,
+      title: gate.title,
+      closed: gate.closed,
+      evidence: typeof gate.evidence === 'string' ? gate.evidence : null,
+    }))),
+    events: (source.events ?? []).map((event) => ({
+      id: event.id,
+      sequence: event.sequence,
+      predicateId: event.predicateId ?? null,
+      role: event.role,
+      type: event.type,
+      status: event.status,
+      summary: event.summary,
+    })),
+    contract: source.executionLoop ?? null,
+  })
   const output = Object.freeze({
     schemaVersion: 1,
     modelVersion: 2,
@@ -189,6 +209,7 @@ export function createAccountModelV2Projection(value, { observedAt } = {}) {
     cherryActionLabel: accountModelV2CherryActionLabel(projection.cherry_action),
     state,
     events: Object.freeze(events),
+    executionLoopItems,
   })
   SOURCE_REVISIONS.set(output, sourceRevision)
   return output
