@@ -19,7 +19,7 @@ const service={
     return receipt
   },
 }
-const vite=await createViteServer({configFile:false,envPrefix:'FIXTURE_NEVER_',plugins:[react()],server:{middlewareMode:true},appType:'spa'})
+let vite
 const server=createHttpServer(async(req,res)=>{
   if(req.url?.startsWith('/api/private/chat/')){
     let body='',oversized=false
@@ -32,6 +32,7 @@ const server=createHttpServer(async(req,res)=>{
   }
   vite.middlewares(req,res,()=>{res.writeHead(404);res.end()})
 })
+vite=await createViteServer({configFile:false,envPrefix:'FIXTURE_NEVER_',plugins:[react()],server:{middlewareMode:true,hmr:{server}},appType:'spa'})
 server.listen(0,'127.0.0.1',()=>{origin=`http://127.0.0.1:${server.address().port}`;console.log(`${origin}/scripts/fixtures/chat-browser.html`)})
 const close=()=>{server.close();void vite.close().then(()=>process.exit(0))}
 process.on('SIGTERM',close);process.on('SIGINT',close)

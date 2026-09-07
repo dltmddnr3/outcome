@@ -22,6 +22,15 @@ const roleCopy: Record<Role, string> = { planner: 'Planner', builder: 'Builder',
 const filterRole: Record<RoleChatFilter, Role | null> = { '전체': null, Planner: 'planner', Builder: 'builder', 'UX & Product QA': 'ux_product_qa', 'Release Audit': 'release_audit' }
 const deliveryCopy = { queued: '전송 대기', acknowledged: '목적지 접수 확인', delivery_unknown: '전달 상태 확인 불가', rejected: '메시지 거부됨', failed: '전송 실패' } as const
 type DeliveryState = keyof typeof deliveryCopy
+
+export function hasCorrelatedPlannerAnswer(timeline: PrivateChatEvent[], correlation: string): boolean {
+  if (!/^message-[a-f0-9]{16}$/.test(correlation)) return false
+  const users = timeline.filter(event => event.kind === 'user_message' && event.correlation_id === correlation)
+  if (users.length !== 1) return false
+  return timeline.some(event => event.kind === 'assistant_message' && event.state === 'completed'
+    && event.correlation_id === correlation && event.sequence > users[0].sequence
+    && event.observed_at >= users[0].observed_at && Boolean(event.payload.private_content?.text.trim()))
+}
 const fixturePresentation: Record<RoleChatFixtureState, { label: string; detail: string; writable: boolean }> = {
   ready: { label: '준비됨', detail: 'Planner에게 메시지를 보낼 준비가 되었습니다.', writable: true }, streaming: { label: '응답 수신 중', detail: 'Planner 응답을 받고 있습니다.', writable: false }, 'tool-running': { label: '도구 실행 중', detail: 'Planner가 도구 결과를 기다리고 있습니다.', writable: false }, 'waiting-approval': { label: '승인 대기', detail: 'Cherry의 명시적 승인이 필요합니다.', writable: false }, 'offline-reconnecting': { label: '오프라인 · 재연결 중', detail: '연결이 복구될 때까지 전송하지 않습니다.', writable: false }, 'permission-absent': { label: '권한 없음', detail: 'Planner 전송 권한이 없습니다.', writable: false }, 'unbound-stale': { label: '연결 없음 · 관측 오래됨', detail: '현재 Planner binding 근거가 없습니다.', writable: false }, delivery_unknown: { label: '전달 상태 확인 불가', detail: '전달 근거를 확인하기 전에는 자동 재전송하지 않습니다.', writable: false },
 }
@@ -54,6 +63,13 @@ export function PlannerConversation({ events, plannerBound = false, onSend, fixt
   const [availability, setAvailability] = useState<'loading' | 'ready' | 'chat_unavailable' | 'conflict'>('loading'), [delivery, setDelivery] = useState<DeliveryState | null>(null), [retryAvailable, setRetryAvailable] = useState(false)
   const submission = useRef<{ text: string; key: string } | null>(null)
   const pending = useRef(false), textarea = useRef<HTMLTextAreaElement>(null)
+  useEffect(() => {
+    const sent = submission.current
+    if (!sent || !hasCorrelatedPlannerAnswer(timeline, sent.key)) return
+    setRetryAvailable(false); setDelivery('acknowledged')
+    setDraft(current => current === sent.text ? '' : current)
+    submission.current = null
+  }, [timeline])
   const authGeneration = useRef(0), refreshRequest = useRef(0)
   const ordered = [...events].sort((a, b) => a.sequence - b.sequence)
   const selectedRole = filterRole[filter]
@@ -114,7 +130,7 @@ export function PlannerConversation({ events, plannerBound = false, onSend, fixt
     {fixture && <div className="planner-conversation__state" role="status"><strong>{fixture.label}</strong><span>{fixture.detail}</span></div>}
     <p className="planner-conversation__boundary" data-non-progress-boundary="true">세션 활동은 진행률이 아닙니다.</p>
     {!fixture && !onSend && (availability === 'chat_unavailable' || availability === 'conflict') && <p role="alert">{availability === 'conflict' ? '대화 순서를 확인할 수 없습니다' : '대화를 사용할 수 없습니다. 로그인과 연결 상태를 확인해 주세요.'}</p>}
-    {eligibleLens && timeline.length > 0 && <ol className="planner-conversation__messages" aria-label="서버에서 확인된 메시지">{timeline.map((event) => <li key={event.event_id} data-sequence={event.sequence}><div><strong>{event.kind === 'user_message' ? 'Cherry' : 'Planner'}</strong><time dateTime={event.observed_at}>{event.observed_at}</time></div>{event.payload.private_content && <p>{event.payload.private_content.text}</p>}<span>{event.kind === 'user_message' ? deliveryCopy[event.delivery] : `${event.kind} · ${event.state}`}</span></li>)}</ol>}
+    {eligibleLens && timeline.length > 0 && <ol className="planner-conversation__messages" aria-label="서버에서 확인된 메시지">{timeline.map((event) => <li key={event.event_id} data-sequence={event.sequence}><div><strong>{event.kind === 'user_message' ? 'Cherry' : 'Planner'}</strong><time dateTime={event.observed_at}>{event.observed_at}</time></div>{event.payload.private_content && <p>{event.payload.private_content.text}</p>}<span>{event.kind === 'user_message' ? hasCorrelatedPlannerAnswer(timeline, event.correlation_id) ? 'Planner 답변 확인됨' : deliveryCopy[event.delivery] : `${event.kind} · ${event.state}`}</span></li>)}</ol>}
     {visible.length === 0 ? <p className="planner-conversation__empty" role="status">아직 관측된 Planner 작업 이벤트가 없습니다</p> : <ol>{visible.map((event) => <li key={event.id} data-event-id={event.id} data-event-sequence={event.sequence} data-event-role={event.role} data-event-type={event.type} data-event-status={event.status}><div><strong>{roleCopy[event.role]} · {typeCopy[event.type]}</strong><time dateTime={event.observedAt}>{event.observedAt}</time></div><p>{event.summary}</p><span>{statusCopy[event.status]}</span>{event.role === 'release_audit' && <small>완료 판정 권한 없음.</small>}{event.status === 'delivery_unknown' && <small>전달 근거를 확인하기 전에는 자동 재전송하지 않습니다.</small>}</li>)}</ol>}
     {writable && <form className="planner-conversation__composer" data-planner-composer="true" onSubmit={onSubmit}><label htmlFor="planner-message">Planner에게 메시지</label><textarea ref={textarea} id="planner-message" rows={4} value={draft} aria-describedby="planner-message-help planner-message-status" onKeyDown={onKeyDown} onChange={(event) => setDraft((current) => boundedComposerDraft(current, event.target.value))} /><div id="planner-message-help"><span>⌘/Ctrl + Enter로 보내기 · Enter는 줄바꿈</span><span className={overLimit ? 'is-error' : ''}>{[...draft].length} / 4000</span></div>{sensitive && <p role="alert">민감할 수 있는 값이 감지되었습니다. 실제 자격 증명은 제거해 주세요.</p>}<div className="planner-conversation__actions"><button type="submit" data-touch-target="44" disabled={disabled}>메시지 보내기</button>{retryAvailable && <button type="button" data-touch-target="44" onClick={() => void submit()}>수동으로 다시 시도</button>}{!injectedWritable && <button type="button" data-touch-target="44" onClick={() => void refresh()}>새로고침</button>}</div><p id="planner-message-status" aria-live="polite">{delivery ? deliveryCopy[delivery] : availability === 'conflict' ? '대화 순서를 확인할 수 없습니다' : availability === 'chat_unavailable' ? '대화를 사용할 수 없습니다' : ''}</p></form>}
   </section>

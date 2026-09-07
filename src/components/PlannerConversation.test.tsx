@@ -1,8 +1,25 @@
 import { renderToStaticMarkup } from 'react-dom/server'
 import { describe, expect, it } from 'vitest'
 import { PlannerConversation, roleChatFilters, roleChatFixtureStates, type RoleChatFilter, type RoleChatFixtureState } from './PlannerConversation'
-import { isComposerSubmitShortcut, resolveConversationCredential, validatePrivateTimeline } from './PlannerConversation'
+import { isComposerSubmitShortcut, resolveConversationCredential, validatePrivateTimeline, hasCorrelatedPlannerAnswer } from './PlannerConversation'
 import type { PrivateChatEvent } from '../lib/api'
+
+describe('correlated answer evidence', () => {
+  const user: PrivateChatEvent = { event_id:'event-0000000000000001',sequence:1,observed_at:'2026-09-08T00:00:00.000Z',correlation_id:'message-0000000000000001',kind:'user_message',state:'queued',delivery:'delivery_unknown',dispatch_state:'invoked',payload:{private_content:{text:'hello'}} }
+  const answer: PrivateChatEvent = {...user,event_id:'event-0000000000000002',sequence:2,kind:'assistant_message',state:'completed',payload:{private_content:{text:'received'}}}
+  it('shows answered evidence without mutating original transport state', () => {
+    const timeline=[user,answer]
+    expect(hasCorrelatedPlannerAnswer(timeline,user.correlation_id)).toBe(true)
+    const html=renderToStaticMarkup(<PlannerConversation events={[]} fixtureTimeline={timeline} />)
+    expect(html).toContain('Planner 답변 확인됨');expect(html).not.toContain('전달 상태 확인 불가')
+    expect(user.delivery).toBe('delivery_unknown')
+  })
+  it('rejects unmatched, earlier, incomplete and ambiguous correlations', () => {
+    for(const change of [{correlation_id:'message-0000000000000002'},{sequence:0},{state:'failed'},{observed_at:'2026-09-07T00:00:00.000Z'},{payload:{private_content:{text:' '}}}]) expect(hasCorrelatedPlannerAnswer([user,{...answer,...change} as PrivateChatEvent],user.correlation_id)).toBe(false)
+    expect(hasCorrelatedPlannerAnswer([user,user,answer],user.correlation_id)).toBe(false)
+    expect(hasCorrelatedPlannerAnswer([answer],user.correlation_id)).toBe(false)
+  })
+})
 
 describe('composer IME boundary', () => {
   it('sends only explicit shortcuts outside composition', () => {
