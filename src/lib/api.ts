@@ -16,7 +16,11 @@ export type PrivateProjectProjection = { project: { id: string; name: string }; 
 export type PrivateWorkspaceView = { viewState?: string; projects?: PrivateProjectProjection[]; dashboard?: OutcomeDashboardData }
 export type PrivateDecisionReason = 'evidence_insufficient' | 'scope_not_authorized' | 'superseded_by_newer_observation' | 'defer_pending_external_input'
 export type PrivateDecisionReceipt = { decisionState: 'recorded'; decisionId: string; decision: 'approved' | 'rejected'; rejectionReason: PrivateDecisionReason | null; decidedAt: string; decisionActorClass: 'owner'; notice: '기록됨 · 전달은 이 범위 밖'; supersedesId: string | null; completionAuthority: false }
-export type PrivateChatEvent = { event_id: string; sequence: number; observed_at: string; kind: 'user_message'; state: 'queued'; correlation_id: string; payload: { private_content: { text: string } }; delivery: PrivateChatSubmit['delivery']; dispatch_state: PrivateChatSubmit['dispatch_state'] }
+type PrivateChatEventBase = { event_id: string; sequence: number; observed_at: string; correlation_id: string }
+export type PrivateChatEvent = PrivateChatEventBase & (
+  { kind: 'user_message'; state: 'queued'; payload: { private_content: { text: string } }; delivery: PrivateChatSubmit['delivery']; dispatch_state: PrivateChatSubmit['dispatch_state'] }
+  | { kind: 'assistant_message' | 'commentary' | 'plan' | 'tool_call' | 'tool_result' | 'file_change' | 'diff' | 'test_result' | 'approval_request' | 'waiting_user' | 'error' | 'connection'; state: 'queued' | 'responding' | 'tool_running' | 'verifying' | 'waiting_approval' | 'waiting_user' | 'completed' | 'failed' | 'cancelled' | 'reconnecting'; payload: { private_content?: { text: string } } }
+)
 export type PrivateChatTimeline = { target: { role: 'planner'; binding_version: number }; events: PrivateChatEvent[]; completion_authority: false; csrf: string }
 export type PrivateChatSubmit = { accepted: true; sequence: number; event_id: string; dispatch_state: 'not_invoked' | 'dispatch_intent_recorded' | 'invoked'; delivery: 'acknowledged' | 'delivery_unknown' | 'rejected' | 'failed'; execution_started: false; result_attached: false; evidence_attached: false }
 

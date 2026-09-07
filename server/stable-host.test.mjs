@@ -13,7 +13,7 @@ if (process.env.OUTCOME_ASSERT_BUILT !== '1') {
   const fixture = finalizeDeploymentSnapshot({ source, commit: '1111111111111111111111111111111111111111', tree: '2222222222222222222222222222222222222222', asset: 'index-test.js' })
   writeFileSync(new URL('../api/deployment-snapshot.mjs', import.meta.url), `export default ${JSON.stringify(fixture)}\n`, 'utf8')
 }
-const { config: stableConfig, createStableHostRequestHandler, default: stableHandler, handleStableHostRequest, requestPath } = await import('../api/index.mjs')
+const { config: stableConfig, createStableHostRequestHandler, default: stableHandler, handleStableHostRequest, requestPath, rawBridgeBody } = await import('../api/index.mjs')
 const { default: snapshot } = await import('../api/deployment-snapshot.mjs')
 
 const request = (method, pathname) => handleStableHostRequest({ method, pathname })
@@ -90,6 +90,46 @@ const identityEnvironment = {
   OUTCOME_PRIVATE_ALLOWED_ORIGIN: 'https://preview.invalid',
   OUTCOME_PRIVATE_ROLLBACK_DEPLOYMENT: 'rollback-preview',
 }
+
+test('production chat ingress reads streamed UTF-8 bodies and caps bytes before service invocation', async () => {
+  const payload = Buffer.from(JSON.stringify({ project_id:'outcome', message:'안녕하세요' }))
+  const request = { method:'POST', async *[Symbol.asyncIterator]() { yield payload.subarray(0, 42); yield payload.subarray(42) } }
+  assert.deepEqual(await rawBridgeBody(request, '/api/private/chat/messages'), payload)
+  let closed = false, excessRead = false
+  const oversized = { method:'POST', async *[Symbol.asyncIterator]() { try { yield Buffer.alloc(10_001); excessRead = true; yield Buffer.alloc(1) } finally { closed = true } } }
+  assert.equal((await rawBridgeBody(oversized, '/api/private/chat/messages')).length, 10_001)
+  assert.equal(closed, true)
+  assert.equal(excessRead, false)
+  assert.equal(await rawBridgeBody(request, '/api/private/chat/unknown'), undefined)
+})
+
+test('chat route contains hostile thrown values without reading status or exposing details', async () => {
+  let reads = 0
+  const hostile = Object.defineProperty({}, 'status', { get() { reads++; throw new Error('private failure') } })
+  for (const failure of [hostile, { status: 401, message: 'private failure' }, null]) {
+    const handler = createStableHostRequestHandler({
+      environment: identityEnvironment,
+      runtimeFactory: async () => ({ allowedOrigin: 'https://preview.invalid', publishableKey: 'pk_test_boundary', service: { readWorkspace() {}, authenticate() {}, resolveBridgeAuthority: async () => { throw failure } } }),
+      chatRuntimeFactory: async () => { throw new Error('must not construct') },
+    })
+    assert.deepEqual(await handler({ method: 'GET', pathname: '/api/private/chat/timeline' }), { status: 503, body: { error: 'chat_unavailable' } })
+  }
+  assert.equal(reads, 0)
+})
+
+test('chat route authenticates server scope and forwards explicit send permission only', async () => {
+  for (const enabled of [false, true]) {
+    let submissions = 0
+    const origin = 'https://preview.invalid', csrf = 'synthetic-chat-csrf-value'
+    const handler = createStableHostRequestHandler({ environment: identityEnvironment,
+      runtimeFactory: async () => ({ allowedOrigin: origin, publishableKey: 'pk_test_boundary', service: { readWorkspace() {}, authenticate() {}, resolveBridgeAuthority: async ({ token }) => { assert.equal(token, 'fixture-token'); return { account_ref: 'account-test', workspace_id: 'workspace-test', project_ids: ['outcome'] } } } }),
+      chatRuntimeFactory: async () => ({ allowedOrigin: origin, csrfSecret: csrf, sendEnabled: enabled, rateLimit: () => ({ allowed: true }), createService: workspace => { assert.equal(workspace, 'workspace-test'); return { submitPlannerMessage: async () => { submissions++; return { accepted: true, sequence: 1, event_id: 'event-0000000000000001', dispatch_state: 'not_invoked', delivery: 'delivery_unknown', execution_started: false, result_attached: false, evidence_attached: false } } } } }),
+    })
+    const response = await handler({ method: 'POST', pathname: '/api/private/chat/messages', headers: { authorization: 'Bearer fixture-token', origin, 'content-type': 'application/json', 'x-outcome-csrf': csrf, 'idempotency-key': 'message-0000000000000001' }, body: JSON.stringify({ project_id: 'outcome', message: 'hello' }) })
+    assert.equal(response.status, enabled ? 202 : 405)
+    assert.equal(submissions, enabled ? 1 : 0)
+  }
+})
 const bridgeEnvironment = (projectionEnrollment = '1', ingestion = '1') => ({
   ...identityEnvironment,
   OUTCOME_OBSERVER_BRIDGE_PROJECTION_ENROLLMENT_ENABLED: projectionEnrollment,

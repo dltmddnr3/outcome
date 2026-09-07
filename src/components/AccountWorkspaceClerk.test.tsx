@@ -23,6 +23,20 @@ const tabStorage = () => {
 }
 
 describe('Clerk browser session boundary', () => {
+  it('rejects superseded owner/workspace reads without writing readiness', async () => {
+    for (const expiresAt of ['owner', 'workspace']) {
+      let current = true
+      const storage = tabStorage(), confirmed = vi.fn()
+      const workspace = vi.fn().mockImplementation(async () => { if (expiresAt === 'workspace') current = false; return { workspace: {} } })
+      await expect(confirmHostedOwnerWorkspace('fixture', storage, {
+        owner: async () => { if (expiresAt === 'owner') current = false; return { authenticated: true, owner: true } },
+        workspace,
+      }, confirmed, () => current)).rejects.toThrow('session_superseded')
+      expect(storage.entries()).toEqual([])
+      expect(workspace).toHaveBeenCalledTimes(expiresAt === 'owner' ? 0 : 1)
+      expect(confirmed).toHaveBeenCalledTimes(expiresAt === 'owner' ? 0 : 1)
+    }
+  })
   it('mounts ClerkProvider with the runtime publishable key and real SDK callback component', () => {
     const html = renderToStaticMarkup(<HostedClerkWorkspace publishableKey="pk_test_browser" pathname="/workspace/sso-callback" />)
     expect(html).toContain('data-clerk-provider="pk_test_browser"')

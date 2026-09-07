@@ -15,6 +15,8 @@
     "test": "vitest run && node --test server/*.test.mjs",
     "test:dashboard": "vitest run src/components",
     "test:collector": "node --test server/cherry-note-dashboard.test.mjs",
+    "chat:consume-once": "node server/outcome-chat-consumer-runner.mjs",
+    "chat:collect-once": "node server/outcome-chat-consumer-runner.mjs --responses",
     "test:package-model": "node --test server/outcome-package.test.mjs",
     "test:runtime": "node --test server/index.test.mjs",
     "test:public": "node --test --test-name-pattern='public mode' server/index.test.mjs",
@@ -38,6 +40,7 @@
     "@clerk/backend": "3.16.12",
     "@clerk/react": "6.14.7",
     "lucide-react": "^0.468.0",
+    "pg": "8.23.0",
     "react": "^19.1.1",
     "react-dom": "^19.1.1",
     "yaml": "^2.9.0"

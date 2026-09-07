@@ -2,6 +2,7 @@ import { AuthenticateWithRedirectCallback, ClerkProvider, useAuth, useSignIn, us
 import { type FormEvent, useEffect, useRef, useState } from 'react'
 import { fetchPrivateOwnerSession, fetchPrivateWorkspace, type PrivateWorkspaceView } from '../lib/api'
 import { AccountWorkspace, type AccountWorkspaceState } from './AccountWorkspace'
+import { PlannerConversationSession } from './PlannerConversation'
 
 const callbackPaths = new Set(['/workspace/sso-callback', '/workspace/apple-callback'])
 export const hostedGoogleSsoParameters = Object.freeze({ strategy: 'oauth_google' as const, redirectCallbackUrl: '/workspace/sso-callback', redirectUrl: '/workspace' })
@@ -34,10 +35,12 @@ type HostedOwnerLoaders = {
   workspace: (sessionToken: string) => Promise<{ workspace: PrivateWorkspaceView }>
 }
 const hostedOwnerLoaders: HostedOwnerLoaders = { owner: fetchPrivateOwnerSession, workspace: fetchPrivateWorkspace }
-export async function confirmHostedOwnerWorkspace(sessionToken: string, storage: HostedTabStorage | undefined = currentTabStorage(), loaders: HostedOwnerLoaders = hostedOwnerLoaders, ownerConfirmed: () => void = () => undefined) {
+export async function confirmHostedOwnerWorkspace(sessionToken: string, storage: HostedTabStorage | undefined = currentTabStorage(), loaders: HostedOwnerLoaders = hostedOwnerLoaders, ownerConfirmed: () => void = () => undefined, isCurrent: () => boolean = () => true) {
   await loaders.owner(sessionToken)
+  if (!isCurrent()) throw new Error('session_superseded')
   ownerConfirmed()
   const value = await loaders.workspace(sessionToken)
+  if (!isCurrent()) throw new Error('session_superseded')
   markHostedOwnerReady(storage)
   return value.workspace
 }
@@ -100,6 +103,11 @@ export async function returnToHostedLogin(signOut: HostedSignOut, storage: Hoste
 }
 
 function HostedWorkspaceBody() {
+  const { sessionId } = useAuth()
+  return <HostedWorkspaceSession key={sessionId ?? 'signed-out'} />
+}
+
+function HostedWorkspaceSession() {
   const { isLoaded, isSignedIn, getToken, signOut } = useAuth()
   const { signIn, errors: signInErrors, fetchStatus } = useSignIn()
   const { user } = useUser()
@@ -116,16 +124,22 @@ function HostedWorkspaceBody() {
   const googleBusy = googlePending || fetchStatus === 'fetching'
 
   useEffect(() => {
+    let current = true
     if (!isLoaded) return
     if (!isSignedIn) { setOwnerVerified(false); setState(ownerWasReady || hostedSignedOutState() === 'session_expired' ? 'session_expired' : 'login'); setWorkspace(undefined); return }
     void requireHostedSessionToken(getToken)
-      .then((sessionToken) => confirmHostedOwnerWorkspace(sessionToken, undefined, undefined, () => setOwnerVerified(true)))
-      .then((value) => { setOwnerWasReady(true); setWorkspace(value); setState('ready') })
+      .then((sessionToken) => {
+        if (!current) throw new Error('session_superseded')
+        return confirmHostedOwnerWorkspace(sessionToken, undefined, undefined, () => { if (current) setOwnerVerified(true) }, () => current)
+      })
+      .then((value) => { if (current) { setOwnerWasReady(true); setWorkspace(value); setState('ready') } })
       .catch((reason) => {
+        if (!current) return
         setWorkspace(undefined)
         if (!(reason instanceof Error && reason.message === 'private_workspace_unavailable')) setOwnerVerified(false)
         setState(hostedFailureState(reason))
       })
+    return () => { current = false }
   }, [getToken, isLoaded, isSignedIn])
 
   useEffect(() => {
@@ -176,7 +190,7 @@ function HostedWorkspaceBody() {
     <span className="account-workspace__apple-note">Apple은 소유자 로그인 확인 후 연결</span>
     <p className="account-workspace__adapter-note">Clerk 브라우저 세션 · 회원가입 전환 차단</p>
   </div>
-  return <AccountWorkspace state={state} workspace={workspace} ownerVerified={ownerVerified} sessionPresent={Boolean(isSignedIn)} loginContent={loginContent} onLogout={isSignedIn || ownerWasReady ? returnToLogin : undefined} onAppleLink={ownerVerified ? linkApple : undefined} transitionError={error} />
+  return <PlannerConversationSession.Provider value={{ getSessionCredential: getToken }}><AccountWorkspace state={state} workspace={workspace} ownerVerified={ownerVerified} sessionPresent={Boolean(isSignedIn)} loginContent={loginContent} onLogout={isSignedIn || ownerWasReady ? returnToLogin : undefined} onAppleLink={ownerVerified ? linkApple : undefined} transitionError={error} /></PlannerConversationSession.Provider>
 }
 
 export function HostedClerkWorkspace({ publishableKey, pathname = window.location.pathname }: { publishableKey: string; pathname?: string }) {

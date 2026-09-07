@@ -5,6 +5,8 @@ import { AccountAccessError } from '../server/account-access.mjs'
 import { HOSTED_IDENTITY_ENV, createHostedIdentityRuntime, readHostedIdentityConfiguration, safeClerkAuthReason } from '../server/account-access-hosted.mjs'
 import { handleHostedObserverBridgeRequest } from '../server/phase3-observer-bridge-api.mjs'
 import { createObserverBridgeRuntimeControl } from '../server/phase3-observer-bridge-runtime.mjs'
+import { handlePrivateChatRequest } from '../server/outcome-chat-api.mjs'
+import { createOutcomeChatHostedRuntimeFactory } from '../server/outcome-chat-hosted-runtime.mjs'
 
 const result = (status, body) => ({ status, body })
 
@@ -117,7 +119,7 @@ const privateSessionDiagnostic = (logger, input, error, configuredOrigin) => {
   try { logger?.info?.('outcome_private_session', { authSource: input.authSource, ...tokenState, ...(sdkReason ? { sdkReason } : {}), ...safeError }) } catch {}
 }
 
-export function createStableHostRequestHandler({ environment = process.env, runtimeFactory = createHostedIdentityRuntime, bridgeRuntimeFactory, clerkClientFactory, clerkTokenVerifier, logger } = {}) {
+export function createStableHostRequestHandler({ environment = process.env, runtimeFactory = createHostedIdentityRuntime, bridgeRuntimeFactory, chatRuntimeFactory, clerkClientFactory, clerkTokenVerifier, logger } = {}) {
   const configured = readHostedIdentityConfiguration(environment).enabled
   const configuredOrigin = typeof environment?.[HOSTED_IDENTITY_ENV.privateAllowedOrigin] === 'string' ? environment[HOSTED_IDENTITY_ENV.privateAllowedOrigin].trim() : ''
   const validRuntime = (value) => value?.allowedOrigin === configuredOrigin
@@ -126,6 +128,8 @@ export function createStableHostRequestHandler({ environment = process.env, runt
     && typeof value?.service?.readWorkspace === 'function'
     && typeof value?.service?.authenticate === 'function'
   let runtimePromise
+  let chatRuntimePromise
+  const selectedChatRuntimeFactory = chatRuntimeFactory ?? createOutcomeChatHostedRuntimeFactory({ environment })
   const bridgeControl = createObserverBridgeRuntimeControl({ environment, runtimeFactory: bridgeRuntimeFactory })
   const selectedRuntime = async () => {
     if (!configured || typeof runtimeFactory !== 'function') return null
@@ -178,6 +182,22 @@ export function createStableHostRequestHandler({ environment = process.env, runt
       return handleStableHostRequest({ method, pathname })
     }
     const hosted = await selectedRuntime()
+    if (pathname.startsWith('/api/private/chat/')) {
+      if (!hosted || typeof selectedChatRuntimeFactory !== 'function') return result(503, { error: 'chat_unavailable' })
+      try {
+        const authority = await hosted.service.resolveBridgeAuthority({ token: privateSessionToken(headers) })
+        if (!authority || !Array.isArray(authority.project_ids) || !authority.project_ids.includes('outcome')) return result(403, { error: 'project_access_denied' })
+        chatRuntimePromise ??= Promise.resolve().then(() => selectedChatRuntimeFactory({ accountRuntime: hosted, allowedOrigin: configuredOrigin })).catch(() => null)
+        const chat = await chatRuntimePromise
+        if (!chat || chat.allowedOrigin !== configuredOrigin || typeof chat.csrfSecret !== 'string' || chat.csrfSecret.length < 16 || typeof chat.createService !== 'function' || typeof chat.rateLimit !== 'function') return result(503, { error: 'chat_unavailable' })
+        const service = chat.createService(authority.workspace_id)
+        const owner = { authenticated: true, actor: 'cherry_owner', allowed_origin: chat.allowedOrigin, csrf: chat.csrfSecret, workspace_id: authority.workspace_id, account_ref: authority.account_ref, project_ids: ['outcome'] }
+        const chatHeaders = Object.fromEntries(['content-type', 'origin', 'x-outcome-csrf', 'idempotency-key'].map(name => [name, String(header(headers, name))]).filter(([, value]) => value))
+        return await handlePrivateChatRequest({ method, url: pathname, headers: chatHeaders, rawBody: Buffer.isBuffer(body) ? body.toString('utf8') : body, service, owner, rateLimit: chat.rateLimit, sendEnabled: chat.sendEnabled === true })
+      } catch {
+        return result(503, { error: 'chat_unavailable' })
+      }
+    }
     if (!hosted) return handleStableHostRequest({ method, pathname })
     if (method === 'GET' && pathname === '/api/private/config') return result(200, { ...privateAccessPublicConfig(true), publishableKey: hosted.publishableKey })
     if (method === 'GET' && pathname === '/api/private/session') {
@@ -210,10 +230,12 @@ export const requestPath = (request) => {
 const hostedRequest = createStableHostRequestHandler({ logger: console })
 
 const MAXIMUM_STABLE_BRIDGE_BODY_BYTES = 1_048_576
-const rawBridgeBody = async (request, pathname) => {
+export const rawBridgeBody = async (request, pathname) => {
   const target = bridgeRequestTarget(pathname)
+  const chatMessage = pathname === '/api/private/chat/messages' && request.method === 'POST'
+  const maximumBytes = chatMessage ? 10_000 : MAXIMUM_STABLE_BRIDGE_BODY_BYTES
   const body = request.body
-  if (!target.candidate || !target.valid || request.method === 'GET' || typeof body === 'string' || Buffer.isBuffer(body)) return body
+  if ((!chatMessage && (!target.candidate || !target.valid)) || request.method === 'GET' || typeof body === 'string' || Buffer.isBuffer(body)) return body
   const chunks = []
   let bytes = 0
   try {
@@ -224,7 +246,7 @@ const rawBridgeBody = async (request, pathname) => {
       else if (Buffer.isBuffer(chunk)) value = chunk
       else return undefined
       bytes += value.length
-      if (bytes > MAXIMUM_STABLE_BRIDGE_BODY_BYTES) return Buffer.alloc(MAXIMUM_STABLE_BRIDGE_BODY_BYTES + 1)
+      if (bytes > maximumBytes) return Buffer.alloc(maximumBytes + 1)
       chunks.push(value)
     }
   } catch {

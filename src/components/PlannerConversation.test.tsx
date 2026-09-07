@@ -1,8 +1,49 @@
 import { renderToStaticMarkup } from 'react-dom/server'
 import { describe, expect, it } from 'vitest'
 import { PlannerConversation, roleChatFilters, roleChatFixtureStates, type RoleChatFilter, type RoleChatFixtureState } from './PlannerConversation'
+import { resolveConversationCredential, validatePrivateTimeline } from './PlannerConversation'
+import type { PrivateChatEvent } from '../lib/api'
+
+describe('live timeline validation', () => {
+  const answer: PrivateChatEvent = { event_id: 'event-0000000000000001', sequence: 1, observed_at: '2026-09-08T00:00:00.000Z', kind: 'assistant_message', state: 'completed', correlation_id: 'message-0000000000000001', payload: { private_content: { text: 'Planner 답변' } } }
+  it('accepts ordered Planner answer content', () => {
+    expect(validatePrivateTimeline([answer])[0]).toEqual(answer)
+  })
+  it('rejects unknown kind, state, gaps and text on non-message events', () => {
+    for (const mutation of [{ kind: 'invented' }, { state: 'invented' }, { sequence: 2 }, { kind: 'tool_call' }, { payload: { private_content: { text: '' } } }]) {
+      expect(() => validatePrivateTimeline([{ ...answer, ...mutation } as PrivateChatEvent])).toThrow('timeline_conflict')
+    }
+  })
+  it('rejects invalid user delivery and duplicate event IDs', () => {
+    expect(() => validatePrivateTimeline([{ ...answer, kind: 'user_message', state: 'queued', delivery: 'invented', dispatch_state: 'invoked' } as unknown as PrivateChatEvent])).toThrow('timeline_conflict')
+    expect(() => validatePrivateTimeline([answer, { ...answer, sequence: 2 }])).toThrow('timeline_conflict')
+  })
+})
+
+describe('conversation request credentials', () => {
+  it('obtains a fresh credential on every request rather than caching the first token', async () => {
+    let calls = 0
+    const session = { sessionCredential: 'obsolete-fixture', getSessionCredential: async () => `fixture-${++calls}` }
+    expect(await resolveConversationCredential(session)).toBe('fixture-1')
+    expect(await resolveConversationCredential(session)).toBe('fixture-2')
+    expect(calls).toBe(2)
+  })
+  it('never falls back to a stale token when the current session expires', async () => {
+    await expect(resolveConversationCredential({ sessionCredential: 'obsolete-fixture', getSessionCredential: async () => null })).rejects.toThrow('authentication_required')
+  })
+  it('propagates session provider failure without falling back', async () => {
+    await expect(resolveConversationCredential({ sessionCredential: 'obsolete-fixture', getSessionCredential: async () => { throw new Error('session_unavailable') } })).rejects.toThrow('session_unavailable')
+  })
+})
 
 describe('Planner conversation observed-event contract', () => {
+  it('renders supplied Planner answer text without relabeling it as Cherry or queued', () => {
+    const html = renderToStaticMarkup(<PlannerConversation events={[]} fixtureTimeline={[{ event_id: 'event-0000000000000002', sequence: 2, observed_at: '2026-09-08T00:00:00.000Z', kind: 'assistant_message', state: 'completed', correlation_id: 'message-0000000000000001', payload: { private_content: { text: '확인된 답변 본문' } } }]} />)
+    expect(html).toContain('확인된 답변 본문')
+    expect(html).toContain('<strong>Planner</strong>')
+    expect(html).not.toContain('<strong>Cherry</strong>')
+    expect(html).not.toContain('전송 대기 기록')
+  })
   it('renders a quiet truthful empty state without synthetic activity', () => {
     const html = renderToStaticMarkup(<PlannerConversation events={[]} />)
     expect(html).toContain('아직 관측된 Planner 작업 이벤트가 없습니다')

@@ -36,6 +36,27 @@ test('named runtime contract contains no secret defaults and exposes approved pr
   assert.equal(JSON.stringify(ACCOUNT_ACCESS_ENV).includes('VITE_'), false)
 })
 
+test('chat authority is server-resolved immutable scope without raw subject or token', async () => {
+  const service = createAccountAccessService({ authProvider: auth(), store: baseStore(), ownerSubject: owner, now })
+  const authority = await service.resolveBridgeAuthority({ token: 'valid', workspace_id: 'forged' })
+  assert.equal(authority.workspace_id, workspace)
+  assert.deepEqual(authority.project_ids, ['cherry-note', 'outcome'])
+  assert.match(authority.account_ref, /^[a-f0-9]{64}$/)
+  assert.equal(Object.isFrozen(authority), true)
+  assert.equal(Object.isFrozen(authority.project_ids), true)
+  assert.equal(JSON.stringify(authority).includes(owner), false)
+  await assert.rejects(service.resolveBridgeAuthority({ token: 'invalid' }), /authentication_required/)
+})
+
+test('chat authority denies missing conflicting or inactive memberships', async () => {
+  const active = { subject: owner, workspaceId: workspace, role: 'owner-viewer', state: 'active' }
+  for (const memberships of [[], [active, active], [{ ...active, state: 'revoked' }], [{ ...active, role: 'viewer' }]]) {
+    const store = { ...baseStore(), membershipsForSubject: async () => memberships }
+    const service = createAccountAccessService({ authProvider: auth(), store, ownerSubject: owner, now })
+    await assert.rejects(service.resolveBridgeAuthority({ token: 'valid' }), /membership_(inactive|conflict)/)
+  }
+})
+
 test('owner session resolves membership server-side and returns only Cherry Note and OUTCOME', async () => {
   const service = createAccountAccessService({ authProvider: auth(), store: baseStore(), ownerSubject: owner, now })
   const result = await service.readWorkspace({ token: 'valid', requestedWorkspaceId: 'forged', requestedProjectId: null })
