@@ -111,6 +111,28 @@ test('zero candidates is empty and plural contradictory correlation is one safe 
   }
 })
 
+test('rejects every unexpected or non-data own array property before getters run', () => {
+  let traps = 0
+  const hiddenPredicates = input()
+  Object.defineProperty(hiddenPredicates.predicates, 'unexpectedHidden', { value: true })
+  const hiddenEvents = input()
+  Object.defineProperty(hiddenEvents.events, 'unexpectedHidden', { value: true })
+  const symbolKey = input()
+  symbolKey.predicates[Symbol('unexpected')] = true
+  const nonEnumerableIndex = input()
+  Object.defineProperty(nonEnumerableIndex.predicates, '0', { value: predicate(), enumerable: false })
+  const sparse = input()
+  sparse.events.length = 2
+  const accessorPredicate = input()
+  Object.defineProperty(accessorPredicate.predicates, '0', { enumerable: true, get() { traps += 1; return predicate() } })
+  const accessorEvent = input()
+  Object.defineProperty(accessorEvent.events, '0', { enumerable: true, get() { traps += 1; return event() } })
+  for (const value of [hiddenPredicates, hiddenEvents, symbolKey, nonEnumerableIndex, sparse, accessorPredicate, accessorEvent]) {
+    assert.throws(() => projectExecutionLoopItems(value), /execution_loop_/)
+  }
+  assert.equal(traps, 0)
+})
+
 test('rejects recursive privacy and hostile shapes before traps', () => {
   let traps = 0
   const proxy = new Proxy(input(), { get() { traps += 1 }, ownKeys() { traps += 1 }, getOwnPropertyDescriptor() { traps += 1 }, getPrototypeOf() { traps += 1 } })

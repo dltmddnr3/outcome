@@ -43,9 +43,11 @@ const materialize = (value, seen = new WeakSet()) => {
   try { descriptors = Object.getOwnPropertyDescriptors(value) } catch { fail('invalid_shape') }
   if (Object.getOwnPropertySymbols(value).length) fail('symbol_forbidden')
   if (Array.isArray(value)) {
-    if (Object.keys(value).length !== value.length) fail('invalid_array')
+    const lengthDescriptor = descriptors.length
+    if (!lengthDescriptor || !Object.hasOwn(lengthDescriptor, 'value') || lengthDescriptor.enumerable || lengthDescriptor.configurable || !Number.isSafeInteger(lengthDescriptor.value) || lengthDescriptor.value < 0) fail('invalid_array')
+    if (Object.getOwnPropertyNames(value).length !== lengthDescriptor.value + 1) fail('invalid_array')
     const output = []
-    for (let index = 0; index < value.length; index += 1) {
+    for (let index = 0; index < lengthDescriptor.value; index += 1) {
       const descriptor = descriptors[index]
       if (!descriptor || !descriptor.enumerable || !Object.hasOwn(descriptor, 'value')) fail('accessor_forbidden')
       output.push(materialize(descriptor.value, seen))
