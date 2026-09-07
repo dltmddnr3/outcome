@@ -17,6 +17,7 @@
     "test:collector": "node --test server/cherry-note-dashboard.test.mjs",
     "chat:consume-once": "node server/outcome-chat-consumer-runner.mjs",
     "chat:collect-once": "node server/outcome-chat-consumer-runner.mjs --responses",
+    "chat:service": "node server/outcome-chat-service.mjs",
     "test:package-model": "node --test server/outcome-package.test.mjs",
     "test:runtime": "node --test server/index.test.mjs",
     "test:public": "node --test --test-name-pattern='public mode' server/index.test.mjs",
