@@ -107,9 +107,10 @@ describe('OUTCOME Package dashboard', () => {
   })
   it('Planner 이동은 같은 대화 패널의 Planner 필터를 선택하고 제목에 포커스한다', () => {
     let clicked = 0; let focused = 0; let tabIndex = 0
-    const heading = { focus() { focused += 1 }, get tabIndex() { return tabIndex }, set tabIndex(value) { tabIndex = value } }
+    const disclosure = { open: false }
+    const heading = { focus() { expect(disclosure.open).toBe(true); focused += 1 }, get tabIndex() { return tabIndex }, set tabIndex(value) { tabIndex = value } }
     const planner = { textContent: 'Planner', click() { clicked += 1 } }
-    const panel = { querySelectorAll: () => [{ textContent: '전체', click() {} }, planner], querySelector: (selector: string) => selector === '#planner-conversation-title' ? heading : null }
+    const panel = { closest: (selector: string) => selector === 'details.oc-v1-compatibility' ? disclosure : null, querySelectorAll: () => [{ textContent: '전체', click() {} }, planner], querySelector: (selector: string) => selector === '#planner-conversation-title' ? heading : null }
     const root = { querySelector: (selector: string) => selector === '#oc-planner-conversation' ? panel : null }
     expect(focusPlannerConversation(root as unknown as Document)).toBe(true)
     expect({ clicked, focused, tabIndex }).toEqual({ clicked: 1, focused: 1, tabIndex: -1 })

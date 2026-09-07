@@ -87,6 +87,8 @@ export function focusPlannerConversation(root: Pick<Document, 'querySelector'> =
   const planner = Array.from(panel?.querySelectorAll<HTMLButtonElement>('.planner-conversation__filters button') ?? []).find((button) => button.textContent?.trim() === 'Planner')
   const heading = panel?.querySelector<HTMLElement>('#planner-conversation-title')
   if (!panel || !planner || !heading) return false
+  const disclosure = panel.closest<HTMLDetailsElement>('details.oc-v1-compatibility')
+  if (disclosure) disclosure.open = true
   planner.click(); heading.tabIndex = -1; heading.focus(); return true
 }
 function ResultLinks({ links, onPlannerNavigate }: { links: ResultNode['links']; onPlannerNavigate?: () => void }) { return <nav className="oc-result-links" aria-label="결과물 이동">{Object.entries(links).map(([key, link]) => link.href ? <a key={key} href={link.href}>{link.label}</a> : link.action === 'planner_conversation' && onPlannerNavigate ? <button key={key} type="button" onClick={onPlannerNavigate}>{link.label}</button> : <span key={key}>{link.action ? '링크 미연결' : link.label}</span>)}</nav> }
