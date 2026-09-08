@@ -20,3 +20,12 @@ it('binds mode, initial intake answers and unresolved questions as well as follo
  const digest=await discoveryContextDigest(initial)
  for(const changed of [{...initial,mode:'brief_gap' as const},{...initial,seedAnswers:{problem:'다른 문제'}},{...initial,unknowns:['다른 미상']}])expect(await discoveryContextDigest(changed)).not.toBe(digest)
 })
+it('binds all 200 full-length answers without reusing the source-file byte limit',async()=>{
+ const answers=Array.from({length:200},(_,i)=>({questionId:`q-${i}`,gapId:`gap-${i}`,value:'가'.repeat(4000)}))
+ const full={...context,answers,askedQuestionIds:answers.map(a=>a.questionId)}
+ const digest=await discoveryContextDigest(full)
+ expect(digest).toMatch(/^[a-f0-9]{64}$/)
+ expect(await discoveryContextDigest({...full,answers:[...answers].reverse()})).toBe(digest)
+ expect(await discoveryContextDigest({...full,answers:answers.map((a,i)=>i===199?{...a,value:a.value.slice(0,-1)+'나'}:a)})).not.toBe(digest)
+ await expect(discoveryContextDigest({...full,source:'x'.repeat(65537)})).rejects.toThrow()
+})

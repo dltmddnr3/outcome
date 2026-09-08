@@ -16,7 +16,13 @@ export async function discoveryContextDigest(context:DiscoveryContext) {
  if(seeds.some(([key,value])=>!fields.has(key)||typeof value!=='string'||!value.trim()||new TextEncoder().encode(value).length>16000))return fail()
  planDestinationQuestions({coverage:[],questions:[],answers:context.answers,askedQuestionIds:context.askedQuestionIds})
  const sourceDigest=await destinationSourceSha256(context.source)
- return destinationSourceSha256(JSON.stringify([sourceDigest,context.mode,seeds.sort(([a],[b])=>a.localeCompare(b)),context.unknowns,context.revision,context.answers.map(a=>[a.questionId,a.gapId,a.value]).sort(([a],[b])=>a.localeCompare(b)),[...context.askedQuestionIds].sort()]))
+ const bytes=new TextEncoder().encode(JSON.stringify([sourceDigest,context.mode,seeds.sort(([a],[b])=>a.localeCompare(b)),context.unknowns,context.revision,context.answers.map(a=>[a.questionId,a.gapId,a.value]).sort(([a],[b])=>a.localeCompare(b)),[...context.askedQuestionIds].sort()]))
+ // Source upload remains 64KB. Accumulated 200 answers and unresolved items
+ // have separate bounded fields and must all participate in the context hash.
+ // 8MiB also accommodates JSON escaping at those existing field limits.
+ if(bytes.length>8*1024*1024)return fail()
+ const digest=await crypto.subtle.digest('SHA-256',bytes)
+ return [...new Uint8Array(digest)].map(byte=>byte.toString(16).padStart(2,'0')).join('')
 }
 
 // This validates linkage and shape, never the truth of Planner-provided evidence.
