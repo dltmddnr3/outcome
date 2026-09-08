@@ -1,36 +1,18 @@
 # OUTCOME Sessions
 
-schema_version: 2
+schema_version: 3
 project_id: outcome
 registry_mode: private_runtime
 registry_ref: outcome-local-private
 
-## Role slots
+## Execution ownership
 
 ```yaml
-schema_version: 2
+schema_version: 3
 project_id: outcome
-roles:
-  planner:
-    required: true
-    active_binding_ref: planner-primary
-    binding_version: 2
-    state: active
-  builder:
-    required: true
-    active_binding_ref: builder-primary
-    binding_version: 2
-    state: idle
-  ux_product_qa:
-    required: true
-    active_binding_ref: ux-qa-primary
-    binding_version: 2
-    state: idle
-  release_audit:
-    required: true
-    active_binding_ref: release-audit-primary
-    binding_version: 2
-    state: idle
+execution_mode: result_owned
+owner_role: planner
+stages: [implementation, qa_verification, release_verification, preview]
 ```
 
-No role assignment is inferred by this manifest. Exact locators, observations, and append-only events belong only to the private runtime registry.
+This declares the approved result-owned workflow, not a live assignment or completion. The existing Planner binding provides the single communication and work-owner observation; implementation, QA verification and Release verification are stages, not separate required sessions. Same-session checks are not independent QA/Audit. Historical role bindings remain in the private runtime registry and do not become current work merely by existing. Exact locators, observations and append-only events remain private; Cherry acceptance and external-action permissions remain separate.

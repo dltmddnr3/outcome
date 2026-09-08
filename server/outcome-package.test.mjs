@@ -19,6 +19,28 @@ function fixture({ contractText = contract, mapText = map(), gateText = '- [x] G
   return buildPackageModel({ root, contractFile: 'docs/OUTCOME_CONTRACT.md', mapFile: 'docs/OUTCOME_MAP.md', sessionsFile: sessionsText === null ? null : 'docs/OUTCOME_SESSIONS.md', bindingRegistry: registry, now, staleAfterSeconds: 3600 })
 }
 
+const ownedSessions = '# Sessions\n```yaml\nschema_version: 3\nproject_id: demo\nexecution_mode: result_owned\nowner_role: planner\nstages: [implementation, qa_verification, release_verification, preview]\n```\n'
+
+test('result-owned manifest selects the existing Planner observation, not historical Builder activity', () => {
+  const registry = [{ ...runtime('planner', 'planner-current', 3, 'idle'), observed_at: '2026-08-27T00:00:00.000Z' }, runtime('builder', 'builder-history', 8, 'active')]
+  const before = JSON.stringify(registry)
+  const value = fixture({ sessionsText: ownedSessions, registry, now: new Date('2026-08-27T00:01:00.000Z') })
+  assert.equal(value.status, 'valid')
+  assert.deepEqual(value.bindings.map(row => row.role), ['planner'])
+  assert.equal(value.now.status, 'idle')
+  assert.equal(value.now.source, 'owner_binding')
+  assert.equal(fixture({ sessionsText: ownedSessions, registry, now: new Date('2026-08-28T00:00:00.000Z') }).now.status, 'stale')
+  assert.equal(JSON.stringify(registry), before)
+  assert.equal(fixture({ sessionsText: ownedSessions }).now.status, 'unbound')
+  assert.equal(fixture({ sessionsText: ownedSessions, registry: { bindings: [], error: 'registry_conflict' } }).now.status, 'registry_conflict')
+})
+
+test('result-owned policy rejects foreign project, unknown mode, volatile state and unapproved stage order', () => {
+  for (const sessionsText of [ownedSessions.replace('project_id: demo','project_id: other'), ownedSessions.replace('result_owned','auto_accept'), ownedSessions.replace('owner_role: planner','owner_role: builder'), ownedSessions.replace('release_verification, preview','preview, release_verification'), ownedSessions.replace('owner_role: planner','owner_role: planner\nstate: active')]) {
+    assert.ok(fixture({ sessionsText }).errors.includes('sessions_manifest_invalid'))
+  }
+})
+
 test('sessions manifest and private runtime reconcile aliases versions states and transitions fail closed', () => {
   const runtimeOnly = fixture({ registry: [runtime('builder', 'builder-primary')] })
   assert.equal(runtimeOnly.status, 'conflict'); assert.ok(runtimeOnly.errors.includes('sessions_registry_conflict:builder'))

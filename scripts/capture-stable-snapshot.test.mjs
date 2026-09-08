@@ -2,7 +2,23 @@ import assert from 'node:assert/strict'
 import test from 'node:test'
 import { createHash } from 'node:crypto'
 import sealedSource from '../snapshot/outcome-package-source.json' with { type: 'json' }
-import { buildStableSnapshot, sourceEvidenceObservation } from './capture-stable-snapshot.mjs'
+import { buildStableSnapshot, sourceEvidenceObservation, refreshSourceBindings } from './capture-stable-snapshot.mjs'
+
+test('fresh canonical binding observations replace stale snapshot session conflicts without deleting unrelated evidence', () => {
+  const old = { project: { id: 'outcome' }, status: 'conflict', conflict: true, errors: ['sessions_registry_conflict:builder'], bindings: [{ role: 'builder' }], now: { status: 'active' } }
+  const canonical = { project: { id: 'outcome' }, errors: [], bindings: [{ role: 'planner', status: 'stale' }], now: { status: 'stale', observedAt: null, source: 'owner_binding' } }
+  const fresh = refreshSourceBindings(old, canonical)
+  assert.equal(fresh.status, 'valid')
+  assert.equal(fresh.now.status, 'stale')
+  assert.deepEqual(fresh.bindings, canonical.bindings)
+  assert.deepEqual(fresh.errors, [])
+  assert.equal(old.bindings[0].role, 'builder')
+  const unrelated = refreshSourceBindings({ ...old, errors: [...old.errors, 'source_projection_conflict:map_primary_narrative_stale'] }, canonical)
+  assert.equal(unrelated.status, 'conflict')
+  assert.deepEqual(unrelated.errors, ['source_projection_conflict:map_primary_narrative_stale'])
+  assert.deepEqual(refreshSourceBindings(old, { ...canonical, errors: ['sessions_manifest_invalid'] }).errors, ['sessions_manifest_invalid'])
+  assert.throws(() => refreshSourceBindings(old, { ...canonical, project: { id: 'other' } }), /current_source_binding_projection_invalid/)
+})
 
 test('source observation is content-bound and cannot be refreshed by capture time or file metadata', () => {
   const text = 'exact observed Gate bytes'

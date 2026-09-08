@@ -180,6 +180,10 @@ function parseSessionsManifest(markdown, projectId) {
     const value = YAML.parse(source)
     const roles = value?.roles
     const exact = (item, keys) => item && typeof item === 'object' && !Array.isArray(item) && Object.keys(item).length === keys.size && Object.keys(item).every((key) => keys.has(key))
+    if (value?.schema_version === 3) {
+      if (!exact(value, new Set(['schema_version', 'project_id', 'execution_mode', 'owner_role', 'stages'])) || value.project_id !== projectId || value.execution_mode !== 'result_owned' || value.owner_role !== 'planner' || JSON.stringify(value.stages) !== JSON.stringify(['implementation', 'qa_verification', 'release_verification', 'preview'])) return { setupRequired: false, errors: ['sessions_manifest_invalid'], roles: null }
+      return { setupRequired: false, errors: [], roles: null, ownerRole: value.owner_role }
+    }
     const validRole = (row) => {
       if (!exact(row, SESSION_ROLE_KEYS) || row.required !== true || !Number.isInteger(row.binding_version)) return false
       if (row.state === 'unbound') return row.binding_version === 0 && row.active_binding_ref === null
@@ -284,8 +288,8 @@ export function buildPackageModel({ root, contractFile, mapFile, sessionsFile = 
     if (item.stage.state === 'complete' || item.stage.state === 'blocked') continue
     item.stage.state = item.stage.dependsOn.every((id) => stages.find((candidate) => candidate.stage.id === id)?.stage.state === 'complete') ? 'queued' : 'locked'
   }
-  const bindings = bindingViews(map.project_id, reconciledRegistry, now, staleAfterSeconds, sessions.setupRequired)
-  const builder = bindings.find((item) => item.role === 'builder')
+  const bindings = bindingViews(map.project_id, reconciledRegistry, now, staleAfterSeconds, sessions.setupRequired).filter((item) => !sessions.ownerRole || item.role === sessions.ownerRole)
+  const builder = bindings.find((item) => item.role === (sessions.ownerRole ?? 'builder'))
   const evidenceTimes = stages.map((item) => item.stage.gate.observedAt).filter(Boolean).map(Date.parse).filter(Number.isFinite)
   const evidenceObservedAt = evidenceTimes.length ? new Date(Math.max(...evidenceTimes)).toISOString() : null
   const model = {
@@ -293,7 +297,7 @@ export function buildPackageModel({ root, contractFile, mapFile, sessionsFile = 
     project: { id: map.project_id, name: map.project_title ?? map.title ?? contract.projectName, outcome: map.project_purpose ?? contract.outcome, acceptanceAuthority: contract.acceptanceAuthority }, phases, connectors: { github },
     current: current ? { phaseId: current.phase.id, scopeId: current.scope.id, stageId: current.stage.id } : null,
     next: next ? { phaseId: next.phase.id, scopeId: next.scope.id, stageId: next.stage.id } : null,
-    bindings, now: builder && !['unbound', 'setup_required', 'registry_unavailable', 'registry_conflict'].includes(builder.status) ? { status: builder.status, activity: builder.activity, observedAt: builder.observedAt, source: 'builder_binding' } : { status: builder?.status ?? 'unbound', activity: null, observedAt: null, source: 'runtime_registry' },
+    bindings, now: builder && !['unbound', 'setup_required', 'registry_unavailable', 'registry_conflict'].includes(builder.status) ? { status: builder.status, activity: builder.activity, observedAt: builder.observedAt, source: sessions.ownerRole ? 'owner_binding' : 'builder_binding' } : { status: builder?.status ?? 'unbound', activity: null, observedAt: null, source: 'runtime_registry' },
     progress: { available: false, reason: 'no_cross_stage_aggregate' },
   }
   model.resultView = null

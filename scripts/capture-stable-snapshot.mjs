@@ -18,6 +18,15 @@ export function sourceEvidenceObservation(gateText, receipt, capturedAt) {
   return receipt.observed_at
 }
 
+export function refreshSourceBindings(sourceProject, canonicalProject) {
+  if (!sourceProject?.project?.id || sourceProject.project.id !== canonicalProject?.project?.id || !Array.isArray(canonicalProject.bindings) || !canonicalProject.now) throw new Error('current_source_binding_projection_invalid')
+  const isSessionError = (error) => typeof error === 'string' && error.startsWith('sessions_')
+  const previousErrors = sourceProject.errors ?? []
+  const errors = [...previousErrors.filter(error => !isSessionError(error)), ...(canonicalProject.errors ?? []).filter(isSessionError)]
+  const clearedOnlySessionConflict = sourceProject.status === 'conflict' && previousErrors.some(isSessionError) && errors.length === 0
+  return { ...sourceProject, errors, bindings: structuredClone(canonicalProject.bindings), now: structuredClone(canonicalProject.now), ...(clearedOnlySessionConflict ? { status: 'valid', conflict: false } : {}) }
+}
+
 export function applyCurrentOutcomeSource({ currentProjection, sourceRoot, capturedAt, bindingRegistry, observationReceipt }) {
   if (typeof sourceRoot !== 'string' || !sourceRoot.startsWith('/')) throw new Error('current_source_root_required')
   const canonicalRoot = resolve(sourceRoot)
@@ -39,7 +48,7 @@ export function applyCurrentOutcomeSource({ currentProjection, sourceRoot, captu
     now: new Date(capturedAt),
   })
   if (!Array.isArray(currentProjection?.projects) || currentProjection.projects.filter((project) => project?.project?.id === 'outcome').length !== 1) throw new Error('current_source_project_ambiguous')
-  const sourceProject = structuredClone(currentProjection.projects.find((project) => project?.project?.id === 'outcome'))
+  const sourceProject = refreshSourceBindings(structuredClone(currentProjection.projects.find((project) => project?.project?.id === 'outcome')), canonicalProject)
   const canonicalMilestones = canonicalProject.phases.filter((phase) => phase.id === 'outcome-phase-5').flatMap((phase) => phase.scopes).filter((scope) => scope.id === 'outcome-phase-5-composition').flatMap((scope) => scope.stages).filter((stage) => ['outcome-milestone-model-v2-pilot', 'outcome-milestone-model-v2-local-default-projection'].includes(stage.id))
   const targetScopes = sourceProject.phases.filter((phase) => phase.id === 'outcome-phase-5').flatMap((phase) => phase.scopes).filter((scope) => scope.id === 'outcome-phase-5-composition')
   if (canonicalMilestones.length !== 2 || targetScopes.length !== 1) throw new Error('current_source_primary_ambiguous')
