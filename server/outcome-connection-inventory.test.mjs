@@ -5,6 +5,19 @@ import { createAccountAccessService, createInMemoryAccountStore } from './accoun
 import { handlePrivateAccessRequest } from './account-access-api.mjs'
 
 const now = 20000
+test('trusted hosted composition forwards observation source without accepting browser replacement', async () => {
+  const { createStableHostRequestHandler } = await import('../api/index.mjs')
+  const source = async () => null
+  let received, factoryCalls = 0
+  const environment = { OUTCOME_PRIVATE_SURFACE_ENABLED: '1', OUTCOME_CLERK_PUBLISHABLE_KEY: 'pk_test_synthetic', OUTCOME_CLERK_SECRET_KEY: 'sk_test_synthetic', OUTCOME_OWNER_SUBJECT: 'synthetic-owner', OUTCOME_PRIVATE_ALLOWED_ORIGIN: 'https://preview.invalid', OUTCOME_PRIVATE_ROLLBACK_DEPLOYMENT: 'previous-preview' }
+  const handler = createStableHostRequestHandler({ environment, workObservationSource: source,
+    runtimeFactory: args => { received = args.workObservationSource; factoryCalls++; return { service: makeService(fixture, { workObservationSource: received }), allowedOrigin: 'https://preview.invalid', publishableKey: 'pk_test_synthetic' } } })
+  const result = await handler({ pathname: '/api/private/connections/outcome', headers: { authorization: 'Bearer valid' }, workObservationSource: () => { throw Error('browser input') } })
+  assert.equal(result.status, 200)
+  assert.equal(received, source)
+  assert.equal(factoryCalls, 1)
+  assert.equal(result.body.entries[1].state, 'not_observed')
+})
 function makeService(seed = fixture, options = {}) {
   return createAccountAccessService({ ownerSubject: 'synthetic-owner', now: () => now,
     authProvider: { verify: async token => ({ subject: token === 'valid' ? 'synthetic-owner' : 'other', issuedAt: now, expiresAt: now + 60000 }) },
