@@ -85,13 +85,14 @@ export function createOutcomeServer(options = {}) {
         } catch { return json(response, 503, { error: 'authentication_unavailable' }) }
       }
       let body
-      if (url.pathname.startsWith('/api/private/destination/drafts/')) {
-        if (request.method === 'PUT') {
+      if (/^\/api\/private\/destination\/(drafts|analysis)\//.test(url.pathname)) {
+        if (request.method === 'PUT' || request.method === 'POST') {
+          const maximumBytes = url.pathname.startsWith('/api/private/destination/analysis/') ? 4096 : 262144
           const chunks = []; let size = 0
           try {
             for await (const chunk of request) {
               size += chunk.length
-              if (size > 262144) return json(response, 413, { error: 'request_too_large' })
+              if (size > maximumBytes) return json(response, 413, { error: 'request_too_large' })
               chunks.push(chunk)
             }
             body = Buffer.concat(chunks).toString('utf8')

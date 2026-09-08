@@ -7,6 +7,21 @@ const path='/api/private/destination/drafts/00000000-0000-4000-8000-000000000001
 const identityService={authenticate:async()=>({subject:'owner'}),resolveBridgeAuthority:async()=>({workspace_id:'workspace',account_ref:'account',project_ids:['outcome']})}
 const headers={'content-type':'application/json',origin:'https://preview.invalid','x-outcome-csrf':'synthetic-csrf'}
 const body=JSON.stringify({requestId:'00000000-0000-4000-8000-000000000002',expectedRevision:0,document:'{}'})
+test('analysis API accepts only an owner-scoped reference and never invokes worker capabilities',async()=>{
+ let enqueues=0;const calls=[]
+ const analysis={requestId:path.split('/').at(-1),state:'queued',completionAuthority:false}
+ const runtime={allowedOrigin:headers.origin,csrfSecret:headers['x-outcome-csrf'],analysisRepository:{load:async input=>{calls.push(input);return analysis},enqueue:async input=>{enqueues++;calls.push(input);return analysis},claim:()=>{throw Error('must not execute')},finish:()=>{throw Error('must not execute')}}}
+ const pathname=path.replace('/drafts/','/analysis/')
+ const request={method:'POST',pathname,token:'valid',identityService,runtime,headers,body:JSON.stringify({draftId:path.split('/').at(-1),draftRevision:1,documentDigest:'a'.repeat(64)})}
+ assert.deepEqual(await handle(request),{status:202,body:{analysis,completionAuthority:false}})
+ assert.equal((await handle({...request,method:'GET'})).status,200)
+ assert.equal(calls[0].accountRef,'account');assert.equal(calls[0].workspaceId,'workspace')
+ for(const extra of ['source','accountRef','execute'])assert.equal((await handle({...request,body:JSON.stringify({...JSON.parse(request.body),[extra]:'forged'})})).status,400)
+ assert.equal((await handle({...request,token:''})).status,401)
+ assert.equal((await handle({...request,headers:{...headers,origin:'https://other.invalid'}})).status,403)
+ assert.equal((await handle({...request,body:'x'.repeat(4097)})).status,400)
+ assert.equal(enqueues,1)
+})
 test('local HTTP draft route preserves long JSON, authentication, origin and size boundaries',async()=>{
  let saved=null;let writes=0
  const runtime={allowedOrigin:headers.origin,csrfSecret:headers['x-outcome-csrf'],repository:{load:async()=>saved,save:async input=>{writes++;saved={document:input.document,state:'draft',completionAuthority:false};return saved}}}
