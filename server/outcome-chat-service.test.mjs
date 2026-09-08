@@ -1,7 +1,11 @@
 import test from 'node:test'
 import assert from 'node:assert/strict'
-import { runOutcomeChatService } from './outcome-chat-service.mjs'
+import { runOutcomeChatService as runService } from './outcome-chat-service.mjs'
 import { plannerRequestEnvelope, projectCompletedPlannerResponse } from './outcome-chat-result-source.mjs'
+
+// Scheduling tests must never compete with the owner's live consumer lease.
+// Real socket exclusion and lease-failure behavior are covered in outcome-chat-service-lease.test.mjs.
+const runOutcomeChatService = options => runService({ ...options, acquireLease: async () => async () => {} })
 
 test('default off and invalid intervals never invoke the runner', async () => {
   for (const options of [{}, { enabled: true, intervalMs: 0 }, { enabled: true, intervalMs: 60001 }]) {
