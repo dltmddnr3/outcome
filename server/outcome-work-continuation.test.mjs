@@ -64,6 +64,30 @@ test('durable revocation during final evidence verification prevents dispatch',a
     assert.equal(s.db.prepare('SELECT count(*) AS n FROM outcome_work_dispatches').get().n,0)
   }finally{s.db.close()}
 })
+test('receiver claim checks atomic durable approval and cannot be reused',()=>{
+  for(const mode of ['valid','revoked','expired','wrong-owner','unsent','unknown','missing-grant','wrong-sequence']){
+    const s=setup(),store=createWorkGrantStore(s.db),ownerRef='e'.repeat(64)
+    try{
+      const grantJson=JSON.stringify({schemaVersion:1,...scope,ownerRef,candidateCommit:commit,candidateTree:tree,allowedStages:['qa_verifying'],issuedAt:time-1,expiresAt:time+1})
+      const {authorityRef}=store.record(grantJson,ownerRef,time)
+      const {reservationDigest}=s.journal.reserveContinuation(scopeJson,3,commit,tree,authorityRef,time)
+      if(mode!=='unsent')s.journal.beginContinuationDispatch(scopeJson,3,reservationDigest,time)
+      if(mode==='unknown')s.journal.recordContinuationResult(scopeJson,reservationDigest,'delivery_unknown',null,time)
+      if(mode==='revoked')store.revoke(authorityRef,ownerRef,time)
+      if(mode==='missing-grant')s.db.prepare('DELETE FROM outcome_execution_grants').run()
+      const claim=()=>s.journal.claimContinuationExecution(scopeJson,mode==='wrong-sequence'?2:3,reservationDigest,mode==='wrong-owner'?'f'.repeat(64):ownerRef,mode==='expired'?time+1:time)
+      if(mode==='valid'){
+        assert.equal(claim().outcome,'claimed')
+        assert.equal(createWorkJournal(s.db).claimContinuationExecution(scopeJson,3,reservationDigest,ownerRef,time).outcome,'already_claimed')
+        assert.equal(s.db.prepare('SELECT count(*) AS n FROM outcome_work_execution_claims').get().n,1)
+        store.revoke(authorityRef,ownerRef,time);assert.throws(claim,/work_journal_unavailable/)
+      }else{
+        assert.throws(claim,/work_journal_unavailable/,mode)
+        assert.equal(s.db.prepare('SELECT count(*) AS n FROM outcome_work_execution_claims').get().n,0)
+      }
+    }finally{s.db.close()}
+  }
+})
 test('missing stage evidence cannot dispatch even when eligibility port erroneously permits it',async()=>{
   for(const action of ['qa_verifying','release_verifying']){
     const s=setup({evidenceRef:action==='qa_verifying'?null:receipt});let sends=0

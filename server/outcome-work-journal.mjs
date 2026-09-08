@@ -1,5 +1,6 @@
 import {createHash} from 'node:crypto'
 import {projectSingleSessionWork} from './outcome-work-observer.mjs'
+import {verifyWorkExecutionGrant} from './outcome-work-execution-grant.mjs'
 
 const digest = text => createHash('sha256').update(text).digest('hex')
 const fail = () => {throw new Error('work_journal_unavailable')}
@@ -32,6 +33,10 @@ export function createWorkJournal(db) {
         CHECK(state IN ('dispatch_started','acknowledged','delivery_unknown')),
       receipt_digest TEXT
     ) STRICT;
+    CREATE TABLE IF NOT EXISTS outcome_work_execution_claims (
+      reservation_digest TEXT PRIMARY KEY, owner_ref TEXT NOT NULL,
+      claimed_at INTEGER NOT NULL
+    ) STRICT;
   `))
   const normalize=(scopeJson,nowMs)=>{
     if(typeof scopeJson!=='string' || Buffer.byteLength(scopeJson)>2048) fail()
@@ -59,6 +64,27 @@ export function createWorkJournal(db) {
     return action
   }
   return Object.freeze({
+    // Caller authenticates current owner and verifies current binding/dependencies/
+    // receipt coverage first. Claim is not start evidence or a mutation capability.
+    // Grant store MUST share this database; no cross-database fallback is allowed.
+    claimContinuationExecution(scopeJson,expectedSequence,reservationDigest,ownerRef,nowMs){return transact(()=>{
+      if(!sha(ownerRef,64)||!Number.isSafeInteger(nowMs)||nowMs<0)fail()
+      const bound=normalize(scopeJson,nowMs),current=load(bound,nowMs),last=current.journal.events.at(-1),action=reservation(bound,reservationDigest)
+      const projection=projectSingleSessionWork(JSON.stringify(current.journal),bound.scopeJson,nowMs)
+      if(current.sequence!==expectedSequence||last?.activity!=='terminal'||!sha(last.evidenceRef,64)
+        ||projection.continuation!=='next_action_recorded'
+        ||JSON.stringify([bound.scopeJson,last.stage,last.attempt,last.nextAction,last.candidateCommit,last.candidateTree,action[6]])!==JSON.stringify(action))fail()
+      const delivery=db.prepare('SELECT state FROM outcome_work_dispatches WHERE reservation_digest=?').get(reservationDigest)
+      if(!delivery||!['dispatch_started','acknowledged'].includes(delivery.state))fail()
+      const grant=db.prepare('SELECT grant_json,owner_ref,revoked_at FROM outcome_execution_grants WHERE digest=?').get(action[6])
+      if(!grant||grant.owner_ref!==ownerRef||grant.revoked_at!==null)fail()
+      const expected=JSON.stringify({...bound.scope,ownerRef,candidateCommit:action[4],candidateTree:action[5],authorityRef:action[6],action:action[3],status:'active'})
+      if(!verifyWorkExecutionGrant(grant.grant_json,expected,nowMs).matches)fail()
+      const old=db.prepare('SELECT owner_ref FROM outcome_work_execution_claims WHERE reservation_digest=?').get(reservationDigest)
+      if(old&&old.owner_ref!==ownerRef)fail()
+      if(!old)db.prepare('INSERT INTO outcome_work_execution_claims VALUES(?,?,?)').run(reservationDigest,ownerRef,nowMs)
+      return Object.freeze({outcome:old?'already_claimed':'claimed',completionAuthority:false,executionAuthority:false})
+    })},
     readTerminal(scopeJson,nowMs){return guarded(()=>{
       const bound=normalize(scopeJson,nowMs),current=load(bound,nowMs),last=current.journal.events.at(-1)
       if(!last||last.activity!=='terminal')fail()

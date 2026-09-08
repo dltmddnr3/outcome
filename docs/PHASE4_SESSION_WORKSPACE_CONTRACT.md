@@ -50,6 +50,11 @@ These are program responsibilities, not new agents, schedules or products. The c
 
 #### Candidate-bound stage receipt check · 2026-09-09
 
+- [x] Receiver claim atomically checks the same local grant store and exact journal reservation; expired/revoked/missing grant, wrong owner and unsent/unknown delivery cannot claim. Repeated claim never grants a second execution.
+  CHECK: node --test --test-name-pattern='receiver claim' server/outcome-work-continuation.test.mjs
+  EXPECT: fail 0
+  EVIDENCE: 2026-09-09 same-session controller/journal/local-runtime 19 PASS; diff check PASS. Eight receiver cases use real SQLite grants and reservations. BEGIN IMMEDIATE serializes grant revocation and claim in the same database; missing co-located grant table fails closed. Duplicate claim after constructing a new journal returns already_claimed. Caller still must authenticate current identity and verify binding/dependencies/receipt coverage; claim is not actual execution/start evidence and does not roll back work already started before later revocation. No runtime database migrated or receiver activated.
+
 - [x] Integrated runtime reaches the existing queue adapter with exact session binding; reconstructed runtime does not enqueue twice.
   CHECK: node --test server/outcome-work-local-runtime.test.mjs
   EXPECT: fail 0
