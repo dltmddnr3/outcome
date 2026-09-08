@@ -7,6 +7,7 @@ import {createDiscoveryQuestionRepository} from './outcome-destination-question-
 import {createDiscoveryQuestionRequests} from './outcome-destination-question-requests.mjs'
 import {createDestinationConfirmationRepository} from './outcome-destination-confirmation-repository.mjs'
 import {verifyStoredDestinationReview} from './outcome-destination-evidence-reader.mjs'
+import {createDestinationCreationStore} from './outcome-destination-creation-store.mjs'
 
 const unavailable=()=>new Error('destination_unavailable')
 const knownError=error=>{
@@ -45,5 +46,6 @@ export function createDestinationRuntime({pool,allowedOrigin,csrfSecret,verifyDe
  if(typeof csrfSecret!=='string'||csrfSecret.length<16)throw unavailable()
  try {const origin=new URL(allowedOrigin);if(origin.protocol!=='https:'||origin.origin!==allowedOrigin)throw unavailable()}catch{throw unavailable()}
  const transact=createDestinationTransactionPort({pool})
- return Object.freeze({allowedOrigin,csrfSecret,repository:createDestinationDraftRepository({transact}),analysisRepository:createDestinationAnalysisRepository({transact,validateResult:validateDestinationAnalysisResult}),discoveryRepository:createDiscoveryRepository({transact}),questionRepository:createDiscoveryQuestionRepository({transact}),questionRequests:createDiscoveryQuestionRequests({transact}),confirmationRepository:createDestinationConfirmationRepository({transact,verifyReview:verifyDestinationReview===undefined?verifyStoredDestinationReview:verifyDestinationReview})})
+ const creationStore=createDestinationCreationStore({transact})
+ return Object.freeze({allowedOrigin,csrfSecret,repository:createDestinationDraftRepository({transact}),analysisRepository:createDestinationAnalysisRepository({transact,validateResult:validateDestinationAnalysisResult}),discoveryRepository:createDiscoveryRepository({transact}),questionRepository:createDiscoveryQuestionRepository({transact}),questionRequests:createDiscoveryQuestionRequests({transact}),confirmationRepository:createDestinationConfirmationRepository({transact,verifyReview:verifyDestinationReview===undefined?verifyStoredDestinationReview:verifyDestinationReview}),creationRepository:Object.freeze({load:creationStore.load})})
 }

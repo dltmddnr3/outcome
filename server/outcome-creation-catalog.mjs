@@ -78,6 +78,15 @@ export function createConfirmedPackagePublisher({catalog,confirmationRepository,
   return {input,root,key,projectId,target,same}
  }
  return Object.freeze({
+ async publicationEvidence(scope){
+  try{
+   const {input,root,key,projectId,target}=await prepare(scope)
+   if(!registrationExists(target))return null
+   const record=readEntry(root,key).record
+   if(record.reviewDigest!==input.reviewDigest||record.evidenceDigest!==input.evidenceDigest)fail()
+   return {...result(projectId),publicationDigest:hash(JSON.stringify({projectId:record.projectId,reviewDigest:record.reviewDigest,evidenceDigest:record.evidenceDigest,files:record.files}))}
+  }catch{fail()}
+ },
  async load(scope){
   try{
    const {target,same}=await prepare(scope)
