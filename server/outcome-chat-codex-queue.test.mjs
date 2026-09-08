@@ -1,4 +1,5 @@
 import assert from 'node:assert/strict'
+import {createHash} from 'node:crypto'
 import { EventEmitter } from 'node:events'
 import { chmodSync, mkdtempSync, readFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
@@ -9,6 +10,17 @@ import { plannerRequestEnvelope } from './outcome-chat-result-source.mjs'
 import { createEmptyRegistry, mutateRegistry } from './outcome-session-registry-persistence.mjs'
 
 const now = '2026-09-03T01:00:00.000Z'
+
+test('work scope requires live owner mode, exact session digest and binding version',async()=>{
+  const adapter=createCodexQueueAdapter({enabled:true,registryPath:registry(),now:()=>now,expectedCwd:'/synthetic/project',ownerProbe:async()=>true,readThread:async id=>JSON.stringify({thread:{id,cwd:'/synthetic/project'}})})
+  const b=await adapter.bindingResolver({project_id:'outcome',role:'planner'})
+  const scope={projectId:'outcome',bindingVersion:1,sessionRef:createHash('sha256').update('outcome-work-session-v1\0synthetic-private-destination').digest('hex')}
+  assert.equal(adapter.matchesWorkScope(b.destination,JSON.stringify(scope)),true)
+  for(const patch of [{projectId:'other'},{bindingVersion:2},{sessionRef:'a'.repeat(64)}])assert.equal(adapter.matchesWorkScope(b.destination,JSON.stringify({...scope,...patch})),false)
+  assert.equal(adapter.matchesWorkScope({},JSON.stringify(scope)),false)
+  const abort=new AbortController();abort.abort()
+  assert.deepEqual(await adapter.transport({destination:b.destination,message:'not sent',correlation_id:'message-0123456789abcdef'},{signal:abort.signal}),{delivery:'delivery_unknown'})
+})
 
 test('live ownership and metadata refresh binding proof without rewriting registry', async () => {
   const path = registry(), before = readFileSync(path), cwd = '/synthetic/project'; let probes = 0

@@ -1,4 +1,5 @@
 import { spawn } from 'node:child_process'
+import { createHash } from 'node:crypto'
 import { types } from 'node:util'
 import { isAbsolute } from 'node:path'
 import { loadRegistry } from './outcome-session-registry-persistence.mjs'
@@ -39,6 +40,14 @@ export function createCodexQueueAdapter({ enabled = false, registryPath, spawnPr
     return rows.length === 1 && rows[0].status === 'active' && rows[0].binding_version === binding.binding_version && rows[0].locator_ref === binding.locator_ref
   }
   return Object.freeze({
+    matchesWorkScope(destination,scopeJson) {
+      try {
+        if(!ownerProbe||typeof scopeJson!=='string'||Buffer.byteLength(scopeJson)>2048)return false
+        const scope=JSON.parse(scopeJson),binding=bindings.get(destination),locator=destinations.get(destination)
+        return Boolean(binding&&locator&&scope.projectId===binding.projectId&&scope.bindingVersion===binding.version
+          &&scope.sessionRef===createHash('sha256').update('outcome-work-session-v1\0').update(locator).digest('hex'))
+      }catch{return false}
+    },
     async bindingResolver(input) {
       const request = exact(input, ['project_id', 'role'])
       if (request.role !== 'planner' || typeof request.project_id !== 'string') fail()
@@ -68,7 +77,8 @@ export function createCodexQueueAdapter({ enabled = false, registryPath, spawnPr
         return projectCompletedPlannerResponse({json,threadId:locator,message:request.message,correlationId:request.correlation_id})
       } catch { return { outcome:'unavailable' } }
     },
-    async transport(input) {
+    async transport(input,{signal}={}) {
+      if(signal?.aborted)return unknown
       let request
       try { request = exact(input, ['destination', 'message', 'correlation_id']) } catch { return unknown }
       const locator = destinations.get(request.destination)
@@ -81,10 +91,12 @@ export function createCodexQueueAdapter({ enabled = false, registryPath, spawnPr
         if (rows.length !== 1 || !CURRENT.has(row.status) || row.binding_version !== expected.version || row.locator_ref !== locator || !Number.isFinite(clock) || !Number.isFinite(observed) || observed > clock || (!ownerProbe && clock - observed > maxFreshMs)) return unknown
         if (ownerProbe && !await liveBinding(row)) return unknown
       } catch { return unknown }
+      if(signal?.aborted)return unknown
       return new Promise((resolve) => {
         let child, settled = false, timer, output = Buffer.alloc(0), killed = false
         const kill = () => { if (killed || !child) return; killed = true; try { child.kill('SIGTERM') } catch {} }
-        const finish = (result = unknown) => { if (settled) return; settled = true; if (timer !== undefined) clearTimer(timer); resolve(result) }
+        const onAbort=()=>{kill();finish()}
+        const finish = (result = unknown) => { if (settled) return; settled = true; signal?.removeEventListener('abort',onAbort); if (timer !== undefined) clearTimer(timer); resolve(result) }
         const collect = (chunk) => {
           if (settled) return
           if (!(typeof chunk === 'string' || Buffer.isBuffer(chunk) || chunk instanceof Uint8Array)) { kill(); finish(); return }
@@ -92,6 +104,8 @@ export function createCodexQueueAdapter({ enabled = false, registryPath, spawnPr
           output = Buffer.concat([output, bytes])
         }
         try {
+          signal?.addEventListener('abort',onAbort,{once:true})
+          if(signal?.aborted){finish();return}
           child = spawnProcess(codexExecutable, ['queue', '--thread', locator, '--message', plannerRequestEnvelope(request.message, request.correlation_id)], { shell: false, stdio: ['ignore', 'pipe', 'pipe'] })
           if (!child || typeof child.once !== 'function' || !child.stdout || !child.stderr || typeof child.stdout.on !== 'function' || typeof child.stderr.on !== 'function' || typeof child.kill !== 'function') { finish(); return }
           child.stdout.on('data', collect); child.stderr.on('data', collect)
