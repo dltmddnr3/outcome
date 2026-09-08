@@ -72,6 +72,12 @@ describe('conversation request credentials', () => {
 })
 
 describe('Planner conversation observed-event contract', () => {
+  it('does not equate send readiness with a running Planner', () => {
+    const html = renderToStaticMarkup(<PlannerConversation events={[]} plannerBound onSend={() => {}} />)
+    expect(html).toContain('메시지 전송 가능')
+    expect(html).not.toContain('Planner 연결됨')
+    expect(html).toContain('전송 가능 표시는 실행기의 작동 상태를 보장하지 않습니다.')
+  })
   it('renders supplied Planner answer text without relabeling it as Cherry or queued', () => {
     const html = renderToStaticMarkup(<PlannerConversation events={[]} fixtureTimeline={[{ event_id: 'event-0000000000000002', sequence: 2, observed_at: '2026-09-08T00:00:00.000Z', kind: 'assistant_message', state: 'completed', correlation_id: 'message-0000000000000001', payload: { private_content: { text: '확인된 답변 본문' } } }]} />)
     expect(html).toContain('확인된 답변 본문')

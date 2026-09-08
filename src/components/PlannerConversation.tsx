@@ -130,7 +130,8 @@ export function PlannerConversation({ events, plannerBound = false, onSend, fixt
   const onKeyDown = (event: KeyboardEvent<HTMLTextAreaElement>) => { if (isComposerSubmitShortcut(event.nativeEvent)) { event.preventDefault(); void submit() } }
   const overLimit = [...draft].length > 4_000, sensitive = sensitiveContentHint(draft), disabled = !writable || pending.current || !draft.trim() || overLimit || sensitive
   return <section className="planner-conversation" aria-labelledby="planner-conversation-title" data-observed-events={events.length} data-chat-availability={availability} data-role-chat-state={fixtureState} data-fixture-boundary={fixture || fixtureTimeline ? 'non-production' : undefined}>
-    <header><div><span>프로젝트 대화 · 단일 관측 스트림</span><h2 id="planner-conversation-title">Planner conversation</h2></div><strong>{writable ? 'Planner 연결됨' : '읽기 전용'}</strong></header>
+    <header><div><span>프로젝트 대화 · 단일 관측 스트림</span><h2 id="planner-conversation-title">Planner conversation</h2></div><strong>{writable ? '메시지 전송 가능' : '읽기 전용'}</strong></header>
+    {writable && <p className="planner-conversation__boundary">전송 가능 표시는 실행기의 작동 상태를 보장하지 않습니다. 접수·답변 여부는 각 메시지의 확인 결과를 확인해 주세요.</p>}
     <nav className="planner-conversation__filters" aria-label="역할 대화 필터">{roleChatFilters.map((label) => <button key={label} type="button" aria-pressed={filter === label} onClick={() => setFilter(label)}>{label}</button>)}</nav>
     {fixture && <div className="planner-conversation__state" role="status"><strong>{fixture.label}</strong><span>{fixture.detail}</span></div>}
     <p className="planner-conversation__boundary" data-non-progress-boundary="true">세션 활동은 진행률이 아닙니다.</p>
