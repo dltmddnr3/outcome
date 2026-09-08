@@ -12,9 +12,38 @@ import {once} from 'node:events'
 import {createOutcomeServer} from './index.mjs'
 import {createDestinationSourceVerifier} from './outcome-destination-source-verifier.mjs'
 import {createDestinationHostedRuntimeFactory} from './outcome-destination-hosted-runtime.mjs'
+import {mkdtempSync,readdirSync} from 'node:fs'
+import {tmpdir} from 'node:os'
+import {join} from 'node:path'
+import {createConfirmedPackagePublisher,readCreatedProjectEntries} from './outcome-creation-catalog.mjs'
+import {buildPackageModel} from './outcome-package.mjs'
 
 const scope={workspaceId:'workspace',accountRef:'owner',draftId:'00000000-0000-4000-8000-000000000001'}
 const requestId='00000000-0000-4000-8000-000000000010'
+test('real restricted confirmation SQL gates local Package publication and immutable replay',async()=>{
+ const f=await fixture(),catalog=mkdtempSync(join(tmpdir(),'outcome-confirmed-package-'));try{
+  const repository=createDestinationConfirmationRepository(f);let renders=0
+  const publisher=createConfirmedPackagePublisher({catalog,confirmationRepository:repository,renderPackage:({projectId,serializedSnapshot})=>{
+   renders++;assert.deepEqual(JSON.parse(serializedSnapshot).document,f.document)
+   return {
+    'OUTCOME_CONTRACT.md':`- Project ID: ${projectId}\n- Project name: Synthetic confirmed destination\n- Outcome: Verified test outcome\n- Acceptance authority: Cherry\n`,
+    'OUTCOME_MAP.md':`\`\`\`yaml\nproject_id: ${projectId}\nphases:\n- id: phase-one\n  title: Outcome\n  purpose: Prove result\n  scopes:\n  - id: scope-one\n    title: Confirmed scope\n    purpose: Prove result\n    stages:\n    - id: stage-one\n      title: Verify result\n      purpose: Owner review\n      depends_on: []\n      gates_file: GATES.md\n\`\`\`\n`,
+    'GATES.md':'- [ ] G1: Verify result\n  - EVIDENCE: pending\n',
+    'OUTCOME_SESSIONS.md':`\`\`\`yaml\nschema_version: 3\nproject_id: ${projectId}\nexecution_mode: result_owned\nowner_role: planner\nstages: [implementation, qa_verification, release_verification, preview]\n\`\`\`\n`,
+   }
+  }})
+  await assert.rejects(()=>publisher.publish({...scope,requestId}));assert.deepEqual(readdirSync(catalog),[]);assert.equal(renders,0)
+  const review=await repository.review(scope);await repository.confirm({...scope,requestId,reviewDigest:review.reviewDigest,confirmed:true})
+  await assert.rejects(()=>publisher.publish({...scope,accountRef:'foreign',requestId}));assert.deepEqual(readdirSync(catalog),[])
+  const created=await publisher.publish({...scope,requestId});assert.equal(created.state,'package_registered')
+  assert.deepEqual(await publisher.publish({...scope,requestId}),created);assert.equal(renders,1);assert.equal(await f.count(),1)
+  const [entry]=readCreatedProjectEntries(catalog)
+  const model=buildPackageModel({root:entry.root,contractFile:entry.contract_file,mapFile:entry.map_file,sessionsFile:entry.sessions_file,gitEvidence:{state:'unknown'}})
+  assert.equal(model.status,'valid');assert.equal(model.now.status,'unbound')
+  await f.db.query('delete from outcome_destination_private.confirmations')
+  await assert.rejects(()=>publisher.publish({...scope,requestId}));assert.equal(readCreatedProjectEntries(catalog).length,1)
+ }finally{await f.db.close()}
+})
 test('creation reader requires exact confirmed request and preserves confirmed snapshot after draft edits',async()=>{
  const f=await fixture();try{
   const repo=createDestinationConfirmationRepository(f)

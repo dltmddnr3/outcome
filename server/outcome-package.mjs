@@ -8,6 +8,7 @@ import { sanitizeEvidenceText, sanitizeRemotePayload } from './cherry-note-dashb
 import { isPublicSessionAlias, loadRegistry, publicRegistryProjection } from './outcome-session-registry-persistence.mjs'
 import { applyOutcomeModelV2Pilot } from './outcome-model-v2.mjs'
 import { projectOutcomeResultView } from './outcome-result-view-projection.mjs'
+import { readCreatedProjectEntries } from './outcome-creation-catalog.mjs'
 
 const ROLES = ['planner', 'builder', 'ux_product_qa', 'release_audit']
 const STABLE_ID = /^[a-z0-9]+(?:-[a-z0-9]+)*$/
@@ -323,6 +324,10 @@ export function loadProjectRegistry({ environment = process.env, repositoryRoot 
   try { value = JSON.parse(readFileSync(sourcePath, 'utf8')) } catch (error) { registryError(error instanceof SyntaxError ? 'project_registry_json_invalid' : 'project_registry_unavailable') }
   if (!value || typeof value !== 'object' || Array.isArray(value) || value.schema_version !== 1) registryError('project_registry_schema_invalid')
   if (!Array.isArray(value.projects) || value.projects.length === 0) registryError('project_registry_projects_invalid')
+  if (value.creation_catalog != null) {
+    if (typeof value.creation_catalog !== 'string' || !value.creation_catalog.trim()) registryError('project_registry_entry_invalid')
+    value.projects = [...value.projects, ...readCreatedProjectEntries(resolve(repositoryRoot, value.creation_catalog))]
+  }
   const fingerprints = new Set(); const projectIds = new Set()
   return value.projects.map((entry) => {
     if (!entry || typeof entry !== 'object' || Array.isArray(entry) || !['root', 'contract_file', 'map_file'].every((key) => typeof entry[key] === 'string' && entry[key].trim())) registryError('project_registry_entry_invalid')
