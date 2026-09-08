@@ -66,10 +66,13 @@ export function projectOutcomeCurrentSource(project, tracking, options, allowedS
   const gates = checkedGateRows(source.gate_text)
   if (gates.length !== PRIMARY_GATE_IDS.length || new Set(gates.map((gate) => gate.id)).size !== PRIMARY_GATE_IDS.length || gates.some((gate, index) => gate.id !== PRIMARY_GATE_IDS[index] || gate.closed !== true || PRIVATE_SOURCE_TEXT.test(gate.title))) failCurrentSource()
   if (!/Status:\s*\*\*MODEL V2 13\/13 CHERRY ACCEPTED\b/.test(source.gate_text)) failCurrentSource()
-  const staleNarrative = source.map_text.match(/Primary implementation target:\s*`[^`]*Slice A A1-A4 OPEN`/)?.[0] ?? null
+  const narratives = [...source.map_text.matchAll(/^- Primary implementation target:[ \t]*`([^`\n]+)`/gm)]
+  const narrative = one(narratives)[1]
+  const staleNarrative = narrative === `${PRIMARY_MILESTONE_ID} · Slice A A1-A4 OPEN`
+  if (!staleNarrative && narrative !== `${PRIMARY_MILESTONE_ID} · 13/13 evidence closure`) failCurrentSource()
   const compatibility = source.map_text.match(/Current:\s*`(outcome-phase-3 \/ outcome-phase-3-evidence-continuity \/ outcome-stage-phase3-cherry-acceptance) · OPEN`/)?.[1] ?? null
   const compatibilityCount = source.map_text.match(/Phase 3은[^\n]*실행 Gate `38\/43`/) ? { closed: 38, total: 43 } : null
-  if (!staleNarrative || !compatibility || !compatibilityCount) failCurrentSource()
+  if (!compatibility || !compatibilityCount) failCurrentSource()
 
   const projected = structuredClone(project)
   const projectedPhase = one(projected.phases.filter((row) => row.id === PRIMARY_DESTINATION_ID))
@@ -84,9 +87,18 @@ export function projectOutcomeCurrentSource(project, tracking, options, allowedS
   projectedMilestone.sourceState = 'present'
   projected.current = { phaseId: PRIMARY_DESTINATION_ID, scopeId: PRIMARY_WORKSTREAM_ID, stageId: PRIMARY_MILESTONE_ID }
   projected.next = null
-  projected.status = 'conflict'
-  projected.conflict = true
-  projected.errors = [...new Set([...(projected.errors ?? []), 'source_projection_conflict:map_primary_narrative_stale'])]
+  const narrativeError = 'source_projection_conflict:map_primary_narrative_stale'
+  const priorErrors = projected.errors ?? []
+  projected.errors = [...new Set(priorErrors.filter((error) => error !== narrativeError))]
+  if (staleNarrative) {
+    projected.status = 'conflict'
+    projected.conflict = true
+    projected.errors.push(narrativeError)
+  } else if (projected.status === 'conflict' && priorErrors.includes(narrativeError) && projected.errors.length === 0) {
+    // Only remove a conflict whose sole recorded cause is this resolved narrative.
+    projected.status = 'valid'
+    projected.conflict = false
+  }
 
   const historicalPhase = one(projected.phases.filter((row) => row.id === 'outcome-phase-2'))
   const historicalStage = one(historicalPhase.scopes.flatMap((row) => row.stages).filter((row) => row.id === 'outcome-stage-account-access-hosted-identity-preview'))
@@ -104,7 +116,7 @@ export function projectOutcomeCurrentSource(project, tracking, options, allowedS
     },
     compatibility: { phase_id: 'outcome-phase-3', scope_id: 'outcome-phase-3-evidence-continuity', stage_id: 'outcome-stage-phase3-cherry-acceptance', closed: 38, total: 43, label: 'compatibility' },
     historical: [{ phase_id: 'outcome-phase-2', stage_id: historicalStage.id, closed: 5, total: 6, label: 'historical' }],
-    conflicts: [{ code: 'map_primary_narrative_stale', map_value: 'Slice A A1-A4 OPEN', gate_value: '13/13 evidence closure' }],
+    conflicts: staleNarrative ? [{ code: 'map_primary_narrative_stale', map_value: 'Slice A A1-A4 OPEN', gate_value: '13/13 evidence closure' }] : [],
     completion_authority: false,
   }
   projected.resultView = projectOutcomeResultView(projected, tracking, options, allowedSourceRefs, sourceProjection)

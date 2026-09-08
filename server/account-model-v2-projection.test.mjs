@@ -115,7 +115,9 @@ test('accepts only the exact current-source context and keeps its authority fals
   }
   source.resultView = { schema_version: 1, observed_at: observedAt, calendar: {}, hierarchy: { id: 'outcome', kind: 'project', children: [] }, links: {}, source_projection: context, completion_authority: false }
   assert.equal(createAccountModelV2Projection(source, { observedAt }).modelVersion, 2)
+  assert.equal(createAccountModelV2Projection({ ...source, resultView: { ...source.resultView, source_projection: { ...context, conflicts: [] } } }, { observedAt }).modelVersion, 2)
   for (const invalid of [
+    { ...context, conflicts: [context.conflicts[0], context.conflicts[0]] },
     { ...context, completion_authority: true },
     { ...context, primary: { ...context.primary, acceptance: { ...context.primary.acceptance, total: 12 } } },
     { ...context, compatibility: { ...context.compatibility, closed: 13 } },

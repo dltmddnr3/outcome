@@ -22,6 +22,10 @@ server.listen(0,'127.0.0.1');await once(server,'listening')
 let browser
 try{
  browser=await chromium.launch({headless:true,executablePath:'/Applications/Google Chrome.app/Contents/MacOS/Google Chrome'})
+ const context=snapshot.projects.find(project=>project.project.id==='outcome').resultView.source_projection
+ const originalConflicts=structuredClone(context.conflicts)
+ for(const coherent of [false,true]){
+ context.conflicts=coherent?[]:structuredClone(originalConflicts)
  for(const viewport of [{width:1440,height:900},{width:430,height:932},{width:390,height:844},{width:375,height:812},{width:320,height:568}]){
   const page=await browser.newPage({viewport});const errors=[];page.on('pageerror',e=>errors.push(e.message))
   await page.goto(`http://127.0.0.1:${server.address().port}/cherry-note-dashboard`,{waitUntil:'networkidle'})
@@ -36,12 +40,18 @@ try{
   const session=await page.context().newCDPSession(page)
   const ax=await session.send('Accessibility.getFullAXTree')
   assert.equal(ax.nodes.some(node=>node.name?.value===expected),!baseline)
-  for(const literal of ['38/43','5/6','Map · Slice A A1-A4 OPEN','Gate · 13/13 evidence closure','completionAuthority=false'])assert.ok(ax.nodes.some(node=>node.name?.value===literal),literal)
+  for(const literal of ['38/43','5/6','completionAuthority=false'])assert.ok(ax.nodes.some(node=>node.name?.value===literal),literal)
+  for(const literal of ['Map · Slice A A1-A4 OPEN','Gate · 13/13 evidence closure']){
+   assert.equal(text.includes(literal),!coherent,literal)
+   assert.equal(ax.nodes.some(node=>node.name?.value===literal),!coherent,literal)
+  }
+  assert.equal(await block.getAttribute('data-source-conflict'),coherent?null:'Slice A A1-A4 OPEN|13/13 evidence closure')
   assert.equal(errors.length,0)
   const overflow=await page.evaluate(()=>document.documentElement.scrollWidth-innerWidth)
   if(!baseline)assert.equal(overflow,0,'document must not overflow horizontally')
   if(overflow>0)console.log(JSON.stringify({overflowElements:await page.evaluate(()=>Array.from(document.querySelectorAll('body *')).map(e=>({tag:e.tagName,cls:e.className,rect:e.getBoundingClientRect()})).filter(x=>x.rect.right>innerWidth&&x.rect.width>0).slice(0,12).map(x=>({tag:x.tag,cls:x.cls,right:x.rect.right,width:x.rect.width})))}))
-  console.log(JSON.stringify({baseline,viewport,visible:true,rawAXExact:true,originalLiterals:5,pageErrors:errors.length,overflow}))
+  console.log(JSON.stringify({baseline,coherent,viewport,visible:true,rawAXExact:true,originalLiterals:coherent?3:5,pageErrors:errors.length,overflow}))
   await page.close()
+ }
  }
 }finally{await browser?.close();server.close();await once(server,'close')}

@@ -57,6 +57,15 @@ describe('OUTCOME Package dashboard', () => {
     expect(markup).toContain('data-source-historical="outcome-phase-2:5/6"')
     expect(markup).toContain('data-source-conflict="Slice A A1-A4 OPEN|13/13 evidence closure"')
   })
+  it('renders coherent source context without fabricating conflict or completion', () => {
+    const source = JSON.parse(readFileSync(new URL('../../snapshot/outcome-package-source.json', import.meta.url), 'utf8'))
+    const view = source.projects.find((item: PackageProject) => item.project.id === 'outcome').resultView as ResultView
+    view.source_projection!.conflicts = []
+    const markup = renderToStaticMarkup(createElement(OutcomeResultView, { view }))
+    expect(markup).not.toContain('원본 충돌')
+    expect(markup).not.toContain('data-source-conflict=')
+    for (const text of ['13/13', '38/43', '5/6', 'completionAuthority=false', '프로젝트 완료나 Cherry 수용을 승인하지 않습니다.']) expect(markup).toContain(text)
+  })
   it('distinguishes Map narrative counts from candidate Gate counts without rewriting either', () => {
     const source = JSON.parse(readFileSync(new URL('../../snapshot/outcome-package-source.json', import.meta.url), 'utf8'))
     const view = source.projects.find((item: PackageProject) => item.project.id === 'outcome').resultView as ResultView

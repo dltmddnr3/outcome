@@ -56,6 +56,36 @@ test('selects the sole Phase 5 current source and exact 13-unit evidence denomin
   assert.equal(corrected.resultView.completion_authority, false)
 })
 
+test('coherent primary narrative recovers without changing evidence counts or claiming phase completion', () => {
+  const source = { ...currentSource(), map_text: currentMapText.replace('Slice A A1-A4 OPEN', '13/13 evidence closure') }
+  const corrected = projectCurrent(source)
+  assert.equal(corrected.status, 'valid')
+  assert.deepEqual(corrected.resultView.source_projection.conflicts, [])
+  assert.equal(corrected.resultView.source_projection.primary.acceptance.closed, 13)
+  assert.equal(corrected.resultView.completion_authority, false)
+  assert.equal(corrected.resultView.source_projection.evidence_observed_at, source.gate_observed_at)
+  const previouslyConflicting = projectCurrent()
+  const recovered = projectOutcomeCurrentSource(previouslyConflicting, currentTracking, cutoff, sourceRefs, source)
+  assert.equal(recovered.status, 'valid')
+  assert.equal(recovered.conflict, false)
+  assert.deepEqual(recovered.errors, [])
+  const unrelated = { ...previouslyConflicting, errors: [...previouslyConflicting.errors, 'unrelated_source_conflict'] }
+  const retained = projectOutcomeCurrentSource(unrelated, currentTracking, cutoff, sourceRefs, source)
+  assert.equal(retained.status, 'conflict')
+  assert.equal(retained.conflict, true)
+  assert.deepEqual(retained.errors, ['unrelated_source_conflict'])
+})
+
+test('primary narrative is unique, exact-target and recognized, never inferred from missing conflict text', () => {
+  for (const map_text of [
+    currentMapText.replace('Slice A A1-A4 OPEN', 'unknown'),
+    currentMapText.replace('outcome-milestone-model-v2-local-default-projection', 'other-target'),
+    currentMapText.split('\n').slice(1).join('\n'),
+    `${currentMapText}\n${currentMapText.split('\n')[0]}`,
+    `${currentMapText}\n${currentMapText.split('\n')[0].replace('Slice A A1-A4 OPEN', '13/13 evidence closure')}`,
+  ]) assert.throws(() => projectCurrent({ ...currentSource(), map_text }), /current_source_projection_invalid/)
+})
+
 test('capture time never changes source identity denominator closure or evidence observation time', () => {
   const first = projectCurrent(currentSource('2026-09-07T05:00:00.000Z'))
   const second = projectCurrent(currentSource('2026-09-07T06:00:00.000Z'))
