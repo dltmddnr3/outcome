@@ -27,6 +27,12 @@ GitHub가 없거나 remote가 일치하지 않아도 Package 자체는 유효하
 
 ## 세션 구성
 
+### 현재 MVP override · 2026-09-08
+
+현재 Phase 1–5 MVP는 Cherry가 승인한 단일 세션 운영이다. 하나의 실행 세션이 작업별 구현 → 같은 세션 QA 검증 → 같은 세션 Release 검증을 수행한다. 아래 역할별 전담 세션 표는 compatibility history이며 현재 필수 세션 수가 아니다. 세부 계약은 `PHASE4_SESSION_WORKSPACE_CONTRACT.md`의 Single-session Observer amendment를 따른다.
+
+Observer는 별도 대화 세션이나 4/4 점유율 관리자가 아니라 작업·단계·근거·다음 행동을 관측하는 코드다. 실제 후속 실행은 별도 책임인 authority-bound execution controller가 동일 작업의 검증된 next action만 1회 claim하여 수행한다. 관측 자체에는 dispatch·수용 권한이 없다. 같은 세션 검증을 독립 QA/Audit로 표시하지 않으며 기존 독립 검증 요구가 있는 Predicate를 자동 완화하지 않는다. 새 세션/스케줄/registry 변경은 이 문서 갱신으로 실행하지 않는다.
+
 | 순서 | 세션 | 책임 | 변경 권한 |
 |---|---|---|---|
 | 1 | OUTCOME · Planner | Outcome Contract, IA, Scope/Stage/Gate 구조, acceptance와 우선순위 확정 | 기획 문서만 |

@@ -8,6 +8,8 @@ This draft makes the compressed Phase 4-5 destination boundaries executable. It 
 
 ## Phase 4 Destination — OUTCOME 안에서 Planner 원채널로 개발 흐름을 완결한다
 
+2026-09-08 current-MVP override: `PHASE4_SESSION_WORKSPACE_CONTRACT.md` Single-session Observer amendment governs session topology. Work items, not role slots, are the unit; one existing session owns implementation → QA verification → Release verification. Existing AP-4-02/04/06/07/10 now include event-backed stage observation and separate authority-bound continuation control, with duplicate/crash/stale/candidate-change tests. No new role, scheduled Observer or 4/4 occupancy requirement. Legacy independent-evidence requirements remain explicit and cannot be satisfied by relabeling same-session checks.
+
 Observable result: Cherry uses one Planner conversation channel while observing routed Builder, UX & Product QA and Release Audit work, reviews approval/evidence, and completes an existing or newly composed project's development flow in one private Preview.
 
 ### M4-1 · Planner single-channel workspace

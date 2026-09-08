@@ -1,7 +1,56 @@
 # OUTCOME Phase 4 · Session Workspace Contract
 
-Updated: 2026-09-04 KST
-Status: **Cherry-approved product direction · definition only · implementation not started**
+Updated: 2026-09-08 KST
+Status: **Cherry-approved product direction · partial implementation · full actual-use acceptance open**
+
+## 2026-09-08 · Single-session Observer amendment
+
+Cherry requested review and reapplication of Observer for the current one-session implementation → QA verification → Release verification workflow. This section takes precedence over the legacy role-per-session wording below for the current Phase 1–5 MVP. It does not close a Gate or declare the Observer deployed.
+
+### Work ownership and observation unit
+
+- Primary unit: one outcome-linked work item and its current run, not a role slot or a desired session count. Each work item binds one Milestone/Acceptance Predicate and exactly one active execution session.
+- `implementing`, `qa_verifying`, and `release_verifying` are stages within that same session. A stage switch creates neither a new session nor a new role binding. The Planner composer remains the single owner communication channel.
+- If multiple independent work items are later explicitly enabled, each session owns its own complete implementation–QA–Release loop. Dependencies and overlapping write scopes prevent concurrent conflicting runs; four occupied slots is not a success condition.
+- Same-session QA and Release evidence is labeled `same-session verification`. It is never displayed as independent QA/Audit. A Predicate explicitly requiring independent evidence remains unmet until separately satisfied or explicitly amended by Cherry.
+- Preserve legacy role bindings and receipts as compatibility history. Do not migrate the protected registry or reinterpret prior independent receipts merely because this contract changes.
+
+### Observer is code, not an extra conversational session
+
+| Component | Owns | Must not do |
+| --- | --- | --- |
+| Source adapter | Authenticated current-session events, exact sequence and immutable artifact references | Infer execution from an open tab, old binding, process port or a plan |
+| Observer | Durable observation cursor, current stage/activity/freshness, completion-without-next-action and stalled-run signals | Dispatch, grant authority, accept a candidate or change progress |
+| Execution controller | One claimed eligible next action under the current work item, authority and dependency version | Fill empty slots, repeat ambiguous sends, invent tasks or extend authority |
+| Evidence verifier | Resolve stage terminal evidence to exact candidate/tree and required checks | Treat a final chat response or test count as stage acceptance |
+| Planner interface | One ordered work timeline, next action and owner decision entry | Present role filters as separate required sessions |
+
+These are program responsibilities, not new agents, schedules or products. The current chat relay is transport only: its dispatch/response polling status is not proof of a product stage or of automatic next-work execution. Existing signed Observer Bridge privacy, authentication, sequence and freshness controls remain reusable transport boundaries; its legacy role field must not be overloaded with a stage without an explicit versioned adapter.
+
+### Stage and continuation rules
+
+1. `queued → implementing`: current authorized request, dependencies satisfied, exact source/write scope and exclusive run ownership verified; require actual start evidence before displaying running.
+2. `implementing → qa_verifying`: pinned candidate/tree and implementation receipt exist; QA checks the same candidate. A chat turn ending alone leaves stage evidence pending.
+3. `qa_verifying → release_verifying`: required QA evidence passes for the exact candidate; failed QA returns one bounded correction to implementation. A new candidate invalidates downstream QA/Release evidence.
+4. `release_verifying → awaiting_owner`: candidate, privacy, rollback and allowed Preview checks pass. `awaiting_owner` is neither release nor Cherry acceptance. Separately approved deployment is a controller action, not an implied effect of PASS.
+5. After any terminal stage event, the controller records either one next eligible action or a finite blocker (`needs_owner`, `dependency_blocked`, `authority_missing`, `evidence_missing`, `delivery_unknown`). Observer flags a terminal-without-next-action discrepancy; it does not repair it by sending a duplicate.
+6. Stable work/run/stage/attempt identity and a durable CAS claim precede dispatch. Acknowledgement/start readback is required. Timeout after dispatch is `delivery_unknown`; reconcile the original action, never automatically replay it. Resume after a crash reconciles the same durable claim before new work.
+7. Offline requests remain server-queued, per Cherry's adopted choice. Reconnection executes only after the existing authority and deduplication checks; it does not introduce a cloud executor. Destination edits form a separately reviewed version while unaffected existing approved work remains valid. Conflicts or revoked approval stop affected work.
+
+### Freshness, UI and authority
+
+- Keep three axes separate: execution stage, process/activity observation, and validated result progress. Message volume, elapsed time, stage position and occupied sessions never increase completion percentage.
+- The work card shows current stage, actual observed activity, last observation age, current immutable candidate evidence, next action or blocker, and verification mode. Private session IDs/paths/credentials are not rendered.
+- A single-session work card replaces the old 4/4 role occupancy target. Technical role/stage filters remain optional read-only lenses over the same ordered work dataset.
+- Prefer provider events; where unsupported, use bounded read-only polling with backoff. A missed freshness deadline means `observation_stale`/unknown, not proven stopped or failed. Proven terminal events are distinct from transport loss. No unconditional timer-driven task dispatch.
+- Source heartbeat loss, lease occupancy and API send readiness must not be presented as model execution evidence. An observer callback failure cannot cause another message dispatch or mark a result complete.
+- Notify on a meaningful change, required owner action, confirmed failure or completion-without-next-action; unchanged healthy observations stay quiet. No scheduled agent heartbeat is installed by this contract.
+
+### Existing Phase 4 acceptance additions
+
+Within M4-1/M4-2 and AP-4-02/04/06/07/10, verify one session traverses all three stages; terminal-without-next-action is detected; one eligible action is claimed once; duplicate/out-of-order events and restart cannot double-dispatch; stale observations never become false stopped/running; changed candidates invalidate old verification; missing authority stops only affected actions; read-only observation changes no Gate/progress. Use real supported source integration and owner Preview testing before calling the feature active. Synthetic state-machine tests alone do not prove continuous operation.
+
+Implementation sequence: (1) work/stage observation contract and finite projector; (2) supported session-event ingestion plus durable cursor; (3) separate authority-bound continuation controller with crash reconciliation; (4) single-work-card UI and real Preview interruption/recovery dogfood. Current runtime remains unchanged until its corresponding bounded implementation and activation evidence exist.
 
 ## Product decision
 
