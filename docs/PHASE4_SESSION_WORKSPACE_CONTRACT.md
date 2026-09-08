@@ -50,6 +50,11 @@ These are program responsibilities, not new agents, schedules or products. The c
 
 #### Candidate-bound stage receipt check · 2026-09-09
 
+- [x] Re-read durable approval after asynchronous eligibility work; revocation during evidence verification must produce zero sends.
+  CHECK: node --test --test-name-pattern='durable revocation during' server/outcome-work-continuation.test.mjs
+  EXPECT: fail 0
+  EVIDENCE: 2026-09-09 RED reproduced acknowledged after durable revocation during final evidence read; GREEN controller/grant/store 17 PASS and diff check PASS. Same-session verification with actual SQLite store and synthetic transport. Re-resolve owner/status/immutable bytes after eligibility. Remaining distributed race between final read and external execution requires executor-side claim/authority enforcement; this correction does not claim atomic external revocation or live activation.
+
 - [x] Local grant storage preserves immutable approval and monotonic revocation across restart, rejects wrong owner and changed bytes. Dedicated disposable SQLite tests only; no runtime database opened or migrated. Caller must authenticate owner before recording/revoking; no public API or implicit approval issuer.
   CHECK: node --test server/outcome-work-grant-store.test.mjs
   EXPECT: fail 0

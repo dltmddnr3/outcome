@@ -7,6 +7,7 @@ import {mkdtempSync,rmSync} from 'node:fs'
 import {join} from 'node:path'
 import {tmpdir} from 'node:os'
 import {createWorkJournal} from './outcome-work-journal.mjs'
+import {createWorkGrantStore} from './outcome-work-grant-store.mjs'
 import {createWorkContinuationController as create} from './outcome-work-continuation.mjs'
 const time=20000,scope={projectId:'outcome',workId:'work-a',runId:'run-a',sessionRef:'session-a',bindingVersion:1},scopeJson=JSON.stringify(scope)
 const commit='a'.repeat(40),tree='b'.repeat(40),authority='c'.repeat(64),receipt='d'.repeat(64)
@@ -33,7 +34,7 @@ test('authorized composition checks grant and evidence before each claim/send an
       const r=await c.runOnce(request)
       assert.equal(r.outcome==='acknowledged',mode==='valid',mode)
       assert.equal(sends,mode==='valid'?1:0,mode)
-      if(mode==='valid'){assert.equal(reads,2);assert.equal((await c.runOnce(request)).outcome,'acknowledged');assert.equal(sends,1)}
+      if(mode==='valid'){assert.equal(reads,4);assert.equal((await c.runOnce(request)).outcome,'acknowledged');assert.equal(sends,1)}
     }finally{s.db.close()}
   }
 })
@@ -45,6 +46,22 @@ test('approval expiring during evidence verification cannot reserve or send',asy
     const c=createAuthorizedWorkContinuationController({...s.options,now:()=>clock,resolveExecutionGrant:async()=>JSON.stringify({grantJson,ownerRef,status:'active'}),verifyEligibility:async()=>{clock++;return true},dispatch:async()=>{sends++;return ack}})
     assert.equal((await c.runOnce(request)).outcome,'authority_hold');assert.equal(sends,0)
     assert.equal(s.db.prepare('SELECT count(*) AS n FROM outcome_work_reservations').get().n,0)
+  }finally{s.db.close()}
+})
+test('durable revocation during final evidence verification prevents dispatch',async()=>{
+  const s=setup(),store=createWorkGrantStore(s.db);let sends=0,checks=0
+  const ownerRef='e'.repeat(64),grantJson=JSON.stringify({schemaVersion:1,...scope,ownerRef,candidateCommit:commit,candidateTree:tree,allowedStages:['qa_verifying'],issuedAt:time-1,expiresAt:time+100})
+  try{
+    const {authorityRef}=store.record(grantJson,ownerRef,time)
+    const request=JSON.stringify({...JSON.parse(input),authorityRef})
+    const c=createAuthorizedWorkContinuationController({...s.options,
+      resolveExecutionGrant:async request=>store.read(request.authorityRef,ownerRef),
+      verifyEligibility:async()=>{if(++checks===2)store.revoke(authorityRef,ownerRef,time);return true},
+      dispatch:async()=>{sends++;return ack}})
+    assert.equal((await c.runOnce(request)).outcome,'pre_dispatch_hold')
+    assert.equal(sends,0)
+    assert.equal(JSON.parse(store.read(authorityRef,ownerRef)).status,'revoked')
+    assert.equal(s.db.prepare('SELECT count(*) AS n FROM outcome_work_dispatches').get().n,0)
   }finally{s.db.close()}
 })
 test('missing stage evidence cannot dispatch even when eligibility port erroneously permits it',async()=>{

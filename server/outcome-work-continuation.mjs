@@ -16,8 +16,14 @@ export function createAuthorizedWorkContinuationController({resolveExecutionGran
       candidateTree:input.candidateTree,authorityRef:input.authorityRef,action:input.action,status:resolved.status})
     if(!verifyWorkExecutionGrant(resolved.grantJson,expected,now()).matches)return false
     if(await verifyEligibility(input,context)!==true||context.signal.aborted)return false
-    // Evidence reads may take time. Never carry an expired approval forward.
-    return verifyWorkExecutionGrant(resolved.grantJson,expected,now()).matches
+    // Evidence reads may take time. Re-resolve revocation and current owner;
+    // identical immutable bytes alone do not establish current approval.
+    const fresh=await resolveExecutionGrant(input,context)
+    if(context.signal.aborted||typeof fresh!=='string'||Buffer.byteLength(fresh)>16384)return false
+    const latest=JSON.parse(fresh)
+    if(!latest||Array.isArray(latest)||Object.keys(latest).sort().join(',')!=='grantJson,ownerRef,status'
+      ||latest.ownerRef!==resolved.ownerRef||latest.status!=='active'||latest.grantJson!==resolved.grantJson)return false
+    return verifyWorkExecutionGrant(latest.grantJson,expected,now()).matches
   }})
 }
 
