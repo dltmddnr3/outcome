@@ -1,7 +1,16 @@
 import assert from 'node:assert/strict'
 import test from 'node:test'
+import { createHash } from 'node:crypto'
 import sealedSource from '../snapshot/outcome-package-source.json' with { type: 'json' }
-import { buildStableSnapshot } from './capture-stable-snapshot.mjs'
+import { buildStableSnapshot, sourceEvidenceObservation } from './capture-stable-snapshot.mjs'
+
+test('source observation is content-bound and cannot be refreshed by capture time or file metadata', () => {
+  const text = 'exact observed Gate bytes'
+  const receipt = { schema_version: 1, kind: 'source_content_read', gate_ref: 'GATES_OUTCOME_MODEL_V2_LOCAL_DEFAULT_AND_SERVICE_PROJECTION.md', gate_sha256: createHash('sha256').update(text).digest('hex'), observed_at: '2026-09-08T01:00:00.000Z' }
+  for (const captured of ['2026-09-08T02:00:00.000Z', '2026-09-09T02:00:00.000Z']) assert.equal(sourceEvidenceObservation(text, receipt, captured), receipt.observed_at)
+  for (const invalid of [undefined, { ...receipt, gate_sha256: '0'.repeat(64) }, { ...receipt, observed_at: '2027-01-01T00:00:00.000Z' }, { ...receipt, observed_at: 'not-a-time' }, { ...receipt, kind: 'qa_pass' }, { ...receipt, gate_ref: 'OTHER.md' }, { ...receipt, mtime: '2026-09-08T02:00:00.000Z' }]) assert.throws(() => sourceEvidenceObservation(text, invalid, '2026-09-08T02:00:00.000Z'), /current_source_observation_invalid/)
+  assert.throws(() => sourceEvidenceObservation(`${text}\nchanged`, receipt, '2026-09-08T02:00:00.000Z'), /current_source_observation_invalid/)
+})
 
 const capturedAt = '2026-08-25T10:00:00.000Z'
 const unavailableCherry = { status: 'unknown', errors: ['contract_missing', 'map_missing'], project: { id: 'unknown', name: 'Unknown project' }, phases: [], progress: { available: false } }

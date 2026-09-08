@@ -1,0 +1,7 @@
+{
+  "schema_version": 1,
+  "kind": "source_content_read",
+  "gate_ref": "GATES_OUTCOME_MODEL_V2_LOCAL_DEFAULT_AND_SERVICE_PROJECTION.md",
+  "gate_sha256": "b6c156c60cfca729c261641a96401590f44d9e47845d5ae34dd4a028790e7357",
+  "observed_at": "2026-09-08T01:53:42.429Z"
+}

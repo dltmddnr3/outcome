@@ -1,4 +1,5 @@
-import { mkdirSync, readFileSync, statSync, writeFileSync } from 'node:fs'
+import { mkdirSync, readFileSync, writeFileSync } from 'node:fs'
+import { createHash } from 'node:crypto'
 import { dirname, resolve } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { buildPackageModel, collectOutcomePackages, loadBindingRegistry, parseOutcomeMap, projectPublicPackages } from '../server/outcome-package.mjs'
@@ -9,7 +10,15 @@ const output = resolve(root, 'snapshot/outcome-package-source.json')
 const trackingPath = resolve(root, 'config/outcome-work-tracking.json')
 const registryPath = resolve(root, 'config/outcome-projects.json')
 
-export function applyCurrentOutcomeSource({ currentProjection, sourceRoot, capturedAt, bindingRegistry }) {
+export function sourceEvidenceObservation(gateText, receipt, capturedAt) {
+  const invalid = () => { throw new Error('current_source_observation_invalid') }
+  if (!receipt || Object.getPrototypeOf(receipt) !== Object.prototype || Object.keys(receipt).sort().join(',') !== 'gate_ref,gate_sha256,kind,observed_at,schema_version') invalid()
+  const instant = /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}\.\d{3}Z$/
+  if (receipt.schema_version !== 1 || receipt.kind !== 'source_content_read' || receipt.gate_ref !== 'GATES_OUTCOME_MODEL_V2_LOCAL_DEFAULT_AND_SERVICE_PROJECTION.md' || typeof gateText !== 'string' || receipt.gate_sha256 !== createHash('sha256').update(gateText).digest('hex') || !instant.test(receipt.observed_at) || !Number.isFinite(Date.parse(receipt.observed_at)) || !instant.test(capturedAt) || !Number.isFinite(Date.parse(capturedAt)) || Date.parse(receipt.observed_at) > Date.parse(capturedAt)) invalid()
+  return receipt.observed_at
+}
+
+export function applyCurrentOutcomeSource({ currentProjection, sourceRoot, capturedAt, bindingRegistry, observationReceipt }) {
   if (typeof sourceRoot !== 'string' || !sourceRoot.startsWith('/')) throw new Error('current_source_root_required')
   const canonicalRoot = resolve(sourceRoot)
   const mapPath = resolve(canonicalRoot, 'docs/OUTCOME_MAP.md')
@@ -43,7 +52,7 @@ export function applyCurrentOutcomeSource({ currentProjection, sourceRoot, captu
     gate_text: gateText,
     captured_at: capturedAt,
     map_updated_at: updated ?? '',
-    gate_observed_at: statSync(gatePath).mtime.toISOString(),
+    gate_observed_at: sourceEvidenceObservation(gateText, observationReceipt, capturedAt),
   })
   return { ...currentProjection, projects: currentProjection.projects.map((project) => project?.project?.id === 'outcome' ? corrected : project) }
 }
@@ -84,7 +93,8 @@ export function captureStableSnapshot() {
   const capturedAt = new Date().toISOString()
   const bindingRegistry = loadBindingRegistry()
   const collected = collectOutcomePackages({ bindingRegistry, now: new Date(capturedAt) })
-  const currentProjection = projectPublicPackages(applyCurrentOutcomeSource({ currentProjection: collected, sourceRoot: process.env.OUTCOME_CURRENT_SOURCE_ROOT, capturedAt, bindingRegistry }))
+  const observationReceipt = JSON.parse(readFileSync(resolve(root, 'config/outcome-source-observation.json'), 'utf8'))
+  const currentProjection = projectPublicPackages(applyCurrentOutcomeSource({ currentProjection: collected, sourceRoot: process.env.OUTCOME_CURRENT_SOURCE_ROOT, capturedAt, bindingRegistry, observationReceipt }))
   const snapshot = buildStableSnapshot({ currentProjection, priorSnapshot: readPriorSnapshot(), capturedAt })
   mkdirSync(dirname(output), { recursive: true })
   writeFileSync(output, `${JSON.stringify(snapshot, null, 2)}\n`, 'utf8')
