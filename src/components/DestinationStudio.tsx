@@ -1,6 +1,6 @@
 import { sensitiveContentHint } from './PlannerConversation'
 import './DestinationStudio.css'
-import { privateDestinationStorageAvailable, requestDestinationDraft, type DestinationDraftDocument } from '../lib/api'
+import { privateDestinationStorageAvailable, requestDestinationDraft, requestDestinationAnalysis, destinationDraftDigest, type DestinationDraftDocument, type StoredDestinationDraft, type DestinationAnalysisView } from '../lib/api'
 import { destinationUnverifiedQuestions } from '../lib/destination-discovery'
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { ArrowLeft, Check, FileText, Lightbulb, Sparkles, X } from 'lucide-react'
@@ -32,6 +32,12 @@ export function DestinationStudio({ open, onClose }: { open: boolean; onClose: (
   const [storageNotice, setStorageNotice] = useState<string | null>(null)
   const [unknowns, setUnknowns] = useState<string[]>([...destinationUnverifiedQuestions])
   const latestDraft = useRef('')
+  const [savedDraft,setSavedDraft]=useState<StoredDestinationDraft|null>(null)
+  const [analysis,setAnalysis]=useState<DestinationAnalysisView|null>(null)
+  const [analysisRequest,setAnalysisRequest]=useState<{id:string;draft:StoredDestinationDraft;input:string}|null>(null)
+  const [analysisBusy,setAnalysisBusy]=useState(false)
+  const analysisLock=useRef(false)
+  const [analysisNotice,setAnalysisNotice]=useState<string|null>(null)
 
   useEffect(() => {
     if (!open) return
@@ -74,12 +80,14 @@ export function DestinationStudio({ open, onClose }: { open: boolean; onClose: (
     try {
       const stored = await requestDestinationDraft(save ? {expectedRevision:revision,document:storageDocument} : undefined)
       if (save) {
+        setSavedDraft(stored)
         setRevision(stored!.revision)
         setStorageNotice(`초안 버전 ${stored!.revision} 저장됨 · 저장 이후 수정한 내용은 다시 저장해야 합니다. 확정은 아닙니다.`)
       } else {
         if (latestDraft.current !== captured) throw new Error('draft_changed_during_load')
         if (!stored) { setRevision(0); setStorageHold(false); setStorageNotice('저장된 초안이 없습니다. 현재 입력은 유지합니다.'); return }
         const doc = stored.document
+        setSavedDraft(stored)
         setMode(doc.mode); setBriefText(doc.source); setAnswers(doc.answers); setUnknowns(doc.unknowns)
         const queue = unansweredDestinationQuestions(doc.answers).map(item=>item.id)
         setQuestionQueue(queue); setQuestionIndex(0); setDraftAnswer(''); setStep(queue.length ? 'question' : 'review')
@@ -91,6 +99,23 @@ export function DestinationStudio({ open, onClose }: { open: boolean; onClose: (
       if (save) setStorageHold(true)
       setStorageNotice(save ? '저장 결과를 확인하지 못했습니다. 입력은 유지됩니다. 자동 재시도하지 않습니다. 서버 초안을 확인한 뒤 계속해 주세요.' : '초안을 불러오지 못했습니다. 현재 입력은 유지됩니다.')
     } finally { storageLock.current=false; setStorageBusy(false) }
+  }
+
+  const analyzeSavedDraft=async(submit:boolean)=>{
+    if(analysisLock.current)return
+    analysisLock.current=true;setAnalysisBusy(true);setAnalysisNotice(null)
+    try{
+      const captured=latestDraft.current
+      if(!savedDraft||await destinationDraftDigest(JSON.parse(captured))!==await destinationDraftDigest(savedDraft.document)||captured!==latestDraft.current)throw Error('unsaved')
+      const request=submit?{id:crypto.randomUUID(),draft:savedDraft,input:captured}:analysisRequest
+      if(!request||submit&&analysisRequest)throw Error('request_exists')
+      if(submit)setAnalysisRequest(request)
+      const value=await requestDestinationAnalysis(request.draft,request.id,submit)
+      if(latestDraft.current!==request.input)throw Error('draft_changed')
+      setAnalysis(value)
+      setAnalysisNotice(value?({queued:'분석 요청 접수됨 · 실행 대기',dispatch_started:'Planner 응답 대기 · 접수는 완료가 아닙니다.',completed:'문서 근거 확인됨 · 제안 의미는 직접 검토해 주세요.',failed:'분석 실패 · 자동 재시도하지 않습니다.',delivery_unknown:'전달 상태 불명 · 자동 재전송하지 않습니다.'}[value.state]):'요청 기록을 찾지 못했습니다. 자동 재전송하지 않습니다.')
+    }catch{setAnalysisNotice('저장된 초안과 요청 상태를 확인해 주세요. 입력은 유지하며 자동 재전송하지 않습니다.')}
+    finally{analysisLock.current=false;setAnalysisBusy(false)}
   }
 
   if (!open) return null
@@ -187,6 +212,20 @@ export function DestinationStudio({ open, onClose }: { open: boolean; onClose: (
           <button type="button" disabled={storageBusy || !privateDestinationStorageAvailable()} onClick={()=>void useStorage(false)}>서버 초안 불러오기 · 현재 입력 대체</button>
         </div>
         {storageNotice && <p role="status">{storageNotice}</p>}
+      </section>
+      <section className="destination-studio__unknowns" aria-label="Planner 문서 분석" aria-busy={analysisBusy}>
+        <strong>Planner 문서 분석</strong>
+        <span>저장한 초안의 버전과 해시로 요청합니다. 새로고침 후 요청 복구는 아직 연결 준비 중입니다.</span>
+        <div className="destination-studio__actions">
+          <button type="button" disabled={!savedDraft||!savedDraft.document.source.trim()||!!analysisRequest||analysisBusy||storageBusy} onClick={()=>void analyzeSavedDraft(true)}>저장한 문서 분석 요청</button>
+          <button type="button" disabled={!analysisRequest||analysisBusy||storageBusy} onClick={()=>void analyzeSavedDraft(false)}>분석 결과 확인</button>
+        </div>
+        {analysisNotice&&<p role="status">{analysisNotice}</p>}
+        {analysis?.state==='completed'&&analysisRequest?.input===latestDraft.current&&analysis.proposals.map((proposal,index)=><article key={index}>
+          <strong>{destinationQuestions.find(q=>q.id===proposal.field)?.label} · 미확정 제안</strong><p>{proposal.value}</p>
+          <blockquote>{proposal.quote}</blockquote><small>원문 {proposal.startLine}–{proposal.endLine}행{analysis.conflicts.includes(proposal.field)?' · 해석 충돌, 하나를 직접 검토하세요.':''}</small>
+          <button type="button" onClick={()=>{editAnswer(proposal.field);setDraftAnswer(proposal.value)}}>이 제안으로 답변 편집</button>
+        </article>)}
       </section>
     </section>
   </div>

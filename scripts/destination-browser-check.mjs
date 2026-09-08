@@ -110,5 +110,35 @@ try {
     assert.equal(await storagePage.evaluate(()=>localStorage.length+sessionStorage.length),0)
     console.log(JSON.stringify({width,storageSaveReload:true,failurePreservesInput:true,writes,automaticRetry:false}))
     await storagePage.close()
+    const analysisPage=await browser.newPage({viewport:{width,height:900}})
+    let analysisRow=null,analysisWrites=0
+    await analysisPage.route('**/api/**',async route=>{
+      const request=route.request()
+      if(request.url().endsWith('/workspace'))return route.fulfill({json:{workspace:{}},headers:{'x-outcome-destination-csrf':'synthetic-only-csrf'}})
+      if(request.url().includes('/drafts/')){const body=request.postDataJSON();return route.fulfill({json:{draft:{draftId:request.url().split('/').at(-1),revision:1,document:JSON.parse(body.document),state:'draft',completionAuthority:false},completionAuthority:false}})}
+      if(request.method()==='POST'){
+        analysisWrites++;const body=request.postDataJSON()
+        assert.deepEqual(Object.keys(body).sort(),['documentDigest','draftId','draftRevision'])
+        analysisRow={requestId:request.url().split('/').at(-1),...body,state:'queued',result:null,completionAuthority:false}
+      }else analysisRow={...analysisRow,state:'completed',result:{schemaVersion:1,documentDigest:analysisRow.documentDigest,draftRevision:1,proposals:[{field:'problem',value:'분산된 화면 때문에 결과를 놓침',quote:'여러 화면을 오가며 결과를 놓칩니다.',startLine:1,endLine:1,status:'needs_confirmation'}],conflicts:[],gaps:[],confirmedAnswers:{},semanticVerification:'owner_review_required',completionAuthority:false}}
+      return route.fulfill({status:request.method()==='POST'?202:200,json:{analysis:analysisRow,completionAuthority:false}})
+    })
+    await analysisPage.goto(`${base}/scripts/fixtures/destination-browser.html?storage`)
+    await analysisPage.getByRole('button',{name:'목적지 설정',exact:true}).click()
+    await analysisPage.getByRole('button',{name:/기획서에서 빈칸 찾기/}).click()
+    await analysisPage.getByRole('textbox',{name:'또는 내용 붙여넣기'}).fill('여러 화면을 오가며 결과를 놓칩니다.')
+    await analysisPage.getByRole('button',{name:'초안 저장',exact:true}).click()
+    await analysisPage.getByRole('status').filter({hasText:'초안 버전 1 저장됨'}).waitFor()
+    await analysisPage.getByRole('button',{name:'저장한 문서 분석 요청',exact:true}).click()
+    await analysisPage.getByRole('status').filter({hasText:'분석 요청 접수됨'}).waitFor()
+    await analysisPage.getByRole('button',{name:'분석 결과 확인',exact:true}).click()
+    await analysisPage.getByRole('status').filter({hasText:'문서 근거 확인됨'}).waitFor()
+    await analysisPage.getByText('문제 · 미확정 제안',{exact:true}).waitFor()
+    await analysisPage.getByRole('button',{name:'이 제안으로 답변 편집',exact:true}).click()
+    assert.equal(await analysisPage.getByRole('textbox',{name:'직접 입력',exact:true}).inputValue(),'분산된 화면 때문에 결과를 놓침')
+    assert.equal(analysisWrites,1)
+    assert.equal(await analysisPage.locator('.destination-studio').evaluate(n=>n.scrollWidth<=n.clientWidth),true)
+    console.log(JSON.stringify({width,referenceOnlyAnalysis:true,explicitProposalEdit:true,analysisWrites}))
+    await analysisPage.close()
   }
 } finally { await browser?.close(); server.kill('SIGTERM') }

@@ -1,5 +1,7 @@
 import type { CherryNoteDashboardData } from '../components/CherryNoteDashboard'
 import type { OutcomeDashboardData } from '../components/OutcomeDashboard'
+import {destinationQuestions} from './destination-discovery'
+import {destinationSourceSha256,validateDestinationAnalysis,type DestinationProposal} from './destination-analysis'
 
 type Session = { authenticated: boolean; publicReadOnly?: boolean }
 export type PrivateAccessConfig = { enabled: boolean; access: 'private_read_only'; providers: Array<{ id: string; mode: string }>; sessionMaximumDays: number; completionAuthority: false; publishableKey?: string }
@@ -31,6 +33,41 @@ export const privateDestinationStorageAvailable = () => privateDestinationBindin
 export const activeDestinationDraftId = '00000000-0000-4000-8000-000000000001'
 export type DestinationDraftDocument = { schemaVersion: 1; mode: 'guided_200q' | 'brief_gap'; source: string; answers: import('./destination-discovery').DestinationAnswers; unknowns: string[] }
 export type StoredDestinationDraft = { draftId: string; revision: number; document: DestinationDraftDocument; state: 'draft'; completionAuthority: false }
+export type DestinationAnalysisView = {requestId:string;state:'queued'|'dispatch_started'|'completed'|'failed'|'delivery_unknown';proposals:DestinationProposal[];conflicts:string[]}
+export async function destinationDraftDigest(doc:DestinationDraftDocument) {
+ const answers=Object.fromEntries(destinationQuestions.filter(q=>Object.hasOwn(doc.answers,q.id)).map(q=>[q.id,doc.answers[q.id]]))
+ const bytes=new TextEncoder().encode(JSON.stringify({schemaVersion:1,mode:doc.mode,source:doc.source,answers,unknowns:doc.unknowns}))
+ if(bytes.length>131072)throw Error('destination_invalid')
+ return [...new Uint8Array(await crypto.subtle.digest('SHA-256',bytes))].map(n=>n.toString(16).padStart(2,'0')).join('')
+}
+export async function requestDestinationAnalysis(draft:StoredDestinationDraft,requestId:string,submit=false):Promise<DestinationAnalysisView|null> {
+ if(!/^[a-f0-9]{8}(?:-[a-f0-9]{4}){3}-[a-f0-9]{12}$/.test(requestId))throw Error('destination_invalid')
+ const binding=privateDestinationBinding,generation=privateDecisionBindingVersion
+ if(!binding)throw Error('destination_unavailable')
+ const documentDigest=await destinationDraftDigest(draft.document)
+ if(binding!==privateDestinationBinding||generation!==privateDecisionBindingVersion)throw Error('destination_identity_changed')
+ const response=await fetch(`/api/private/destination/analysis/${requestId}`,{method:submit?'POST':'GET',credentials:'same-origin',headers:{...privateSessionHeaders(binding.bearer),...(submit?{'content-type':'application/json','x-outcome-csrf':binding.csrf}:{})},...(submit?{body:JSON.stringify({draftId:draft.draftId,draftRevision:draft.revision,documentDigest})}:{})})
+ const body=await readJson<{analysis:Record<string,unknown>|null;completionAuthority:false}>(response)
+ if(binding!==privateDestinationBinding||generation!==privateDecisionBindingVersion)throw Error('destination_identity_changed')
+ if(!body||body.completionAuthority!==false)throw Error('destination_response_invalid')
+ const row=body.analysis
+ if(row===null&&!submit)return null
+ if(!row||row.requestId!==requestId||row.draftId!==draft.draftId||row.draftRevision!==draft.revision||row.documentDigest!==documentDigest||row.completionAuthority!==false||!['queued','dispatch_started','completed','failed','delivery_unknown'].includes(String(row.state)))throw Error('destination_response_invalid')
+ const state=row.state as DestinationAnalysisView['state']
+ if(state!=='completed') {
+  if(row.result!==null)throw Error('destination_response_invalid')
+  return {requestId,state,proposals:[],conflicts:[]}
+ }
+ const result=row.result as Record<string,unknown>
+ if(!result||result.schemaVersion!==1||result.documentDigest!==documentDigest||result.draftRevision!==draft.revision||result.completionAuthority!==false||result.semanticVerification!=='owner_review_required'||!Array.isArray(result.proposals))throw Error('destination_response_invalid')
+ const proposals=result.proposals.map(p=>{
+  if(!p||p.status!=='needs_confirmation'||Object.keys(p).sort().join(',')!=='endLine,field,quote,startLine,status,value')throw Error('destination_response_invalid')
+  const {status:_,...value}=p;return value
+ })
+ const verified=await validateDestinationAnalysis(draft.document.source,JSON.stringify({schemaVersion:1,sourceSha256:await destinationSourceSha256(draft.document.source),proposals}))
+ if(binding!==privateDestinationBinding||generation!==privateDecisionBindingVersion)throw Error('destination_identity_changed')
+ return {requestId,state,proposals:verified.proposals,conflicts:verified.conflicts}
+}
 
 export function validateStoredDestinationDraft(value: unknown): StoredDestinationDraft | null {
   const object = (v: unknown, keys: string[]): v is Record<string, unknown> => !!v && typeof v === 'object' && !Array.isArray(v) && Object.keys(v).length === keys.length && keys.every(k => Object.hasOwn(v, k))
