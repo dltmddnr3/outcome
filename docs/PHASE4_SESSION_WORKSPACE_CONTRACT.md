@@ -50,6 +50,11 @@ These are program responsibilities, not new agents, schedules or products. The c
 
 #### Candidate-bound stage receipt check · 2026-09-09
 
+- [x] Integrated runtime reaches the existing queue adapter with exact session binding; reconstructed runtime does not enqueue twice.
+  CHECK: node --test server/outcome-work-local-runtime.test.mjs
+  EXPECT: fail 0
+  EVIDENCE: 2026-09-09 same-session integrated suite 2 PASS (eight integration scenarios plus bounded configuration failures); diff check PASS. Actual account service, SQLite grant/journal, protected receipt file, protected registry and Codex queue adapter compose through shell-free argv; identity provider, owner probe and spawned process are fixture ports. Reconstructed runtime retains one total enqueue. This is not a real agent stage execution or owner dogfood.
+
 - [x] Work stage queue transport matches exact private session digest and binding version; cancellation/mismatch prevents enqueue. Acknowledgement remains transport-only, not stage evidence.
   CHECK: node --test server/outcome-chat-codex-queue.test.mjs server/outcome-work-queue.test.mjs
   EXPECT: fail 0

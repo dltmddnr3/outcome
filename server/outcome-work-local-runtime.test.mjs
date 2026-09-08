@@ -2,6 +2,9 @@ import test from 'node:test'
 import assert from 'node:assert/strict'
 import {DatabaseSync} from 'node:sqlite'
 import {createHash} from 'node:crypto'
+import {EventEmitter} from 'node:events'
+import {createCodexQueueAdapter} from './outcome-chat-codex-queue.mjs'
+import {createEmptyRegistry,mutateRegistry} from './outcome-session-registry-persistence.mjs'
 import {mkdtempSync,realpathSync,writeFileSync,rmSync} from 'node:fs'
 import {join} from 'node:path'
 import {tmpdir} from 'node:os'
@@ -10,8 +13,8 @@ import fixture from '../test/fixtures/account-access.json' with {type:'json'}
 import {createWorkJournal} from './outcome-work-journal.mjs'
 import {createWorkGrantStore} from './outcome-work-grant-store.mjs'
 import {createLocalWorkRuntime} from './outcome-work-local-runtime.mjs'
-const time=20000,commit='a'.repeat(40),tree='b'.repeat(40)
-const scope={projectId:'outcome',workId:'w',runId:'r',sessionRef:'s',bindingVersion:1}
+const time=Date.parse('2026-09-03T01:00:00.000Z'),commit='a'.repeat(40),tree='b'.repeat(40)
+const scope={projectId:'outcome',workId:'w',runId:'r',sessionRef:createHash('sha256').update('outcome-work-session-v1\0synthetic-private-destination').digest('hex'),bindingVersion:1}
 test('unconfigured, oversized or stalled current policy never invokes transport',async()=>{
   let sends=0
   const dispatch=async()=>{sends++}
@@ -23,7 +26,7 @@ test('unconfigured, oversized or stalled current policy never invokes transport'
   assert.equal(sends,0)
 })
 test('integrated local runtime checks account, durable grant, exact terminal receipt and dependencies',async()=>{
-  for(const mode of ['valid','revoked-session','revoked-grant','missing-dependency','wrong-receipt','changed-policy','disabled']){
+  for(const mode of ['valid','queue','revoked-session','revoked-grant','missing-dependency','wrong-receipt','changed-policy','disabled']){
     const directory=realpathSync(mkdtempSync(join(tmpdir(),'outcome-local-runtime-'))),db=new DatabaseSync(join(directory,'journal.sqlite'))
     const journal=createWorkJournal(db),grantStore=createWorkGrantStore(db);let sends=0,reads=0,revoked=false
     const accountService=createAccountAccessService({ownerSubject:'synthetic-owner',now:()=>time,store:createInMemoryAccountStore(fixture),authProvider:{verify:async()=>({subject:'synthetic-owner',issuedAt:time-1,expiresAt:time+1000,revoked})}})
@@ -45,10 +48,24 @@ test('integrated local runtime checks account, durable grant, exact terminal rec
       if(mode==='revoked-grant')grantStore.revoke(authorityRef,ownerRef,time)
       const policy=JSON.stringify({request:{scopeJson,expectedSequence:3,candidateCommit:commit,candidateTree:tree,authorityRef,action:'qa_verifying'},priorReceipt:mode==='wrong-receipt'?{...priorReceipt,digest:'d'.repeat(64)}:priorReceipt,dependencyReceipts:mode==='missing-dependency'?[{...priorReceipt,digest:'e'.repeat(64)}]:[]})
       const options={enabled:mode!=='disabled',accountService,readToken:async()=>'fixture-only',grantStore,journal,receiptDirectory:directory,readCurrentPolicy:async()=>++reads>1&&mode==='changed-policy'?'{}':policy,now:()=>time,dispatch:async()=>{sends++;return JSON.stringify({delivery:'acknowledged',sourceDigest:'f'.repeat(64)})}}
+      if(mode==='queue'){
+        const registryPath=join(directory,'bindings.json'),occurredAt=new Date(time).toISOString()
+        createEmptyRegistry(registryPath,['outcome'])
+        mutateRegistry(registryPath,{action:'assign',projectId:'outcome',role:'planner',expectedVersion:0,actorClass:'planner',reasonClass:'chat_queue_test',occurredAt,publicAlias:'planner-current',providerClass:'codex',locator:'synthetic-private-destination',phaseId:null,scopeId:null,stageId:null})
+        delete options.dispatch
+        options.queueAdapter=createCodexQueueAdapter({enabled:true,registryPath,now:()=>occurredAt,expectedCwd:'/synthetic/project',ownerProbe:async()=>true,readThread:async id=>JSON.stringify({thread:{id,cwd:'/synthetic/project'}}),spawnProcess:(executable,args,settings)=>{
+          sends++;assert.equal(settings.shell,false);assert.deepEqual(args.slice(0,3),['queue','--thread','synthetic-private-destination'])
+          assert(args[4].includes('outcome-stage-request'));assert(args[4].includes(authorityRef));assert(args[4].includes(commit))
+          const child=new EventEmitter();child.stdout=new EventEmitter();child.stderr=new EventEmitter();child.kill=()=>true
+          queueMicrotask(()=>{child.stdout.emit('data','acknowledged');child.emit('close',0,null)})
+          return child
+        }})
+      }
       const result=await createLocalWorkRuntime(options).runOnce()
-      assert.equal(result.outcome==='acknowledged',mode==='valid',mode)
-      assert.equal(sends,mode==='valid'?1:0,mode)
-      if(mode==='valid'){assert.equal((await createLocalWorkRuntime(options).runOnce()).outcome,'acknowledged');assert.equal(sends,1)}
+      const passes=['valid','queue'].includes(mode)
+      assert.equal(result.outcome==='acknowledged',passes,mode)
+      assert.equal(sends,passes?1:0,mode)
+      if(passes){assert.equal((await createLocalWorkRuntime(options).runOnce()).outcome,'acknowledged');assert.equal(sends,1)}
       assert.equal(result.completionAuthority,false)
     }finally{db.close();rmSync(directory,{recursive:true,force:true})}
   }
