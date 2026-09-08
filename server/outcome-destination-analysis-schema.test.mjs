@@ -2,6 +2,9 @@ import test from 'node:test'
 import assert from 'node:assert/strict'
 import {readFile} from 'node:fs/promises'
 import {PGlite} from '@electric-sql/pglite'
+import {createDestinationAnalysisRepository} from './outcome-destination-analysis-repository.mjs'
+import {createDestinationDraftRepository} from './outcome-destination-postgres.mjs'
+import {destinationDocumentDigest} from './outcome-destination-analysis-source.mjs'
 test('analysis SQL pins source, enforces one claim and terminal hold, and isolates owners',async()=>{
  const db=await PGlite.create('memory://')
  try{
@@ -26,5 +29,28 @@ test('analysis SQL pins source, enforces one claim and terminal hold, and isolat
   await assert.rejects(()=>run(`delete from ${table}`),/permission denied/)
   for(const role of ['anon','authenticated'])await assert.rejects(()=>db.transaction(async tx=>{await tx.exec(`set local role ${role}`);return tx.query(`select * from ${table}`)}),/permission denied/)
   assert.equal((await run(`select state from ${table}`)).rows[0].state,'delivery_unknown')
+  const transact=work=>db.transaction(async tx=>{await tx.exec('set local role outcome_destination_backend');return work({query:(sql,args)=>tx.query(sql,args)})})
+  const draftScope={workspaceId:'workspace',accountRef:'owner',draftId:'00000000-0000-4000-8000-000000000010'}
+  const document={schemaVersion:1,mode:'guided_200q',source:'',answers:{problem:'synthetic problem'},unknowns:['verification needed']}
+  await createDestinationDraftRepository({transact}).save({...draftScope,requestId:'00000000-0000-4000-8000-000000000011',expectedRevision:0,document:JSON.stringify(document)})
+  const request={...draftScope,requestId:'00000000-0000-4000-8000-000000000012',draftRevision:1,documentDigest:destinationDocumentDigest(document)}
+  const repo=createDestinationAnalysisRepository({transact})
+  const queued=await repo.enqueue(request)
+  assert.equal(queued.state,'queued')
+  assert.deepEqual(await createDestinationAnalysisRepository({transact}).enqueue(request),queued)
+  await assert.rejects(()=>repo.enqueue({...request,draftRevision:2}),/destination_analysis_unavailable/)
+  const claimInput={...request,dispatchToken:'00000000-0000-4000-8000-000000000013'}
+  const claimed=await Promise.all([repo.claim(claimInput),repo.claim(claimInput)])
+  assert.equal(claimed.filter(Boolean).length,1)
+  assert.deepEqual(JSON.parse(claimed.find(Boolean).serializedDocument),document)
+  await assert.rejects(()=>repo.finish({...claimInput,state:'completed',result:{completionAuthority:false}}),/destination_analysis_unavailable/)
+  assert.equal((await repo.load(request)).state,'dispatch_started')
+  assert.equal(await repo.load({...request,accountRef:'other'}),null)
+  assert.equal(await repo.finish({...claimInput,dispatchToken:'00000000-0000-4000-8000-000000000014',state:'failed'}),null)
+  const validated=createDestinationAnalysisRepository({transact,validateResult:async input=>{assert.equal(input.documentDigest,request.documentDigest);return {completionAuthority:false,proposals:[]}}})
+  const completed=await validated.finish({...claimInput,state:'completed',result:'synthetic'})
+  assert.equal(completed.state,'completed');assert.deepEqual(completed.result,{completionAuthority:false,proposals:[]})
+  assert.equal(await repo.claim(claimInput),null)
+  assert.equal(await repo.finish({...claimInput,state:'failed'}),null)
  }finally{await db.close()}
 })
