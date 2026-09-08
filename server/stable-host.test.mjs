@@ -116,6 +116,40 @@ test('hosted decision boundary requires authentication, authentic origin and exp
   assert.equal((await rawBridgeBody(stream,'/api/private/decisions')).length,10001)
 })
 
+test('hosted destination stays default-off and routes authenticated bearer save/load with bounded raw body',async()=>{
+ let factories=0,writes=0,saved=null
+ const runtimeFactory=async()=>({allowedOrigin:'https://preview.invalid',publishableKey:'pk_test_boundary',service:{authenticate:async token=>{if(token!=='valid')throw Error('private detail')},readWorkspace:async()=>({projects:[]}),resolveBridgeAuthority:async()=>({workspace_id:'workspace',account_ref:'account',project_ids:['outcome']})}})
+ const destinationRuntimeFactory=async()=>{factories++;return {allowedOrigin:'https://preview.invalid',csrfSecret:'synthetic-destination-csrf',repository:{load:async()=>saved,save:async input=>{writes++;saved={document:input.document};return saved}}}}
+ const args={environment:identityEnvironment,runtimeFactory,destinationRuntimeFactory}
+ const handler=createStableHostRequestHandler(args)
+ const pathname='/api/private/destination/drafts/00000000-0000-4000-8000-000000000001'
+ assert.equal((await handler({pathname})).status,401)
+ assert.equal((await handler({pathname,headers:{authorization:'Bearer bad'}})).status,401)
+ assert.equal(factories,0)
+ const headers={authorization:'Bearer valid'}
+ const workspace=await handler({pathname:'/api/private/workspace',headers})
+ assert.equal(workspace.headers['x-outcome-destination-csrf'],'synthetic-destination-csrf')
+ const payload=Buffer.from(JSON.stringify({requestId:'00000000-0000-4000-8000-000000000002',expectedRevision:0,document:'한글'.repeat(10000)}))
+ const stream={method:'PUT',async *[Symbol.asyncIterator](){yield payload.subarray(0,101);yield payload.subarray(101)}}
+ const body=await rawBridgeBody(stream,pathname)
+ assert.deepEqual(body,payload)
+ const request={method:'PUT',pathname,headers:{...headers,'content-type':'application/json',origin:'https://preview.invalid','x-outcome-csrf':workspace.headers['x-outcome-destination-csrf']},body}
+ const result=await handler(request);assert.equal(result.status,200)
+ assert.deepEqual(await handler({pathname,headers}),result)
+ assert.equal((await handler({...request,headers:{...request.headers,origin:'https://evil.invalid'}})).status,403)
+ assert.equal(writes,1);assert.equal(factories,1)
+ assert.equal((await createStableHostRequestHandler({environment:identityEnvironment,runtimeFactory})(request)).status,503)
+ let excess=false
+ const large={method:'PUT',async *[Symbol.asyncIterator](){yield Buffer.alloc(262145);excess=true}}
+ const capped=await rawBridgeBody(large,pathname)
+ assert.equal(capped.length,262145);assert.equal(excess,false)
+ assert.equal((await handler({...request,body:capped})).status,400);assert.equal(writes,1)
+ let failed=0
+ const unavailable=createStableHostRequestHandler({...args,destinationRuntimeFactory:async()=>{failed++;throw Error('private provider detail')}})
+ for(let i=0;i<2;i++)assert.deepEqual(await unavailable({pathname,headers}),{status:503,body:{error:'destination_unavailable'}})
+ assert.equal(failed,1)
+})
+
 test('production chat ingress reads streamed UTF-8 bodies and caps bytes before service invocation', async () => {
   const payload = Buffer.from(JSON.stringify({ project_id:'outcome', message:'안녕하세요' }))
   const request = { method:'POST', async *[Symbol.asyncIterator]() { yield payload.subarray(0, 42); yield payload.subarray(42) } }
