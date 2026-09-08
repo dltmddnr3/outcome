@@ -5,6 +5,8 @@ import {join} from 'node:path'
 import {tmpdir} from 'node:os'
 import {createDestinationInputStore} from './outcome-destination-input-store.mjs'
 import {destinationDocumentDigest} from './outcome-destination-analysis-source.mjs'
+import {execFileSync,spawnSync} from 'node:child_process'
+import {fileURLToPath} from 'node:url'
 test('private input store persists exact reference, denies scope/permission/symlink/content drift',async()=>{
  const directory=await realpath(await mkdtemp(join(tmpdir(),'outcome-analysis-store-test-')))
  await chmod(directory,0o700)
@@ -12,6 +14,15 @@ test('private input store persists exact reference, denies scope/permission/syml
  const input={requestId:'00000000-0000-4000-8000-000000000001',draftId:'00000000-0000-4000-8000-000000000002',draftRevision:1,documentDigest:destinationDocumentDigest(doc),serializedDocument:JSON.stringify(doc),purpose:'destination_analysis_only',executionAuthority:false}
  const options={directory,scopeKey:'a'.repeat(64)},store=createDestinationInputStore(options)
  const receipt=await store.publish(input)
+ const reader=fileURLToPath(new URL('../scripts/read-destination-analysis-input.mjs',import.meta.url))
+ const env={...process.env,OUTCOME_DESTINATION_INPUT_READER_ENABLED:'1',OUTCOME_DESTINATION_INPUT_DIRECTORY:directory,OUTCOME_DESTINATION_INPUT_SCOPE_SHA256:options.scopeKey}
+ const output=JSON.parse(execFileSync(process.execPath,[reader,receipt.reference],{env,encoding:'utf8'}))
+ assert.equal(output.reference,receipt.reference);assert.equal(output.serializedDocument,input.serializedDocument)
+ assert.equal(output.executionAuthority,false)
+ for(const [enabled,args] of [['0',[receipt.reference]],['1',[receipt.reference,'extra']],['1',['../escape']]]){
+  const invalid=spawnSync(process.execPath,[reader,...args],{env:{...env,OUTCOME_DESTINATION_INPUT_READER_ENABLED:enabled},encoding:'utf8'})
+  assert.equal(invalid.status,1);assert.equal(invalid.stdout,'');assert.equal(invalid.stderr,'destination_input_unavailable\n')
+ }
  assert.deepEqual(await createDestinationInputStore(options).read(receipt.reference),input)
  const path=join(directory,`${receipt.reference}.json`),before=await readFile(path)
  assert.deepEqual(await store.publish(input),receipt)
