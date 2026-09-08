@@ -38,8 +38,20 @@ test('fatal or malformed result stops without retry or error detail disclosure',
 })
 test('response failure stops before a second dispatch', async () => {
   let calls = 0
-  assert.equal(await runOutcomeChatService({ enabled: true, signal: new AbortController().signal, write() {}, runOnce: async () => ++calls === 1 ? 0 : 70 }), 70)
-  assert.equal(calls, 2)
+  assert.equal(await runOutcomeChatService({ enabled: true, signal: new AbortController().signal, write() {}, wait:async()=>{}, runOnce: async () => ++calls === 1 ? 0 : 70 }), 70)
+  assert.equal(calls, 4)
+})
+test('transient response failure recovers without another dispatch or unbounded retries', async () => {
+  const controller=new AbortController(),calls=[],waits=[],logs=[];let responses=0
+  assert.equal(await runOutcomeChatService({enabled:true,signal:controller.signal,write:x=>logs.push(x),wait:async ms=>waits.push(ms),
+    runOnce:async({argv})=>{calls.push(argv.length?'responses':'dispatch');if(!argv.length)return 0;if(++responses===1)return 70;controller.abort();return 0},
+  }),0)
+  assert.deepEqual(calls,['dispatch','responses','responses']);assert.deepEqual(waits,[4000]);assert(logs.includes('OUTCOME_CHAT_SERVICE_RESPONSES_RECOVERED\n'))
+})
+test('response configuration failure is not retried',async()=>{
+  let calls=0
+  assert.equal(await runOutcomeChatService({enabled:true,signal:new AbortController().signal,write(){},runOnce:async()=>++calls===1?0:64}),70)
+  assert.equal(calls,2)
 })
 test('abort during a pass or sleep does not begin another pass', async () => {
   for (const boundary of ['dispatch', 'sleep']) {

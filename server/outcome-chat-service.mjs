@@ -9,12 +9,12 @@ export async function runOutcomeChatService({ enabled = false, runOnce = runOutc
   write = line => process.stdout.write(line), environment = process.env } = {}) {
   if (enabled !== true || typeof runOnce !== 'function' || !signal || typeof signal.aborted !== 'boolean'
     || !Number.isSafeInteger(intervalMs) || intervalMs < 1000 || intervalMs > 60000) return 64
-  let dispatch = true, phase = 'DISPATCH'
+  let dispatch = true, phase = 'DISPATCH', responseFailures = 0
   const emit = state => { try { write(`OUTCOME_CHAT_SERVICE_${state}\n`) } catch {} }
   emit('STARTED')
   try {
     while (!signal.aborted) {
-      if (dispatch) {
+      if (dispatch && responseFailures === 0) {
         phase = 'DISPATCH'
         const result = await runOnce({ environment, argv: [], write: () => {} })
         if (result === 2) { dispatch = false; emit('DISPATCH_UNKNOWN_RESPONSE_ONLY') }
@@ -23,7 +23,14 @@ export async function runOutcomeChatService({ enabled = false, runOnce = runOutc
       if (signal.aborted) break
       phase = 'RESPONSES'
       const result = await runOnce({ environment, argv: ['--responses'], write: () => {} })
+      if (result === 70 && responseFailures < 2) {
+        responseFailures++; emit('RESPONSES_RECHECK')
+        await wait(Math.min(intervalMs * 2 ** responseFailures, 60000), signal)
+        continue
+      }
       if (result !== 0) { emit('RESPONSES_SAFE_HOLD'); return 70 }
+      if (responseFailures) emit('RESPONSES_RECOVERED')
+      responseFailures = 0
       phase = 'WAIT'
       if (!signal.aborted) await wait(intervalMs, signal)
     }
