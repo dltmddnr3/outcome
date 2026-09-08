@@ -168,11 +168,26 @@ test('project registry accepts a bounded sessions_file and uses its unassigned r
 
 test('Package installer creates the four-slot sessions companion without assignment', () => {
   const root = mkdtempSync(join(tmpdir(), 'outcome-session-install-'))
-  assert.deepEqual(installOutcomeSessions({ root, projectId: 'new-project' }), { created: true, projectId: 'new-project', roles: ['planner', 'builder', 'ux_product_qa', 'release_audit'] })
+  assert.deepEqual(installOutcomeSessions({ root, projectId: 'new-project', executionMode: 'role_separated' }), { created: true, projectId: 'new-project', roles: ['planner', 'builder', 'ux_product_qa', 'release_audit'] })
   const text = readFileSync(join(root, 'OUTCOME_SESSIONS.md'), 'utf8')
   for (const role of ['planner', 'builder', 'ux_product_qa', 'release_audit']) assert.match(text, new RegExp(`^  ${role}:`, 'm'))
   assert.equal((text.match(/active_binding_ref: null/g) ?? []).length, 4)
   assert.throws(() => installOutcomeSessions({ root, projectId: 'new-project' }), /EEXIST/)
+})
+
+test('new sessions companion defaults to one result owner and never installs runtime bindings', () => {
+ const root=mkdtempSync(join(tmpdir(),'outcome-owner-install-'))
+ assert.deepEqual(installOutcomeSessions({root,projectId:'demo'}),{created:true,projectId:'demo',roles:['planner']})
+ const text=readFileSync(join(root,'OUTCOME_SESSIONS.md'),'utf8')
+ assert.match(text,/schema_version: 3/);assert.match(text,/execution_mode: result_owned/)
+ const model=fixture({sessionsText:text})
+ assert.equal(model.status,'valid');assert.deepEqual(model.bindings.map(row=>row.role),['planner']);assert.equal(model.now.status,'unbound')
+ assert.throws(()=>installOutcomeSessions({root,projectId:'demo'}),/EEXIST/)
+ assert.equal(readFileSync(join(root,'OUTCOME_SESSIONS.md'),'utf8'),text)
+ const bad=mkdtempSync(join(tmpdir(),'outcome-owner-invalid-'))
+ assert.throws(()=>installOutcomeSessions({root:bad,projectId:'demo',executionMode:'auto_accept'}),/sessions_execution_mode_invalid/)
+ assert.throws(()=>installOutcomeSessions({root:bad,projectId:'demo',templatePath:resolve('templates/OUTCOME_SESSIONS.md')}),/sessions_template_invalid/)
+ assert.throws(()=>readFileSync(join(bad,'OUTCOME_SESSIONS.md')),/ENOENT/)
 })
 
 test('sessions manifest accepts a stable public alias and rejects private or secret-bearing shapes', () => {

@@ -67,7 +67,7 @@ EVIDENCE: pending
 
 ### M4-3 · Connections, project composition and private Preview
 
-- User delta: Cherry sees safe connection/runtime state and can compose a template project with four governed roles.
+- User delta: Cherry sees safe connection/runtime state and can compose a template project with one governed work owner; implementation, QA and Release are stages in that owner's session. Historical four-role topology remains compatibility-only.
 - Fallback: connection inventory stays read-only and creation controls are absent.
 
 ### AP-4-08 · Connection authority and secrecy
@@ -78,8 +78,8 @@ EVIDENCE: pending
 
 ### AP-4-09 · Atomic project and role composition
 
-CHECK: Create a template Package with Planner, Builder, UX & Product QA and Release Audit under injected partial failures.
-EXPECT: Creation is atomic or recoverably rolled back; exactly one current binding exists per role and no orphan authority remains.
+CHECK: After explicit Destination confirmation, compose a template Package with a result-owned session manifest under injected partial failures; verify legacy manifests remain unchanged.
+EXPECT: Creation is atomic or recoverably rolled back; one current execution-owner binding is resolved separately, no extra role session is created, and no orphan authority remains. Manifest installation alone is not project creation or binding activation.
 EVIDENCE: pending
 
 ### AP-4-10 · Responsive and accessible workspace

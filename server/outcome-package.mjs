@@ -391,11 +391,15 @@ export function loadBindingRegistry(path = process.env.OUTCOME_BINDING_REGISTRY 
   } catch (error) { return { bindings: [], error: error instanceof Error && error.message === 'registry_conflict' ? 'registry_conflict' : 'registry_unavailable' } }
 }
 
-export function installOutcomeSessions({ root, projectId, templatePath = join(OUTCOME_ROOT, 'templates', 'OUTCOME_SESSIONS.md') }) {
+export function installOutcomeSessions({ root, projectId, executionMode = 'result_owned', templatePath }) {
   if (typeof projectId !== 'string' || !STABLE_ID.test(projectId)) registryError('invalid_stable_id')
+  if (!['result_owned', 'role_separated'].includes(executionMode)) registryError('sessions_execution_mode_invalid')
   const target = resolve(root, 'OUTCOME_SESSIONS.md')
   if (!insideRoot(resolve(root), target)) registryError('sessions_manifest_traversal')
-  const template = readFileSync(templatePath, 'utf8')
-  writeFileSync(target, template.replaceAll('<stable-project-id>', projectId).replace('<non-secret registry alias>', `${projectId}-local-private`), { encoding: 'utf8', flag: 'wx', mode: 0o644 })
-  return { created: true, projectId, roles: [...ROLES] }
+  const template = readFileSync(templatePath ?? join(OUTCOME_ROOT, 'templates', executionMode === 'result_owned' ? 'OUTCOME_SESSIONS_RESULT_OWNED.md' : 'OUTCOME_SESSIONS.md'), 'utf8')
+  const content = template.replaceAll('<stable-project-id>', projectId).replace('<non-secret registry alias>', `${projectId}-local-private`)
+  const manifest = parseSessionsManifest(content, projectId)
+  if (manifest.setupRequired || manifest.errors.length || (executionMode === 'result_owned' ? manifest.ownerRole !== 'planner' : !manifest.roles)) registryError('sessions_template_invalid')
+  writeFileSync(target, content, { encoding: 'utf8', flag: 'wx', mode: 0o644 })
+  return { created: true, projectId, roles: executionMode === 'result_owned' ? ['planner'] : [...ROLES] }
 }
