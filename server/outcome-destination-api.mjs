@@ -36,8 +36,8 @@ export async function handleDestinationDraftRequest({method='GET',pathname='',to
   if(creation){
    const raw=await repository.load(scope)
    if(raw===null)return {status:200,body:{creation:null,completionAuthority:false}}
-   const value=data(raw,['projectId','state','completionAuthority','executionAuthority'])
-   if(!value||typeof value.projectId!=='string'||!/^destination-[a-f0-9]{64}$/.test(value.projectId)||value.state!=='package_registered'||value.completionAuthority!==false||value.executionAuthority!==false)return result(503,'destination_unavailable')
+   const value=data(raw,['projectId','requestId','reviewDigest','state','completionAuthority','executionAuthority'])
+   if(!value||typeof value.projectId!=='string'||!/^destination-[a-f0-9]{64}$/.test(value.projectId)||typeof value.requestId!=='string'||!/^[a-f0-9]{8}(?:-[a-f0-9]{4}){3}-[a-f0-9]{12}$/.test(value.requestId)||typeof value.reviewDigest!=='string'||!/^[a-f0-9]{64}$/.test(value.reviewDigest)||value.state!=='package_registered'||value.completionAuthority!==false||value.executionAuthority!==false)return result(503,'destination_unavailable')
    return {status:200,body:{creation:value,completionAuthority:false}}
   }
   if(review)return {status:200,body:{review:await repository.review(scope),completionAuthority:false}}

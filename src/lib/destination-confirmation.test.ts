@@ -1,15 +1,47 @@
 import {afterEach,expect,it,vi} from 'vitest'
-import {activeDestinationDraftId,fetchPrivateWorkspace,requestDestinationConfirmationReview,requestDestinationConfirmation,type StoredDiscovery} from './api'
+import {activeDestinationDraftId,fetchPrivateWorkspace,requestDestinationConfirmationReview,requestDestinationConfirmation,requestDestinationCreation,type StoredDiscovery} from './api'
 afterEach(()=>vi.unstubAllGlobals())
 const discovery:StoredDiscovery={draftId:activeDestinationDraftId,revision:2,intakeRevision:1,contextDigest:'a'.repeat(64),state:'draft',completionAuthority:false,context:{mode:'guided_200q',source:'',seedAnswers:{},unknowns:[],answers:[],askedQuestionIds:[],revision:2}}
 const review={reviewDigest:'b'.repeat(64),intakeRevision:1,contextRevision:2,completionAuthority:false as const,executionAuthority:false as const}
 const receipt={...review,requestId:activeDestinationDraftId,draftId:activeDestinationDraftId,state:'creation_requested' as const}
 const json=(v:unknown)=>new Response(JSON.stringify(v))
 const workspace=()=>new Response('{"workspace":{}}',{headers:{'x-outcome-destination-csrf':'synthetic'}})
+const creation={projectId:`destination-${'a'.repeat(64)}`,requestId:receipt.requestId,reviewDigest:receipt.reviewDigest,state:'package_registered',completionAuthority:false,executionAuthority:false}
 async function setup(handler:(url:string,options:RequestInit)=>Promise<Response>|Response,refresh?:()=>Promise<string|null>){
  const mock=vi.fn((url:string,options:RequestInit)=>url.endsWith('/workspace')?Promise.resolve(workspace()):Promise.resolve(handler(url,options)))
  vi.stubGlobal('fetch',mock);await fetchPrivateWorkspace('owner',refresh);return mock
 }
+it('creation read requires a minted current confirmation and sends only a no-store GET with fresh credentials',async()=>{
+ const refresh=vi.fn(async()=>'fresh-owner'),mock=await setup(url=>json(url.includes('/creations/')?{creation,completionAuthority:false}:{confirmation:receipt,completionAuthority:false}),refresh)
+ await expect(requestDestinationCreation(discovery,{...receipt})).rejects.toThrow()
+ const confirmed=(await requestDestinationConfirmation(discovery))!
+ expect(Object.isFrozen(confirmed)).toBe(true)
+ expect(await requestDestinationCreation(discovery,confirmed)).toEqual(creation)
+ const calls=mock.mock.calls.filter(([url])=>url.includes('/creations/'));expect(calls).toHaveLength(1)
+ expect(calls[0][1]).toMatchObject({method:'GET',cache:'no-store',credentials:'same-origin',headers:{authorization:'Bearer fresh-owner'}})
+ expect(calls[0][1].body).toBeUndefined();expect(refresh).toHaveBeenCalledTimes(2)
+ await expect(requestDestinationCreation({...discovery,contextDigest:'c'.repeat(64)},confirmed)).rejects.toThrow()
+ await fetchPrivateWorkspace('other-owner');await expect(requestDestinationCreation(discovery,confirmed)).rejects.toThrow()
+ expect(mock.mock.calls.filter(([,options])=>options.method==='POST')).toHaveLength(0)
+})
+it('creation read rejects fabricated state, authority and extra fields without exposing a private locator',async()=>{
+ for(const invalid of [{...creation,state:'complete'},{...creation,executionAuthority:true},{...creation,projectId:'foreign'},{...creation,requestId:'00000000-0000-4000-8000-000000000099'},{...creation,reviewDigest:'c'.repeat(64)},{...creation,path:'/private/hidden'}]){
+  await setup(url=>json(url.includes('/creations/')?{creation:invalid,completionAuthority:false}:{confirmation:receipt,completionAuthority:false}))
+  const confirmed=(await requestDestinationConfirmation(discovery))!
+  await expect(requestDestinationCreation(discovery,confirmed)).rejects.toThrow('creation_invalid')
+ }
+ await setup(url=>json(url.includes('/creations/')?{creation:null,completionAuthority:false}:{confirmation:receipt,completionAuthority:false}))
+ expect(await requestDestinationCreation(discovery,(await requestDestinationConfirmation(discovery))!)).toBeNull()
+})
+it('late creation response after owner switch and already-aborted read cannot publish a UI result',async()=>{
+ let finish!:(v:Response)=>void,started!:()=>void;const issued=new Promise<void>(resolve=>{started=resolve})
+ const mock=await setup(url=>url.includes('/creations/')?new Promise<Response>(resolve=>{finish=resolve;started()}):json({confirmation:receipt,completionAuthority:false}))
+ const confirmed=(await requestDestinationConfirmation(discovery))!,abort=new AbortController();abort.abort()
+ await expect(requestDestinationCreation(discovery,confirmed,abort.signal)).rejects.toThrow()
+ expect(mock.mock.calls.filter(([url])=>url.includes('/creations/'))).toHaveLength(0)
+ const pending=requestDestinationCreation(discovery,confirmed);await issued;await fetchPrivateWorkspace('other-owner');finish(json({creation,completionAuthority:false}))
+ await expect(pending).rejects.toThrow('destination_identity_changed')
+})
 it('requires an exact minted review and sends one explicit confirmation with fresh credentials',async()=>{
  const refresh=vi.fn(async()=>'fresh-owner')
  const mock=await setup((url,options)=>url.includes('/confirmation-review/')?json({confirmationReview:review,completionAuthority:false}):json({confirmation:options.method==='POST'?receipt:null,completionAuthority:false}),refresh)

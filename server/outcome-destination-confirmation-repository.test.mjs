@@ -44,7 +44,7 @@ test('default renderer consumes real SQL confirmation without a synthetic render
    assert.equal((await fetch(url)).status,401)
    const response=await fetch(url,{headers:{cookie:'__session=valid'}})
    assert.equal(response.status,200);assert.equal(response.headers.get('cache-control'),'no-store')
-   assert.deepEqual(await response.json(),{creation:created,completionAuthority:false})
+   assert.deepEqual(await response.json(),{creation:{...created,requestId,reviewDigest:review.reviewDigest},completionAuthority:false})
    for(const method of ['POST','PUT','DELETE'])assert.equal((await fetch(url,{method,headers:{cookie:'__session=valid'}})).status,405)
    assert.deepEqual(readdirSync(catalog).sort(),before)
   }finally{server.closeAllConnections();await new Promise(resolve=>server.close(resolve))}

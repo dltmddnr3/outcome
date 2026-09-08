@@ -115,6 +115,8 @@ export type StoredDestinationDraft = { draftId: string; revision: number; docume
 export type StoredDiscovery = {draftId:string;revision:number;intakeRevision:number;context:DiscoveryContext;contextDigest:string;state:'draft';completionAuthority:false}
 export type DestinationConfirmationReview={reviewDigest:string;intakeRevision:number;contextRevision:number;completionAuthority:false;executionAuthority:false}
 export type DestinationConfirmation={requestId:string;draftId:string;reviewDigest:string;intakeRevision:number;contextRevision:number;state:'creation_requested';completionAuthority:false;executionAuthority:false}
+export type DestinationCreation={projectId:string;requestId:string;reviewDigest:string;state:'package_registered';completionAuthority:false;executionAuthority:false}
+const confirmationReceipts=new WeakMap<DestinationConfirmation,{binding:DestinationBinding;generation:number;contextDigest:string}>()
 const confirmationReviews=new WeakMap<DestinationConfirmationReview,{binding:DestinationBinding;generation:number;contextDigest:string;attempted:boolean}>()
 const confirmationExact=(v:unknown,keys:string[]):v is Record<string,unknown>=>!!v&&typeof v==='object'&&!Array.isArray(v)&&Object.keys(v).length===keys.length&&keys.every(k=>Object.hasOwn(v,k))
 const confirmationHash=(v:unknown):v is string=>typeof v==='string'&&/^[a-f0-9]{64}$/.test(v)
@@ -151,7 +153,25 @@ export async function requestDestinationConfirmation(discovery:StoredDiscovery,r
  const row=value.confirmation
  if(row===null&&!review)return null
  if(!confirmationExact(row,['requestId','draftId','reviewDigest','intakeRevision','contextRevision','state','completionAuthority','executionAuthority'])||typeof row.requestId!=='string'||!/^[a-f0-9]{8}(?:-[a-f0-9]{4}){3}-[a-f0-9]{12}$/.test(row.requestId)||row.draftId!==pinned.draftId||!confirmationHash(row.reviewDigest)||review&&row.reviewDigest!==review.reviewDigest||row.intakeRevision!==pinned.intakeRevision||row.contextRevision!==pinned.revision||row.state!=='creation_requested'||row.completionAuthority!==false||row.executionAuthority!==false)throw Error('confirmation_invalid')
- return row as DestinationConfirmation
+ const receipt=Object.freeze({...row}) as DestinationConfirmation
+ confirmationReceipts.set(receipt,{binding,generation,contextDigest:pinned.contextDigest})
+ return receipt
+}
+export async function requestDestinationCreation(discovery:StoredDiscovery,receipt:DestinationConfirmation,signal?:AbortSignal):Promise<DestinationCreation|null>{
+ const binding=privateDestinationBinding,generation=privateDecisionBindingVersion,capability=confirmationReceipts.get(receipt)
+ const draftId=discovery.draftId
+ if(!binding||!capability||capability.binding!==binding||capability.generation!==generation||capability.contextDigest!==discovery.contextDigest
+  ||draftId!==activeDestinationDraftId||receipt.draftId!==draftId||receipt.intakeRevision!==discovery.intakeRevision||receipt.contextRevision!==discovery.revision)throw Error('destination_identity_changed')
+ const headers=await destinationSessionHeaders(binding,generation)
+ signal?.throwIfAborted()
+ const value=await readJson<unknown>(await fetch(`/api/private/destination/creations/${draftId}`,{method:'GET',cache:'no-store',credentials:'same-origin',headers,signal}))
+ signal?.throwIfAborted()
+ if(binding!==privateDestinationBinding||generation!==privateDecisionBindingVersion)throw Error('destination_identity_changed')
+ if(!confirmationExact(value,['creation','completionAuthority'])||value.completionAuthority!==false)throw Error('creation_invalid')
+ const row=value.creation
+ if(row===null)return null
+ if(!confirmationExact(row,['projectId','requestId','reviewDigest','state','completionAuthority','executionAuthority'])||typeof row.projectId!=='string'||!/^destination-[a-f0-9]{64}$/.test(row.projectId)||row.requestId!==receipt.requestId||row.reviewDigest!==receipt.reviewDigest||row.state!=='package_registered'||row.completionAuthority!==false||row.executionAuthority!==false)throw Error('creation_invalid')
+ return Object.freeze({...row}) as DestinationCreation
 }
 export type DiscoveryDecisionReview={contextDigest:string;contextRevision:number;intakeRevision:number;decisions:Array<{questionId:string;gapId:string;value:string;prompt:string;sourceContextRevision:number}>;sourceVerification:'required';completionAuthority:false}
 export async function requestDestinationDecisionReview(discovery:StoredDiscovery):Promise<DiscoveryDecisionReview>{

@@ -1,5 +1,6 @@
 import {useEffect,useRef,useState} from 'react'
 import {captureDestinationReviewBinding,requestDestinationConfirmation,requestDestinationConfirmationReview,type DestinationConfirmation,type DestinationConfirmationReview,type StoredDiscovery} from '../lib/api'
+import {DestinationCreationResult} from './DestinationCreationResult'
 
 const readinessNotices:Record<string,string>={
  destination_confirmation_intake_incomplete:'기본 초안의 필수 답변이 남아 있습니다. 답변을 저장한 뒤 다시 검토해 주세요.',
@@ -40,7 +41,7 @@ export function DestinationConfirmationPanel({discovery}:{discovery:StoredDiscov
     const value=await requestDestinationConfirmation(discovery,kind==='confirm'?review!:undefined,abort.signal)
     if(!mounted.current)return
     setReceipt(value);setChecked(true);setReview(null);setAck(false)
-    setNotice(value?'목적지 확정 요청이 기록되었습니다. 프로젝트 생성·작업 실행·최종 수용은 아직 아닙니다.':attempted?'이번 요청 기록이 아직 확인되지 않습니다. 자동 재전송하지 않으며 기존 기록만 다시 조회할 수 있습니다.':'기존 확정 요청이 없습니다. 현재 초안의 근거 검증을 요청할 수 있습니다.')
+    setNotice(value?'목적지 확정 요청이 기록되었습니다. 생성 결과는 아래에서 별도로 확인합니다. 작업 실행·최종 수용을 의미하지 않습니다.':attempted?'이번 요청 기록이 아직 확인되지 않습니다. 자동 재전송하지 않으며 기존 기록만 다시 조회할 수 있습니다.':'기존 확정 요청이 없습니다. 현재 초안의 근거 검증을 요청할 수 있습니다.')
    }
   }catch(error){
    if(!mounted.current)return
@@ -64,8 +65,8 @@ export function DestinationConfirmationPanel({discovery}:{discovery:StoredDiscov
     <button className="destination-studio__primary" type="button" disabled={busy||!ack||attempted} onClick={()=>void act('confirm')}>이 버전으로 확정 요청</button>
    </div>
   </>}
-  {receipt&&<p>확정 요청 기록됨 · 프로젝트 생성 대기</p>}
-  <p>이 단계는 목적지 확정 요청만 기록합니다. 프로젝트·세션·Gate 생성과 실행 승인은 별도입니다.</p>
+  {receipt&&<><p>확정 요청 기록됨 · 생성 결과 별도 확인</p><DestinationCreationResult key={`${receipt.requestId}:${receipt.reviewDigest}`} discovery={discovery} receipt={receipt}/></>}
+  {!receipt&&<p>이 단계는 목적지 확정 요청만 기록합니다. 프로젝트·세션·Gate 생성과 실행 승인은 별도입니다.</p>}
   <p>completionAuthority=false</p>
  </section>
 }

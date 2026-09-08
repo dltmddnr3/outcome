@@ -9,7 +9,7 @@ const headers={'content-type':'application/json',origin:'https://preview.invalid
 const body=JSON.stringify({requestId:'00000000-0000-4000-8000-000000000002',expectedRevision:0,document:'{}'})
 test('creation result GET is owner-scoped and finite; no publication or private receipt leaks',async()=>{
  let reads=0
- const creation={projectId:`destination-${'a'.repeat(64)}`,state:'package_registered',completionAuthority:false,executionAuthority:false}
+ const creation={projectId:`destination-${'a'.repeat(64)}`,requestId:path.split('/').at(-1),reviewDigest:'b'.repeat(64),state:'package_registered',completionAuthority:false,executionAuthority:false}
  const runtime={creationRepository:{load:async scope=>{reads++;assert.deepEqual(scope,{workspaceId:'workspace',accountRef:'account',draftId:path.split('/').at(-1)});return creation},publish:()=>{throw Error('forbidden')}}}
  const request={pathname:path.replace('/drafts/','/creations/'),token:'valid',identityService,runtime}
  assert.deepEqual(await handle(request),{status:200,body:{creation,completionAuthority:false}})

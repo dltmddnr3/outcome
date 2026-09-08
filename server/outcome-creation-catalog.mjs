@@ -56,7 +56,8 @@ export function createDestinationCreationReader({confirmationRepository,publishe
  return Object.freeze({async load(scope){
   const confirmation=await confirmationRepository.load(scope)
   if(!confirmation)return null
-  return publisher.load({...scope,requestId:confirmation.requestId})
+  const creation=await publisher.load({...scope,requestId:confirmation.requestId})
+  return creation?{...creation,requestId:confirmation.requestId,reviewDigest:confirmation.reviewDigest}:null
  }})
 }
 
