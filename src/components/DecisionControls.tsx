@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from 'react'
-import { fetchPrivateDecisionHistory, privateDecisionRecordingAvailable, recordPrivateDecision, type PrivateDecisionReason, type PrivateDecisionReceipt } from '../lib/api'
+import { capturePrivateDecisionBindingVersion, fetchPrivateDecisionHistory, privateDecisionRecordingAvailable, recordPrivateDecision, type PrivateDecisionReason, type PrivateDecisionReceipt } from '../lib/api'
 
 const reasons: Array<[PrivateDecisionReason,string]> = [['evidence_insufficient','근거 보완 필요'],['scope_not_authorized','승인 범위 밖'],['superseded_by_newer_observation','새 관측으로 대체'],['defer_pending_external_input','외부 입력 대기']]
 export function DecisionControls({projectId,eventId,sequence,onRecorded}: {projectId:string;eventId:string;sequence:number;onRecorded?:()=>void}) {
@@ -14,6 +14,7 @@ export function DecisionControls({projectId,eventId,sequence,onRecorded}: {proje
   const trigger=useRef<HTMLButtonElement|null>(null)
   const confirm=useRef<HTMLButtonElement|null>(null)
   const restoreFocus=useRef(false)
+  const reviewedBinding=useRef<number|null>(null)
   const available=privateDecisionRecordingAvailable()
   useEffect(()=>{
     if(!available){setLoading(false);return}
@@ -32,7 +33,7 @@ export function DecisionControls({projectId,eventId,sequence,onRecorded}: {proje
     if(!available||loading||!choice||busy.current||failure||receipt)return
     busy.current=true;setPending(true)
     try {
-      const result=await recordPrivateDecision({projectId,eventId,sequence,decision:choice,rejectionReason:choice==='rejected'?reason:null})
+      const result=await recordPrivateDecision({projectId,eventId,sequence,decision:choice,rejectionReason:choice==='rejected'?reason:null,expectedBindingVersion:reviewedBinding.current})
       if(result.decisionState!=='recorded'||result.completionAuthority!==false||result.decision!==choice||!result.decisionId)throw Error('invalid_receipt')
       setReceipt(result);setChoice(null);onRecorded?.()
     } catch {setFailure(true);setChoice(null)}
@@ -45,8 +46,8 @@ export function DecisionControls({projectId,eventId,sequence,onRecorded}: {proje
     <p>기록만 하며 전달·완료·배포 권한을 부여하지 않습니다.</p>
     {!available&&<p role="status">승인 기록 저장소 연결이 준비되지 않았습니다.</p>}
     <label>반려 사유<select value={reason} disabled={pending||choice!==null} onChange={event=>setReason(event.target.value as PrivateDecisionReason)}>{reasons.map(([value,label])=><option key={value} value={value}>{label}</option>)}</select></label>
-    <button type="button" disabled={!available||pending||choice!==null} onClick={event=>{trigger.current=event.currentTarget;setChoice('approved')}}>승인 기록</button>
-    <button type="button" disabled={!available||pending||choice!==null} onClick={event=>{trigger.current=event.currentTarget;setChoice('rejected')}}>반려 기록</button>
+    <button type="button" disabled={!available||pending||choice!==null} onClick={event=>{trigger.current=event.currentTarget;reviewedBinding.current=capturePrivateDecisionBindingVersion();setChoice('approved')}}>승인 기록</button>
+    <button type="button" disabled={!available||pending||choice!==null} onClick={event=>{trigger.current=event.currentTarget;reviewedBinding.current=capturePrivateDecisionBindingVersion();setChoice('rejected')}}>반려 기록</button>
     {choice&&<section role="alertdialog" aria-label="결정 기록 검토" onKeyDown={event=>{if(event.key==='Escape'){event.preventDefault();cancel()}}}>
       <h4>결정 기록 검토</h4><p>{eventId} · sequence {sequence}</p><p>{choice==='approved'?'승인':'반려'}{choice==='rejected'?` · ${reasons.find(([value])=>value===reason)?.[1]}`:''}</p>
       <p>completionAuthority=false · 확인 전에는 기록되지 않습니다.</p>

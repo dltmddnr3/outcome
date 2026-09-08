@@ -7,7 +7,7 @@ const server=await createServer({configFile:false,server:{host:'127.0.0.1',port:
 await server.listen()
 const browser=await chromium.launch({headless:true,executablePath:'/Applications/Google Chrome.app/Contents/MacOS/Google Chrome'})
 try {
- for(const width of [390,1440])for(const scenario of ['success','failure','malformed','unavailable','withdrawn']){
+ for(const width of [390,1440])for(const scenario of ['success','failure','malformed','unavailable','withdrawn','stale']){
   const page=await browser.newPage({viewport:{width,height:900}});let posts=0;const errors=[];page.on('pageerror',error=>errors.push(error.message))
   await page.route('**/api/private/workspace',route=>route.fulfill({json:{workspace:{}},headers:scenario==='unavailable'?{}:{etag:'"synthetic"','x-outcome-csrf':'synthetic-csrf-token'}}))
   let saved=scenario==='withdrawn'?{decisionState:'recorded',decisionId:'00000000-0000-4000-8000-000000000001',decision:'approved',rejectionReason:null,decidedAt:'2026-09-08T00:00:00.000Z',decisionActorClass:'owner',notice:'기록됨 · 전달은 이 범위 밖',supersedesId:null,completionAuthority:false}:null
@@ -25,9 +25,11 @@ try {
    await approve.click();await page.getByRole('alertdialog').waitFor();assert.equal(posts,0)
    await page.keyboard.press('Escape');await page.getByRole('alertdialog').waitFor({state:'detached'})
    assert.equal(await approve.evaluate(element=>document.activeElement===element),true,'cancel restores trigger focus')
-   await approve.click();await page.getByRole('button',{name:'확인 기록',exact:true}).click()
-   await page.getByRole(['failure','malformed'].includes(scenario)?'alert':'status').waitFor()
-   assert.equal(posts,1);assert.equal(await page.getByRole('button',{name:'확인 기록',exact:true}).count(),0)
+   await approve.click()
+   if(scenario==='stale')await page.evaluate(async()=>{const api=await import('/src/lib/api.ts');await api.fetchPrivateWorkspace()})
+   await page.getByRole('button',{name:'확인 기록',exact:true}).click()
+   await page.getByRole(['failure','malformed','stale'].includes(scenario)?'alert':'status').waitFor()
+   assert.equal(posts,scenario==='stale'?0:1);assert.equal(await page.getByRole('button',{name:'확인 기록',exact:true}).count(),0)
    if(scenario==='success'){await page.reload();await page.getByText('기록 ID · 00000000-0000-4000-8000-000000000001').waitFor();assert.equal(await page.getByRole('button',{name:'승인 기록',exact:true}).count(),0);assert.equal(posts,1)}
   }
   assert.equal((await page.locator('body').innerText()).includes('private-untrusted-value'),false)

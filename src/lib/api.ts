@@ -25,6 +25,7 @@ export type PrivateChatTimeline = { target: { role: 'planner'; binding_version: 
 export type PrivateChatSubmit = { accepted: true; sequence: number; event_id: string; dispatch_state: 'not_invoked' | 'dispatch_intent_recorded' | 'invoked'; delivery: 'acknowledged' | 'delivery_unknown' | 'rejected' | 'failed'; execution_started: false; result_attached: false; evidence_attached: false }
 
 let privateDecisionBinding: { etag: string; csrf: string; bearer?: string } | null = null
+let privateDecisionBindingVersion = 0
 
 async function readJson<T>(response: Response): Promise<T> {
   const body = await response.json() as T & { error?: string }
@@ -63,11 +64,13 @@ export async function fetchPrivateAccessConfig(): Promise<PrivateAccessConfig> {
 }
 
 export async function fetchPrivateWorkspace(sessionToken?: string): Promise<{ workspace: PrivateWorkspaceView }> {
+  const bindingVersion=++privateDecisionBindingVersion
+  privateDecisionBinding=null
   const response = await fetch('/api/private/workspace', { credentials: 'same-origin', headers: privateSessionHeaders(sessionToken) })
   const value = await readJson<{ workspace: PrivateWorkspaceView }>(response)
   const etag = response.headers.get('etag') ?? ''
   const csrf = response.headers.get('x-outcome-csrf') ?? ''
-  privateDecisionBinding = etag && csrf ? { etag, csrf, ...(sessionToken ? { bearer: sessionToken } : {}) } : null
+  if(bindingVersion===privateDecisionBindingVersion)privateDecisionBinding = etag && csrf ? { etag, csrf, ...(sessionToken ? { bearer: sessionToken } : {}) } : null
   return value
 }
 
@@ -92,12 +95,14 @@ export async function beginPrivateSession(provider: 'google' | 'email_code', nav
 }
 
 export async function endPrivateSession(): Promise<void> {
-  await readJson(await fetch('/api/private/auth/logout', { method: 'POST', credentials: 'same-origin' }))
+  privateDecisionBindingVersion++
   privateDecisionBinding = null
+  await readJson(await fetch('/api/private/auth/logout', { method: 'POST', credentials: 'same-origin' }))
 }
 
 const decisionNonce = () => Array.from(crypto.getRandomValues(new Uint8Array(24)), (value) => value.toString(16).padStart(2, '0')).join('')
 export const privateDecisionRecordingAvailable = () => privateDecisionBinding !== null
+export const capturePrivateDecisionBindingVersion = () => privateDecisionBinding ? privateDecisionBindingVersion : null
 
 export type PrivateDecisionHistoryEntry = {receipt:PrivateDecisionReceipt; target:{projectId:string;eventId:string;sequence:number};withdrawn:boolean}
 export function validatePrivateDecisionHistory(value:unknown): PrivateDecisionHistoryEntry[] {
@@ -144,9 +149,10 @@ export function validatePrivateDecisionReceipt(value: unknown, expected: {decisi
   return Object.freeze(record) as PrivateDecisionReceipt
 }
 
-export async function recordPrivateDecision(input: { projectId: string; eventId: string; sequence: number; decision: 'approved' | 'rejected'; rejectionReason?: PrivateDecisionReason | null }): Promise<PrivateDecisionReceipt> {
+export async function recordPrivateDecision(input: { projectId: string; eventId: string; sequence: number; decision: 'approved' | 'rejected'; rejectionReason?: PrivateDecisionReason | null; expectedBindingVersion?:number|null }): Promise<PrivateDecisionReceipt> {
   const binding = privateDecisionBinding
   if (!binding) throw new Error('decision_store_unavailable')
+  if(input.expectedBindingVersion!==undefined&&input.expectedBindingVersion!==privateDecisionBindingVersion)throw new Error('decision_source_changed')
   const receipt = await readJson<unknown>(await fetch('/api/private/decisions', {
     method: 'POST',
     credentials: 'same-origin',
