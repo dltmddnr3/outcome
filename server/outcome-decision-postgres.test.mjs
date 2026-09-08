@@ -4,6 +4,10 @@ import test from 'node:test'
 import { PGlite } from '@electric-sql/pglite'
 import { createDecisionPostgresStore } from './outcome-decision-postgres.mjs'
 import { createDecisionRecordService } from './outcome-decision-record.mjs'
+import { createDecisionRuntime } from './outcome-decision-runtime.mjs'
+import { createOutcomeServer } from './index.mjs'
+import { createAccountModelV2Projection } from './account-model-v2-projection.mjs'
+import { once } from 'node:events'
 
 test('real SQL decision store preserves replay and history across service reconstruction under backend role', async () => {
   const db = await PGlite.create('memory://')
@@ -42,5 +46,28 @@ test('real SQL decision store preserves replay and history across service recons
     await assert.rejects(() => failing.record({...input,nonce:'rollback-nonce-that-is-long-enough-123',target:{...input.target,eventId:'event-next',sequence:8}}),/decision_store_unavailable/)
     assert.equal((await db.query('select count(*)::int n from outcome_private.decision_records')).rows[0].n,2)
     assert.equal((await db.query('select count(*)::int n from outcome_private.decision_request_replay')).rows[0].n,3)
+    const runtime=createDecisionRuntime({transact,allowedOrigin:'https://preview.invalid',csrfSecret:'synthetic-csrf-token'})
+    const recorded=await runtime.service.record({...input,nonce:'runtime-nonce-that-is-long-enough-123',target:{...input.target,eventId:'event-runtime',sequence:9}})
+    assert.equal(recorded.status,201)
+    const reconstructed=createDecisionRuntime({transact,allowedOrigin:'https://preview.invalid',csrfSecret:'synthetic-csrf-token'})
+    const runtimeHistory=await reconstructed.service.history({actorSubject:'owner',workspaceId:'workspace-a',projectIds:['outcome']})
+    assert.deepEqual(runtimeHistory.body.decisions.map(entry=>[entry.target.eventId,entry.withdrawn]),[['event-blocked',true],['event-runtime',false]])
+    assert.deepEqual((await reconstructed.service.history({actorSubject:'owner',workspaceId:'workspace-b',projectIds:['outcome']})).body.decisions.map(entry=>entry.target.eventId),['event-blocked'])
+    const projection=createAccountModelV2Projection({project:{id:'outcome',name:'OUTCOME',outcome:'safe result'},blocked:true,events:[{id:'event-http',sequence:10,role:'planner',type:'result_observed',summary:'검토 필요',observedAt:'2026-09-08T00:00:00.000Z',status:'safe_hold'}]},{observedAt:'2026-09-08T00:00:00.000Z'})
+    const identity={authenticate:async token=>{if(token!=='valid')throw Error('invalid');return {subject:'owner'}},readWorkspace:async()=>({workspace:{id:'workspace-a'},projects:[{project:{id:'outcome'},modelV2:projection}],completionAuthority:false})}
+    const http=createOutcomeServer({publicReadOnly:true,accountAccess:identity,decisionRuntime:reconstructed})
+    http.listen(0,'127.0.0.1');await once(http,'listening')
+    try{
+      const base=`http://127.0.0.1:${http.address().port}`
+      const workspace=await fetch(`${base}/api/private/workspace`,{headers:{cookie:'__session=valid'}})
+      assert.equal(workspace.status,200)
+      const posted=await fetch(`${base}/api/private/decisions`,{method:'POST',headers:{cookie:'__session=valid','content-type':'application/json',origin:'https://preview.invalid','x-outcome-csrf':workspace.headers.get('x-outcome-csrf'),'if-match':workspace.headers.get('etag')},body:JSON.stringify({projectId:'outcome',eventId:'event-http',sequence:10,decision:'approved',nonce:'http-nonce-that-is-long-enough-123'})})
+      assert.equal(posted.status,201)
+      const receipt=await posted.json()
+      const history=await fetch(`${base}/api/private/decisions`,{headers:{cookie:'__session=valid'}})
+      assert.equal(history.status,200)
+      assert.deepEqual((await history.json()).decisions.find(entry=>entry.target.eventId==='event-http').receipt,receipt)
+      assert.equal((await db.query("select count(*)::int n from outcome_private.decision_records where event_id='event-http'")).rows[0].n,1)
+    }finally{http.close();await once(http,'close')}
   } finally { await db.close() }
 })
