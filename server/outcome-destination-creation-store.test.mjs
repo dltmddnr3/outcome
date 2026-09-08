@@ -11,6 +11,7 @@ import {createDiscoveryQuestionRepository} from './outcome-destination-question-
 import {createDestinationConfirmationRepository} from './outcome-destination-confirmation-repository.mjs'
 import {createDestinationCreationStore} from './outcome-destination-creation-store.mjs'
 import {createDestinationCreationWorker} from './outcome-destination-creation-worker.mjs'
+import {runDestinationCreationOnce} from '../scripts/run-destination-creation.mjs'
 import {createConfirmedPackagePublisher} from './outcome-creation-catalog.mjs'
 import {createDestinationRuntime} from './outcome-destination-runtime.mjs'
 import {handleDestinationDraftRequest} from './outcome-destination-api.mjs'
@@ -34,6 +35,22 @@ async function fixture(){
  const confirm=async()=>{const review=await confirmationRepository.review(scope);await confirmationRepository.confirm({...scope,confirmed:true,reviewDigest:review.reviewDigest});return {...scope,claimId,reviewDigest:review.reviewDigest,evidenceDigest:'b'.repeat(64)}}
  return {db,transact,store,catalog,publisher,confirmationRepository,confirm}
 }
+test('one-shot runner check and execution use restricted SQL and actual package publication',async()=>{
+ const f=await fixture()
+ try{
+  const confirmation=await f.confirm(),output=[],options={...f,...confirmation,scope,mode:'--check',ready:async()=>true,signal:new AbortController().signal,write:line=>output.push(JSON.parse(line))}
+  const before=readdirSync(f.catalog).sort()
+  assert.equal(await runDestinationCreationOnce(options),0)
+  assert.deepEqual(readdirSync(f.catalog).sort(),before)
+  for(const table of ['creation_claims','creation_results'])assert.equal(Number((await f.db.query(`select count(*) as n from outcome_destination_private.${table}`)).rows[0].n),0)
+  assert.equal(await runDestinationCreationOnce({...options,mode:'--run-once'}),0)
+  const files=readdirSync(f.catalog).sort()
+  assert.equal(await runDestinationCreationOnce({...options,mode:'--run-once'}),0)
+  assert.deepEqual(readdirSync(f.catalog).sort(),files)
+  assert.deepEqual(output.map(row=>row.state),['CHECKED_NO_MUTATION','PACKAGE_RECORDED','ALREADY_RECORDED'])
+  assert.equal((await f.store.load(scope)).state,'package_registered')
+ }finally{await f.db.close()}
+})
 test('confirmed one-shot local publication becomes durable owner-scoped hosted readback without replay',async()=>{
  const f=await fixture();try{
   const worker=createDestinationCreationWorker(f)

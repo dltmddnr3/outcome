@@ -120,6 +120,7 @@ export function createConfirmedPackagePublisher({catalog,confirmationRepository,
    const stages=map?.phases?.flatMap(phase=>phase.scopes.flatMap(scope=>scope.stages))
    if(!Array.isArray(stages)||!stages.length||stages.some(stage=>stage.gates_file!=='GATES.md'
     ||['implementation_state','test_state','evidence_closure_state','independent_qa_state','cherry_acceptance_state','release_state'].some(key=>Object.hasOwn(stage,key)&&!['not_started','pending','unknown','unverified'].includes(stage[key]))))fail()
+   await checkpoint('before_files_write')
    attempt=mkdtempSync(join(root,'.package-'))
    for(const name of names){durableWrite(join(attempt,name),files[name]);owned[name]=files[name]}
    await checkpoint('files_written')

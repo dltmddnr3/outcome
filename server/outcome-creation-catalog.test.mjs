@@ -45,7 +45,7 @@ test('missing confirmation creates nothing; conflicts and bad capability proofs 
  assert.equal(f.collect().projects.length,2)
 })
 test('each pre-publication failure leaves no visible project and removes only attempt-owned files',async()=>{
- for(const boundary of ['files_written','package_validated','before_publish']){
+ for(const boundary of ['before_files_write','files_written','package_validated','before_publish']){
   const f=fixture();writeFileSync(join(f.catalog,'user-note.txt'),'keep')
   await assert.rejects(()=>createConfirmedPackagePublisher({...f.options,checkpoint:step=>{assert.equal(f.collect().projects.length,1);if(step===boundary)throw Error('injected')}}).publish(scope))
   assert.equal(f.collect().projects.length,1);assert.deepEqual(readdirSync(f.catalog),['user-note.txt'])
