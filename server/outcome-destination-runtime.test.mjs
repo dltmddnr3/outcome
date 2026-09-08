@@ -35,3 +35,10 @@ test('destination runtime construction is inert and rejects noncanonical origin 
  for(const allowedOrigin of ['http://preview.invalid','https://preview.invalid/path','https://user:pass@preview.invalid'])assert.throws(()=>createDestinationRuntime({...f,allowedOrigin,csrfSecret:'synthetic-csrf-long'}),/destination_unavailable/)
  assert.throws(()=>createDestinationRuntime({...f,allowedOrigin:'https://preview.invalid',csrfSecret:''}),/destination_unavailable/)
 })
+test('finite confirmation readiness survives only a successful rollback',async()=>{
+ for(const suffix of ['intake_incomplete','residual_unknowns','issued_answers_missing','question_receipt_missing','coverage_or_material_gap','verification_pending'])for(const rollback of [false,true]){
+  const f=fixture({rollback}),code=`destination_confirmation_${suffix}`
+  await assert.rejects(()=>createDestinationTransactionPort(f)(async()=>{throw Error(code)}),error=>error.message===(rollback?'destination_unavailable':code))
+  assert.equal(f.stats().connections,1);assert(!f.calls.some(([sql])=>sql==='COMMIT'))
+ }
+})

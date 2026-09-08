@@ -47,9 +47,9 @@ export function createDestinationConfirmationRepository({transact,verifyReview}=
   return {snapshot,serialized,reviewDigest,blockers}
  }
  const prepare=async(query,scope)=>{
-  if(typeof verifyReview!=='function')fail()
   const {snapshot,serialized,reviewDigest,blockers}=await readSnapshot(query,scope)
-  if(blockers.length)fail()
+  if(blockers.length)throw Error(`destination_confirmation_${blockers[0]}`)
+  if(typeof verifyReview!=='function')throw Error('destination_confirmation_verification_pending')
   const raw=await verifyReview({workspaceId:scope[0],accountRef:scope[1],reviewDigest,serializedSnapshot:serialized,query})
   if(typeof raw!=='string'||Buffer.byteLength(raw)>2048)fail()
   let proof;try{proof=JSON.parse(raw)}catch{fail()}

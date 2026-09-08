@@ -12,7 +12,7 @@ const unavailable=()=>new Error('destination_unavailable')
 const knownError=error=>{
  if(!error||typeof error!=='object'||types.isProxy(error))return null
  const code=Object.getOwnPropertyDescriptor(error,'message')?.value
- return ['destination_revision_conflict','destination_request_conflict','destination_invalid','discovery_revision_conflict','discovery_request_conflict','discovery_intake_stale','discovery_invalid'].includes(code)?code:null
+ return ['destination_revision_conflict','destination_request_conflict','destination_invalid','discovery_revision_conflict','discovery_request_conflict','discovery_intake_stale','discovery_invalid','destination_confirmation_intake_incomplete','destination_confirmation_residual_unknowns','destination_confirmation_issued_answers_missing','destination_confirmation_question_receipt_missing','destination_confirmation_coverage_or_material_gap','destination_confirmation_verification_pending'].includes(code)?code:null
 }
 
 // An explicitly supplied dedicated pool only: no env reads, credentials or grants.

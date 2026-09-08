@@ -1,6 +1,19 @@
 import {useEffect,useRef,useState} from 'react'
 import {captureDestinationReviewBinding,requestDestinationConfirmation,requestDestinationConfirmationReview,type DestinationConfirmation,type DestinationConfirmationReview,type StoredDiscovery} from '../lib/api'
 
+const readinessNotices:Record<string,string>={
+ destination_confirmation_intake_incomplete:'기본 초안의 필수 답변이 남아 있습니다. 답변을 저장한 뒤 다시 검토해 주세요.',
+ destination_confirmation_residual_unknowns:'초안의 미상 항목이 남아 있습니다. 필요한 근거를 확인해 해결해야 하며, 확정을 위해 목록만 지우면 안 됩니다.',
+ destination_confirmation_issued_answers_missing:'이미 받은 질문 중 답변하지 않은 항목이 있습니다. 후속 질문과 저장된 답변을 확인해 주세요.',
+ destination_confirmation_question_receipt_missing:'현재 답변 버전에 연결된 질문 검토 결과가 없습니다. 저장된 답변을 유지한 채 현재 맥락의 검토가 필요합니다.',
+ destination_confirmation_coverage_or_material_gap:'목적지의 중요한 미결정 사항 또는 기술 검증이 남아 있습니다. 답변 개수만으로 검토를 완료하지 않습니다.',
+ destination_confirmation_verification_pending:'현재 초안의 근거 내용을 검증하는 연결이 아직 준비되지 않았습니다. 기술 검증 후 다시 확인해야 합니다.',
+}
+export function destinationConfirmationFailureNotice(error:unknown){
+ const code=error instanceof Error?error.message:''
+ return Object.hasOwn(readinessNotices,code)?`${readinessNotices[code]} 확정 요청은 보내지 않았습니다.`:'현재 초안의 근거 검증 결과를 확인하지 못했습니다. 서버 연결 또는 검증 상태를 확인해야 하며 확정 요청은 보내지 않았습니다.'
+}
+
 export function DestinationConfirmationPanel({discovery}:{discovery:StoredDiscovery}){
  const [isCurrent]=useState(()=>captureDestinationReviewBinding())
  const [checked,setChecked]=useState(false),[busy,setBusy]=useState(false),[ack,setAck]=useState(false),[attempted,setAttempted]=useState(false)
@@ -29,11 +42,11 @@ export function DestinationConfirmationPanel({discovery}:{discovery:StoredDiscov
     setReceipt(value);setChecked(true);setReview(null);setAck(false)
     setNotice(value?'목적지 확정 요청이 기록되었습니다. 프로젝트 생성·작업 실행·최종 수용은 아직 아닙니다.':attempted?'이번 요청 기록이 아직 확인되지 않습니다. 자동 재전송하지 않으며 기존 기록만 다시 조회할 수 있습니다.':'기존 확정 요청이 없습니다. 현재 초안의 근거 검증을 요청할 수 있습니다.')
    }
-  }catch{
+  }catch(error){
    if(!mounted.current)return
    setReview(null);setAck(false)
    if(kind==='read')setChecked(false)
-   setNotice(kind==='prepare'?'현재 초안의 근거 검증을 완료하지 못했습니다. 미결정 답변·기술 검증 또는 서버 연결을 확인해야 하며 확정 요청은 보내지 않았습니다.':'요청 결과를 확인하지 못했습니다. 자동 재전송하지 않고 확정 요청 기록 조회로 확인해 주세요.')
+   setNotice(kind==='prepare'?destinationConfirmationFailureNotice(error):'요청 결과를 확인하지 못했습니다. 자동 재전송하지 않고 확정 요청 기록 조회로 확인해 주세요.')
   }finally{lock.current=false;if(mounted.current)setBusy(false)}
  }
  return <section className="destination-studio__unknowns" aria-label="Destination 확정 요청" aria-busy={busy}>

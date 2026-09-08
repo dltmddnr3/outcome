@@ -25,7 +25,7 @@ test('trusted inspection reads pending snapshot without verification, writes or 
   const snapshot=JSON.parse(inspected.serializedSnapshot)
   assert.deepEqual(snapshot.document.unknowns,['technical review pending']);assert.deepEqual(snapshot.questionReceipt.coverage,[])
   assert.equal(await f.count(),0);assert.equal(f.verifications(),0)
-  await assert.rejects(()=>repo.review(scope));await assert.rejects(()=>repo.confirm({...scope,requestId,confirmed:true,reviewDigest:inspected.reviewDigest}))
+  await assert.rejects(()=>repo.review(scope),/destination_confirmation_residual_unknowns/);await assert.rejects(()=>repo.confirm({...scope,requestId,confirmed:true,reviewDigest:inspected.reviewDigest}))
   await assert.rejects(()=>repo.inspect({...scope,accountRef:'other'}))
   assert.equal(await f.count(),0)
  }finally{await f.db.close()}
@@ -137,7 +137,8 @@ test('owner HTTP confirmation composes real restricted SQL, CSRF, exact body and
   assert.deepEqual(await (await fetch(url,{method:'POST',headers,body:JSON.stringify(body)})).json(),saved)
   assert.equal(await f.count(),1)
   runtime.confirmationRepository=createDestinationConfirmationRepository({transact:f.transact})
-  assert.equal((await fetch(reviewUrl,{headers})).status,503)
+  const pending=await fetch(reviewUrl,{headers});assert.equal(pending.status,409)
+  assert.deepEqual(await pending.json(),{error:'destination_confirmation_verification_pending'})
   assert.equal((await fetch(url,{method:'POST',headers,body:JSON.stringify(body)})).status,503)
   assert.equal(await f.count(),1)
  }finally{server.closeAllConnections();await new Promise(resolve=>server.close(resolve));await f.db.close()}

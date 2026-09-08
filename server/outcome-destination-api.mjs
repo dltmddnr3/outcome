@@ -51,6 +51,7 @@ export async function handleDestinationDraftRequest({method='GET',pathname='',to
   return {status:analysis||questionRequest||confirmation?202:200,body:{[field]:value,completionAuthority:false}}
  }catch(error){
   const code=errorCode(error)
+  if(confirmationReview&&['destination_confirmation_intake_incomplete','destination_confirmation_residual_unknowns','destination_confirmation_issued_answers_missing','destination_confirmation_question_receipt_missing','destination_confirmation_coverage_or_material_gap','destination_confirmation_verification_pending'].includes(code))return result(409,code)
   if(['destination_revision_conflict','destination_request_conflict','discovery_revision_conflict','discovery_request_conflict','discovery_intake_stale'].includes(code))return result(409,code)
   if(['destination_invalid','discovery_invalid'].includes(code))return result(400,'invalid_request')
   return result(503,'destination_unavailable')
