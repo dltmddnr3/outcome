@@ -3,6 +3,7 @@ import test from 'node:test'
 import {readFile} from 'node:fs/promises'
 import {PGlite} from '@electric-sql/pglite'
 import {createDestinationDraftRepository,parseDestinationDraft} from './outcome-destination-postgres.mjs'
+import {handleDestinationDraftRequest} from './outcome-destination-api.mjs'
 
 const document=()=>JSON.stringify({schemaVersion:1,mode:'brief_gap',source:'목적: 실행 결과 확인',answers:{problem:'작업 결과를 확인하기 어렵다'},unknowns:['수용 기준 확인 필요']})
 test('destination draft parser preserves unknowns and rejects secret-like or oversized content',()=>{
@@ -42,5 +43,19 @@ test('private draft SQL preserves revisions, rejects stale saves and isolates ac
   const failing=createDestinationDraftRepository({transact:work=>transact(async port=>{await work(port);throw Error('synthetic_rollback')})})
   await assert.rejects(()=>failing.save({...next,requestId:'00000000-0000-4000-8000-000000000004',expectedRevision:2}),/synthetic_rollback/)
   assert.equal((await make().load(scope)).revision,2)
+  // Exercise the public-safe handler against the actual restricted SQL repository.
+  const identityService={authenticate:async()=>({subject:'synthetic-owner'}),resolveBridgeAuthority:async()=>({workspace_id:scope.workspaceId,account_ref:scope.accountRef,project_ids:['outcome']})}
+  const headers={'content-type':'application/json',origin:'https://preview.invalid','x-outcome-csrf':'synthetic-only-csrf'}
+  const request={pathname:`/api/private/destination/drafts/${scope.draftId}`,token:'synthetic',identityService,runtime:{repository:make(),allowedOrigin:headers.origin,csrfSecret:headers['x-outcome-csrf']},headers}
+  const payload={requestId:'00000000-0000-4000-8000-000000000005',expectedRevision:2,document:document()}
+  const saved=await handleDestinationDraftRequest({...request,method:'PUT',body:JSON.stringify(payload)})
+  assert.equal(saved.status,200);assert.equal(saved.body.draft.revision,3);assert.equal(saved.body.completionAuthority,false)
+  assert.deepEqual(await handleDestinationDraftRequest({...request,method:'PUT',body:JSON.stringify(payload)}),saved)
+  assert.deepEqual(await handleDestinationDraftRequest({...request,runtime:{repository:make()}}),saved)
+  const stale=await handleDestinationDraftRequest({...request,method:'PUT',body:JSON.stringify({...payload,requestId:'00000000-0000-4000-8000-000000000006'})})
+  assert.equal(stale.status,409)
+  const foreign=await handleDestinationDraftRequest({...request,identityService:{...identityService,resolveBridgeAuthority:async()=>({workspace_id:scope.workspaceId,account_ref:'another-owner',project_ids:['outcome']})}})
+  assert.deepEqual(foreign.body,{draft:null,completionAuthority:false})
+  assert.equal((await make().load(scope)).revision,3)
  }finally{await db.close()}
 })
