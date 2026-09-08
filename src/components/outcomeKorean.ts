@@ -1,3 +1,5 @@
+import { outcomeDisplayLabel } from '../lib/outcome-display-copy'
+
 const phaseCopy: Record<string, [string, string]> = {
   'phase-1-mvp-closure': ['1단계 · 최소 제품 마무리', '실제 사용 경계, 불변 근거, 독립 검수와 Cherry 승인을 거쳐 기록·정리·재발견 최소 제품을 마무리합니다.'],
   'outcome-phase-1': ['1단계 · 로컬 최소 제품', 'Cherry Note와 OUTCOME을 같은 표준 계약으로 추적하는 독립 로컬 대시보드를 Cherry가 실제 사용할 수 있는 상태로 닫습니다.'],
@@ -8,7 +10,7 @@ const phaseCopy: Record<string, [string, string]> = {
 }
 
 export const hierarchyLabels = ['프로젝트', '큰 단계', '범위', '작업 단계', '완료 조건'] as const
-export const projectOutcomePresentation = (id: string, value: string) => id === 'outcome' ? '인공지능 역할의 작업을 결과 구조와 근거에 연결해 현재 위치와 다음 경계를 보여줍니다.' : value
+export const projectOutcomePresentation = (id: string, value: string) => id === 'outcome' ? '인공지능과 원하는 결과를 만들어 가세요. 진행 상황과 다음 할 일을 확인할 수 있어요.' : value
 
 const scopeCopy: Record<string, [string, string]> = {
   'scope-stage-33-physical-boundary': ['33단계 실제 사용 경계', '열려 있는 빌드 41 하단 셸 의견을 검증된 불변 후보와 Cherry의 실제 사용 판정으로 전환하되 피드는 시작하지 않습니다.'],
@@ -135,7 +137,9 @@ export const axisLabelKo = (value: string) => axisCopy[value] ?? '원본 상태 
 export const freshnessLabelKo = (value: string) => ({ fresh: '최근 관측', stale: '관측 오래됨', unknown: '관측 근거 없음', replaced: '교체된 관측' }[value] ?? '관측 상태 미상')
 export const sourceLabelKo = (value: string) => ({ runtime_registry: '실시간 역할 연결', builder_binding: '구현 역할 연결' }[value] ?? '원본 연결')
 export const activityLabelKo = (value: string | null) => value === 'Stage 6 NEEDS_REVISION correction is active; fresh independent QA remains required' ? '6단계 수정 진행 중 · 새 독립 검수가 필요합니다' : value ? '현재 작업 설명 한글화 대기' : null
-export const phasePresentation = (id: string, sourceTitle?: string, sourcePurpose?: string) => phaseCopy[id] ?? [sourceTitle || '큰 단계 제목 한글화 대기', sourcePurpose || '큰 단계 목적 한글화 대기']
+export const phasePresentation = (id: string, sourceTitle?: string, sourcePurpose?: string) => /^outcome-phase-[1-5]$/.test(id) && sourceTitle
+  ? [outcomeDisplayLabel('outcome', sourceTitle), sourcePurpose || '단계 목적 확인 필요']
+  : phaseCopy[id] ?? [sourceTitle || '큰 단계 제목 한글화 대기', sourcePurpose || '큰 단계 목적 한글화 대기']
 export const scopePresentation = (id: string, sourceTitle?: string, sourcePurpose?: string) => scopeCopy[id] ?? [sourceTitle || '범위 제목 한글화 대기', sourcePurpose || '범위 목적 한글화 대기']
 export const stagePresentation = (id: string, sourceTitle?: string, sourcePurpose?: string) => stageCopy[id] ?? [sourceTitle || '작업 단계 제목 한글화 대기', sourcePurpose || '작업 단계 목적 한글화 대기']
 export const gatePresentation = (stageId: string, gateId: string, sourceTitle?: string) => gateCopy[`${stageId}:${gateId}`] ?? (sourceTitle || '원본 완료 조건 설명 한글화 대기')

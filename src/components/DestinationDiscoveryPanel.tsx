@@ -51,7 +51,7 @@ export function DestinationDiscoveryPanel({intake}:{intake:StoredDestinationDraf
     }else{
      const [value,status]=await Promise.all([requestDestinationQuestions(discovery),requestDestinationQuestionRun(discovery)])
      setReceipt(value);setRun(status);setRunChecked(true);setRunHold(false)
-     setNotice(value?'현재 답변 맥락에 연결된 질문입니다.':status?'질문 요청 상태를 확인했습니다. 자동 재전송하지 않습니다.':'아직 현재 맥락의 Planner 질문이 없습니다. 자동 전송하거나 임의 질문으로 대체하지 않습니다.')
+     setNotice(value?'현재 답변 맥락에 연결된 질문입니다.':status?'질문 요청 상태를 확인했습니다. 자동 재전송하지 않습니다.':'아직 현재 맥락의 플래너 질문이 없습니다. 자동 전송하거나 임의 질문으로 대체하지 않습니다.')
     }
    }else{
     const document=intake.document
@@ -81,7 +81,7 @@ export function DestinationDiscoveryPanel({intake}:{intake:StoredDestinationDraf
    <button type="button" disabled={busy||!checked||!!discovery||hold} onClick={()=>void act('initialize')}>후속 질문 준비 시작</button>
    <button type="button" disabled={busy||!discovery} onClick={()=>void act('questions')}>현재 후속 질문 확인</button>
    <button type="button" disabled={busy||!discovery} onClick={()=>void act('review')}>저장된 추가 결정 검토</button>
-   <button type="button" disabled={busy||!discovery||!runChecked||!!run||runHold||!!receipt} onClick={()=>void act('request')}>Planner 후속 질문 요청</button>
+   <button type="button" disabled={busy||!discovery||!runChecked||!!run||runHold||!!receipt} onClick={()=>void act('request')}>플래너 후속 질문 요청</button>
   </div>
   {previous&&<DestinationPreviousReview key={previous.value.contextDigest} intake={intake} previous={previous.value} decisions={previous.decisions} pending={previous.pending} pendingReceipt={previous.pendingReceipt} isCurrent={reviewIsCurrent} onCancel={()=>setPrevious(null)} onUpdated={value=>{setPrevious(null);setDiscovery(value);setDecisionReview(null);setReceipt(null);setChecked(true);setHold(false);setRun(null);setRunChecked(false);setRunHold(false);setNotice('기존 답변을 보존해 현재 초안 버전에 연결했습니다. 새 맥락의 질문과 근거를 다시 검토해 주세요.')}}/>}
   {run&&<p role="status">{{queued:'요청 접수 · 실행 대기',dispatch_started:'질문 처리 중 · 응답 미확인',completed:'질문 응답 기록됨 · 목적지 확정 아님',failed:'질문 요청 실패 · 자동 재전송 없음',delivery_unknown:'전달 상태 불명 · 자동 재전송 없음'}[run.state]}</p>}
@@ -89,7 +89,7 @@ export function DestinationDiscoveryPanel({intake}:{intake:StoredDestinationDraf
   {discovery&&decisionReview&&decisionReview.contextDigest===discovery.contextDigest&&<section aria-label="저장된 추가 결정">
    <h4>저장된 추가 결정</h4><p>기본 초안 버전 {decisionReview.intakeRevision} · 후속 답변 버전 {decisionReview.contextRevision}</p>
    {decisionReview.decisions.length?<dl>{decisionReview.decisions.map(item=><div key={item.questionId}><dt>{item.prompt}</dt><dd>{item.value}</dd></div>)}</dl>:<p>아직 저장된 추가 결정이 없습니다. 권장안은 자동 채택하지 않습니다.</p>}
-   <p>질문 원문과 답변의 연결만 확인했습니다. 근거 내용 검증·Destination 확정·실행 승인은 별도입니다.</p>
+   <p>질문 원문과 답변의 연결만 확인했습니다. 근거 내용 검증·목적지 확정·실행 승인은 별도입니다.</p>
    <DestinationConfirmationPanel key={discovery.contextDigest} discovery={discovery}/>
   </section>}
   {discovery&&receipt&&<DestinationQuestionBatch context={discovery.context} receipt={receipt} onSave={save}/>}

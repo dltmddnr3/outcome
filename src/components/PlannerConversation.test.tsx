@@ -20,7 +20,7 @@ describe('correlated answer evidence', () => {
     const timeline=[user,answer]
     expect(hasCorrelatedPlannerAnswer(timeline,user.correlation_id)).toBe(true)
     const html=renderToStaticMarkup(<PlannerConversation events={[]} fixtureTimeline={timeline} />)
-    expect(html).toContain('Planner 답변 확인됨');expect(html).not.toContain('전달 상태 확인 불가')
+    expect(html).toContain('플래너 답변 확인됨');expect(html).not.toContain('전달 상태 확인 불가')
     expect(user.delivery).toBe('delivery_unknown')
   })
   it('rejects unmatched, earlier, incomplete and ambiguous correlations', () => {
@@ -56,6 +56,17 @@ describe('live timeline validation', () => {
 })
 
 describe('conversation request credentials', () => {
+  it('localizes timeline labels while preserving original message content', () => {
+    const kinds = ['assistant_message', 'commentary', 'plan', 'tool_call', 'tool_result', 'file_change', 'diff', 'test_result', 'approval_request', 'waiting_user', 'error', 'connection'] as const
+    const states = ['queued', 'responding', 'tool_running', 'verifying', 'waiting_approval', 'waiting_user', 'completed', 'failed', 'cancelled', 'reconnecting'] as const
+    for (const kind of kinds) for (const state of states) {
+      const html = renderToStaticMarkup(<PlannerConversation events={[]} fixtureTimeline={[{ event_id: 'event-0000000000000001', sequence: 1, observed_at: '2026-09-08T00:00:00.000Z', correlation_id: 'message-0000000000000001', kind, state, payload: kind === 'assistant_message' ? { private_content: { text: 'Original English message' } } : {} }]} />)
+      expect(html).toContain('플래너와 대화')
+      expect(html).not.toContain(`${kind} · ${state}`)
+      expect(html).not.toContain('undefined')
+      if (kind === 'assistant_message') expect(html).toContain('Original English message')
+    }
+  })
   it('obtains a fresh credential on every request rather than caching the first token', async () => {
     let calls = 0
     const session = { sessionCredential: 'obsolete-fixture', getSessionCredential: async () => `fixture-${++calls}` }
@@ -81,13 +92,13 @@ describe('Planner conversation observed-event contract', () => {
   it('renders supplied Planner answer text without relabeling it as Cherry or queued', () => {
     const html = renderToStaticMarkup(<PlannerConversation events={[]} fixtureTimeline={[{ event_id: 'event-0000000000000002', sequence: 2, observed_at: '2026-09-08T00:00:00.000Z', kind: 'assistant_message', state: 'completed', correlation_id: 'message-0000000000000001', payload: { private_content: { text: '확인된 답변 본문' } } }]} />)
     expect(html).toContain('확인된 답변 본문')
-    expect(html).toContain('<strong>Planner</strong>')
-    expect(html).not.toContain('<strong>Cherry</strong>')
+    expect(html).toContain('<strong>플래너</strong>')
+    expect(html).not.toContain('<strong>나</strong>')
     expect(html).not.toContain('전송 대기 기록')
   })
   it('renders a quiet truthful empty state without synthetic activity', () => {
     const html = renderToStaticMarkup(<PlannerConversation events={[]} />)
-    expect(html).toContain('아직 관측된 Planner 작업 이벤트가 없습니다')
+    expect(html).toContain('아직 확인된 작업 기록이 없습니다')
     expect(html).toContain('data-observed-events="0"')
     for (const token of ['typing', 'streaming', 'tool call', '완료됨', '전송']) expect(html).not.toContain(token)
   })
@@ -121,11 +132,20 @@ describe('Phase 4 role chat D3 contract', () => {
   it('keeps one ordered event dataset behind the exact five read-only lenses', () => {
     const html = renderToStaticMarkup(<PlannerConversation events={events} />)
     const controls = html.match(/<nav class="planner-conversation__filters"[\s\S]*?<\/nav>/)?.[0].match(/<button[^>]*>(.*?)<\/button>/g)?.map((button) => button.replace(/<[^>]+>/g, '').replace('&amp;', '&'))
-    expect(controls).toEqual(roleChatFilters)
+    expect(controls).toEqual(['전체', '플래너', '구현', '사용성·품질 검증', '출시 전 점검'])
     expect(controls).toHaveLength(5)
     expect(html.indexOf('event-planner-1')).toBeLessThan(html.indexOf('event-builder-2'))
     expect(html.indexOf('event-builder-2')).toBeLessThan(html.indexOf('event-audit-3'))
     expect(html).toContain('완료 판정 권한 없음')
+    expect(html).toContain('세션 활동은 진행률이 아닙니다')
+  })
+  it('collapses routine activity but exposes safety holds without hiding original evidence', () => {
+    const html = renderToStaticMarkup(<PlannerConversation events={events} />)
+    const activities = [...html.matchAll(/<details class="planner-conversation__activity"([^>]*)>([\s\S]*?)<\/details>/g)]
+    expect(activities).toHaveLength(4)
+    expect(activities.filter(match => match[1].includes('open'))).toHaveLength(1)
+    expect(activities.find(match => match[1].includes('open'))?.[2]).toContain('감사 관측')
+    for (const event of events) expect(html).toContain(event.summary)
     expect(html).toContain('세션 활동은 진행률이 아닙니다')
   })
 
@@ -152,7 +172,7 @@ describe('Phase 4 role chat D3 contract', () => {
   it('renders exactly one planner-only composer only with a live adapter and binding', () => {
     const writable = renderToStaticMarkup(<PlannerConversation events={events} plannerBound onSend={() => undefined} />)
     expect(writable.match(/data-planner-composer="true"/g)).toHaveLength(1)
-    expect(writable).toContain('Planner에게 메시지')
+    expect(writable).toContain('플래너에게 메시지')
     expect(writable).not.toContain('Builder에게 메시지')
     const readOnly = renderToStaticMarkup(<PlannerConversation events={events} plannerBound />)
     expect(readOnly).not.toContain('data-planner-composer="true"')

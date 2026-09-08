@@ -56,7 +56,8 @@ describe('OUTCOME Package dashboard', () => {
     expect(markup).toContain('data-completion-authority="false"')
     expect(markup.match(/data-source-context="true"/g) ?? []).toHaveLength(1)
     expect(markup).toContain('aria-labelledby="oc-source-context-title"')
-    for (const text of ['현재 primary · Phase 5', '13/13', 'compatibility · Phase 3', '38/43', 'historical · Phase 2', '5/6', 'Map · Slice A A1-A4 OPEN', 'Gate · 13/13 evidence closure', '캡처 시각', '2026-09-07T12:23:21.492Z', '원본 갱신', '2026-08-31 KST', '근거 원본 확인', '2026-09-03T09:55:56.978Z', 'completionAuthority=false', '프로젝트 완료나 Cherry 수용을 승인하지 않습니다.']) expect(markup).toContain(text)
+    for (const text of ['현재 기준 · 5단계', '13/13', '이전 체계의 참고 기록 · 3단계', '38/43', '과거 자료 · 2단계', '5/6', 'Map · Slice A A1-A4 OPEN', 'Gate · 13/13 evidence closure', '캡처 시각', '2026-09-07T12:23:21.492Z', '원본 갱신', '2026-08-31 KST', '근거 원본 확인', '2026-09-03T09:55:56.978Z', 'completionAuthority=false', '프로젝트 완료나 Cherry 수용을 승인하지 않습니다.']) expect(markup).toContain(text)
+    for (const text of ['현재 primary', 'compatibility · Phase', 'historical · Phase']) expect(markup).not.toContain(text)
     expect(markup).toContain('data-source-primary="outcome-phase-5:13/13"')
     expect(markup).toContain('data-source-compatibility="outcome-phase-3:38/43"')
     expect(markup).toContain('data-source-historical="outcome-phase-2:5/6"')
@@ -70,6 +71,15 @@ describe('OUTCOME Package dashboard', () => {
     expect(markup).not.toContain('원본 충돌')
     expect(markup).not.toContain('data-source-conflict=')
     for (const text of ['13/13', '38/43', '5/6', 'completionAuthority=false', '프로젝트 완료나 Cherry 수용을 승인하지 않습니다.']) expect(markup).toContain(text)
+  })
+  it('localizes built-in result titles without changing evidence or another project', () => {
+    const source = JSON.parse(readFileSync(new URL('../../snapshot/outcome-package-source.json', import.meta.url), 'utf8'))
+    const view = source.projects.find((item: PackageProject) => item.project.id === 'outcome').resultView as ResultView
+    const before = JSON.stringify(view)
+    expect(renderToStaticMarkup(createElement(OutcomeResultView, { view }))).toContain('5단계 · 원하는 결과부터 프로젝트 만들기')
+    expect(JSON.stringify(view)).toBe(before)
+    view.hierarchy.id = 'another-project'
+    expect(renderToStaticMarkup(createElement(OutcomeResultView, { view }))).toContain('Phase 5 · Outcome-first Creation')
   })
   it('distinguishes Map narrative counts from candidate Gate counts without rewriting either', () => {
     const source = JSON.parse(readFileSync(new URL('../../snapshot/outcome-package-source.json', import.meta.url), 'utf8'))
@@ -96,7 +106,15 @@ describe('OUTCOME Package dashboard', () => {
     const node = { id: 'outcome', kind: 'project', title: 'OUTCOME', outcome: '사용 가능한 결과', acceptance: { closed: 1, total: 2, unmapped: 1, partial: true, label: '부분 분모 · 전체 완료율 아님', unit_ids: ['GATES.md#G1', 'GATES.md#G2'], denominator_sha256: 'a'.repeat(64), weight: 1, completion_authority: false }, work: { initial_hours: null, actual_hours: null, remaining_hours: null, planned_finish_at: '2026-09-18T07:55:25+09:00', latest_forecast: null, provenance: { planned_finish_at: { source_ref: 'docs/PLAN.md', observed_at: '2026-09-07T00:00:00+09:00' } } }, comparison: { yesterday: null, current: { observed_at: '2026-09-07T00:00:00+09:00', closed: 1, total: 2, unmapped: 1, denominator_sha256: 'a'.repeat(64) }, today_delta: null, message: '이 날짜 이전의 비교 기록 없음' }, timeline: [{ type: 'current', observed_at: '2026-09-07T00:00:00+09:00', closed: 1, total: 2, unmapped: 1 }], links: { source: { href: '#result-node-outcome', action: null, label: '출처 보기' }, usable_result: { href: '#result-node-outcome', action: null, label: '사용 가능한 결과 보기' }, planner_conversation: { href: null, action: 'planner_conversation', label: 'Planner 대화 보기' } }, children: [] }
     const value = { schema_version: 1, observed_at: '2026-09-07T00:00:00+09:00', calendar: { plan_started_at: null, planned_finish_at: '2026-09-18T07:55:25+09:00', source_ref: 'docs/PLAN.md' }, hierarchy: node, links: node.links, completion_authority: false } as ResultView
     const markup = renderToStaticMarkup(createElement(OutcomeResultView, { view: value, onPlannerNavigate: () => undefined }))
-    for (const text of ['결과물·진척·시간', '부분 분모 · 전체 완료율 아님', '최초 예상', '실제 작업', '남은 예상 범위', '계획 마감', '최신 완료 예측', '전일 누적', '당일 변화', '현재 누적', '이 날짜 이전의 비교 기록 없음', '미확정', 'Planner 대화 보기']) expect(markup).toContain(text)
+    for (const text of ['결과물·진척·시간', '부분 분모 · 전체 완료율 아님', '최초 예상', '실제 작업', '남은 예상 범위', '계획 마감', '최신 완료 예측', '전일 누적', '당일 변화', '현재 누적', '이 날짜 이전의 비교 기록 없음', '미확정', '플래너와 대화']) expect(markup).toContain(text)
+    expect(markup).not.toContain('Planner 대화 보기')
+    expect(value.links.planner_conversation.label).toBe('Planner 대화 보기')
+    expect(markup).toContain('결과 기록 보기')
+    expect(markup).not.toContain('사용 가능한 결과 보기')
+    expect(markup.indexOf('결과 기록 보기')).toBeLessThan(markup.indexOf('id="result-node-outcome"'))
+    expect(markup).toContain('이 기록만으로 실제 사용 가능 여부나 최종 수용을 판단하지 않습니다.')
+    value.hierarchy.links.usable_result.href = null
+    expect(renderToStaticMarkup(createElement(OutcomeResultView, { view: value }))).toContain('결과가 없거나 작업이 끝났다는 뜻은 아닙니다.')
     expect(markup).toContain('data-completion-authority="false"')
     expect(markup).not.toContain('100%')
   })
@@ -123,7 +141,7 @@ describe('OUTCOME Package dashboard', () => {
     let clicked = 0; let focused = 0; let tabIndex = 0
     const disclosure = { open: false }
     const heading = { focus() { expect(disclosure.open).toBe(true); focused += 1 }, get tabIndex() { return tabIndex }, set tabIndex(value) { tabIndex = value } }
-    const planner = { textContent: 'Planner', click() { clicked += 1 } }
+    const planner = { textContent: '플래너', dataset: { roleFilter: 'Planner' }, click() { clicked += 1 } }
     const panel = { closest: (selector: string) => selector === 'details.oc-v1-compatibility' ? disclosure : null, querySelectorAll: () => [{ textContent: '전체', click() {} }, planner], querySelector: (selector: string) => selector === '#planner-conversation-title' ? heading : null }
     const root = { querySelector: (selector: string) => selector === '#oc-planner-conversation' ? panel : null }
     expect(focusPlannerConversation(root as unknown as Document)).toBe(true)
@@ -131,15 +149,30 @@ describe('OUTCOME Package dashboard', () => {
     expect(focusPlannerConversation({ querySelector: () => null } as unknown as Document)).toBe(false)
   })
   it('uses a neutral completed map node with one internal point accent no larger than 8px', () => {
-    expect(effectiveProperty(styles, '.oc-map-column button[role=option]>i.complete', 'background')).toBe('#151a15')
+    expect(effectiveProperty(styles, '.oc-map-column button[role=option]>i.complete', 'background')).toBe('#191919')
     expect(effectiveProperty(styles, '.oc-map-column button[role=option]>i.complete::after', 'width')).toBe('7px')
     expect(effectiveProperty(styles, '.oc-map-column button[role=option]>i.complete::after', 'height')).toBe('7px')
     expect(effectiveProperty(styles, '.oc-map-column button[role=option]>i.complete::after', 'background')).toBe('var(--oc-accent)')
   })
+  it('keeps dark surface fills neutral rather than green tinted', () => {
+    const fills = [...styles.matchAll(/background(?:-color)?:[^;}]*?#([0-9a-f]{6})(?![0-9a-f])/gi)]
+    expect(fills.length).toBeGreaterThan(40)
+    for (const [, hex] of fills) {
+      const [red, green, blue] = [0, 2, 4].map(index => parseInt(hex.slice(index, index + 2), 16))
+      if (green >= red && green >= blue && green < 64) expect([red, green, blue], hex).toEqual([green, green, green])
+    }
+  })
+  it('does not reintroduce translucent green surfaces or glow', () => {
+    const colors = [...styles.matchAll(/(?:background|box-shadow):[^;}]*?rgba\((\d+),(\d+),(\d+),[^)]+\)/g)]
+    expect(colors.length).toBeGreaterThan(0)
+    for (const [, red, green, blue] of colors) expect([red, green, blue]).toEqual([green, green, green])
+    expect(effectiveProperty(styles, '.outcome-login button', 'background')).toBe('var(--oc-surface-raised)')
+    expect(effectiveProperty(styles, '.cn-signout', 'background')).toBe('#161616')
+  })
 
   it('keeps default current and complete rail states above 3:1 adjacent contrast', () => {
     const colors = ['.oc-project-progress-track>i', '.oc-project-progress-track>i.current', '.oc-project-progress-track>i.complete'].map((selector) => effectiveProperty(styles, selector, 'background')!)
-    expect(colors).toEqual(['#171918', '#737876', '#f2f4f0'])
+    expect(colors).toEqual(['#191919', '#737876', '#f2f4f0'])
     expect(contrast(colors[0], colors[1])).toBeGreaterThanOrEqual(3)
     expect(contrast(colors[1], colors[2])).toBeGreaterThanOrEqual(3)
   })
@@ -170,7 +203,10 @@ describe('OUTCOME Package dashboard', () => {
   })
   it('keeps unbound Cherry action read-only without decision controls', () => {
     const markup = renderToStaticMarkup(createElement(ApprovalInbox, { projection: modelV2({ cherryActionLabel: '후보 화면을 확인한다' }) }))
-    for (const value of ['요청', '요청자 → 권한', '차단 대상', '공개 pin', '공개 근거', '만료', '신선도', '계보 / 교체', '불변 이력', '고정된 대상 식별자가 없어']) expect(markup).toContain(value)
+    for (const value of ['요청자', '결정 권한', '대상', '고정된 버전', '확인 근거', '유효 기한', '확인 시각', '변경·교체 관계', '원본 이력', '고정된 대상 식별자가 없어']) expect(markup).toContain(value)
+    expect(markup).toContain('<details class="oc-approval-evidence">')
+    expect(markup).not.toContain('<details class="oc-approval-evidence" open')
+    expect(markup).not.toContain('Model v2')
     expect(markup).toContain('data-completion-authority="false"')
     expect(markup).not.toContain('<button')
     expect(ApprovalInbox.toString()).not.toMatch(/onClick|onSubmit|fetch\(|XMLHttpRequest|form/)
@@ -242,7 +278,7 @@ describe('OUTCOME Package dashboard', () => {
     for (const obsolete of ['globalNavigationItems', 'activeSection', 'revealGlobalSection']) expect(source).not.toContain(obsolete)
   })
   it('고정 호스트 스냅샷은 실시간 연결과 구분되어 표시된다', () => {
-    expect(snapshotPresentation({ boundary: 'deployment_snapshot', capturedAt: '2026-08-24T09:00:00.000Z', source: 'sanitized_public_projection', liveSessionRelay: false, refreshBehavior: 'new_deployment_required' })).toEqual({ label: '배포 스냅샷', detail: '실시간 세션 연결 대기 · 새 배포 시 갱신', sourceLabel: '패키지 구조 정상', timePrefix: '스냅샷 생성', refreshLabel: '배포 스냅샷 다시 불러오기' })
+    expect(snapshotPresentation({ boundary: 'deployment_snapshot', capturedAt: '2026-08-24T09:00:00.000Z', source: 'sanitized_public_projection', liveSessionRelay: false, refreshBehavior: 'new_deployment_required' })).toEqual({ label: '배포 스냅샷', detail: '실시간 세션 연결 대기 · 새 배포 시 갱신', sourceLabel: '저장된 기록', timePrefix: '기록 생성', refreshLabel: '저장된 기록 다시 불러오기' })
     expect(snapshotPresentation(undefined)).toBeNull()
     const source = OutcomeDashboard.toString()
     expect(source).toContain('data-snapshot-boundary')
@@ -450,6 +486,11 @@ describe('OUTCOME Package dashboard', () => {
     expect(stagePresentation('outcome-stage-stable-snapshot-host')).toEqual(['안정적인 배포 스냅샷 호스트', '로컬 원본과 임시 연결 없이 고정 보안 웹 주소에서 정제된 프로젝트 스냅샷을 제공합니다.'])
   })
   it('기술 식별자 보존 keeps Package IDs and GitHub evidence unchanged beneath Korean presentation', () => { const value = project('outcome', 'OUTCOME'); const before = structuredClone(value); expect(phasePresentation(value.phases[0].id)).toEqual(['큰 단계 제목 한글화 대기', '큰 단계 목적 한글화 대기']); expect(projectOutcomePresentation(value.project.id, value.project.outcome)).toContain('인공지능'); expect(githubEvidenceItems(value.connectors.github)[1].value).toContain('owner/repo · origin/main'); expect(value).toEqual(before); expect(value.current?.stageId).toBe('outcome-stage') })
+  it('does not overwrite a current phase with stale hard-coded meaning', () => {
+    expect(phasePresentation('outcome-phase-3', 'Phase 3 · Existing Session Operations', '현재 원본 목적')).toEqual(['3단계 · 기존 작업 세션 연결', '현재 원본 목적'])
+    expect(phasePresentation('outcome-phase-3', '사용자가 바꾼 이름', '새 목적')).toEqual(['사용자가 바꾼 이름', '새 목적'])
+    expect(phasePresentation('outcome-phase-3', '사용자가 바꾼 이름')).toEqual(['사용자가 바꾼 이름', '단계 목적 확인 필요'])
+  })
   it('현재 렌더 가능한 미완료 완료 조건은 모두 자연스러운 한글 설명을 갖는다', () => {
     const gateIds = [
       ['stage-33-physical-acceptance-boundary', 'P33A3'], ['stage-33-physical-acceptance-boundary', 'P33A4'], ['stage-33-physical-acceptance-boundary', 'P33A5'],

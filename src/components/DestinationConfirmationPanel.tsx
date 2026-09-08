@@ -50,13 +50,13 @@ export function DestinationConfirmationPanel({discovery}:{discovery:StoredDiscov
    setNotice(kind==='prepare'?destinationConfirmationFailureNotice(error):'요청 결과를 확인하지 못했습니다. 자동 재전송하지 않고 확정 요청 기록 조회로 확인해 주세요.')
   }finally{lock.current=false;if(mounted.current)setBusy(false)}
  }
- return <section className="destination-studio__unknowns" aria-label="Destination 확정 요청" aria-busy={busy}>
-  <h4>Destination 확정 요청</h4>
+ return <section className="destination-studio__unknowns" aria-label="목적지 확정 요청" aria-busy={busy}>
+  <h4>목적지 확정 요청</h4>
   <p role="status">{notice}</p>
-  <p>{`기본 초안 버전 ${discovery.intakeRevision} · 후속 답변 버전 ${discovery.revision}`}</p>
+  {!receipt&&<p>{`기본 초안 버전 ${discovery.intakeRevision} · 후속 답변 버전 ${discovery.revision}`}</p>}
   <div className="destination-studio__actions">
    <button type="button" disabled={busy} onClick={()=>void act('read')}>확정 요청 기록 조회</button>
-   <button type="button" disabled={busy||!checked||!!receipt||attempted||!!review} onClick={()=>void act('prepare')}>현재 초안 근거 검증</button>
+   {!receipt&&<button type="button" disabled={busy||!checked||attempted||!!review} onClick={()=>void act('prepare')}>현재 초안 근거 검증</button>}
   </div>
   {review&&!receipt&&<>
    <fieldset><legend>최종 확인</legend><label><input type="checkbox" checked={ack} disabled={busy} onChange={event=>setAck(event.currentTarget.checked)}/>위 기본 초안과 저장된 추가 결정을 검토했고, 이 버전으로 목적지 확정을 요청합니다.</label></fieldset>
@@ -66,7 +66,7 @@ export function DestinationConfirmationPanel({discovery}:{discovery:StoredDiscov
    </div>
   </>}
   {receipt&&<><p>확정 요청 기록됨 · 생성 결과 별도 확인</p><DestinationCreationResult key={`${receipt.requestId}:${receipt.reviewDigest}`} discovery={discovery} receipt={receipt}/></>}
-  {!receipt&&<p>이 단계는 목적지 확정 요청만 기록합니다. 프로젝트·세션·Gate 생성과 실행 승인은 별도입니다.</p>}
-  <p>completionAuthority=false</p>
+  {!receipt&&<p>이 단계에서는 목적지 확정 요청만 기록합니다. 프로젝트 생성과 작업 실행은 별도입니다.</p>}
+  <details><summary>확정 요청의 권한 범위</summary>{receipt&&<p>{`기본 초안 버전 ${discovery.intakeRevision} · 후속 답변 버전 ${discovery.revision}`}</p>}<p>확정 요청은 최종 수용이나 출시 승인이 아닙니다.</p><code>completionAuthority=false</code></details>
  </section>
 }

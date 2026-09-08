@@ -2,6 +2,7 @@ import { useEffect, useRef, useState, type CSSProperties } from 'react'
 import { Archive, Check, ChevronLeft, ChevronRight, Circle, Layers3, Menu, MoreHorizontal, Plug, Plus, Radio, RefreshCw, Search, UserRound, X } from 'lucide-react'
 import { fetchOutcomeDashboard, type PrivateModelV2Event, type PrivateModelV2Projection, type PrivateProjectProjection } from '../lib/api'
 import { CurrentProjection } from './CurrentProjection'
+import { outcomeDisplayLabel } from '../lib/outcome-display-copy'
 import { DestinationStudio } from './DestinationStudio'
 import { DecisionControls } from './DecisionControls'
 import { DecisionHistory } from './DecisionHistory'
@@ -54,7 +55,7 @@ export function hierarchyPlacement(project: PackageProject) { const value = curr
 export function deriveScopeState(scope: Scope, currentScopeId: string | undefined): 'complete' | 'active' | 'pending' | 'unknown' { if (!scope.stages.length) return 'unknown'; if (scope.stages.every((stage) => stage.state === 'complete')) return 'complete'; if (scope.id === currentScopeId) return 'active'; if (scope.stages.every((stage) => stage.state === 'unknown')) return 'unknown'; return 'pending' }
 export function deriveStageRailState(stage: PackageStage, currentStageId: string | undefined): 'complete' | 'active' | 'pending' | 'unknown' { if (stage.state === 'complete') return 'complete'; if (stage.id === currentStageId) return 'active'; return stage.state === 'unknown' ? 'unknown' : 'pending' }
 export function selectLiveBinding(bindings: Binding[]) { return bindings.find((binding) => binding.status === 'active' && binding.freshness === 'fresh') ?? null }
-export function snapshotPresentation(snapshot: DeploymentSnapshot | undefined) { return snapshot?.boundary === 'deployment_snapshot' ? { label: '배포 스냅샷', detail: snapshot.liveSessionRelay ? '실시간 세션 연결됨' : '실시간 세션 연결 대기 · 새 배포 시 갱신', sourceLabel: '패키지 구조 정상', timePrefix: '스냅샷 생성', refreshLabel: '배포 스냅샷 다시 불러오기' } : null }
+export function snapshotPresentation(snapshot: DeploymentSnapshot | undefined) { return snapshot?.boundary === 'deployment_snapshot' ? { label: '배포 스냅샷', detail: snapshot.liveSessionRelay ? '실시간 세션 연결됨' : '실시간 세션 연결 대기 · 새 배포 시 갱신', sourceLabel: '저장된 기록', timePrefix: '기록 생성', refreshLabel: '저장된 기록 다시 불러오기' } : null }
 const durationKo = (minutes: number) => { const hours = Math.floor(minutes / 60); const rest = minutes % 60; return hours ? `${hours}시간${rest ? ` ${rest}분` : ''}` : `${rest}분` }
 export function timingPresentation(stage: PackageStage, binding: Binding | null, currentStageId: string, now = new Date()) { const boundAt = binding?.boundAt ? Date.parse(binding.boundAt) : NaN; const eligible = Boolean(binding && binding.status === 'active' && binding.freshness === 'fresh' && binding.stageId === currentStageId && Number.isFinite(boundAt) && boundAt <= now.getTime()); if (!eligible || !binding) return { elapsed: { available: false, label: '현재 작업시간', value: '작업시간 측정 근거 없음', basis: null }, eta: { available: false, label: '남은 예상 시간', value: '남은 시간 예상 근거 없음' } }; const elapsedMinutes = Math.max(0, Math.floor((now.getTime() - boundAt) / 60_000)); const expected = Number.isInteger(stage.expectedDurationMinutes) && stage.expectedDurationMinutes! > 0 ? stage.expectedDurationMinutes! : null; return { elapsed: { available: true, label: '현재 역할 연결 후 경과', value: durationKo(elapsedMinutes), basis: `${roleLabel(binding.role)} 연결 시작 ${compactTime(binding.boundAt)}` }, eta: expected === null ? { available: false, label: '남은 예상 시간', value: '남은 시간 예상 근거 없음' } : { available: true, label: '계획 기준 예상', value: durationKo(Math.max(0, expected - elapsedMinutes)) } } }
 
@@ -80,34 +81,39 @@ export const structureStatusLabel = (value: string) => ({ current: '현재', com
 function StageNode({ state, current }: { state: string; current: boolean }) { return <i className={`${state} ${current ? 'current' : ''}`} aria-hidden="true">{state === 'complete' ? <Check size={11} /> : current ? <Radio size={11} /> : <Circle size={9} />}</i> }
 function Axis({ label, value }: { label: string; value: string }) { return <div className="oc-axis"><small>{label}</small><strong>{axisStateLabel(value)}</strong></div> }
 
-const resultKindLabel = (kind: ResultNode['kind']) => ({ project: 'OUTCOME 전체', phase: 'Phase', scope: '큰 결과물', stage: '작은 결과물' }[kind])
+const resultKindLabel = (kind: ResultNode['kind']) => ({ project: '프로젝트 전체', phase: '단계', scope: '큰 결과물', stage: '작은 결과물' }[kind])
 const resultDate = (value: string | null) => value ? new Intl.DateTimeFormat('ko-KR', { timeZone: 'Asia/Seoul', year: 'numeric', month: 'short', day: 'numeric' }).format(new Date(value)) : '미확정'
 const hours = (value: [number, number] | number | null) => value === null ? '미확정' : Array.isArray(value) ? value[0] === value[1] ? `${value[0]}시간` : `${value[0]}~${value[1]}시간` : `${value}시간`
 const forecast = (value: ResultWork['latest_forecast']) => value ? `${resultDate(value.earliest_at)} ~ ${resultDate(value.latest_at)}` : '미확정'
 function ResultFact({ label, value, proof }: { label: string; value: string; proof?: { source_ref: string; observed_at: string } }) { return <div><dt>{label}</dt><dd>{value}</dd><small>{proof ? `${proof.source_ref} · 관측 ${resultDate(proof.observed_at)}` : '근거 미확정'}</small></div> }
 export function focusPlannerConversation(root: Pick<Document, 'querySelector'> = document) {
   const panel = root.querySelector<HTMLElement>('#oc-planner-conversation')
-  const planner = Array.from(panel?.querySelectorAll<HTMLButtonElement>('.planner-conversation__filters button') ?? []).find((button) => button.textContent?.trim() === 'Planner')
+  const planner = Array.from(panel?.querySelectorAll<HTMLButtonElement>('.planner-conversation__filters button') ?? []).find((button) => button.dataset?.roleFilter === 'Planner')
   const heading = panel?.querySelector<HTMLElement>('#planner-conversation-title')
   if (!panel || !planner || !heading) return false
   const disclosure = panel.closest<HTMLDetailsElement>('details.oc-v1-compatibility')
   if (disclosure) disclosure.open = true
   planner.click(); heading.tabIndex = -1; heading.focus(); return true
 }
-function ResultLinks({ links, onPlannerNavigate }: { links: ResultNode['links']; onPlannerNavigate?: () => void }) { return <nav className="oc-result-links" aria-label="결과물 이동">{Object.entries(links).map(([key, link]) => link.href ? <a key={key} href={link.href}>{link.label}</a> : link.action === 'planner_conversation' && onPlannerNavigate ? <button key={key} type="button" onClick={onPlannerNavigate}>{link.label}</button> : <span key={key}>{link.action ? '링크 미연결' : link.label}</span>)}</nav> }
-function ResultNodeDetails({ node, depth = 0, onPlannerNavigate }: { node: ResultNode; depth?: number; onPlannerNavigate?: () => void }) {
+function ResultLinks({ links, onPlannerNavigate }: { links: ResultNode['links']; onPlannerNavigate?: () => void }) { return <nav className="oc-result-links" aria-label="결과물 이동">{Object.entries(links).map(([key, link]) => {
+  const label = key === 'planner_conversation' && link.label === 'Planner 대화 보기' ? '플래너와 대화' : key === 'usable_result' && !link.href ? '결과 기록 미연결' : key === 'usable_result' && link.href?.startsWith('#result-node-') ? '결과 기록 보기' : link.label
+  return link.href ? <a key={key} href={link.href}>{label}</a> : link.action === 'planner_conversation' && onPlannerNavigate ? <button key={key} type="button" onClick={onPlannerNavigate}>{label}</button> : <span key={key}>{link.action ? '링크 미연결' : label}</span>
+})}</nav> }
+function ResultNodeDetails({ node, depth = 0, projectId = node.id, onPlannerNavigate }: { node: ResultNode; depth?: number; projectId?: string; onPlannerNavigate?: () => void }) {
   const scale = node.acceptance.total ? Math.max(0, Math.min(1, node.acceptance.closed / node.acceptance.total)) : 0
   const evidenceProgressLabel = node.acceptance.total === 0 && node.acceptance.unmapped ? '완료 조건 미연결 · 전체 완료율 아님' : `근거 닫힘 ${node.acceptance.closed}/${node.acceptance.total}`
   const previous = node.comparison.yesterday
   return <details id={`result-node-${node.id}`} className="oc-result-node" open={depth === 0} data-result-kind={node.kind} data-partial-denominator={node.acceptance.partial ? 'true' : 'false'} data-completion-authority="false">
-    <summary><span><small>{resultKindLabel(node.kind)}</small><strong>{node.title}</strong></span><span><b>{node.acceptance.closed}/{node.acceptance.total}</b><small>{node.acceptance.label}</small></span></summary>
+    <summary><span><small>{resultKindLabel(node.kind)}</small><strong>{outcomeDisplayLabel(projectId, node.title)}</strong></span><span><b>{node.acceptance.closed}/{node.acceptance.total}</b><small>{node.acceptance.label}</small></span></summary>
     <div className="oc-result-node__body"><p>{node.outcome}</p><div className="oc-result-evidence"><span role="img" aria-label={evidenceProgressLabel}><i style={{ transform: `scaleX(${scale})` }} /></span><p>{node.acceptance.total === 0 && node.acceptance.unmapped ? '완료 조건 미연결 · 전체 완료율 아님' : node.acceptance.unmapped ? `미연결 하위 결과물 ${node.acceptance.unmapped}개` : '연결된 완료 조건 분모'} · 가중치 1 · 완료 판정 권한 없음</p></div>
+      {depth > 0 && <ResultLinks links={node.links} onPlannerNavigate={onPlannerNavigate} />}
+      {node.comparison.message && <p className="oc-result-message" role="status">{node.comparison.message}</p>}
+      <details className="oc-result-measurements"><summary>예상 시간과 변화 기록</summary>
       <dl className="oc-result-work"><ResultFact label="최초 예상" value={hours(node.work.initial_hours)} proof={node.work.provenance.initial_hours} /><ResultFact label="실제 작업" value={hours(node.work.actual_hours)} proof={node.work.provenance.actual_hours} /><ResultFact label="남은 예상 범위" value={hours(node.work.remaining_hours)} proof={node.work.provenance.remaining_hours} /><ResultFact label="계획 마감" value={resultDate(node.work.planned_finish_at)} proof={node.work.provenance.planned_finish_at} /><ResultFact label="최신 완료 예측" value={forecast(node.work.latest_forecast)} proof={node.work.provenance.latest_forecast} /></dl>
       <dl className="oc-result-delta"><div><dt>전일 누적</dt><dd>{previous ? `${previous.closed}/${previous.total}` : '미확정'}</dd></div><div><dt>당일 변화</dt><dd>{node.comparison.today_delta === null ? '미확정' : `${node.comparison.today_delta >= 0 ? '+' : ''}${node.comparison.today_delta}`}</dd></div><div><dt>현재 누적</dt><dd>{node.comparison.current.closed}/{node.comparison.current.total}</dd></div></dl>
-      {node.comparison.message && <p className="oc-result-message" role="status">{node.comparison.message}</p>}
       <section className="oc-result-timeline" aria-label={`${node.title} 날짜별 타임라인`}><h4>날짜별 타임라인</h4><ol>{node.timeline.map((event, index) => <li key={`${event.type}-${event.observed_at}-${index}`}><time>{resultDate(event.observed_at)}</time><span>{event.type === 'scope_change' ? `완료 조건 범위 변경 · ${event.old_count}→${event.new_count}` : event.total === 0 && event.unmapped ? '완료 조건 미연결 · 전체 완료율 아님' : `근거 닫힘 ${event.closed}/${event.total}`}</span></li>)}</ol></section>
-      <ResultLinks links={node.links} onPlannerNavigate={onPlannerNavigate} />
-      {node.children.length > 0 && <div className="oc-result-children">{node.children.map((child) => <ResultNodeDetails key={child.id} node={child} depth={depth + 1} onPlannerNavigate={onPlannerNavigate} />)}</div>}
+      </details>
+      {node.children.length > 0 && <div className="oc-result-children">{node.children.map((child) => <ResultNodeDetails key={child.id} node={child} projectId={projectId} depth={depth + 1} onPlannerNavigate={onPlannerNavigate} />)}</div>}
     </div>
   </details>
 }
@@ -118,17 +124,21 @@ function ResultSourceContext({ source, hierarchy }: { source: ResultSourceProjec
   const current = matches.length === 1 ? matches[0].acceptance : null
   const differs = current && (current.closed !== source.compatibility.closed || current.total !== source.compatibility.total)
   return <section className="oc-result-node" role="region" aria-labelledby="oc-source-context-title" data-source-context="true" data-completion-authority={String(source.completion_authority)} data-source-primary={`${source.primary.destination_id}:${source.primary.acceptance.closed}/${source.primary.acceptance.total}`} data-source-compatibility={`${source.compatibility.phase_id}:${source.compatibility.closed}/${source.compatibility.total}`} data-source-historical={`${historical.phase_id}:${historical.closed}/${historical.total}`} data-source-conflict={conflict ? `${conflict.map_value}|${conflict.gate_value}` : undefined}>
-    <div className="oc-result-node__body"><h3 id="oc-source-context-title">원본 맥락 · 비권한 참조</h3>
-      <dl className="oc-result-work"><div><dt>현재 primary · Phase 5</dt><dd>{`${source.primary.acceptance.closed}/${source.primary.acceptance.total}`}</dd></div><div><dt>{source.compatibility.label} · Phase 3</dt><dd>{`${source.compatibility.closed}/${source.compatibility.total}`}</dd></div><div><dt>{historical.label} · Phase 2</dt><dd>{`${historical.closed}/${historical.total}`}</dd></div></dl>
+    <div className="oc-result-node__body"><h3 id="oc-source-context-title">확인 기준</h3>
+      {conflict && <p className="oc-result-message" role="status">진행 기록이 서로 다릅니다. 원본을 대조하기 전에는 완료 여부를 확정할 수 없습니다.</p>}
+      {differs && <p className="oc-result-message" role="status">이전 단계의 문서 기록과 현재 검증 수가 다릅니다. 이전 기록을 현재 완료율로 보지 마세요.</p>}
+      <details className="oc-source-context-details"><summary>기준과 이전 기록 확인</summary>
+      <dl className="oc-result-work"><div><dt>현재 기준 · 5단계</dt><dd>{`${source.primary.acceptance.closed}/${source.primary.acceptance.total}`}</dd></div><div><dt>이전 체계의 참고 기록 · 3단계</dt><dd>{`${source.compatibility.closed}/${source.compatibility.total}`}</dd></div><div><dt>과거 자료 · 2단계</dt><dd>{`${historical.closed}/${historical.total}`}</dd></div></dl>
       {conflict && <p className="oc-result-message" role="status">원본 충돌 · <span>{`Map · ${conflict.map_value}`}</span> · <span>{`Gate · ${conflict.gate_value}`}</span></p>}
       {differs && <p className="oc-result-message" role="status">{`Phase 3 집계 차이 · Map 문서 기록 ${source.compatibility.closed}/${source.compatibility.total} · 현재 후보의 연결 Gate 집계 ${current.closed}/${current.total}. 문서 기록을 현재 후보의 검증 완료율로 사용하지 않습니다.`}</p>}
       <dl className="oc-result-delta"><div><dt>캡처 시각</dt><dd>{source.captured_at}</dd></div><div><dt>원본 갱신</dt><dd>{source.source_updated_at}</dd></div><div><dt>근거 원본 확인</dt><dd>{source.evidence_observed_at}</dd></div></dl>
       <p>근거 원본 확인 시각은 문서 내용을 확인한 시각이며, 테스트 재통과나 작업 완료 시각이 아닙니다.</p>
       <p><span>{`completionAuthority=${String(source.completion_authority)}`}</span> · 이 원본 맥락은 프로젝트 완료나 Cherry 수용을 승인하지 않습니다.</p>
+      </details>
     </div>
   </section>
 }
-export function OutcomeResultView({ view, onPlannerNavigate }: { view: ResultView; onPlannerNavigate?: () => void }) { return <section id="oc-result-view" className="oc-result-view" aria-labelledby="oc-result-view-title" data-completion-authority="false"><header><div><small>SUZN-OUTCOME-005 · 읽기 전용</small><h2 id="oc-result-view-title">결과물·진척·시간</h2></div><span>관측 {resultDate(view.observed_at)}</span></header><p>막대는 연결된 완료 조건의 근거 닫힘만 나타내며, 프로젝트 완료나 Cherry 수용을 의미하지 않습니다.</p>{view.source_projection && <ResultSourceContext source={view.source_projection} hierarchy={view.hierarchy} />}<ResultNodeDetails node={view.hierarchy} onPlannerNavigate={onPlannerNavigate} /></section> }
+export function OutcomeResultView({ view, onPlannerNavigate }: { view: ResultView; onPlannerNavigate?: () => void }) { return <section id="oc-result-view" className="oc-result-view" aria-labelledby="oc-result-view-title" data-completion-authority="false"><header><div><small>결과 확인 · 읽기 전용</small><h2 id="oc-result-view-title">결과물·진척·시간</h2></div><span>관측 {resultDate(view.observed_at)}</span></header><p>{view.hierarchy.links.usable_result.href ? '연결된 결과 기록을 확인할 수 있습니다. 이 기록만으로 실제 사용 가능 여부나 최종 수용을 판단하지 않습니다.' : '연결된 결과 기록이 없습니다. 결과가 없거나 작업이 끝났다는 뜻은 아닙니다.'}</p><ResultLinks links={view.hierarchy.links} onPlannerNavigate={onPlannerNavigate} /><p>막대는 연결된 완료 조건의 근거 닫힘만 나타내며, 프로젝트 완료나 Cherry 수용을 의미하지 않습니다.</p>{view.source_projection && <ResultSourceContext source={view.source_projection} hierarchy={view.hierarchy} />}<ResultNodeDetails node={view.hierarchy} onPlannerNavigate={onPlannerNavigate} /></section> }
 
 const APPROVAL_UNKNOWN = '알 수 없음'
 const blockerStatuses = new Set<PrivateModelV2Event['status']>(['blocked', 'failed', 'rejected', 'safe_hold'])
@@ -152,10 +162,10 @@ export function ApprovalInbox({ projection, active = false, className = 'oc-appr
   const items = approvalInboxProjection(projection)
   const [historyVersion,setHistoryVersion]=useState(0)
   return <aside className={className} data-workspace-panel="승인" data-workspace-active={active ? 'true' : 'false'} data-completion-authority="false" aria-labelledby="oc-approval-title">
-    <header><span>Model v2 · 읽기 전용</span><h2 id="oc-approval-title">승인</h2><strong>승인 권한 위임 없음</strong></header>
-    {items.length === 0 ? <p className="oc-approval-empty" role="status">Cherry의 명시적 행동 또는 확인 가능한 차단 근거가 없습니다.</p> : <ol className="oc-approval-list">{items.map((item, index) => { const reasonId = `oc-approval-reason-${index}`; return <li className="oc-approval-item" key={`${item.kind}-${index}`} data-approval-kind={item.kind}>
-      <div className="oc-approval-request"><small>{item.requestClass}</small><h3>{item.request}</h3></div>
-      <dl><div><dt>요청</dt><dd>{item.request}</dd></div><div><dt>요청자 → 권한</dt><dd>{item.requester} → {item.authorityTarget}</dd></div><div><dt>차단 대상</dt><dd>{item.blockedTarget}</dd></div><div><dt>공개 pin</dt><dd>{item.publicPin}</dd></div><div><dt>공개 근거</dt><dd>{item.evidence}</dd></div><div><dt>만료</dt><dd>{item.expiry}</dd></div><div><dt>신선도</dt><dd>{item.freshness}</dd></div><div><dt>계보 / 교체</dt><dd>{item.lineage}</dd></div><div><dt>불변 이력</dt><dd>{item.immutableHistory}</dd></div></dl>
+    <header><h2 id="oc-approval-title">승인</h2><span>확인과 결정이 필요한 항목</span></header>
+    {items.length === 0 ? <p className="oc-approval-empty" role="status">확인된 결정 요청이나 차단 보고가 없습니다.</p> : <ol className="oc-approval-list">{items.map((item, index) => { const reasonId = `oc-approval-reason-${index}`; return <li className="oc-approval-item" key={`${item.kind}-${index}`} data-approval-kind={item.kind}>
+      <div className="oc-approval-request"><small>{item.kind === 'evidence_blocker' ? '진행을 막는 문제' : '결정 요청'}</small><h3>{item.request}</h3><p>대상 · {item.blockedTarget}</p></div>
+      <details className="oc-approval-evidence"><summary>요청 근거와 적용 범위</summary><dl><div><dt>요청</dt><dd>{item.request}</dd></div><div><dt>요청자</dt><dd>{item.requester === 'Planner' ? '플래너' : item.requester === 'Builder' ? '구현 담당' : item.requester}</dd></div><div><dt>결정 권한</dt><dd>소유자</dd></div><div><dt>대상</dt><dd>{item.blockedTarget}</dd></div><div><dt>고정된 버전</dt><dd>{item.publicPin}</dd></div><div><dt>확인 근거</dt><dd>{item.evidence}</dd></div><div><dt>유효 기한</dt><dd>{item.expiry}</dd></div><div><dt>확인 시각</dt><dd>{item.freshness}</dd></div><div><dt>변경·교체 관계</dt><dd>{item.lineage}</dd></div><div><dt>원본 이력</dt><dd>{item.immutableHistory}</dd></div></dl><p>최종 수용과 출시 권한은 소유자에게 있습니다.</p></details>
       {item.kind === 'evidence_blocker' && projection ? (() => { const event = projection.events.find(event => `${event.id} · sequence ${event.sequence}` === item.immutableHistory); return event ? <DecisionControls key={`${projection.project.id}:${event.id}:${event.sequence}:${event.observedAt}`} projectId={projection.project.id} eventId={event.id} sequence={event.sequence} onRecorded={()=>setHistoryVersion(value=>value+1)} /> : null })() : <p className="oc-approval-reason" id={reasonId}>고정된 대상 식별자가 없어 결정을 기록할 수 없습니다.</p>}
     </li> })}</ol>}
     {projection&&<DecisionHistory key={projection.project.id} projectId={projection.project.id} version={historyVersion} />}
@@ -179,12 +189,24 @@ export function OutcomeDashboard({ onUnauthorized, initialData, onLogout, privat
   const productionBuild = (import.meta as ImportMeta & { env?: { PROD?: boolean } }).env?.PROD === true
   const roleChatFixture = productionBuild ? undefined : nonProductionRoleChatFixture
   const roleChat = (events: PrivateModelV2Event[]) => <PlannerConversation events={events} fixtureState={roleChatFixture?.state} plannerBound={roleChatFixture?.plannerBound} initialFilter={roleChatFixture?.initialFilter} onSend={roleChatFixture?.onSend} />
+  const projectionWorkspace = (projection: PrivateModelV2Projection, observation: unknown) => <>
+    <nav className="oc-workspace-tabs" aria-label="모바일 작업공간">{mobileWorkspaceTabs.map(label => <button key={label} type="button" aria-current={workspaceTab === label ? 'page' : undefined} onClick={() => setWorkspaceTab(label)}>{label}</button>)}</nav>
+    <section className="oc-workbench" aria-label="프로젝트 작업대" data-conversation-peer-breakpoint={desktopConversationBreakpoint - 1}>
+      <div className="oc-map-workspace" data-workspace-panel="지도" data-workspace-active={workspaceTab === '지도' ? 'true' : 'false'}><div className="oc-primary-workspace"><CurrentProjection projection={projection} workObservation={observation} /></div></div>
+      <ApprovalInbox className="oc-approval-rail" projection={projection} active={workspaceTab === '승인'} />
+      <div id="oc-planner-conversation" className="oc-conversation-panel" data-workspace-panel="대화" data-workspace-active={workspaceTab === '대화' ? 'true' : 'false'}>{roleChat(projection.events)}</div>
+    </section>
+  </>
   const openDestination = () => { setNavigationOpen(false); setDestinationOpen(true) }
   const openConnections = () => {
     setNavigationOpen(false); setWorkspaceTab('지도')
     window.requestAnimationFrame(() => {
       const details = contentRef.current?.querySelector<HTMLDetailsElement>('[data-projection-field="connection-inventory"] details')
       if (!details) return
+      // Opening the destination alone cannot reveal it inside a closed evidence group.
+      for (let parent = details.parentElement; parent; parent = parent.parentElement) {
+        if (parent instanceof HTMLDetailsElement) parent.open = true
+      }
       details.open = true
       details.querySelector('summary')?.focus()
       details.scrollIntoView({ block: 'nearest', behavior: 'instant' })
@@ -222,13 +244,13 @@ export function OutcomeDashboard({ onUnauthorized, initialData, onLogout, privat
       {navigationOpen && <button className="oc-nav-backdrop" aria-label="탐색 닫기" tabIndex={-1} onClick={() => closePrivateNavigation(true)} />}
       <aside ref={navigationRef} className="oc-global-nav" data-open={navigationOpen ? 'true' : 'false'} aria-label="OUTCOME 전역 탐색" role={navigationOpen ? 'dialog' : undefined} aria-modal={navigationOpen ? true : undefined}>
         <header><span className="oc-nav-brand"><Layers3 size={20} aria-hidden="true" /><strong>OUTCOME</strong></span><button className="oc-nav-close" aria-label="탐색 닫기" onClick={() => closePrivateNavigation(true)}><X size={20} aria-hidden="true" /></button></header>
-        <div className="oc-nav-workspace"><button className="oc-new-project" type="button" aria-label="새 프로젝트 · Destination 설정" onClick={openDestination}><Plus size={18} aria-hidden="true" /><span>새 프로젝트</span><small>Destination 설정</small></button>
+        <div className="oc-nav-workspace"><button className="oc-new-project" type="button" aria-label="새 프로젝트 · 목적지 설정" onClick={openDestination}><Plus size={18} aria-hidden="true" /><span>새 프로젝트</span><small>목적지 설정</small></button>
           <label className="oc-project-search"><Search size={18} aria-hidden="true" /><span className="oc-visually-hidden">프로젝트 검색</span><input type="search" value={projectQuery} onChange={(event) => setProjectQuery(event.target.value)} placeholder="프로젝트 검색" aria-label="프로젝트 검색" /></label>
           <section className="oc-projects" aria-labelledby="oc-projects-label"><header><strong id="oc-projects-label">최근 프로젝트</strong><small>{privateSidebarProjects.length}/{privateProjects!.length}</small></header><nav className="oc-project-switcher" aria-label="프로젝트 전환">{privateSidebarProjects.map((item) => { const selected = item.project.id === privateOnlyProject.project.id; return <div className="oc-project-row" data-selected={selected ? 'true' : undefined} key={item.project.id}><button className="oc-project-select" data-private-project={item.project.id} aria-label={item.project.name} aria-current={selected ? 'page' : undefined} onClick={() => switchPrivateProject(item.project.id)}><i aria-hidden="true" /><span>{item.project.name}</span></button><button className="oc-project-menu" type="button" disabled aria-label={`${item.project.name} 프로젝트 메뉴 · 준비 중`} title="프로젝트 메뉴 · 준비 중"><MoreHorizontal size={18} aria-hidden="true" /></button></div> })}{privateSidebarProjects.length === 0 && <p className="oc-project-empty">일치하는 프로젝트가 없습니다.</p>}</nav></section>
           <WorkspaceManagement onConnections={openConnections} /></div>
         {onLogout ? <button className="oc-nav-account" type="button" data-private-logout="true" onClick={() => void onLogout()}><UserRound size={18} aria-hidden="true" /><span><strong>Cherry 계정</strong><small>로그아웃</small></span></button> : <a className="oc-nav-account" href="/workspace" onClick={() => closePrivateNavigation()}><UserRound size={18} aria-hidden="true" /><span><strong>로그인 또는 계정 관리</strong><small>비공개 워크스페이스</small></span></a>}
       </aside>
-      <main ref={contentRef} id="oc-main-content" className="oc-dashboard-content" tabIndex={-1}><header className="oc-topbar"><button ref={menuButtonRef} className="oc-nav-trigger" aria-label="전역 탐색 열기" aria-expanded={navigationOpen} onClick={() => setNavigationOpen(true)}><Menu size={20} aria-hidden="true" /></button></header><div className="oc-primary-workspace"><CurrentProjection projection={privateOnlyProject.modelV2} workObservation={privateOnlyProject.workObservation} />{roleChat(privateOnlyProject.modelV2.events)}</div><details className="oc-v1-compatibility"><summary><span>v1 호환 정보</span><small>현재 projection에는 호환 위계가 없습니다</small></summary><div className="oc-v1-compatibility__content" role="status"><h2>v1 호환 정보 없음</h2><p>서버가 제공한 호환 위계가 없어 페이즈·범위·스테이지를 대신 계산하지 않습니다.</p></div></details></main>
+      <main ref={contentRef} id="oc-main-content" className="oc-dashboard-content" tabIndex={-1}><header className="oc-topbar"><button ref={menuButtonRef} className="oc-nav-trigger" aria-label="전역 탐색 열기" aria-expanded={navigationOpen} onClick={() => setNavigationOpen(true)}><Menu size={20} aria-hidden="true" /></button></header>{projectionWorkspace(privateOnlyProject.modelV2, privateOnlyProject.workObservation)}<details className="oc-v1-compatibility"><summary><span>이전 단계 기록</span><small>현재 정보에는 이전 단계 기록이 없습니다</small></summary><div className="oc-v1-compatibility__content" role="status"><h2>이전 단계 기록 없음</h2><p>확인된 이전 단계 기록이 없습니다. 현재 진행률로 추정해 표시하지 않습니다.</p></div></details></main>
       <DestinationStudio open={destinationOpen} onClose={() => setDestinationOpen(false)} />
     </section>
   }
@@ -243,7 +265,7 @@ export function OutcomeDashboard({ onUnauthorized, initialData, onLogout, privat
     {navigationOpen && <button className="oc-nav-backdrop" aria-label="탐색 닫기" tabIndex={-1} onClick={() => closeNavigation(true)} />}
     <aside ref={navigationRef} className="oc-global-nav" data-open={navigationOpen ? 'true' : 'false'} aria-label="OUTCOME 전역 탐색" role={navigationOpen ? 'dialog' : undefined} aria-modal={navigationOpen ? true : undefined}>
       <header><span className="oc-nav-brand"><Layers3 size={20} aria-hidden="true" /><strong>OUTCOME</strong></span><button className="oc-nav-close" aria-label="탐색 닫기" onClick={() => closeNavigation(true)}><X size={20} aria-hidden="true" /></button></header>
-      <div className="oc-nav-workspace"><button className="oc-new-project" type="button" aria-label="새 프로젝트 · Destination 설정" onClick={openDestination}><Plus size={18} aria-hidden="true" /><span>새 프로젝트</span><small>Destination 설정</small></button>
+      <div className="oc-nav-workspace"><button className="oc-new-project" type="button" aria-label="새 프로젝트 · 목적지 설정" onClick={openDestination}><Plus size={18} aria-hidden="true" /><span>새 프로젝트</span><small>목적지 설정</small></button>
         <label className="oc-project-search"><Search size={18} aria-hidden="true" /><span className="oc-visually-hidden">프로젝트 검색</span><input type="search" value={projectQuery} onChange={(event) => setProjectQuery(event.target.value)} placeholder="프로젝트 검색" aria-label="프로젝트 검색" /></label>
         <section className="oc-projects" aria-labelledby="oc-projects-label"><header><strong id="oc-projects-label">최근 프로젝트</strong><small>{sidebarProjects.length}/{dashboardProjects.length}</small></header><nav className="oc-project-switcher" aria-label="프로젝트 전환">{sidebarProjects.map((item) => { const selected = item.project.id === project.project.id; return <div className="oc-project-row" data-selected={selected ? 'true' : undefined} key={item.project.id}><button className="oc-project-select" data-private-project={item.project.id} aria-label={`${item.project.name} · ${sourceStateLabel(item.status)}`} aria-current={selected ? 'page' : undefined} onClick={() => switchProject(item.project.id)}><i className={item.status} aria-hidden="true" /><span>{item.project.name}</span><span className="oc-visually-hidden">{sourceStateLabel(item.status)}</span></button><button className="oc-project-menu" type="button" disabled aria-label={`${item.project.name} 프로젝트 메뉴 · 준비 중`} title="프로젝트 메뉴 · 준비 중"><MoreHorizontal size={18} aria-hidden="true" /></button></div> })}{sidebarProjects.length === 0 && <p className="oc-project-empty">일치하는 프로젝트가 없습니다.</p>}</nav></section>
         <WorkspaceManagement onConnections={openConnections} /></div>
@@ -251,8 +273,8 @@ export function OutcomeDashboard({ onUnauthorized, initialData, onLogout, privat
     </aside>
     <main ref={contentRef} id="oc-main-content" className="oc-dashboard-content" tabIndex={-1}>
       <header className="oc-topbar"><button ref={menuButtonRef} className="oc-nav-trigger" aria-label="전역 탐색 열기" aria-expanded={navigationOpen} onClick={() => setNavigationOpen(true)}><Menu size={20} aria-hidden="true" /></button></header>
-      <div className="oc-primary-workspace"><CurrentProjection projection={privateProjection} workObservation={privateWorkObservation} />{roleChat(privateProjection.events)}</div>
-      <details className="oc-v1-compatibility"><summary><span>v1 호환 정보</span><small>현재 projection에는 호환 위계가 없습니다</small></summary><div className="oc-v1-compatibility__content" role="status"><h2>v1 호환 정보 없음</h2><p>서버가 제공한 호환 위계가 없어 페이즈·범위·스테이지를 대신 계산하지 않습니다.</p></div></details>
+      {projectionWorkspace(privateProjection, privateWorkObservation)}
+      <details className="oc-v1-compatibility"><summary><span>이전 단계 기록</span><small>현재 정보에는 이전 단계 기록이 없습니다</small></summary><div className="oc-v1-compatibility__content" role="status"><h2>이전 단계 기록 없음</h2><p>확인된 이전 단계 기록이 없습니다. 현재 진행률로 추정해 표시하지 않습니다.</p></div></details>
     </main>
     <DestinationStudio open={destinationOpen} onClose={() => setDestinationOpen(false)} />
   </section>
@@ -272,7 +294,7 @@ export function OutcomeDashboard({ onUnauthorized, initialData, onLogout, privat
     {navigationOpen && <button className="oc-nav-backdrop" aria-label="탐색 닫기" tabIndex={-1} onClick={() => closeNavigation(true)} />}
     <aside ref={navigationRef} className="oc-global-nav" data-open={navigationOpen ? 'true' : 'false'} aria-label="OUTCOME 전역 탐색" role={navigationOpen ? 'dialog' : undefined} aria-modal={navigationOpen ? true : undefined}>
       <header><span className="oc-nav-brand"><Layers3 size={20} aria-hidden="true" /><strong>OUTCOME</strong></span><button className="oc-nav-close" aria-label="탐색 닫기" onClick={() => closeNavigation(true)}><X size={20} aria-hidden="true" /></button></header>
-      <div className="oc-nav-workspace"><button className="oc-new-project" type="button" aria-label="새 프로젝트 · Destination 설정" onClick={openDestination}><Plus size={18} aria-hidden="true" /><span>새 프로젝트</span><small>Destination 설정</small></button>
+      <div className="oc-nav-workspace"><button className="oc-new-project" type="button" aria-label="새 프로젝트 · 목적지 설정" onClick={openDestination}><Plus size={18} aria-hidden="true" /><span>새 프로젝트</span><small>목적지 설정</small></button>
         <label className="oc-project-search"><Search size={18} aria-hidden="true" /><span className="oc-visually-hidden">프로젝트 검색</span><input type="search" value={projectQuery} onChange={(event) => setProjectQuery(event.target.value)} placeholder="프로젝트 검색" aria-label="프로젝트 검색" /></label>
         <section className="oc-projects" aria-labelledby="oc-projects-label"><header><strong id="oc-projects-label">최근 프로젝트</strong><small>{sidebarProjects.length}/{data.projects.length}</small></header><nav className="oc-project-switcher" aria-label="프로젝트 전환">{sidebarProjects.map((item) => { const selected = item.project.id === project.project.id; return <div className="oc-project-row" data-selected={selected ? 'true' : undefined} key={item.project.id}><button className="oc-project-select" data-private-project={item.project.id} aria-label={`${item.project.name} · ${sourceStateLabel(item.status)}`} aria-current={selected ? 'page' : undefined} onClick={() => switchProject(item.project.id)}><i className={item.status} aria-hidden="true" /><span>{item.project.name}</span><span className="oc-visually-hidden">{sourceStateLabel(item.status)}</span></button><button className="oc-project-menu" type="button" disabled aria-label={`${item.project.name} 프로젝트 메뉴 · 준비 중`} title="프로젝트 메뉴 · 준비 중"><MoreHorizontal size={18} aria-hidden="true" /></button></div> })}{sidebarProjects.length === 0 && <p className="oc-project-empty">일치하는 프로젝트가 없습니다.</p>}</nav></section>
         <WorkspaceManagement onConnections={privateProjection ? openConnections : undefined} /></div>
@@ -290,10 +312,10 @@ export function OutcomeDashboard({ onUnauthorized, initialData, onLogout, privat
     <nav className="oc-workspace-tabs" aria-label="모바일 작업공간">{mobileWorkspaceTabs.map((label) => <button key={label} type="button" aria-current={workspaceTab === label ? 'page' : undefined} onClick={() => setWorkspaceTab(label)}>{label}</button>)}</nav>
     <section className="oc-workbench" aria-label="프로젝트 작업대" data-conversation-peer-breakpoint={desktopConversationBreakpoint - 1}>
       <div className="oc-map-workspace" data-workspace-panel="지도" data-workspace-active={workspaceTab === '지도' ? 'true' : 'false'}>
+    {privateProjection && <div className="oc-primary-workspace"><CurrentProjection projection={privateProjection} workObservation={privateWorkObservation} hasResultRecord={Boolean(project.resultView)} /></div>}
     {project.resultView && <OutcomeResultView view={project.resultView} onPlannerNavigate={navigatePlanner} />}
-    {privateProjection && <div className="oc-primary-workspace"><CurrentProjection projection={privateProjection} workObservation={privateWorkObservation} /></div>}
     <details className="oc-v1-compatibility" open={!privateProjection}>
-      {privateProjection && <summary><span>v1 호환 정보</span><small>역할 연결과 기술 근거는 필요할 때만 확인</small></summary>}
+      {privateProjection && <summary><span>이전 단계 기록</span><small>현재 정보와 구분해 확인하세요</small></summary>}
       <div className="oc-v1-compatibility__content">
     <div className="oc-hierarchy-sticky">
       <div className="oc-structure-band" role="img" aria-label={`전체 진행 흐름 · 현재 페이즈 ${current.phaseIndex}/${current.phaseTotal} · ${phases.map((phase) => `${phase.index} ${structureStatusLabel(phase.status)}`).join(', ')}`} data-structure-signature={phases.map((phase) => `${phase.id}:${phase.complete}/${phase.stages}:${phase.status}`).join('|')}>

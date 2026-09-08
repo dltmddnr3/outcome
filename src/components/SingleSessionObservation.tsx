@@ -2,9 +2,9 @@ import { useEffect, useState } from 'react'
 import { captureWorkObservationReader } from '../lib/api'
 import { startWorkObservationPolling } from '../lib/work-observation-poll'
 
-const stages = { queued: '작업 대기', implementing: '구현', qa_verifying: 'QA 검증', release_verifying: '릴리즈 검증', awaiting_owner: 'Cherry 확인 대기' }
+const stages = { queued: '작업 대기', implementing: '구현', qa_verifying: '품질 검증', release_verifying: '출시 전 점검', awaiting_owner: '소유자 확인 대기' }
 const runtimes = { active: '실행 관측됨', idle: '현재 실행 없음', waiting_approval: '권한 승인 대기', waiting_user: '답변 대기', waiting_approval_and_user: '권한 승인·답변 대기', unknown: '실행 상태 확인 불가' }
-const nextStates = { unobserved: '연결 확인 전', observation_stale: '새 관측 필요', observing: '관측 중', next_action_recorded: '다음 단계 기록됨 · 실행과 별개', next_action_missing: '완료 후 다음 단계 누락', needs_owner: 'Cherry 확인 필요', dependency_blocked: '선행 작업 대기', authority_missing: '실행 권한 확인 필요', evidence_missing: '검증 근거 필요', delivery_unknown: '전달 확인 필요 · 자동 재전송 안 함' }
+const nextStates = { unobserved: '연결 확인 전', observation_stale: '새 관측 필요', observing: '관측 중', next_action_recorded: '다음 단계 기록됨 · 실행과 별개', next_action_missing: '완료 후 다음 단계 누락', needs_owner: '소유자 확인 필요', dependency_blocked: '선행 작업 대기', authority_missing: '실행 권한 확인 필요', evidence_missing: '검증 근거 필요', delivery_unknown: '전달 확인 필요 · 자동 재전송 안 함' }
 type Snapshot = {
   observedAtMs: number
   work: { stage: keyof typeof stages | null; activity: 'running' | 'waiting' | 'terminal' | 'unknown'; freshness: 'fresh' | 'stale' | 'unobserved'; evidenceStatus: 'missing' | 'reference_only_unverified'; continuation: keyof typeof nextStates }
@@ -57,7 +57,7 @@ export function SingleSessionObservation({ observation, projectId }: { observati
       <dt>후속 작업</dt><dd>{snapshot ? fresh ? nextStates[snapshot.work.continuation] : '새 관측 필요' : '연결 확인 전'}</dd>
       <dt>검증 근거</dt><dd>{snapshot?.work.evidenceStatus === 'reference_only_unverified' ? '근거 참조 있음 · 내용 검증과 별개' : '근거 확인 전'}</dd>
     </dl>
-    <p>구현 → QA 검증 → 릴리즈 검증 → Cherry 확인</p>
-    <p>동일 세션 검증이며 독립 QA·감사와 구분합니다. 세션 활동은 진행률이나 완료를 뜻하지 않습니다.</p>
+    <p>구현 → 품질 검증 → 출시 전 점검 → 소유자 확인</p>
+    <p>같은 세션에서 진행한 검증입니다. 별도의 독립 검증과 다르며, 활동 기록만으로 진행률이나 완료를 판단하지 않습니다.</p>
   </article>
 }

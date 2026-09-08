@@ -13,7 +13,7 @@ export function DestinationUnknownEditor({unknowns,disabled,onChange}:{unknowns:
   const cancel=()=>{setEditing(false);setText(unknowns.join('\n'));setAcknowledged(false)}
   return <section className="destination-studio__unknowns" aria-label="초안의 미상 목록 편집">
     <strong>초안의 미상 목록</strong>
-    <p>목록 편집은 기술 검증 통과나 Destination 확정이 아닙니다. 변경한 목록은 초안 저장을 눌러야 서버에 반영됩니다.</p>
+    <p>목록 편집은 기술 검증 통과나 목적지 확정이 아닙니다. 변경한 목록은 초안 저장을 눌러야 서버에 반영됩니다.</p>
     {!editing?<><span>{unknowns.length?`${unknowns.length}개 항목`:'등록된 항목 없음 · 검증 완료를 뜻하지 않습니다.'}</span><button type="button" disabled={disabled} onClick={()=>setEditing(true)}>미상 목록 수정</button></>:<>
       <label><span>미상 항목 · 한 줄에 하나</span><textarea rows={5} value={text} disabled={disabled} onChange={event=>{setText(event.currentTarget.value);setAcknowledged(false)}} /></label>
       <div><strong>변경 전</strong>{unknowns.length?<ul>{unknowns.map((value,index)=><li key={index}>{value}</li>)}</ul>:<p>등록된 항목 없음</p>}</div>

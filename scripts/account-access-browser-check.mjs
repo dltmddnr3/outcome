@@ -80,7 +80,7 @@ try {
         const buttons = [...document.querySelectorAll('.account-workspace button')].map((element) => element.getBoundingClientRect().height)
         const rgb = (value) => (value.match(/[\d.]+/g) ?? []).slice(0, 3).map(Number); const luminance = (value) => { const channels = rgb(value).map((channel) => { const normalized = channel / 255; return normalized <= .03928 ? normalized / 12.92 : ((normalized + .055) / 1.055) ** 2.4 }); return .2126 * channels[0] + .7152 * channels[1] + .0722 * channels[2] }; const paragraph = document.querySelector('.account-workspace__state p'); const foreground = luminance(getComputedStyle(paragraph).color); const background = luminance(getComputedStyle(root).backgroundColor); const contrast = (Math.max(foreground, background) + .05) / (Math.min(foreground, background) + .05)
         return {
-          Korean: document.body.innerText.includes('Cherry 전용 비공개 워크스페이스'),
+          Korean: document.body.innerText.includes('내 프로젝트'),
           readOnly: document.body.innerText.includes('읽기 전용'),
           completionFalse: root?.getAttribute('data-completion-authority') === 'false',
           horizontalOverflow: document.documentElement.scrollWidth - document.documentElement.clientWidth,
@@ -98,7 +98,7 @@ try {
         }
       })
       if (!result.Korean || !result.readOnly || !result.completionFalse || result.horizontalOverflow > 1 || result.intersection !== 0 || result.buttons.some((height) => height < 44) || result.contrast < 4.5) throw new Error(`${viewport.name}/${state} failed ${JSON.stringify(result)}`)
-      if (state === 'login' && (!result.login || result.login.panelWidth > Math.min(620, viewport.width - 32) + 1 || result.login.headerWidth > Math.min(620, viewport.width - 32) + 1 || result.login.googleHeight < 44 || result.login.googleBackground !== 'rgb(173, 255, 47)' || !result.login.separator || !result.login.fallback)) throw new Error(`${viewport.name}/login visual contract failed ${JSON.stringify(result.login)}`)
+      if (state === 'login' && (!result.login || result.login.panelWidth > Math.min(620, viewport.width - 32) + 1 || result.login.headerWidth > Math.min(620, viewport.width - 32) + 1 || result.login.googleHeight < 44 || result.login.googleBackground !== 'rgb(32, 32, 32)' || !result.login.separator || !result.login.fallback)) throw new Error(`${viewport.name}/login visual contract failed ${JSON.stringify(result.login)}`)
       if (state === 'login') loginMeasurements.push({ viewport: `${viewport.width}x${viewport.height}`, panel: result.login.panelWidth, header: result.login.headerWidth, overflow: result.horizontalOverflow, google: result.login.googleHeight })
       if (state === 'ready') {
         const ready = await page.evaluate(() => ({ projects: document.querySelectorAll('[data-private-project]').length, columns: [...document.querySelectorAll('.account-workspace__hierarchy h3')].map((item) => item.textContent.trim()), current: document.querySelectorAll('[data-actual-current=true][aria-current=step]').length, gates: document.querySelectorAll('.account-workspace__gates li').length, logout: document.querySelector('[data-private-logout=true]')?.getBoundingClientRect().height ?? 0 }))
@@ -106,6 +106,18 @@ try {
       }
       if (state === 'login') {
         await page.keyboard.press('Tab')
+        if (await page.locator('[data-private-login-provider=google]').evaluate(element => element !== document.activeElement)) throw new Error(`${viewport.name} first keyboard target changed`)
+        const ax = await context.newCDPSession(page)
+        const rawNames = async () => (await ax.send('Accessibility.getFullAXTree')).nodes.filter(node => !node.ignored).map(node => node.name?.value).filter(Boolean)
+        const initialNames = await rawNames()
+        if (!initialNames.includes('내 프로젝트에 로그인') || !initialNames.includes('구글로 계속') || initialNames.includes('completionAuthority=false')) throw new Error(`${viewport.name} login raw AX disclosure boundary failed`)
+        const authority = page.locator('footer details')
+        await authority.locator('summary').focus(); await page.keyboard.press('Enter')
+        if (await authority.getAttribute('open') === null || !(await rawNames()).includes('completionAuthority=false')) throw new Error(`${viewport.name} authority keyboard disclosure failed`)
+        await page.keyboard.press('Enter')
+        if (await authority.getAttribute('open') !== null || (await rawNames()).includes('completionAuthority=false')) throw new Error(`${viewport.name} authority keyboard collapse failed`)
+        await ax.detach()
+        await page.locator('[data-private-login-provider=google]').focus()
         const focus = await page.evaluate(() => ({ provider: document.activeElement?.getAttribute('data-private-login-provider'), outlineWidth: Number.parseFloat(getComputedStyle(document.activeElement).outlineWidth), outlineColor: getComputedStyle(document.activeElement).outlineColor }))
         if (focus.provider !== 'google' || focus.outlineWidth < 3 || focus.outlineColor !== 'rgb(173, 255, 47)') throw new Error(`${viewport.name}/login keyboard focus failed ${JSON.stringify(focus)}`)
         if (process.env.OUTCOME_ACCOUNT_UX_SCREENSHOTS === '1' && ['macbook', 'mobile'].includes(viewport.name)) await page.screenshot({ path: `${screenshotDirectory}/${viewport.name}-${viewport.width}x${viewport.height}-login.png`, fullPage: true })
@@ -125,8 +137,12 @@ try {
     let browserErrors = 0
     // This fixture tests observed role lenses, not the separately verified durable chat service.
     await page.route('**/api/private/chat/timeline?*', route => route.fulfill({ json: { events: [], csrf: null, target: { role: 'planner', binding_version: 1 }, completion_authority: false } }))
+    // This fixture injects workspace access without a real session; its observation
+    // reads must use the same fixture boundary, not hit the unauthenticated server.
+    await page.route('**/api/private/work-observation/outcome', route => route.fulfill({ json: { projectId: 'outcome', observation: null, completionAuthority: false } }))
     page.on('pageerror', () => { browserErrors += 1 })
     page.on('console', (message) => { if (message.type() === 'error') browserErrors += 1 })
+    page.on('response', (response) => { if (response.status() >= 400) console.log('hostile fixture response', response.status(), new URL(response.url()).pathname) })
     await page.route('**/api/private/config', (route) => route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ enabled: true, access: 'private_read_only', providers: [], sessionMaximumDays: 7, completionAuthority: false }) }))
     const hostileProjects = readyProjects.map((project) => project.project.id === 'outcome' ? { ...project, modelV2: hostileProjection } : project)
     await page.route('**/api/private/workspace', (route) => route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ workspace: { viewState: 'ready', projects: hostileProjects, dashboard: readyDashboard } }) }))
@@ -136,7 +152,7 @@ try {
     if (await compatibility.count() && await compatibility.getAttribute('open') === null) await compatibility.locator(':scope > summary').click()
     const conversationTab = page.getByRole('navigation', { name: '모바일 작업공간' }).getByRole('button', { name: '대화', exact: true })
     if (await conversationTab.isVisible()) await conversationTab.click()
-    for (const [index, label] of ['Planner', 'Builder', 'UX & Product QA', 'Release Audit'].entries()) {
+    for (const [index, label] of ['플래너', '구현', '사용성·품질 검증', '출시 전 점검'].entries()) {
       await page.getByRole('button', { name: label, exact: true }).click()
       const event = page.locator(`[data-event-id="${roleEvents[index].id}"]`)
       if (await event.count() !== 1 || await event.getAttribute('data-event-sequence') !== String(index + 1) || await event.getAttribute('data-event-role') !== roleEvents[index].role || await page.locator('[data-non-progress-boundary="true"]').count() !== 1) throw new Error(`role lens ${label} lost stable projected identity or non-progress boundary`)
@@ -153,7 +169,7 @@ try {
       const contrast = (left, right) => { const values = [luminance(left), luminance(right)].sort((a, b) => b - a); return (values[0] + .05) / (values[1] + .05) }
       return { node: nodeStyle && markerStyle ? { width: nodeStyle.width, height: nodeStyle.height, background: nodeStyle.backgroundColor, image: nodeStyle.backgroundImage, shadow: nodeStyle.boxShadow, markerWidth: markerStyle.width, markerHeight: markerStyle.height, markerBackground: markerStyle.backgroundColor } : null, colors, contrasts: [contrast(colors[0], colors[1]), contrast(colors[1], colors[2])] }
     })
-    if (!visual.node || visual.node.width !== '22px' || visual.node.height !== '22px' || visual.node.background !== 'rgb(21, 26, 21)' || visual.node.image !== 'none' || visual.node.shadow !== 'none' || visual.node.markerWidth !== '7px' || visual.node.markerHeight !== '7px' || visual.node.markerBackground !== 'rgb(173, 255, 47)' || visual.contrasts.some((value) => value < 3)) throw new Error(`role chat visual contract failed ${JSON.stringify(visual)}`)
+    if (!visual.node || visual.node.width !== '22px' || visual.node.height !== '22px' || visual.node.background !== 'rgb(25, 25, 25)' || visual.node.image !== 'none' || visual.node.shadow !== 'none' || visual.node.markerWidth !== '7px' || visual.node.markerHeight !== '7px' || visual.node.markerBackground !== 'rgb(173, 255, 47)' || visual.contrasts.some((value) => value < 3)) throw new Error(`role chat visual contract failed ${JSON.stringify(visual)}`)
     const hostile = await page.evaluate((slug) => ({ apiFieldCount: document.querySelectorAll('[data-projection-field=boundary] li').length, markup: document.documentElement.outerHTML.includes(slug), visible: document.body.innerText.includes(slug), accessibility: document.body.textContent.includes(slug), overflow: document.documentElement.scrollWidth - document.documentElement.clientWidth }), hostileMilestoneSlug)
     if (hostile.apiFieldCount !== 0 || hostile.markup || hostile.visible || hostile.accessibility || hostile.overflow !== 0 || browserErrors !== 0) throw new Error(`hostile milestone built boundary failed ${JSON.stringify({ ...hostile, browserErrors })}`)
     await context.close()
@@ -167,6 +183,18 @@ try {
     await page.locator('[data-private-login-provider=google]').focus(); await page.keyboard.press('Enter')
     await page.locator('.account-workspace__loading').waitFor()
     await page.locator('.oc-dashboard').waitFor()
+    const measurements = page.locator('.oc-result-measurements').first()
+    if (await measurements.count()) {
+      if (await measurements.getAttribute('open') !== null) throw new Error('result measurements should start collapsed')
+      await measurements.locator(':scope > summary').focus(); await page.keyboard.press('Enter')
+      if (await measurements.getAttribute('open') === null || !await measurements.locator('.oc-result-work').isVisible()) throw new Error('result measurements keyboard disclosure failed')
+      const ax = await page.context().newCDPSession(page)
+      const tree = await ax.send('Accessibility.getFullAXTree')
+      if (!tree.nodes.some(node => !node.ignored && node.name?.value === '최초 예상')) throw new Error('result measurements raw AX missing')
+      await ax.detach()
+      await measurements.locator(':scope > summary').focus(); await page.keyboard.press('Enter')
+      if (await measurements.getAttribute('open') !== null) throw new Error('result measurements collapse failed')
+    }
     if (await page.locator('[data-private-project]').count() !== 2) throw new Error(`${viewport.name} project controls missing`)
     const shell = await page.evaluate(() => {
       const projection = document.querySelector('.current-projection'); const conversation = document.querySelector('.planner-conversation')
@@ -174,11 +202,28 @@ try {
       return { sidebar: Boolean(document.querySelector('.oc-global-nav')), journey: Boolean(document.querySelector('.oc-outcome-map')), current: document.querySelectorAll('[aria-current=step]').length, overflow: document.documentElement.scrollWidth - document.documentElement.clientWidth, approvedBoundaryLabels: [...document.querySelectorAll('[data-projection-field=boundary] li')].map((item) => item.textContent?.trim()).filter(Boolean), semanticProjectionFirst: Boolean(projection && conversation && (projection.compareDocumentPosition(conversation) & Node.DOCUMENT_POSITION_FOLLOWING)), visualProjectionFirst: Boolean(projectionBox && projectionBox.height > 0 && document.querySelector('details.oc-v1-compatibility:not([open])') && projectionBox.bottom <= document.querySelector('details.oc-v1-compatibility').getBoundingClientRect().top + 1), rawActionSlugVisible: ['q2-independent-qa', 'verify-coherent-slice', 'resolve-blocker', 'resolve_blocker'].some((value) => document.body.innerText.includes(value)) }
     })
     if (!shell.sidebar || !shell.journey || shell.current < 3 || shell.overflow !== 0 || shell.approvedBoundaryLabels.length === 0 || !shell.semanticProjectionFirst || !shell.visualProjectionFirst || shell.rawActionSlugVisible) throw new Error(`${viewport.name} existing shell failed ${JSON.stringify(shell)}`)
+    const resultJump = page.locator('.current-projection a[href="#oc-result-view"]')
+    if (await resultJump.count() !== 1) throw new Error('one early result-record navigation required')
+    if (await resultJump.evaluate(el => el.getBoundingClientRect().height < 44)) throw new Error('result record target too small')
+    await resultJump.focus();await page.keyboard.press('Enter')
+    if (new URL(page.url()).hash !== '#oc-result-view') throw new Error('result navigation did not preserve its exact target')
+    await page.locator('#oc-result-view').waitFor({state:'visible'})
+    const observedTime = page.locator('.current-projection [data-projection-field=now] time')
+    const displayedTime = await observedTime.innerText()
+    if (!/년.*월.*일.*(?:오전|오후).*한국 시간/.test(displayedTime) || /AM|PM/.test(displayedTime)) throw new Error('observation time must use explicit Korean wording')
+    const timeAx = await page.context().newCDPSession(page)
+    const timeTree = await timeAx.send('Accessibility.getFullAXTree')
+    if (!timeTree.nodes.some(node => !node.ignored && node.name?.value === displayedTime)) throw new Error('Korean observation time missing from raw AX')
+    await timeAx.detach()
     if (viewport.width === 1440) {
       await page.setViewportSize({ width: 720, height: 900 })
       const zoom = await page.evaluate(() => ({ overflow: document.documentElement.scrollWidth - document.documentElement.clientWidth, semanticProjectionFirst: Boolean(document.querySelector('.current-projection')?.compareDocumentPosition(document.querySelector('.planner-conversation')) & Node.DOCUMENT_POSITION_FOLLOWING) }))
       if (zoom.overflow !== 0 || !zoom.semanticProjectionFirst) throw new Error(`${viewport.name} ready 200% reflow failed ${JSON.stringify(zoom)}`)
       await page.setViewportSize({ width: 1440, height: 900 })
+    }
+    if (process.env.OUTCOME_ACCOUNT_UX_SCREENSHOTS === '1' && ['macbook-ready', 'mobile-ready'].includes(viewport.name)) {
+      await page.evaluate(() => window.scrollTo(0, 0))
+      await page.screenshot({ path: `${screenshotDirectory}/${viewport.name}-${viewport.width}x${viewport.height}-default.png`, fullPage: false })
     }
     await page.locator('details.oc-v1-compatibility > summary').click()
     if (await page.locator('details.oc-v1-compatibility').getAttribute('open') === null) throw new Error('compatibility disclosure did not open')
@@ -237,7 +282,7 @@ try {
     const loading = await page.evaluate(() => ({
       title: document.querySelector('.account-workspace__loading h1')?.textContent?.trim(),
       detail: document.querySelector('.account-workspace__loading p')?.textContent?.trim(),
-      technicalCopy: ['Cherry 전용 비공개 워크스페이스', '권한 확인 중', '서버에서', 'completionAuthority=false'].filter((value) => document.body.innerText.includes(value)),
+      technicalCopy: ['내 프로젝트', '권한 확인 중', '서버에서', 'completionAuthority=false'].filter((value) => document.body.innerText.includes(value)),
       overflow: document.documentElement.scrollWidth - document.documentElement.clientWidth,
       busy: document.querySelector('.account-workspace__loading')?.getAttribute('aria-busy'),
     }))

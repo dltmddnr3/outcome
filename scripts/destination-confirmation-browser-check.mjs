@@ -50,10 +50,10 @@ try{
    await page.getByRole('button',{name:'후속 답변 불러오기',exact:true}).click()
    await page.getByText('보관된 후속 답변 0개',{exact:false}).waitFor()
    await page.getByRole('button',{name:'저장된 추가 결정 검토',exact:true}).click()
-   await page.getByRole('region',{name:'Destination 확정 요청',exact:true}).waitFor()
+   await page.getByRole('region',{name:'목적지 확정 요청',exact:true}).waitFor()
   }
   await page.goto(`${base}/scripts/fixtures/destination-browser.html?storage`);await open()
-  const panel=page.getByRole('region',{name:'Destination 확정 요청',exact:true}),prepare=panel.getByRole('button',{name:'현재 초안 근거 검증',exact:true}),read=panel.getByRole('button',{name:'확정 요청 기록 조회',exact:true})
+  const panel=page.getByRole('region',{name:'목적지 확정 요청',exact:true}),prepare=panel.getByRole('button',{name:'현재 초안 근거 검증',exact:true}),read=panel.getByRole('button',{name:'확정 요청 기록 조회',exact:true})
   assert.equal(posts,0);assert.equal(reads,0);assert.equal(prepares,0);assert.equal(await prepare.isDisabled(),true)
   await read.click();await page.getByText('기존 확정 요청이 없습니다.',{exact:false}).waitFor();await prepare.click()
   if(mode==='unavailable'){
@@ -84,10 +84,14 @@ try{
      const beforeRefresh=creationReads;await panel.getByRole('button',{name:'생성 결과 다시 조회',exact:true}).click();await panel.getByText(creationNotice,{exact:true}).waitFor()
      assert.equal(creationReads,beforeRefresh+1);assert.equal(posts,1)
     }else{assert.equal(creationReads,1);assert.equal(await panel.getByRole('button',{name:'생성 결과 다시 조회',exact:true}).isEnabled(),true)}
-    assert.equal(await prepare.isDisabled(),true);assert.equal(await confirm.count(),0)
+    assert.equal(await prepare.count(),0);assert.equal(await confirm.count(),0)
     if(mode!=='creation-timeout'){await page.reload();await open();await read.click()}
     await panel.getByText('확정 요청 기록됨 · 생성 결과 별도 확인',{exact:true}).waitFor()
     await panel.getByText(creationNotice,{exact:true}).waitFor()
+    const permission=panel.locator(':scope > details')
+    assert.equal(await permission.getAttribute('open'),null)
+    await permission.locator('summary').focus();await page.keyboard.press('Enter')
+    assert.notEqual(await permission.getAttribute('open'),null)
     const cdp=await page.context().newCDPSession(page),ax=await cdp.send('Accessibility.getFullAXTree')
     for(const text of ['확정 요청 기록됨 · 생성 결과 별도 확인',creationNotice,'completionAuthority=false'])assert.ok(ax.nodes.some(n=>n.name?.value===text))
     await cdp.detach()

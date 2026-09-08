@@ -36,6 +36,11 @@ try{
   const block=page.locator('[data-source-context="true"]');
   if(await block.count()===0){console.log(JSON.stringify({diagnostic:(await page.locator('body').innerText()).slice(0,1600),errors}));throw Error('source_context_not_rendered')}
   await block.waitFor({state:'visible',timeout:5000})
+  const sourceDetails=block.locator('.oc-source-context-details')
+  assert.equal(await sourceDetails.getAttribute('open'),null)
+  if(!coherent)assert.equal(await block.getByText('진행 기록이 서로 다릅니다. 원본을 대조하기 전에는 완료 여부를 확정할 수 없습니다.',{exact:true}).isVisible(),true)
+  await sourceDetails.locator('summary').focus();await page.keyboard.press('Enter')
+  assert.notEqual(await sourceDetails.getAttribute('open'),null)
   const text=await block.innerText()
   const expected='Phase 3 집계 차이 · Map 문서 기록 38/43 · 현재 후보의 연결 Gate 집계 17/43. 문서 기록을 현재 후보의 검증 완료율로 사용하지 않습니다.'
   assert.equal(text.includes(expected),!baseline)

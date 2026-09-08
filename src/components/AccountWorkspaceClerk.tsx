@@ -55,9 +55,9 @@ type HostedGoogleAttempt = 'complete' | 'failed' | 'incomplete' | 'popup_blocked
 const openHostedGooglePopup = () => window.open('about:blank', 'outcome-google-auth', 'popup,width=600,height=800')
 const navigateHostedWorkspace: HostedGoogleNavigate = ({ decorateUrl }) => window.location.assign(decorateUrl('/workspace'))
 export function hostedGoogleAttemptError(result: HostedGoogleAttempt) {
-  if (result === 'unavailable') return '인증 공급자를 불러오지 못했습니다. 다시 시도해 주세요.'
-  if (result === 'popup_blocked') return 'Google 로그인 창을 열 수 없습니다. 팝업을 허용한 뒤 다시 시도해 주세요.'
-  if (result === 'failed' || result === 'incomplete') return 'Google 로그인을 완료하지 못했습니다. 다시 시도해 주세요.'
+  if (result === 'unavailable') return '로그인 기능을 불러오지 못했습니다. 다시 시도해 주세요.'
+  if (result === 'popup_blocked') return '구글 로그인 창을 열 수 없습니다. 팝업을 허용한 뒤 다시 시도해 주세요.'
+  if (result === 'failed' || result === 'incomplete') return '구글 로그인을 완료하지 못했습니다. 다시 시도해 주세요.'
   return null
 }
 export async function attemptHostedGoogleSignIn(signIn: HostedGoogleSignIn | null | undefined, lock: { current: boolean }, openPopup: () => Window | null = openHostedGooglePopup, navigate: HostedGoogleNavigate = navigateHostedWorkspace): Promise<HostedGoogleAttempt> {
@@ -178,12 +178,12 @@ function HostedWorkspaceSession() {
   }
   const sendCode = async (event: FormEvent) => {
     event.preventDefault(); setError(null)
-    if (!(await requestHostedEmailCode(signIn, email))) { setError(signIn ? '인증 코드를 보내지 못했습니다.' : '인증 공급자를 불러오지 못했습니다.'); return }
+    if (!(await requestHostedEmailCode(signIn, email))) { setError(signIn ? '인증 코드를 보내지 못했습니다.' : '로그인 기능을 불러오지 못했습니다.'); return }
     setCodeSent(true)
   }
   const verifyCode = async (event: FormEvent) => {
     event.preventDefault(); setError(null)
-    if (!signIn) { setError('인증 공급자를 불러오지 못했습니다.'); return }
+    if (!signIn) { setError('로그인 기능을 불러오지 못했습니다.'); return }
     const result = await signIn.emailCode.verifyCode({ code })
     if (result?.error) { setError('인증 코드를 확인하지 못했습니다.'); return }
     await signIn.finalize({ navigate: ({ decorateUrl }) => window.location.assign(decorateUrl('/workspace')) })
@@ -203,15 +203,15 @@ function HostedWorkspaceSession() {
     await returnToHostedLogin(signOut)
   }
   const loginContent = <div className="account-workspace__actions" data-clerk-browser-auth="true">
-    <button className="account-workspace__google" type="button" data-touch-target="44" data-private-login-provider="google" data-google-start-pending={googleBusy} aria-busy={googleBusy} disabled={googleBusy} onClick={() => void google()}>{googleBusy ? 'Google 로그인 시작 중…' : 'Google로 계속'}</button>
+    <button className="account-workspace__google" type="button" data-touch-target="44" data-private-login-provider="google" data-google-start-pending={googleBusy} aria-busy={googleBusy} disabled={googleBusy} onClick={() => void google()}>{googleBusy ? '구글 로그인 시작 중…' : '구글로 계속'}</button>
     <div className="account-workspace__separator" aria-hidden="true"><span>또는</span></div>
     <form className="account-workspace__fallback" onSubmit={codeSent ? verifyCode : sendCode}>
       <strong>이메일로 확인</strong>
       {!codeSent ? <><label htmlFor="private-email">이메일</label><input id="private-email" type="email" required value={email} onChange={(event) => setEmail(event.target.value)} /></> : <><label htmlFor="private-code">인증 코드</label><input id="private-code" inputMode="numeric" required value={code} onChange={(event) => setCode(event.target.value)} /></>}
       <button type="submit" data-touch-target="44">{codeSent ? '인증 코드 확인' : '이메일 인증 코드 받기'}</button>
     </form>
-    <span className="account-workspace__apple-note">Apple은 소유자 로그인 확인 후 연결</span>
-    <p className="account-workspace__adapter-note">Clerk 브라우저 세션 · 회원가입 전환 차단</p>
+    <span className="account-workspace__apple-note">애플 계정은 소유자 로그인 확인 후 연결</span>
+    <p className="account-workspace__adapter-note">접근이 허용된 기존 계정만 사용할 수 있습니다.</p>
   </div>
   return <PlannerConversationSession.Provider value={{ getSessionCredential: getToken }}><AccountWorkspace state={state} workspace={workspace} ownerVerified={ownerVerified} sessionPresent={Boolean(isSignedIn)} loginContent={loginContent} onLogout={isSignedIn || ownerWasReady ? returnToLogin : undefined} onAppleLink={ownerVerified ? linkApple : undefined} transitionError={error} /></PlannerConversationSession.Provider>
 }

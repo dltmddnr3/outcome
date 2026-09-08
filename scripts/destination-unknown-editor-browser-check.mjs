@@ -21,7 +21,7 @@ try{
    }else throw Error(`unexpected fixture route ${path}`)
    await route.fulfill({status:200,contentType:'application/json',headers:{'x-outcome-destination-csrf':'synthetic'},body:JSON.stringify(body)})
   })
-  const load=async()=>{await page.goto(`${base}/scripts/fixtures/destination-browser.html?storage`);await page.getByRole('button',{name:'목적지 설정',exact:true}).click();await page.getByRole('button',{name:'서버 초안 불러오기 · 현재 입력 대체',exact:true}).click();await page.getByText('Destination 초안을 확인해주세요',{exact:true}).waitFor()}
+  const load=async()=>{await page.goto(`${base}/scripts/fixtures/destination-browser.html?storage`);await page.getByRole('button',{name:'목적지 설정',exact:true}).click();await page.getByRole('button',{name:'서버 초안 불러오기 · 현재 입력 대체',exact:true}).click();await page.getByText('목적지 초안을 확인해 주세요',{exact:true}).waitFor()}
   await load()
   const panel=page.getByRole('region',{name:'초안의 미상 목록 편집',exact:true}),open=panel.getByRole('button',{name:'미상 목록 수정',exact:true}),apply=panel.getByRole('button',{name:'목록 변경 적용 · 아직 미저장',exact:true})
   await open.click();await panel.getByRole('textbox').fill('취소할 변경');await panel.getByRole('button',{name:'목록 수정 취소',exact:true}).click();assert.equal(puts,0)

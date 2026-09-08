@@ -57,10 +57,10 @@ try{
   await page.getByRole('button',{name:'후속 답변 불러오기',exact:true}).click()
   await page.getByRole('button',{name:'후속 질문 준비 시작',exact:true}).click()
   await page.getByRole('button',{name:'현재 후속 질문 확인',exact:true}).click()
-  await page.getByRole('button',{name:'Planner 후속 질문 요청',exact:true}).click()
+  await page.getByRole('button',{name:'플래너 후속 질문 요청',exact:true}).click()
   if(requestFailure){
    await page.getByText('연결 상태 또는 저장 결과를 확인하지 못했습니다. 입력을 유지하고 자동 재시도하지 않습니다.',{exact:true}).waitFor()
-   const requestButton=page.getByRole('button',{name:'Planner 후속 질문 요청',exact:true})
+   const requestButton=page.getByRole('button',{name:'플래너 후속 질문 요청',exact:true})
    assert.equal(await requestButton.isDisabled(),true)
    // Read the unchanged UI through separate browser turns; no timers or retry trigger.
    await page.getByRole('heading',{name:'목적지 심화 질문',exact:true}).focus()
@@ -72,7 +72,7 @@ try{
    await page.close();continue
   }
   await page.getByText('요청 접수 · 실행 대기',{exact:true}).waitFor()
-  assert.equal(await page.getByRole('button',{name:'Planner 후속 질문 요청',exact:true}).isDisabled(),true)
+  assert.equal(await page.getByRole('button',{name:'플래너 후속 질문 요청',exact:true}).isDisabled(),true)
   await page.getByRole('button',{name:'현재 후속 질문 확인',exact:true}).click()
   await page.getByRole('heading',{name:'결과 확인 담당자는 누구인가요?',exact:true}).waitFor()
   assert.equal(await page.getByRole('radio',{name:/소유자/}).isChecked(),false)
@@ -98,7 +98,7 @@ try{
    assert.equal((await page.locator('body').innerText()).includes('synthetic-private'),false)
   }
   await page.getByRole('button',{name:'현재 후속 질문 확인',exact:true}).click()
-  await page.getByText('아직 현재 맥락의 Planner 질문이 없습니다.',{exact:false}).waitFor()
+  await page.getByText('아직 현재 맥락의 플래너 질문이 없습니다.',{exact:false}).waitFor()
   assert.equal(await page.getByRole('radio').count(),0);assert.equal(writes,2)
   assert.deepEqual(errors,[]);assert.equal(await page.evaluate(()=>document.documentElement.scrollWidth>innerWidth),false)
   assert.equal(questionPosts,1)

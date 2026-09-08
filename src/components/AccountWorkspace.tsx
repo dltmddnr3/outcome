@@ -1,11 +1,11 @@
 export const accountWorkspaceStateCopy = {
-  login: { title: 'Cherry 계정으로 확인', detail: '승인된 한 명의 소유자만 비공개 프로젝트를 볼 수 있습니다.' },
+  login: { title: '내 프로젝트에 로그인', detail: '접근이 허용된 소유자 계정으로 로그인해 주세요.' },
   loading: { title: '로그인 중', detail: '잠시만 기다려 주세요.' },
-  empty: { title: '연결된 프로젝트가 없습니다', detail: '프로젝트를 임의로 대신 표시하지 않습니다.' },
-  stale: { title: '마지막 확인 결과를 표시합니다', detail: '새 수집이 확인될 때까지 기존 스냅샷 시간을 유지합니다.' },
+  empty: { title: '연결된 프로젝트가 없습니다', detail: '현재 이 계정으로 볼 수 있는 프로젝트가 없습니다.' },
+  stale: { title: '마지막 확인 결과를 표시합니다', detail: '이후 변경 사항은 아직 확인되지 않았습니다. 표시된 확인 시각을 참고해 주세요.' },
   conflict: { title: '계정 연결을 확인할 수 없습니다', detail: '서로 충돌하는 워크스페이스 정보가 있어 접근을 중단했습니다.' },
-  unavailable: { title: '비공개 워크스페이스를 열 수 없습니다', detail: '공급자 설정 또는 저장소 연결이 준비되지 않았습니다.' },
-  session_expired: { title: '로그인이 만료되었습니다', detail: 'Google 또는 이메일 인증 코드로 다시 확인해 주세요.' },
+  unavailable: { title: '프로젝트를 불러올 수 없습니다', detail: '프로젝트 데이터 연결이 준비되지 않았습니다.' },
+  session_expired: { title: '로그인이 만료되었습니다', detail: '구글 또는 이메일 인증 코드로 다시 로그인해 주세요.' },
   access_denied: { title: '이 프로젝트에 접근할 수 없습니다', detail: '다른 프로젝트나 공개 데이터로 대신 연결하지 않습니다.' },
   safe_degraded: { title: '안전한 읽기 전용 상태입니다', detail: '마지막 검증 결과만 보이며 새로고침과 변경 작업은 중단되었습니다.' },
   ready: { title: '비공개 결과를 확인할 수 있습니다', detail: '허용된 프로젝트만 읽기 전용으로 표시합니다.' },
@@ -26,7 +26,7 @@ const accountWorkspaceStateLabel: Record<keyof typeof accountWorkspaceStateCopy,
 
 const verifiedUnavailableCopy = {
   title: '로그인 완료 · 데이터 연결 준비 중',
-  detail: 'Cherry 소유자 인증은 완료되었습니다. 비공개 프로젝트 저장소가 연결될 때까지 프로젝트 내용은 표시하지 않습니다.',
+  detail: '계정 확인은 끝났지만 프로젝트 데이터를 아직 불러올 수 없습니다.',
 } as const
 
 export type AccountWorkspaceState = keyof typeof accountWorkspaceStateCopy
@@ -67,7 +67,7 @@ export function AccountWorkspace({ state = 'unavailable', workspace, ownerVerifi
   </main>
   return <main className="account-workspace" data-account-state={state} data-completion-authority="false">
     <header className="account-workspace__header">
-      <div><span className="account-workspace__eyebrow">OUTCOME · 비공개</span><h1>Cherry 전용 비공개 워크스페이스</h1></div>
+      <div><span className="account-workspace__eyebrow">OUTCOME · 비공개</span><h1>내 프로젝트</h1></div>
       <div className="account-workspace__header-actions"><span className="account-workspace__mode">읽기 전용</span>{sessionPresent && onLogout && <button type="button" data-private-logout="true" disabled={busy !== null} onClick={() => void transition('logout', onLogout)}>{busy === 'logout' ? '로그아웃 중…' : '로그아웃'}</button>}</div>
     </header>
     <section className="account-workspace__state" role={alert ? 'alert' : 'status'} aria-live={alert ? 'assertive' : 'polite'}>
@@ -75,13 +75,13 @@ export function AccountWorkspace({ state = 'unavailable', workspace, ownerVerifi
       <h2>{copy.title}</h2>
       <p>{copy.detail}</p>
       {state === 'login' && (loginContent ?? <div className="account-workspace__actions">
-        <button className="account-workspace__google" type="button" data-touch-target="44" data-private-login-provider="google" disabled={busy !== null} onClick={() => void transition('google', onLogin ? () => onLogin('google') : undefined)}>{busy === 'google' ? '연결 확인 중…' : 'Google로 계속'}</button>
+        <button className="account-workspace__google" type="button" data-touch-target="44" data-private-login-provider="google" disabled={busy !== null} onClick={() => void transition('google', onLogin ? () => onLogin('google') : undefined)}>{busy === 'google' ? '연결 확인 중…' : '구글로 계속'}</button>
         <div className="account-workspace__separator" aria-hidden="true"><span>또는</span></div>
         <div className="account-workspace__fallback"><span>이메일로 확인</span><button type="button" data-touch-target="44" data-private-login-provider="email_code" disabled={busy !== null} onClick={() => void transition('email_code', onLogin ? () => onLogin('email_code') : undefined)}>{busy === 'email_code' ? '코드 확인 중…' : '이메일 인증 코드 받기'}</button></div>
-        <span className="account-workspace__apple-note">Apple은 로그인 후 연결</span>
-        <p className="account-workspace__adapter-note">검증용 공급자 중립 전환 · 실제 OAuth 연결 아님</p>
+        <span className="account-workspace__apple-note">애플 계정은 로그인 후 연결</span>
+        <p className="account-workspace__adapter-note">검증용 화면 · 실제 계정에 로그인하지 않습니다</p>
       </div>)}
-      {ownerVerified && onAppleLink && <div className="account-workspace__verified-actions"><button type="button" data-touch-target="44" data-private-link-provider="apple" disabled={busy !== null} onClick={() => void transition('logout', onAppleLink)}>Apple 계정 연결</button><small>소유자 계정에 읽기 전용으로 연결합니다.</small></div>}
+      {ownerVerified && onAppleLink && <div className="account-workspace__verified-actions"><button type="button" data-touch-target="44" data-private-link-provider="apple" disabled={busy !== null} onClick={() => void transition('logout', onAppleLink)}>애플 계정 연결</button><small>소유자 계정에 읽기 전용으로 연결합니다.</small></div>}
       {state === 'session_expired' && onLogout && <button type="button" data-touch-target="44" data-private-session-retry="true" disabled={busy !== null} onClick={() => void transition('logout', onLogout)}>{busy === 'logout' ? '로그아웃 중…' : '다시 로그인'}</button>}
       {state === 'safe_degraded' && <p className="account-workspace__notice">변경 기능 없음 · 자동 동기화 없음 · 마지막 검증 시각 유지</p>}
       {transitionError && <p className="account-workspace__transition-error" role="alert">{transitionError}</p>}
@@ -89,9 +89,9 @@ export function AccountWorkspace({ state = 'unavailable', workspace, ownerVerifi
     {state === 'ready' && project && <section className="account-workspace__ready" aria-label="비공개 프로젝트 결과 위계">
       <nav className="account-workspace__projects" aria-label="비공개 프로젝트 전환">{projects.map((item) => <button type="button" key={item.project.id} data-private-project={item.project.id} aria-pressed={item.project.id === project.project.id} onClick={() => chooseProject(item)}>{item.project.name}</button>)}</nav>
       <div className="account-workspace__regions">
-        {project.modelV2 ? <CurrentProjection projection={project.modelV2} workObservation={project.workObservation} /> : <section className="current-projection current-projection--missing" role="status"><h2>Current Projection을 표시할 수 없습니다</h2><p>서버가 검증한 Model v2 projection이 없어 v1 정보로 대신 계산하지 않습니다.</p></section>}
+        {project.modelV2 ? <CurrentProjection projection={project.modelV2} workObservation={project.workObservation} /> : <section className="current-projection current-projection--missing" role="status"><h2>현재 상황을 확인할 수 없습니다</h2><p>검증된 최신 정보가 없습니다. 이전 기록은 아래에서 볼 수 있지만 현재 진행 상황을 뜻하지는 않습니다.</p></section>}
         <details className="account-workspace__compatibility">
-          <summary><span>v1 호환 정보</span><small>역할·기술 근거는 필요할 때만 확인</small></summary>
+          <summary><span>이전 기록과 상세 근거</span><small>현재 상황과 구분해 확인하세요</small></summary>
           <div className="account-workspace__compatibility-content">
             <div className="account-workspace__position"><p data-private-actual><strong>실제 현재</strong><span>{actual}</span></p><p data-private-selected><strong>선택 위치</strong><span>{selected}</span></p></div>
             <div className="account-workspace__hierarchy">
@@ -106,7 +106,7 @@ export function AccountWorkspace({ state = 'unavailable', workspace, ownerVerifi
     </section>}
     <footer>
       <span>서버에서 허용된 프로젝트만 표시</span>
-      <code>completionAuthority=false</code>
+      <details><summary>권한 안내</summary><p>이 화면의 정보만으로 작업이 최종 수용되거나 출시되지는 않습니다.</p><code>completionAuthority=false</code></details>
     </footer>
   </main>
 }

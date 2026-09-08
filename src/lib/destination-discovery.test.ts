@@ -4,6 +4,16 @@ import { analyzeDestinationBrief, createDestinationReview, destinationQuestions,
 const completeAnswers = Object.fromEntries(destinationQuestions.map((question) => [question.id, question.choices[0]]))
 
 describe('Phase 5 destination discovery contract', () => {
+  it('uses Korean question copy without rewriting previously saved answers', () => {
+    for (const question of destinationQuestions) {
+      const visible = [question.label, question.prompt, question.why, ...question.choices].join(' ')
+      expect(visible).not.toMatch(/Destination|Production|QA|Release|pin|fail-closed|MVP/)
+    }
+    const original = { ...completeAnswers, scope: '문서 분석 → 빈칸 질문 → Destination 확인', acceptance: '후보·QA·Release 검증이 하나의 불변 pin을 가리킨다' }
+    const review = createDestinationReview(original)
+    expect(review.scope).toBe(original.scope)
+    expect(review.acceptance).toBe(original.acceptance)
+  })
   it('reads Markdown heading bodies without matching unrelated word prefixes', () => {
     expect(extractBriefAnswers('## 문제\n작업이 끊긴다\n다음 단계가 없다\n## 대상 사용자\nCherry\n## 부록\n참고 사항')).toEqual({problem:'작업이 끊긴다\n다음 단계가 없다',targetUser:'Cherry'})
     expect(extractBriefAnswers('문제점은 미정\nusername: admin\nscopeful: no')).toEqual({})

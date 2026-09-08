@@ -55,7 +55,7 @@ try{
    }
    const comparisonSession=await page.context().newCDPSession(page),comparisonAx=await comparisonSession.send('Accessibility.getFullAXTree')
    assert.ok(comparisonAx.nodes.some(n=>n.name?.value==='기본 초안 버전 1 → 2 · 후속 답변 버전 2'));await comparisonSession.detach()
-   assert.equal(puts,0);assert.equal(await page.getByRole('region',{name:'Destination 확정 요청',exact:true}).count(),0)
+   assert.equal(puts,0);assert.equal(await page.getByRole('region',{name:'목적지 확정 요청',exact:true}).count(),0)
    if(pendingMode){
     await panel.getByText('이전 맥락에 미답변 질문이 남아 갱신을 보류합니다.',{exact:false}).waitFor()
     assert.equal(await panel.getByRole('checkbox').count(),0)

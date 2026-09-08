@@ -143,8 +143,8 @@ describe('Clerk browser session boundary', () => {
   it('maps popup/mobile fallback and provider failures to bounded Korean copy only', () => {
     expect(hostedGoogleAttemptError('popup_blocked')).toContain('팝업을 허용')
     expect(hostedGoogleAttemptError('unavailable')).toContain('다시 시도')
-    expect(hostedGoogleAttemptError('failed')).toBe('Google 로그인을 완료하지 못했습니다. 다시 시도해 주세요.')
-    expect(hostedGoogleAttemptError('incomplete')).toBe('Google 로그인을 완료하지 못했습니다. 다시 시도해 주세요.')
+    expect(hostedGoogleAttemptError('failed')).toBe('구글 로그인을 완료하지 못했습니다. 다시 시도해 주세요.')
+    expect(hostedGoogleAttemptError('incomplete')).toBe('구글 로그인을 완료하지 못했습니다. 다시 시도해 주세요.')
     expect(hostedGoogleAttemptError('complete')).toBeNull()
     expect(hostedGoogleAttemptError('ignored')).toBeNull()
     expect(JSON.stringify((['popup_blocked', 'unavailable', 'failed', 'incomplete'] as const).map(hostedGoogleAttemptError))).not.toMatch(/raw-provider|token|cookie|secret/i)
@@ -170,7 +170,7 @@ describe('Clerk browser session boundary', () => {
     clerkAuth.fetchStatus = 'fetching'
     const html = renderToStaticMarkup(<HostedClerkWorkspace publishableKey="pk_test_browser" pathname="/workspace" />)
     clerkAuth.fetchStatus = 'idle'
-    expect(html).toContain('Google 로그인 시작 중…')
+    expect(html).toContain('구글 로그인 시작 중…')
     expect(html).toContain('data-google-start-pending="true"')
     expect(html).toContain('disabled=""')
   })

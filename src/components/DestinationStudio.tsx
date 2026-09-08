@@ -12,6 +12,7 @@ import { createDestinationReview, destinationQuestions, analyzeDestinationBrief,
 type DestinationStep = 'entry' | 'brief' | 'question' | 'review'
 
 const reviewRows: ReadonlyArray<{ id: DestinationDomainId; label: string }> = destinationQuestions.map(({ id, label }) => ({ id, label }))
+const primaryReviewIds: readonly DestinationDomainId[] = ['outcome', 'scope', 'acceptance']
 
 export function DestinationStudio({ open, onClose }: { open: boolean; onClose: () => void }) {
   const [step, setStep] = useState<DestinationStep>('entry')
@@ -127,7 +128,7 @@ export function DestinationStudio({ open, onClose }: { open: boolean; onClose: (
       if(latestDraft.current!==request.input)throw Error('draft_changed')
       setAnalysis(value)
       if(!submit)setAnalysisAttempted(value!==null)
-      setAnalysisNotice(value?({queued:'분석 요청 접수됨 · 실행 대기',dispatch_started:'Planner 응답 대기 · 접수는 완료가 아닙니다.',completed:'문서 근거 확인됨 · 제안 의미는 직접 검토해 주세요.',failed:'분석 실패 · 자동 재시도하지 않습니다.',delivery_unknown:'전달 상태 불명 · 자동 재전송하지 않습니다.'}[value.state]):'요청 기록을 찾지 못했습니다. 자동 재전송하지 않습니다.')
+      setAnalysisNotice(value?({queued:'분석 요청 접수됨 · 실행 대기',dispatch_started:'플래너 응답 대기 · 접수는 완료가 아닙니다.',completed:'문서 근거 확인됨 · 제안 의미는 직접 검토해 주세요.',failed:'분석 실패 · 자동 재시도하지 않습니다.',delivery_unknown:'전달 상태 불명 · 자동 재전송하지 않습니다.'}[value.state]):'요청 기록을 찾지 못했습니다. 자동 재전송하지 않습니다.')
     }catch{setAnalysisNotice('저장된 초안과 요청 상태를 확인해 주세요. 입력은 유지하며 자동 재전송하지 않습니다.')}
     finally{analysisLock.current=false;setAnalysisBusy(false)}
   }
@@ -173,28 +174,29 @@ export function DestinationStudio({ open, onClose }: { open: boolean; onClose: (
     setStep(mode === 'brief_gap' ? 'brief' : 'entry')
   }
   const editAnswer = (id: DestinationDomainId) => { setQuestionQueue([id]); setQuestionIndex(0); setDraftAnswer(answers[id] ?? ''); setStep('question') }
+  const renderReviewRows = (primary: boolean) => <dl>{reviewRows.filter(({ id }) => primaryReviewIds.includes(id) === primary).map(({ id, label }) => <div key={id}><dt>{label}</dt><dd>{review?.[id]}{evidence.filter(item => item.field === id).map((item, index) => <small key={index}>문서 근거 {item.startLine}–{item.endLine}행 · 현재 답변은 직접 검토 필요</small>)}</dd><button type="button" onClick={() => editAnswer(id)}>{label} 수정</button></div>)}</dl>
 
   return <div className="destination-studio__backdrop" data-destination-studio="open">
     <section ref={dialogRef} className="destination-studio" role="dialog" aria-modal="true" aria-labelledby="destination-studio-title" data-step={step} data-completion-authority="false">
       <header className="destination-studio__header">
-        <div><small>Phase 5 · Destination 설정</small><h2 id="destination-studio-title">원하는 결과부터 정합니다</h2></div>
-        <button ref={closeRef} type="button" aria-label="Destination 설정 닫기" onClick={onClose}><X size={20} aria-hidden="true" /></button>
+        <div><small>목적지 설정</small><h2 id="destination-studio-title">원하는 결과부터 정합니다</h2></div>
+        <button ref={closeRef} type="button" aria-label="목적지 설정 닫기" onClick={onClose}><X size={20} aria-hidden="true" /></button>
       </header>
 
       {step === 'entry' && <div className="destination-studio__entry">
         <p>아이디어 또는 제목이 명시된 기획서에서 목적지 초안을 정리합니다. 저장하지 않은 입력은 이 화면의 메모리에만 있으며 새로고침하면 사라집니다.</p>
         <div className="destination-studio__entry-grid">
-          <button type="button" onClick={() => { setSourceNote(null); setEvidence([]); beginQuestions('guided_200q') }}><Sparkles size={22} aria-hidden="true" /><span><strong>질문으로 시작</strong><small>기본 8개 항목을 정리합니다. 적응형 200Q는 연결 준비 중이에요.</small></span></button>
-          <button type="button" onClick={() => { setMode('brief_gap'); setStep('brief'); setError(null) }}><FileText size={22} aria-hidden="true" /><span><strong>기획서에서 빈칸 찾기</strong><small>텍스트·Markdown을 이 기기에서만 읽고, 없거나 충돌하는 항목만 묻습니다.</small></span></button>
+          <button type="button" onClick={() => { setSourceNote(null); setEvidence([]); beginQuestions('guided_200q') }}><Sparkles size={22} aria-hidden="true" /><span><strong>질문으로 시작</strong><small>먼저 기본 내용을 정리합니다. 저장한 초안에서 추가 질문을 요청할 수 있습니다.</small></span></button>
+          <button type="button" onClick={() => { setMode('brief_gap'); setStep('brief'); setError(null) }}><FileText size={22} aria-hidden="true" /><span><strong>기획서에서 빈칸 찾기</strong><small>텍스트·마크다운을 이 기기에서만 읽고, 없거나 충돌하는 항목만 묻습니다.</small></span></button>
         </div>
-        <p className="destination-studio__boundary"><Lightbulb size={16} aria-hidden="true" />Destination을 확인하기 전에는 프로젝트·역할 세션·Gate를 만들지 않아요.</p>
+        <p className="destination-studio__boundary"><Lightbulb size={16} aria-hidden="true" />목적지를 확정하기 전에는 프로젝트나 작업을 만들지 않습니다.</p>
       </div>}
 
       {step === 'brief' && <div className="destination-studio__brief">
         <button className="destination-studio__back" type="button" onClick={() => setStep('entry')}><ArrowLeft size={17} aria-hidden="true" />시작 방식</button>
         <div><h3>기획서의 빈칸만 찾을게요</h3><p>헤더에 `문제`, `대상 사용자`, `결과`, `범위`, `비목표`, `제약`, `수용 기준`, `복구`를 쓰면 더 정확해요.</p></div>
         <label className="destination-studio__file"><span>이 기기에서 파일 읽기</span><input type="file" accept=".md,.markdown,.txt,text/plain,text/markdown" onChange={(event) => void readLocalFile(event.currentTarget.files?.[0])} /><small>읽기만으로는 서버 업로드 없음 · 초안 저장은 별도 · 64KB 이하</small></label>
-        <label><span>또는 내용 붙여넣기</span><textarea rows={12} value={briefText} disabled={reading} onChange={(event) => setBriefText(event.currentTarget.value)} placeholder="텍스트 또는 Markdown 기획서" /></label>
+        <label><span>또는 내용 붙여넣기</span><textarea rows={12} value={briefText} disabled={reading} onChange={(event) => setBriefText(event.currentTarget.value)} placeholder="텍스트 또는 마크다운 기획서" /></label>
         {sourceNote && <p className="destination-studio__note" role="status">{sourceNote}</p>}
         {error && <p className="destination-studio__error" role="alert">{error}</p>}
         <button className="destination-studio__primary" type="button" disabled={reading || !briefText.trim()} onClick={analyzeBrief}>{reading ? '파일 읽는 중' : '빈칸 찾기'}</button>
@@ -207,16 +209,17 @@ export function DestinationStudio({ open, onClose }: { open: boolean; onClose: (
         <fieldset><legend>하나를 고르거나 직접 적어주세요</legend>{currentQuestion.choices.map((choice) => <label key={choice} data-selected={draftAnswer === choice ? 'true' : undefined}><input type="radio" name={`destination-${currentQuestion.id}`} checked={draftAnswer === choice} onChange={() => setDraftAnswer(choice)} /><span><strong>{choice}</strong></span></label>)}</fieldset>
         <label className="destination-studio__custom"><span>직접 입력</span><textarea rows={3} maxLength={4000} value={currentQuestion.choices.includes(draftAnswer as never) ? '' : draftAnswer} onChange={(event) => setDraftAnswer(event.currentTarget.value)} placeholder="선택지에 없는 내용을 적어주세요" /></label>
         {error && <p role="alert">{error}</p>}
-        <div className="destination-studio__actions"><button type="button" onClick={goBack}><ArrowLeft size={17} aria-hidden="true" />이전</button><button className="destination-studio__primary" type="button" disabled={!draftAnswer.trim()} onClick={commitAnswer}>{questionIndex + 1 === questionQueue.length ? 'Destination 검토' : '다음 질문'}</button></div>
+        <div className="destination-studio__actions"><button type="button" onClick={goBack}><ArrowLeft size={17} aria-hidden="true" />이전</button><button className="destination-studio__primary" type="button" disabled={!draftAnswer.trim()} onClick={commitAnswer}>{questionIndex + 1 === questionQueue.length ? '목적지 검토' : '다음 질문'}</button></div>
       </div>}
 
       {step === 'review' && review && <div className="destination-studio__review">
-        <div className="destination-studio__review-intro"><span><Check size={18} aria-hidden="true" /></span><div><h3>Destination 초안을 확인해주세요</h3><p>두 시작 경로는 같은 형식으로 수렴합니다. 아직 프로젝트를 만들지 않았어요.</p></div></div>
-        <dl>{reviewRows.map(({ id, label }) => <div key={id}><dt>{label}</dt><dd>{review[id]}{evidence.filter(item => item.field === id).map((item, index) => <small key={index}>문서 근거 {item.startLine}–{item.endLine}행 · 현재 답변은 직접 검토 필요</small>)}</dd><button type="button" onClick={() => editAnswer(id)}>{label} 수정</button></div>)}</dl>
+        <div className="destination-studio__review-intro"><span><Check size={18} aria-hidden="true" /></span><div><h3>목적지 초안을 확인해 주세요</h3><p>원하는 결과와 포함할 범위가 맞는지 확인해 주세요. 아직 프로젝트는 만들지 않았습니다.</p></div></div>
+        {renderReviewRows(true)}
+        <details className="destination-studio__review-details"><summary>문제·대상·하지 않을 일·제약·복구 확인</summary>{renderReviewRows(false)}</details>
         <section className="destination-studio__unknowns" aria-label="잔여 미상"><strong>잔여 미상</strong>{review.residualUnknowns.map(item=><span key={item}>{item}</span>)}</section>
         <DestinationUnknownEditor key={`${savedDraftGeneration}:${JSON.stringify(unknowns)}`} unknowns={unknowns} disabled={storageBusy||analysisBusy} onChange={setUnknowns}/>
         {savedDraft&&savedIntakeMatches&&<DestinationDiscoveryPanel key={`${savedDraft.draftId}:${savedDraft.revision}:${savedDraftGeneration}`} intake={savedDraft}/>}
-        <p className="destination-studio__boundary"><Lightbulb size={16} aria-hidden="true" />초안 저장은 Destination 확정이 아닙니다. 프로젝트·세션·Gate는 생성하지 않습니다.</p>
+        <p className="destination-studio__boundary"><Lightbulb size={16} aria-hidden="true" />초안을 저장해도 목적지가 확정되거나 작업이 시작되지는 않습니다.</p>
         <div className="destination-studio__actions"><button type="button" onClick={() => { const last = destinationQuestions[destinationQuestions.length - 1].id; editAnswer(last) }}><ArrowLeft size={17} aria-hidden="true" />답변 다시 보기</button></div>
         <p>확정하려면 현재 기본 초안과 후속 답변을 불러오고, 저장된 추가 결정을 검토해 주세요.</p>
       </div>}
@@ -230,13 +233,16 @@ export function DestinationStudio({ open, onClose }: { open: boolean; onClose: (
         </div>
         {storageNotice && <p role="status">{storageNotice}</p>}
       </section>
-      <section className="destination-studio__unknowns" aria-label="Planner 문서 분석" aria-busy={analysisBusy}>
-        <strong>Planner 문서 분석</strong>
-        <span>저장한 초안의 버전과 해시로 요청합니다. 새로고침 후 서버 초안을 불러오고 결과 확인을 누르면 기존 요청을 복구합니다. 자동 재전송은 없습니다.</span>
+      <section className="destination-studio__unknowns" aria-label="플래너 문서 분석" aria-busy={analysisBusy}>
+        <details className="destination-studio__analysis-tools">
+        <summary>저장한 기획서를 플래너와 검토하기</summary>
+        <p>저장한 문서에서 제안을 받습니다. 제안은 직접 확인한 뒤 답변에 반영할 수 있습니다.</p>
+        <p>이전에 요청했다면 초안을 불러온 뒤 분석 결과를 확인하세요. 요청을 자동으로 다시 보내지는 않습니다.</p>
         <div className="destination-studio__actions">
           <button type="button" disabled={!savedDraft||!savedDraft.document.source.trim()||analysisAttempted||analysisBusy||storageBusy} onClick={()=>void analyzeSavedDraft(true)}>저장한 문서 분석 요청</button>
           <button type="button" disabled={!analysisRequest||analysisBusy||storageBusy} onClick={()=>void analyzeSavedDraft(false)}>분석 결과 확인</button>
         </div>
+        </details>
         {analysisNotice&&<p role="status">{analysisNotice}</p>}
         {analysis?.state==='completed'&&analysisRequest?.input===latestDraft.current&&analysis.proposals.map((proposal,index)=><article key={index}>
           <strong>{destinationQuestions.find(q=>q.id===proposal.field)?.label} · 미확정 제안</strong><p>{proposal.value}</p>

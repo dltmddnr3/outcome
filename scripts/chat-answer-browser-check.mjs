@@ -36,7 +36,7 @@ try {
     await page.getByRole('button', { name: 'Planner 대화 보기', exact: true }).click()
     assert.notEqual(await page.locator('details.oc-v1-compatibility').getAttribute('open'), null)
     assert.equal(await page.locator('#planner-conversation-title').evaluate(node => node === document.activeElement), true)
-    const draft = page.getByLabel('Planner에게 메시지', { exact: true })
+    const draft = page.getByLabel('플래너에게 메시지', { exact: true })
     await draft.fill('합성 수신 확인')
     await page.getByRole('button', { name: '메시지 보내기', exact: true }).click()
     if (confirmation !== 'direct') await page.getByRole('button', { name: '수동으로 다시 시도', exact: true }).waitFor()
@@ -46,7 +46,7 @@ try {
     else if (confirmation !== 'direct') events[0].delivery = 'acknowledged'
     if (confirmation === 'direct') releasePost()
     else await page.getByRole('button', { name: '새로고침', exact: true }).click()
-    const confirmationText = confirmation === 'answer' ? 'Planner 답변 확인됨' : '목적지 접수 확인'
+    const confirmationText = confirmation === 'answer' ? '플래너 답변 확인됨' : '목적지 접수 확인'
     await page.locator('.planner-conversation__messages').getByText(confirmationText, { exact: true }).waitFor()
     await page.getByRole('button', { name: '수동으로 다시 시도', exact: true }).waitFor({ state: 'detached' })
     assert.equal(await draft.inputValue(), edited ? '보존해야 할 새로운 초안' : '')

@@ -30,7 +30,7 @@ describe('account workspace presentation contract', () => {
     for (const state of ['login', 'empty', 'stale', 'conflict', 'unavailable', 'session_expired', 'access_denied', 'safe_degraded'] as const) {
       const html = render(state)
       expect(html).toContain(accountWorkspaceStateCopy[state].title)
-      expect(html).toContain('Cherry 전용 비공개 워크스페이스')
+      expect(html).toContain('내 프로젝트')
       expect(html).toContain('읽기 전용')
       expect(html).toContain('completionAuthority')
     }
@@ -41,16 +41,16 @@ describe('account workspace presentation contract', () => {
     expect(html).toContain('account-workspace--loading')
     expect(html).toContain('로그인 중')
     expect(html).toContain('잠시만 기다려 주세요')
-    for (const hidden of ['Cherry 전용 비공개 워크스페이스', '권한 확인 중', '서버에서', 'completionAuthority=false']) expect(html).not.toContain(hidden)
+    for (const hidden of ['내 프로젝트', '권한 확인 중', '서버에서', 'completionAuthority=false']) expect(html).not.toContain(hidden)
   })
 
   it('shows Google primary, email-code fallback and Apple linked-only without self-signup', () => {
     const html = render('login')
-    expect(html).toContain('Google로 계속')
+    expect(html).toContain('구글로 계속')
     expect(html).toContain('이메일 인증 코드')
     expect(html).toContain('account-workspace__separator')
     expect(html).toContain('account-workspace__fallback')
-    expect(html).toContain('Apple은 로그인 후 연결')
+    expect(html).toContain('애플 계정은 로그인 후 연결')
     expect(html).not.toContain('회원가입')
     expect(html).not.toContain('초대')
   })
@@ -69,7 +69,7 @@ describe('account workspace presentation contract', () => {
     const html = renderToStaticMarkup(<AccountWorkspace state="ready" workspace={readyWorkspace} />)
     expect(html.match(/data-private-project=/g)).toHaveLength(2)
     for (const label of ['프로젝트', '페이즈', '범위', '스테이지', '완료 조건', '실제 현재']) expect(html).toContain(label)
-    expect(html).toContain('Current Projection')
+    expect(html).toContain('현재 상황')
     expect(html).toContain('Cherry Note Destination')
     expect(html).toContain('<details class="account-workspace__compatibility">')
     expect(html).not.toContain('<details class="account-workspace__compatibility" open="">')
@@ -83,7 +83,7 @@ describe('account workspace presentation contract', () => {
     expect(html).toContain('oc-global-nav')
     expect(html).toContain('oc-project-switcher')
     expect(html).toContain('프로젝트 여정')
-    expect(html).toContain('Current Projection')
+    expect(html).toContain('현재 상황')
     expect(html).toContain('<details class="oc-v1-compatibility">')
     expect(html).not.toContain('<details class="oc-v1-compatibility" open="">')
     expect(html.match(/data-private-project=/g)).toHaveLength(2)
@@ -96,25 +96,28 @@ describe('account workspace presentation contract', () => {
     const legacyProjects = readyWorkspace.projects.map(({ modelV2: _modelV2, ...project }) => project)
     const html = renderToStaticMarkup(<AccountWorkspace state="ready" workspace={{ projects: legacyProjects, dashboard }} />)
     expect(html).toContain('<details class="oc-v1-compatibility" open="">')
-    expect(html).not.toContain('Current Projection')
+    expect(html).not.toContain('현재 상황')
   })
 
-  it('실제 Model v2 server envelope는 v1 current hierarchy 없이도 기존 shell과 Current Projection을 렌더링한다', () => {
+  it('실제 Model v2 server envelope는 v1 current hierarchy 없이도 기존 shell과 현재 상황을 렌더링한다', () => {
     const dashboard = { ...deploymentFixture, projects: deploymentFixture.projects.map((item) => item.project.id === 'outcome' ? { ...item, phases: [], current: null } : item), build: { repository: 'test/repo', ref: 'test', commit: null, tree: null, asset: null, runtimeNowPinned: false } } as unknown as OutcomeDashboardData
     const projects = [{ project: { id: 'outcome', name: 'OUTCOME' }, modelV2: modelV2('outcome', 'OUTCOME') }]
     const html = renderToStaticMarkup(<AccountWorkspace state="ready" workspace={{ projects, dashboard } as unknown as typeof readyWorkspace & { dashboard: OutcomeDashboardData }} />)
     expect(html).toContain('oc-global-nav')
     expect(html).toContain('oc-project-switcher')
-    expect(html).toContain('Current Projection')
+    expect(html).toContain('현재 상황')
     expect(html).toContain('OUTCOME Destination')
-    expect(html).toContain('Planner conversation')
-    expect(html.indexOf('Current Projection')).toBeLessThan(html.indexOf('Planner conversation'))
-    expect(html).toContain('아직 관측된 Planner 작업 이벤트가 없습니다')
-    expect(html).toContain('v1 호환 정보 없음')
+    expect(html).toContain('플래너와 대화')
+    for (const panel of ['지도', '대화', '승인']) expect(html).toContain(`data-workspace-panel="${panel}"`)
+    expect(html).toContain('aria-label="모바일 작업공간"')
+    expect(html.match(/id="oc-planner-conversation"/g)).toHaveLength(1)
+    expect(html.indexOf('현재 상황')).toBeLessThan(html.indexOf('플래너와 대화'))
+    expect(html).toContain('아직 확인된 작업 기록이 없습니다')
+    expect(html).toContain('이전 단계 기록 없음')
     expect(html).not.toContain('OUTCOME 원본 묶음을 검증하고 있습니다')
   })
 
-  it('실제 account service의 project와 modelV2만 있는 envelope도 dashboard 없이 Current Projection을 렌더링한다', () => {
+  it('실제 account service의 project와 modelV2만 있는 envelope도 dashboard 없이 현재 상황을 렌더링한다', () => {
     const projects = [
       { project: { id: 'cherry-note', name: 'Cherry Note' }, modelV2: modelV2('cherry-note', 'Cherry Note') },
       { project: { id: 'outcome', name: 'OUTCOME' }, modelV2: modelV2('outcome', 'OUTCOME') },
@@ -123,15 +126,16 @@ describe('account workspace presentation contract', () => {
     expect(html).toContain('oc-global-nav')
     expect(html).toContain('oc-project-switcher')
     expect(html.match(/data-private-project=/g)).toHaveLength(2)
-    expect(html).toContain('Current Projection')
+    expect(html).toContain('현재 상황')
     expect(html).toContain('OUTCOME Destination')
-    expect(html).toContain('v1 호환 정보 없음')
+    expect(html).toContain('이전 단계 기록 없음')
     expect(html).not.toContain('account-workspace__ready')
+    for (const panel of ['지도', '대화', '승인']) expect(html).toContain(`data-workspace-panel="${panel}"`)
   })
 
   it('login은 실제 OAuth가 아닌 주입 어댑터 전환을 명시하고 ready에는 로그아웃이 있다', () => {
     const login = renderToStaticMarkup(<AccountWorkspace state="login" onLogin={async () => {}} />)
-    expect(login).toContain('실제 OAuth 연결 아님')
+    expect(login).toContain('실제 계정에 로그인하지 않습니다')
     expect(login).toContain('data-private-login-provider="google"')
     const ready = renderToStaticMarkup(<AccountWorkspace state="ready" workspace={readyWorkspace} ownerVerified sessionPresent onLogout={async () => {}} />)
     expect(ready).toContain('data-private-logout="true"')

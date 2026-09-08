@@ -7,6 +7,9 @@
 .destination-studio button:disabled{opacity:.55;cursor:not-allowed}.destination-studio :focus-visible{outline:2px solid var(--oc-accent);outline-offset:3px}
 .destination-studio__entry-grid{display:grid;gap:12px}.destination-studio__entry-grid button{display:flex;gap:12px;text-align:left}.destination-studio small{display:block;margin-top:5px;color:var(--oc-muted)}
 .destination-studio textarea{display:block;width:100%;margin:8px 0 16px;padding:12px;resize:vertical;border:1px solid var(--oc-rule-strong);border-radius:var(--oc-radius-md);background:#111;line-height:1.5}
-.destination-studio fieldset{display:grid;gap:10px;margin:16px 0;padding:12px;border:1px solid var(--oc-rule-strong);min-width:0}.destination-studio fieldset label{display:flex;gap:12px;padding:10px;align-items:center;min-height:44px}.destination-studio fieldset label[data-selected]{outline:1px solid var(--oc-accent)}
+.destination-studio fieldset{display:grid;gap:10px;margin:16px 0;padding:12px;border:1px solid var(--oc-rule-strong);min-width:0}.destination-studio fieldset label{display:flex;gap:12px;padding:10px;align-items:center;min-height:44px}.destination-studio fieldset label[data-selected=true]{outline:1px solid var(--oc-accent)}
+.destination-studio__analysis-tools{border-top:1px solid var(--oc-rule);padding-top:8px}
+.destination-studio__analysis-tools summary,.destination-studio__review-details summary{min-height:44px;display:flex;align-items:center;cursor:pointer;line-height:1.5;color:var(--oc-text)}
+.destination-studio__review-details{border-block:1px solid var(--oc-rule);padding:8px 0}
 .destination-studio dl>div{padding:12px 0;border-bottom:1px solid var(--oc-rule)}.destination-studio dd{margin:8px 0;white-space:pre-wrap}.destination-studio__boundary,.destination-studio__unknowns{margin:16px 0}.destination-studio [role=alert]{color:#ff9d8e}.destination-studio__file{display:grid;gap:8px;margin:16px 0}
 @media(max-width:480px){.destination-studio{padding:16px}.destination-studio__actions{align-items:stretch;flex-direction:column}}
