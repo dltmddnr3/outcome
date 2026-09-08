@@ -17,14 +17,15 @@ test('full discovery save/load survives repository reconstruction, replay and st
  let http
  try {
   await db.exec('create role anon nologin;create role authenticated nologin')
-  for(const file of ['20260908011009_outcome_destination_private_drafts.sql','20260908042838_outcome_destination_discovery_drafts.sql'])await db.exec(await readFile(new URL(`../supabase/migrations/${file}`,import.meta.url),'utf8'))
+  for(const file of ['20260908011009_outcome_destination_private_drafts.sql','20260908042838_outcome_destination_discovery_drafts.sql','20260908044800_outcome_discovery_question_receipts.sql'])await db.exec(await readFile(new URL(`../supabase/migrations/${file}`,import.meta.url),'utf8'))
   const transact=work=>db.transaction(async tx=>{await tx.exec('set local role outcome_destination_backend');return work({query:(sql,args)=>tx.query(sql,args)})})
   const scope={workspaceId:'workspace',accountRef:'owner',draftId:'00000000-0000-4000-8000-000000000001'}
   const document={schemaVersion:1,mode:'guided_200q',source:'',answers:{problem:'synthetic problem'},unknowns:['검증 필요']}
   const drafts=createDestinationDraftRepository({transact})
   await drafts.save({...scope,requestId:'00000000-0000-4000-8000-000000000002',expectedRevision:0,document:JSON.stringify(document)})
   const answers=Array.from({length:200},(_,i)=>({questionId:`q-${i}`,gapId:`gap-${i}`,value:'가'.repeat(4000)}))
-  const context={source:document.source,mode:document.mode,seedAnswers:document.answers,unknowns:document.unknowns,answers,askedQuestionIds:answers.map(a=>a.questionId),revision:1}
+  const context={source:document.source,mode:document.mode,seedAnswers:document.answers,unknowns:document.unknowns,answers:[],askedQuestionIds:[],revision:1}
+  assert.equal(parseDiscoveryContext(JSON.stringify({...context,answers,askedQuestionIds:answers.map(a=>a.questionId)})).answers.length,200)
   const input={...scope,requestId:'00000000-0000-4000-8000-000000000003',expectedRevision:0,intakeRevision:1,context:JSON.stringify(context)}
   const repo=createDiscoveryRepository({transact})
   const headers={cookie:'__session=owner',origin:'https://preview.invalid','content-type':'application/json','x-outcome-csrf':'synthetic-discovery-csrf'}
@@ -36,6 +37,8 @@ test('full discovery save/load survives repository reconstruction, replay and st
   const put=await fetch(url,{method:'PUT',headers,body})
   assert.equal(put.status,200);assert.equal(put.headers.get('cache-control'),'no-store')
   const saved=(await put.json()).discovery
+  const forged={...JSON.parse(body),requestId:'00000000-0000-4000-8000-000000000099',expectedRevision:1,context:JSON.stringify({...context,revision:2,askedQuestionIds:['fabricated'],answers:[{questionId:'fabricated',gapId:'fake-gap',value:'invented decision'}]})}
+  assert.equal((await fetch(url,{method:'PUT',headers,body:JSON.stringify(forged)})).status,400)
   assert.deepEqual((await (await fetch(url,{headers})).json()).discovery,saved)
   assert.equal((await (await fetch(url,{headers:{cookie:'__session=other'}})).json()).discovery,null)
   for(const changed of [{origin:'https://wrong.invalid'},{'x-outcome-csrf':'wrong'}])assert.equal((await fetch(url,{method:'PUT',headers:{...headers,...changed},body})).status,403)
@@ -45,7 +48,7 @@ test('full discovery save/load survives repository reconstruction, replay and st
   assert.deepEqual(await createDiscoveryRepository({transact}).load(scope),saved)
   assert.deepEqual(await repo.save(input),saved)
   assert.equal(await repo.load({...scope,accountRef:'other'}),null)
-  await assert.rejects(()=>repo.save({...input,context:JSON.stringify({...context,answers:[]})}),/discovery_request_conflict/)
+  await assert.rejects(()=>repo.save({...input,context:JSON.stringify({...context,unknowns:['changed']})}),/discovery_request_conflict/)
   await assert.rejects(()=>repo.save({...input,requestId:'00000000-0000-4000-8000-000000000004'}),/discovery_revision_conflict/)
   const second={...input,requestId:'00000000-0000-4000-8000-000000000005',expectedRevision:1,context:JSON.stringify({...context,revision:2})}
   const simultaneous=await Promise.all([repo.save(second),repo.save(second)])

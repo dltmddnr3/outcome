@@ -64,6 +64,29 @@ export function createDiscoveryRepository({transact}={}) {
    const pinned=parseDestinationDraft(JSON.stringify(intake.document))
    const supplied=parseDestinationDraft(JSON.stringify({schemaVersion:1,mode:context.mode,source:context.source,answers:context.seedAnswers,unknowns:context.unknowns}))
    if(JSON.stringify(pinned)!==JSON.stringify(supplied))fail('discovery_intake_stale')
+   // The browser cannot reset the question budget or invent a source question.
+   // Initial discovery starts from intake evidence, never caller-made followups.
+   if(!prior){if(context.answers.length||context.askedQuestionIds.length)fail()}
+   else{
+    const previous=project(prior).context
+    const receipt=(await query('select * from outcome_destination_private.discovery_question_receipts where workspace_id=$1 and account_ref=$2 and draft_id=$3 and context_digest=$4',[...values,prior.context_digest])).rows[0]
+    let offered=[]
+    if(receipt){
+     if(receipt.context_revision!==previous.revision)fail()
+     // Deferred import avoids the validator/parser module initialization cycle.
+     const {validateDestinationQuestionReceipt}=await import('./outcome-destination-question-receipt.mjs')
+     offered=validateDestinationQuestionReceipt({serializedContext:JSON.stringify(previous),serializedReceipt:JSON.stringify(receipt.receipt)}).plan.batch
+    }
+    const expectedIds=new Set([...previous.askedQuestionIds,...offered.map(q=>q.id)])
+    if(context.askedQuestionIds.length!==expectedIds.size||context.askedQuestionIds.some(id=>!expectedIds.has(id)))fail()
+    const known=new Map(previous.answers.map(a=>[a.questionId,a.gapId]))
+    for(const question of offered)known.set(question.id,question.gapId)
+    if(previous.answers.some(old=>!context.answers.some(a=>a.questionId===old.questionId&&a.gapId===old.gapId)))fail()
+    if(context.answers.some(a=>known.get(a.questionId)!==a.gapId))fail()
+    // The currently supported batch save is atomic: every offered decision is
+    // answered explicitly, rather than silently adopting a recommended value.
+    if(offered.some(q=>!context.answers.some(a=>a.questionId===q.id&&a.gapId===q.gapId)))fail()
+   }
    const params=[...values,input.expectedRevision+1,input.intakeRevision,input.requestId,fingerprint,digest,JSON.stringify(context)]
    const result=prior?await query('update outcome_destination_private.discovery_drafts set revision=$4,intake_revision=$5,last_request_id=$6,request_fingerprint=$7,context_digest=$8,context=$9 where workspace_id=$1 and account_ref=$2 and draft_id=$3 returning *',params):await query('insert into outcome_destination_private.discovery_drafts(workspace_id,account_ref,draft_id,revision,intake_revision,last_request_id,request_fingerprint,context_digest,context) values($1,$2,$3,$4,$5,$6,$7,$8,$9) returning *',params)
    if(result.rows.length!==1)fail('discovery_unavailable')

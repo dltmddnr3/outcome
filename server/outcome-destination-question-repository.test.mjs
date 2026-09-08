@@ -28,7 +28,7 @@ test('question receipts persist once for exact active context and remain owner-p
   await assert.rejects(()=>repo.record({...input,responseSourceDigest:'b'.repeat(64)}))
   assert.deepEqual(await repo.load(scope),recorded)
   for(const action of ['update outcome_destination_private.discovery_question_receipts set binding_version=2','delete from outcome_destination_private.discovery_question_receipts'])await assert.rejects(()=>transact(({query})=>query(action)))
-  await discoveries.save({...scope,requestId:'00000000-0000-4000-8000-000000000002',expectedRevision:1,intakeRevision:1,context:JSON.stringify({...context,revision:2})})
+  await discoveries.save({...scope,requestId:'00000000-0000-4000-8000-000000000002',expectedRevision:1,intakeRevision:1,context:JSON.stringify({...context,revision:2,askedQuestionIds:['q-1'],answers:[{questionId:'q-1',gapId:'owner',value:'소유자'}]})})
   assert.equal(await repo.load(scope),null)
   await assert.rejects(()=>repo.record(input),/discovery_questions_unavailable/)
   await createDestinationDraftRepository({transact}).save({...scope,requestId:'00000000-0000-4000-8000-000000000003',expectedRevision:1,document:JSON.stringify({...document,source:'changed intake'})})
