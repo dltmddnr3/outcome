@@ -1,6 +1,7 @@
 import { sensitiveContentHint } from './PlannerConversation'
 import './DestinationStudio.css'
 import { privateDestinationStorageAvailable, requestDestinationDraft, type DestinationDraftDocument } from '../lib/api'
+import { destinationUnverifiedQuestions } from '../lib/destination-discovery'
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { ArrowLeft, Check, FileText, Lightbulb, Sparkles, X } from 'lucide-react'
 import { createDestinationReview, destinationQuestions, analyzeDestinationBrief, unansweredDestinationQuestions, type DestinationAnswers, type DestinationDomainId, type DestinationMode, type BriefEvidence } from '../lib/destination-discovery'
@@ -29,7 +30,7 @@ export function DestinationStudio({ open, onClose }: { open: boolean; onClose: (
   const storageLock = useRef(false)
   const [storageHold, setStorageHold] = useState(false)
   const [storageNotice, setStorageNotice] = useState<string | null>(null)
-  const [unknowns, setUnknowns] = useState(['기술·실행 가능성 및 문서 의미 검증 미완료'])
+  const [unknowns, setUnknowns] = useState<string[]>([...destinationUnverifiedQuestions])
   const latestDraft = useRef('')
 
   useEffect(() => {
@@ -55,7 +56,7 @@ export function DestinationStudio({ open, onClose }: { open: boolean; onClose: (
   }, [open])
 
   const currentQuestion = destinationQuestions.find((item) => item.id === questionQueue[questionIndex]) ?? null
-  const review = useMemo(() => { try { return createDestinationReview(answers) } catch { return null } }, [answers])
+  const review = useMemo(() => { try { return createDestinationReview(answers, unknowns) } catch { return null } }, [answers, unknowns])
   const pendingAnswers = {...answers}
   if (step === 'question' && currentQuestion) {
     if (draftAnswer.trim()) pendingAnswers[currentQuestion.id] = draftAnswer.trim()
@@ -173,7 +174,7 @@ export function DestinationStudio({ open, onClose }: { open: boolean; onClose: (
       {step === 'review' && review && <div className="destination-studio__review">
         <div className="destination-studio__review-intro"><span><Check size={18} aria-hidden="true" /></span><div><h3>Destination 초안을 확인해주세요</h3><p>두 시작 경로는 같은 형식으로 수렴합니다. 아직 프로젝트를 만들지 않았어요.</p></div></div>
         <dl>{reviewRows.map(({ id, label }) => <div key={id}><dt>{label}</dt><dd>{review[id]}{evidence.filter(item => item.field === id).map((item, index) => <small key={index}>문서 근거 {item.startLine}–{item.endLine}행 · 현재 답변은 직접 검토 필요</small>)}</dd><button type="button" onClick={() => editAnswer(id)}>{label} 수정</button></div>)}</dl>
-        <section className="destination-studio__unknowns" aria-label="잔여 미상"><strong>잔여 미상</strong><span>기본 항목 입력됨 · 기술·실행 가능성 및 문서 의미 검증 미완료</span></section>
+        <section className="destination-studio__unknowns" aria-label="잔여 미상"><strong>잔여 미상</strong>{review.residualUnknowns.map(item=><span key={item}>{item}</span>)}</section>
         <p className="destination-studio__boundary"><Lightbulb size={16} aria-hidden="true" />초안 저장은 Destination 확정이 아닙니다. 프로젝트·세션·Gate는 생성하지 않습니다.</p>
         <div className="destination-studio__actions"><button type="button" onClick={() => { const last = destinationQuestions[destinationQuestions.length - 1].id; editAnswer(last) }}><ArrowLeft size={17} aria-hidden="true" />답변 다시 보기</button><button className="destination-studio__primary" type="button" disabled>Destination 확정 · 연결 준비 중</button></div>
       </div>}

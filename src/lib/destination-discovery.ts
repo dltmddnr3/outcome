@@ -119,7 +119,9 @@ export type DestinationReview = {
   confirmation: { state: 'unconfirmed'; authority: false }
 }
 
-export function createDestinationReview(answers: DestinationAnswers): DestinationReview {
+export const destinationUnverifiedQuestions = ['기술·실행 가능성 및 문서 의미 검증 미완료'] as const
+
+export function createDestinationReview(answers: DestinationAnswers, unknowns: readonly string[] = destinationUnverifiedQuestions): DestinationReview {
   const missing = unansweredDestinationQuestions(answers)
   if (missing.length) throw new Error('material_gaps_remain')
   return Object.freeze({
@@ -132,7 +134,7 @@ export function createDestinationReview(answers: DestinationAnswers): Destinatio
     constraints: answers.constraints!,
     acceptance: answers.acceptance!,
     failureRecovery: answers.failureRecovery!,
-    residualUnknowns: Object.freeze([]) as unknown as string[],
+    residualUnknowns: Object.freeze([...new Set([...destinationUnverifiedQuestions, ...unknowns])]) as unknown as string[],
     confirmation: Object.freeze({ state: 'unconfirmed' as const, authority: false as const }),
   })
 }

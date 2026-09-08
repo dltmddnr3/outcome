@@ -1,5 +1,7 @@
 import assert from 'node:assert/strict'
 import test from 'node:test'
+import {once} from 'node:events'
+import {createOutcomeServer} from './index.mjs'
 import {readFile} from 'node:fs/promises'
 import {PGlite} from '@electric-sql/pglite'
 import {createDestinationDraftRepository,parseDestinationDraft} from './outcome-destination-postgres.mjs'
@@ -57,5 +59,24 @@ test('private draft SQL preserves revisions, rejects stale saves and isolates ac
   const foreign=await handleDestinationDraftRequest({...request,identityService:{...identityService,resolveBridgeAuthority:async()=>({workspace_id:scope.workspaceId,account_ref:'another-owner',project_ids:['outcome']})}})
   assert.deepEqual(foreign.body,{draft:null,completionAuthority:false})
   assert.equal((await make().load(scope)).revision,3)
+  const httpIdentity={...identityService,readWorkspace:async()=>({projects:[]}),resolveBridgeAuthority:async({token})=>({workspace_id:scope.workspaceId,account_ref:token==='other'? 'other-owner':scope.accountRef,project_ids:['outcome']})}
+  const http=createOutcomeServer({publicReadOnly:true,accountAccess:httpIdentity,destinationRuntime:{...request.runtime,repository:make()}})
+  http.listen(0,'127.0.0.1');await once(http,'listening')
+  const base=`http://127.0.0.1:${http.address().port}`
+  try{
+   const workspace=await fetch(`${base}/api/private/workspace`,{headers:{cookie:'__session=owner'}})
+   assert.equal(workspace.status,200)
+   assert.equal(workspace.headers.get('x-outcome-destination-csrf'),headers['x-outcome-csrf'])
+   const nextBody=JSON.stringify({...payload,expectedRevision:3,requestId:'00000000-0000-4000-8000-000000000007'})
+   const send=()=>fetch(base+request.pathname,{method:'PUT',headers:{...headers,cookie:'__session=owner'},body:nextBody})
+   const write=await send();assert.equal(write.status,200)
+   const receipt=await write.json();assert.equal(receipt.draft.revision,4)
+   assert.deepEqual(await (await send()).json(),receipt)
+   assert.deepEqual(await (await fetch(base+request.pathname,{headers:{cookie:'__session=owner'}})).json(),receipt)
+   assert.deepEqual(await (await fetch(base+request.pathname,{headers:{cookie:'__session=other'}})).json(),{draft:null,completionAuthority:false})
+   assert.equal((await fetch(base+request.pathname)).status,401)
+   assert.equal((await make().load(scope)).revision,4)
+   assert.equal((await db.query('select count(*)::int n from outcome_destination_private.drafts')).rows[0].n,1)
+  }finally{http.closeAllConnections();await new Promise(resolve=>http.close(resolve))}
  }finally{await db.close()}
 })

@@ -48,6 +48,9 @@ describe('Phase 5 destination discovery contract', () => {
 
   it('converges both paths on one non-authoritative review and stable idempotency key', () => {
     const review = createDestinationReview(completeAnswers)
+    expect(review.residualUnknowns).toContain('기술·실행 가능성 및 문서 의미 검증 미완료')
+    expect(createDestinationReview(completeAnswers, ['운영 책임 확인 필요']).residualUnknowns).toContain('운영 책임 확인 필요')
+    expect(createDestinationReview(completeAnswers, []).residualUnknowns.length).toBeGreaterThan(0)
     expect(Object.keys(review)).toEqual(['schemaVersion', 'problem', 'targetUser', 'outcome', 'scope', 'nonGoals', 'constraints', 'acceptance', 'failureRecovery', 'residualUnknowns', 'confirmation'])
     expect(review.confirmation).toEqual({ state: 'unconfirmed', authority: false })
     expect(destinationRequestId(review)).toBe(destinationRequestId(createDestinationReview({ ...completeAnswers })))
