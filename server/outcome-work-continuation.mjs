@@ -33,6 +33,14 @@ export function createWorkContinuationController({enabled=false,journal,verifyEl
         if(await invoke(verifyEligibility,input)!==true) return result('authority_hold')
         const reserved=journal.reserveContinuation(input.scopeJson,input.expectedSequence,input.candidateCommit,input.candidateTree,input.authorityRef,now())
         reservationDigest=reserved.reservationDigest
+        if(reserved.outcome==='already_reserved') {
+          // Recover only a durable result for this exact reservation. Receipt
+          // acknowledgement is not execution start, and uncertain starts never replay.
+          const saved=journal.readContinuationDispatch(input.scopeJson,reservationDigest,now())
+          if(saved.state==='acknowledged' && hash(saved.receiptDigest,64)) return result('acknowledged')
+          if(saved.state==='delivery_unknown' && saved.receiptDigest===null) return result('delivery_unknown')
+          return result('reconciliation_required')
+        }
         if(reserved.outcome!=='reserved') return result('reconciliation_required')
         // No automatic reuse if eligibility changed while the reservation was made.
         if(await invoke(verifyEligibility,input)!==true) return result('pre_dispatch_hold')

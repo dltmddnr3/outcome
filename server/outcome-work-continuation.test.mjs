@@ -1,6 +1,9 @@
 import test from 'node:test'
 import assert from 'node:assert/strict'
 import {DatabaseSync} from 'node:sqlite'
+import {mkdtempSync,rmSync} from 'node:fs'
+import {join} from 'node:path'
+import {tmpdir} from 'node:os'
 import {createWorkJournal} from './outcome-work-journal.mjs'
 import {createWorkContinuationController as create} from './outcome-work-continuation.mjs'
 const time=20000,scope={projectId:'outcome',workId:'work-a',runId:'run-a',sessionRef:'session-a',bindingVersion:1},scopeJson=JSON.stringify(scope)
@@ -24,7 +27,7 @@ test('parallel controllers and reconstructed controller dispatch once; start is 
     }}
     const results=await Promise.all([create(options).runOnce(input),create(options).runOnce(input)])
     assert.deepEqual(results.map(x=>x.outcome).sort(),['acknowledged','reconciliation_required'])
-    assert.equal((await create(options).runOnce(input)).outcome,'reconciliation_required');assert.equal(sends,1)
+    assert.equal((await create(options).runOnce(input)).outcome,'acknowledged');assert.equal(sends,1)
     const row=s.db.prepare('SELECT * FROM outcome_work_dispatches').get()
     assert.equal(row.state,'acknowledged');assert.equal(row.receipt_digest,receipt)
     assert(results.every(x=>x.completionAuthority===false&&x.executionAuthority===false))
@@ -56,7 +59,7 @@ test('thrown malformed and timed-out delivery stay unknown and are never automat
         return JSON.stringify({delivery:'acknowledged'})
       }}
       assert.equal((await create(options).runOnce(input)).outcome,'delivery_unknown')
-      assert.equal((await create(options).runOnce(input)).outcome,'reconciliation_required')
+      assert.equal((await create(options).runOnce(input)).outcome,'delivery_unknown')
       assert.equal(sends,1);assert.equal(s.db.prepare('SELECT state FROM outcome_work_dispatches').get().state,'delivery_unknown')
       if(mode==='timeout')assert(signal.aborted)
     }finally{s.db.close()}
@@ -69,8 +72,47 @@ test('result persistence ambiguity is not retried or rewritten as a second outco
     const options={...s.options,journal,dispatch:async()=>{sends++;return ack}}
     assert.equal((await create(options).runOnce(input)).outcome,'delivery_unknown')
     assert.equal(writes,1);assert.equal(s.db.prepare('SELECT state FROM outcome_work_dispatches').get().state,'acknowledged')
-    assert.equal((await create(options).runOnce(input)).outcome,'reconciliation_required');assert.equal(sends,1)
+    assert.equal((await create(options).runOnce(input)).outcome,'acknowledged');assert.equal(sends,1)
   }finally{s.db.close()}
+})
+test('restart readback never sends or writes a result for reserved or started actions',async()=>{
+  for(const state of ['reserved','dispatch_started','acknowledged','delivery_unknown']) {
+    const s=setup();let sends=0,writes=0
+    try {
+      const reserved=s.journal.reserveContinuation(scopeJson,3,commit,tree,authority,time)
+      if(state!=='reserved')s.journal.beginContinuationDispatch(scopeJson,3,reserved.reservationDigest,time)
+      if(['acknowledged','delivery_unknown'].includes(state))s.journal.recordContinuationResult(scopeJson,reserved.reservationDigest,state,state==='acknowledged'?receipt:null,time)
+      const before=s.db.prepare('SELECT * FROM outcome_work_dispatches').all()
+      const journal={...s.journal,recordContinuationResult(){writes++;throw Error('unexpected write')}}
+      const recovered=await create({...s.options,journal,dispatch:async()=>{sends++;return ack}}).runOnce(input)
+      assert.equal(recovered.outcome,['reserved','dispatch_started'].includes(state)?'reconciliation_required':state)
+      assert.equal(sends,0);assert.equal(writes,0)
+      assert.equal(recovered.completionAuthority,false);assert.equal(recovered.executionAuthority,false)
+      assert.deepEqual(s.db.prepare('SELECT * FROM outcome_work_dispatches').all(),before)
+    }finally{s.db.close()}
+  }
+})
+test('a closed disk journal recovers acknowledged delivery without invoking transport',async()=>{
+  const directory=mkdtempSync(join(tmpdir(),'outcome-continuation-recovery-'))
+  let db
+  try {
+    db=new DatabaseSync(join(directory,'journal.sqlite'))
+    const journal=createWorkJournal(db),seed=setup()
+    try {
+      const row=seed.db.prepare('SELECT journal_json FROM outcome_work_journals').get()
+      for(const event of JSON.parse(row.journal_json).events)journal.append(scopeJson,JSON.stringify(event),event.sequence-1,time)
+    }finally{seed.db.close()}
+    let sends=0
+    const options={enabled:true,verifyEligibility:async()=>true,now:()=>time,dispatch:async()=>{sends++;return ack}}
+    assert.equal((await create({...options,journal}).runOnce(input)).outcome,'acknowledged')
+    db.close();db=new DatabaseSync(join(directory,'journal.sqlite'))
+    const reopened=createWorkJournal(db)
+    const recovered=await create({...options,journal:reopened}).runOnce(input)
+    assert.equal(recovered.outcome,'acknowledged');assert.equal(sends,1)
+    assert.equal(recovered.completionAuthority,false);assert.equal(recovered.executionAuthority,false)
+    assert.equal((await create({...options,journal:reopened,verifyEligibility:async()=>false}).runOnce(input)).outcome,'authority_hold')
+    assert.equal(sends,1)
+  }finally{db?.close();rmSync(directory,{recursive:true,force:true})}
 })
 test('expired/stuck eligibility is bounded and cannot later dispatch',async()=>{
   const s=setup();let sends=0,complete

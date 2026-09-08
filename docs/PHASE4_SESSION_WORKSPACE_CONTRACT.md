@@ -48,6 +48,14 @@ These are program responsibilities, not new agents, schedules or products. The c
 
 ### Existing Phase 4 acceptance additions
 
+#### Restart delivery readback correction · 2026-09-09
+
+Scope: M4-1/AP-4-04 and AP-4-07. Preserve the current UI/design. When an exact existing continuation reservation is found after eligibility and source checks, read its durable dispatch outcome. A stored acknowledgement is delivery evidence only, never execution start or stage acceptance. Stored unknown remains unknown; reserved or dispatch_started remains reconciliation_required. No resend or result write is permitted on this recovery path. Original action/candidate/authority mismatches remain fail-closed.
+
+CHECK: node --test server/outcome-work-continuation.test.mjs server/outcome-work-journal.test.mjs
+EXPECT: persisted acknowledged/unknown results recovered with one total send; unresolved starts never replay; completionAuthority=false and executionAuthority=false preserved.
+EVIDENCE: 2026-09-09 targeted continuation/journal suites 12 PASS, full npm test PASS (235 frontend and 859 server), diff check PASS. Four recovery states verify zero sends and zero result writes; closed/reopened disk DB recovers a receipt with one total send, and revoked eligibility blocks readback reporting. Existing parallel/revocation/timeout/candidate and authority guards retained. Same-session local verification only; no live transport integration, activation, commit or deployment for this correction yet. Source review confirms existing chat service returns delivery/response-collection results, not candidate-bound stage verification evidence; do not wire its timer to stage dispatch as a substitute.
+
 Within M4-1/M4-2 and AP-4-02/04/06/07/10, verify one session traverses all three stages; terminal-without-next-action is detected; one eligible action is claimed once; duplicate/out-of-order events and restart cannot double-dispatch; stale observations never become false stopped/running; changed candidates invalidate old verification; missing authority stops only affected actions; read-only observation changes no Gate/progress. Use real supported source integration and owner Preview testing before calling the feature active. Synthetic state-machine tests alone do not prove continuous operation.
 
 Implementation sequence: (1) work/stage observation contract and finite projector; (2) supported session-event ingestion plus durable cursor; (3) separate authority-bound continuation controller with crash reconciliation; (4) single-work-card UI and real Preview interruption/recovery dogfood. Current runtime remains unchanged until its corresponding bounded implementation and activation evidence exist.
