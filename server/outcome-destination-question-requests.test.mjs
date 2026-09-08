@@ -10,6 +10,7 @@ import {createDiscoveryQuestionRepository} from './outcome-destination-question-
 import {createDiscoveryQuestionRequests} from './outcome-destination-question-requests.mjs'
 import {createDiscoveryQuestionDispatch} from './outcome-destination-question-dispatch.mjs'
 import {runDiscoveryQuestionOnce,collectDiscoveryQuestionOnce} from './outcome-destination-question-worker.mjs'
+import {createDestinationQuestionCoordinator} from './outcome-destination-question-coordinator.mjs'
 test('durable question claim and real receipt ingestion prevent duplicate transport and false completion',async()=>{
  const db=await PGlite.create('memory://')
  let http
@@ -37,13 +38,14 @@ test('durable question claim and real receipt ingestion prevent duplicate transp
   assert.equal((await fetch(url,{method:'POST',headers:{...headers,origin:'https://wrong.invalid'},body})).status,403)
   assert.equal((await fetch(url,{method:'POST',headers,body:JSON.stringify({contextDigest:request.contextDigest,accountRef:'other'})})).status,400)
   assert.equal((await fetch(url,{method:'POST',headers,body:'x'.repeat(4097)})).status,413)
-  let sends=0,mode='pending',original
+  let sends=0,mode='pending',original,responseDigest=discovery.contextDigest
   const queueAdapter={bindingResolver:async()=>({project_id:'outcome',role:'planner',binding_version:1,status:'active',freshness:'fresh',destination:{opaque:true}}),transport:async({destination})=>{original=destination;sends++;return {delivery:'acknowledged'}},readPlannerResponse:async({destination,correlation_id})=>{
    assert.equal(destination,original)
    if(mode==='pending')return {outcome:'pending'}
-   return {outcome:'completed',response:{correlation_id,source_digest:'a'.repeat(64),message:JSON.stringify({schemaVersion:1,contextDigest:mode==='wrong'?'wrong':discovery.contextDigest,coverage:[],questions:[],completionAuthority:false})}}
+   return {outcome:'completed',response:{correlation_id,source_digest:'a'.repeat(64),message:JSON.stringify({schemaVersion:1,contextDigest:mode==='wrong'?'wrong':responseDigest,coverage:[],questions:[],completionAuthority:false})}}
   }}
-  const dispatch=createDiscoveryQuestionDispatch({queueAdapter,publishInput:async input=>({state:'ready',reference:`analysis-${'a'.repeat(64)}`,requestId:input.requestId,contextDigest:input.contextDigest,contextRevision:input.contextRevision})})
+  const publishInput=async input=>({state:'ready',reference:`analysis-${'a'.repeat(64)}`,requestId:input.requestId,contextDigest:input.contextDigest,contextRevision:input.contextRevision})
+  const dispatch=createDiscoveryQuestionDispatch({queueAdapter,publishInput})
   const started=await Promise.all([runDiscoveryQuestionOnce({requests,dispatch,request}),runDiscoveryQuestionOnce({requests:createDiscoveryQuestionRequests({transact}),dispatch,request})])
   assert.equal(sends,1);assert.equal(started.filter(v=>v.state==='not_claimed').length,1)
   const collection=started.find(v=>v.collection).collection
@@ -70,5 +72,22 @@ test('durable question claim and real receipt ingestion prevent duplicate transp
   assert.equal((await runDiscoveryQuestionOnce({requests,dispatch:uncertainDispatch,request:nextRequest})).state,'delivery_unknown')
   assert.equal((await runDiscoveryQuestionOnce({requests:createDiscoveryQuestionRequests({transact}),dispatch:uncertainDispatch,request:nextRequest})).state,'not_claimed')
   assert.equal(uncertainSends,1);assert.equal((await requests.load(nextRequest)).state,'delivery_unknown')
+  const coordinator=()=>createDestinationQuestionCoordinator({scope,discovery:createDiscoveryRepository({transact}),requests,questions,queueAdapter,publishInput,ready:async()=>true})
+  assert.equal((await coordinator().runOnce()).state,'safe_hold');assert.equal(sends,1)
+  const live=coordinator()
+  for(const revision of [3,4]){
+   const changed=await createDiscoveryRepository({transact}).save({...scope,requestId:`00000000-0000-4000-8000-00000000000${revision+1}`,expectedRevision:revision-1,intakeRevision:1,context:JSON.stringify({...context,revision})})
+   responseDigest=changed.contextDigest;mode='pending'
+   assert.equal((await live.runOnce()).state,'idle')
+   const accepted=await fetch(url,{method:'POST',headers,body:JSON.stringify({contextDigest:responseDigest})});assert.equal(accepted.status,202)
+   assert.equal((await live.runOnce()).state,'awaiting_result')
+   assert.equal((await coordinator().runOnce()).state,'safe_hold') // Restart cannot reclaim a started request.
+   assert.equal((await live.runOnce()).state,'awaiting_result');assert.equal(sends,revision-1)
+   mode='valid';assert.equal((await live.runOnce()).state,'result_recorded')
+   assert.equal((await live.runOnce()).state,'idle')
+   assert.equal((await (await fetch(url,{headers})).json()).questionRequest.state,'completed')
+   assert.equal((await (await fetch(url.replace('/question-requests/','/questions/'),{headers})).json()).questions.contextDigest,responseDigest)
+  }
+  assert.equal(sends,3)
  }finally{if(http){http.closeAllConnections();await new Promise(resolve=>http.close(resolve))}await db.close()}
 })
