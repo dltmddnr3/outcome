@@ -1,7 +1,10 @@
 import test from 'node:test'
 import assert from 'node:assert/strict'
 import {createHash} from 'node:crypto'
-import {verifyWorkStageReceipt as verify} from './outcome-work-stage-receipt.mjs'
+import {verifyWorkStageReceipt as verify,verifyStoredWorkStageReceipt as stored} from './outcome-work-stage-receipt.mjs'
+import {mkdtempSync,realpathSync,writeFileSync,chmodSync,unlinkSync,symlinkSync,linkSync,rmSync} from 'node:fs'
+import {join} from 'node:path'
+import {tmpdir} from 'node:os'
 const scope={projectId:'outcome',workId:'work-a',runId:'run-a',candidateCommit:'a'.repeat(40),candidateTree:'b'.repeat(40),stage:'qa_verifying',verificationMode:'same-session verification'}
 const receipt=()=>({schemaVersion:1,...scope,checks:[{id:'regression',outcome:'pass',evidenceDigest:'c'.repeat(64)}]})
 const expected=text=>JSON.stringify({...scope,digest:createHash('sha256').update(text).digest('hex'),requiredChecks:['regression']})
@@ -22,4 +25,21 @@ test('invalid empty duplicated or oversized expected policy never permits a rece
   for(const value of [null,{},'null','{','x'.repeat(65537)])assert.equal(verify(value,expected(text)).matches,false)
   assert.equal(verify(text,'null').matches,false)
   let accessed=false;assert.equal(verify({get text(){accessed=true}},expected(text)).matches,false);assert.equal(accessed,false)
+})
+test('stored receipt validates real bytes and rejects writable, altered, linked and missing files',()=>{
+  const directory=realpathSync(mkdtempSync(join(tmpdir(),'outcome-stage-receipt-')))
+  chmodSync(directory,0o700)
+  const text=JSON.stringify(receipt()),policy=expected(text),file=join(directory,`${JSON.parse(policy).digest}.json`)
+  try{
+    writeFileSync(file,text,{mode:0o400})
+    assert.equal(stored(directory,policy).matches,true)
+    chmodSync(file,0o600);assert.equal(stored(directory,policy).matches,false)
+    writeFileSync(file,`${text} `);chmodSync(file,0o400);assert.equal(stored(directory,policy).matches,false)
+    unlinkSync(file);writeFileSync(file,text,{mode:0o400})
+    linkSync(file,join(directory,'second'));assert.equal(stored(directory,policy).matches,false);unlinkSync(join(directory,'second'))
+    unlinkSync(file);symlinkSync('missing',file);assert.equal(stored(directory,policy).matches,false);unlinkSync(file)
+    assert.equal(stored(directory,policy).matches,false)
+    writeFileSync(file,text,{mode:0o400});chmodSync(directory,0o755);assert.equal(stored(directory,policy).matches,false)
+    assert.deepEqual(stored(directory,'{}'),{matches:false,executionAuthority:false,completionAuthority:false})
+  }finally{rmSync(directory,{recursive:true,force:true})}
 })

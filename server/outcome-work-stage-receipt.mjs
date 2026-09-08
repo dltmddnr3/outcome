@@ -1,4 +1,6 @@
 import {createHash} from 'node:crypto'
+import {constants,openSync,closeSync,lstatSync,realpathSync,fstatSync,readSync} from 'node:fs'
+import {isAbsolute,join} from 'node:path'
 
 const exact=(value,keys)=>value!==null&&typeof value==='object'&&!Array.isArray(value)
   &&Object.keys(value).length===keys.length&&keys.every(key=>Object.hasOwn(value,key))
@@ -34,4 +36,27 @@ export function verifyWorkStageReceipt(receiptJson,expectedJson){
     }
     return result(true)
   }catch{return result(false)}
+}
+
+// Explicit read-only local adapter; directory ownership is not issuer approval.
+export function verifyStoredWorkStageReceipt(directory,expectedJson){
+  let fd
+  try{
+    if(typeof directory!=='string'||!isAbsolute(directory)||typeof expectedJson!=='string'||Buffer.byteLength(expectedJson)>16384)return result(false)
+    const expected=JSON.parse(expectedJson)
+    if(!hash(expected?.digest,64))return result(false)
+    const before=lstatSync(directory)
+    if(!before.isDirectory()||(before.mode&0o777)!==0o700||before.uid!==process.getuid()||realpathSync(directory)!==directory)return result(false)
+    fd=openSync(join(directory,`${expected.digest}.json`),constants.O_RDONLY|constants.O_NOFOLLOW|constants.O_NONBLOCK)
+    const stat=fstatSync(fd)
+    if(!stat.isFile()||(stat.mode&0o777)!==0o400||stat.uid!==process.getuid()||stat.nlink!==1||stat.size>65536)return result(false)
+    const bytes=Buffer.alloc(65537);let count=0,read
+    while(count<bytes.length&&(read=readSync(fd,bytes,count,bytes.length-count,null))>0)count+=read
+    const after=fstatSync(fd),root=lstatSync(directory)
+    if(count!==stat.size||count>65536||after.size!==stat.size||after.mtimeMs!==stat.mtimeMs||after.ctimeMs!==stat.ctimeMs
+      ||root.dev!==before.dev||root.ino!==before.ino||!root.isDirectory()||(root.mode&0o777)!==0o700||realpathSync(directory)!==directory)return result(false)
+    const content=bytes.subarray(0,count)
+    if(createHash('sha256').update(content).digest('hex')!==expected.digest)return result(false)
+    return verifyWorkStageReceipt(content.toString('utf8'),expectedJson)
+  }catch{return result(false)}finally{if(fd!==undefined)try{closeSync(fd)}catch{}}
 }
