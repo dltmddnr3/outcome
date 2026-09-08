@@ -1,12 +1,21 @@
 import { renderToStaticMarkup } from 'react-dom/server'
 import { describe, expect, it } from 'vitest'
 import { PlannerConversation, roleChatFilters, roleChatFixtureStates, type RoleChatFilter, type RoleChatFixtureState } from './PlannerConversation'
-import { isComposerSubmitShortcut, resolveConversationCredential, validatePrivateTimeline, hasCorrelatedPlannerAnswer } from './PlannerConversation'
+import { isComposerSubmitShortcut, resolveConversationCredential, validatePrivateTimeline, hasCorrelatedPlannerAnswer, hasConfirmedPlannerDelivery } from './PlannerConversation'
 import type { PrivateChatEvent } from '../lib/api'
 
 describe('correlated answer evidence', () => {
   const user: PrivateChatEvent = { event_id:'event-0000000000000001',sequence:1,observed_at:'2026-09-08T00:00:00.000Z',correlation_id:'message-0000000000000001',kind:'user_message',state:'queued',delivery:'delivery_unknown',dispatch_state:'invoked',payload:{private_content:{text:'hello'}} }
   const answer: PrivateChatEvent = {...user,event_id:'event-0000000000000002',sequence:2,kind:'assistant_message',state:'completed',payload:{private_content:{text:'received'}}}
+  it('accepts only one exact acknowledged receipt or a correlated final answer', () => {
+    const ack: PrivateChatEvent = {...user,delivery:'acknowledged'}
+    expect(hasConfirmedPlannerDelivery([ack],user.correlation_id)).toBe(true)
+    expect(hasCorrelatedPlannerAnswer([ack],user.correlation_id)).toBe(false)
+    expect(hasConfirmedPlannerDelivery([user,answer],user.correlation_id)).toBe(true)
+    for (const timeline of [[user],[ack,ack],[answer],[]]) expect(hasConfirmedPlannerDelivery(timeline,user.correlation_id)).toBe(false)
+    expect(hasConfirmedPlannerDelivery([ack],'message-0000000000000002')).toBe(false)
+    expect(hasConfirmedPlannerDelivery([ack],'invalid')).toBe(false)
+  })
   it('shows answered evidence without mutating original transport state', () => {
     const timeline=[user,answer]
     expect(hasCorrelatedPlannerAnswer(timeline,user.correlation_id)).toBe(true)

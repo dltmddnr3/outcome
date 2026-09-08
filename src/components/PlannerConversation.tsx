@@ -31,6 +31,11 @@ export function hasCorrelatedPlannerAnswer(timeline: PrivateChatEvent[], correla
     && event.correlation_id === correlation && event.sequence > users[0].sequence
     && event.observed_at >= users[0].observed_at && Boolean(event.payload.private_content?.text.trim()))
 }
+export function hasConfirmedPlannerDelivery(timeline: PrivateChatEvent[], correlation: string): boolean {
+  if (!/^message-[a-f0-9]{16}$/.test(correlation)) return false
+  const users = timeline.filter(event => event.kind === 'user_message' && event.correlation_id === correlation)
+  return users.length === 1 && ((users[0].kind === 'user_message' && users[0].delivery === 'acknowledged') || hasCorrelatedPlannerAnswer(timeline, correlation))
+}
 const fixturePresentation: Record<RoleChatFixtureState, { label: string; detail: string; writable: boolean }> = {
   ready: { label: '준비됨', detail: 'Planner에게 메시지를 보낼 준비가 되었습니다.', writable: true }, streaming: { label: '응답 수신 중', detail: 'Planner 응답을 받고 있습니다.', writable: false }, 'tool-running': { label: '도구 실행 중', detail: 'Planner가 도구 결과를 기다리고 있습니다.', writable: false }, 'waiting-approval': { label: '승인 대기', detail: 'Cherry의 명시적 승인이 필요합니다.', writable: false }, 'offline-reconnecting': { label: '오프라인 · 재연결 중', detail: '연결이 복구될 때까지 전송하지 않습니다.', writable: false }, 'permission-absent': { label: '권한 없음', detail: 'Planner 전송 권한이 없습니다.', writable: false }, 'unbound-stale': { label: '연결 없음 · 관측 오래됨', detail: '현재 Planner binding 근거가 없습니다.', writable: false }, delivery_unknown: { label: '전달 상태 확인 불가', detail: '전달 근거를 확인하기 전에는 자동 재전송하지 않습니다.', writable: false },
 }
@@ -65,7 +70,7 @@ export function PlannerConversation({ events, plannerBound = false, onSend, fixt
   const pending = useRef(false), textarea = useRef<HTMLTextAreaElement>(null)
   useEffect(() => {
     const sent = submission.current
-    if (!sent || !hasCorrelatedPlannerAnswer(timeline, sent.key)) return
+    if (!sent || !hasConfirmedPlannerDelivery(timeline, sent.key)) return
     setRetryAvailable(false); setDelivery('acknowledged')
     setDraft(current => current === sent.text ? '' : current)
     submission.current = null

@@ -12,7 +12,7 @@ try {
     server.stdout.on('data', chunk => { const match = String(chunk).match(/http:\/\/127\.0\.0\.1:\d+\/scripts\/fixtures\/chat-browser.html/); if (match) { clearTimeout(timer); resolve(match[0]) } })
   })
   browser = await chromium.launch({ channel: 'chrome', headless: true })
-  for (const width of [390, 1440]) for (const edited of [false, true]) {
+  for (const width of [390, 1440]) for (const edited of [false, true]) for (const confirmation of ['answer', 'acknowledgement']) {
     const page = await browser.newPage({ viewport: { width, height: 900 } })
     const errors = []
     page.on('pageerror', error => errors.push(error.message))
@@ -38,19 +38,21 @@ try {
     await page.getByRole('button', { name: '메시지 보내기', exact: true }).click()
     await page.getByRole('button', { name: '수동으로 다시 시도', exact: true }).waitFor()
     if (edited) await draft.fill('보존해야 할 새로운 초안')
-    events.push({ event_id: 'event-0000000000000002', sequence: 2, observed_at: '2026-09-08T00:00:01.000Z', kind: 'assistant_message', state: 'completed', correlation_id: events[0].correlation_id, payload: { private_content: { text: '합성 답변 확인' } } })
+    if (confirmation === 'answer') events.push({ event_id: 'event-0000000000000002', sequence: 2, observed_at: '2026-09-08T00:00:01.000Z', kind: 'assistant_message', state: 'completed', correlation_id: events[0].correlation_id, payload: { private_content: { text: '합성 답변 확인' } } })
+    else events[0].delivery = 'acknowledged'
     await page.getByRole('button', { name: '새로고침', exact: true }).click()
-    await page.getByText('Planner 답변 확인됨', { exact: true }).waitFor()
+    const confirmationText = confirmation === 'answer' ? 'Planner 답변 확인됨' : '목적지 접수 확인'
+    await page.locator('.planner-conversation__messages').getByText(confirmationText, { exact: true }).waitFor()
     await page.getByRole('button', { name: '수동으로 다시 시도', exact: true }).waitFor({ state: 'detached' })
     assert.equal(await draft.inputValue(), edited ? '보존해야 할 새로운 초안' : '')
     assert.equal(posts, 1, 'no automatic resend')
-    assert.equal(events[0].delivery, 'delivery_unknown', 'original receipt preserved')
+    assert.equal(events[0].delivery, confirmation === 'answer' ? 'delivery_unknown' : 'acknowledged', 'server receipt preserved')
     assert.deepEqual(errors, [])
     assert.equal(await page.locator('vite-error-overlay').count(), 0)
     await page.reload()
-    await page.getByText('Planner 답변 확인됨', { exact: true }).waitFor()
+    await page.locator('.planner-conversation__messages').getByText(confirmationText, { exact: true }).waitFor()
     assert.equal(posts, 1)
-    console.log(JSON.stringify({ width, edited, answerConfirmed: true, draftPreserved: true, retryRemoved: true, posts, reloadConfirmed: true }))
+    console.log(JSON.stringify({ width, edited, confirmation, confirmed: true, draftPreserved: true, retryRemoved: true, posts, reloadConfirmed: true }))
     await page.close()
   }
 } finally {
