@@ -2,6 +2,7 @@ import type { CherryNoteDashboardData } from '../components/CherryNoteDashboard'
 import type { OutcomeDashboardData } from '../components/OutcomeDashboard'
 import {destinationQuestions} from './destination-discovery'
 import {destinationSourceSha256,validateDestinationAnalysis,type DestinationProposal} from './destination-analysis'
+import {discoveryContextDigest,type DiscoveryContext} from './destination-question-receipt'
 
 type Session = { authenticated: boolean; publicReadOnly?: boolean }
 export type PrivateAccessConfig = { enabled: boolean; access: 'private_read_only'; providers: Array<{ id: string; mode: string }>; sessionMaximumDays: number; completionAuthority: false; publishableKey?: string }
@@ -33,6 +34,39 @@ export const privateDestinationStorageAvailable = () => privateDestinationBindin
 export const activeDestinationDraftId = '00000000-0000-4000-8000-000000000001'
 export type DestinationDraftDocument = { schemaVersion: 1; mode: 'guided_200q' | 'brief_gap'; source: string; answers: import('./destination-discovery').DestinationAnswers; unknowns: string[] }
 export type StoredDestinationDraft = { draftId: string; revision: number; document: DestinationDraftDocument; state: 'draft'; completionAuthority: false }
+export type StoredDiscovery = {draftId:string;revision:number;intakeRevision:number;context:DiscoveryContext;contextDigest:string;state:'draft';completionAuthority:false}
+export async function requestDestinationDiscovery(intake:StoredDestinationDraft,save?:{expectedRevision:number;context:DiscoveryContext}):Promise<StoredDiscovery|null> {
+ const binding=privateDestinationBinding,generation=privateDecisionBindingVersion
+ const fail=():never=>{throw Error('discovery_response_invalid')}
+ if(!binding||intake.draftId!==activeDestinationDraftId)throw Error('destination_unavailable')
+ const pinned=JSON.parse(JSON.stringify(intake)) as StoredDestinationDraft
+ const submitted=save?JSON.parse(JSON.stringify(save)) as typeof save:undefined
+ const intakeDigest=await destinationDraftDigest(pinned.document)
+ const matchesIntake=async(context:DiscoveryContext)=>(await destinationDraftDigest({schemaVersion:1,mode:context.mode,source:context.source,answers:context.seedAnswers,unknowns:context.unknowns}))===intakeDigest
+ let expectedDigest:string|undefined,body:string|undefined
+ if(submitted){
+  if(!Number.isSafeInteger(submitted.expectedRevision)||submitted.expectedRevision<0||submitted.context.revision!==submitted.expectedRevision+1||!await matchesIntake(submitted.context))return fail()
+  expectedDigest=await discoveryContextDigest(submitted.context)
+  body=JSON.stringify({requestId:crypto.randomUUID(),expectedRevision:submitted.expectedRevision,intakeRevision:pinned.revision,context:JSON.stringify(submitted.context)})
+  if(new TextEncoder().encode(body).length>4194304)throw Error('discovery_request_too_large')
+ }
+ if(binding!==privateDestinationBinding||generation!==privateDecisionBindingVersion)throw Error('destination_identity_changed')
+ const response=await fetch(`/api/private/destination/discovery/${activeDestinationDraftId}`,{method:submitted?'PUT':'GET',credentials:'same-origin',headers:{...privateSessionHeaders(binding.bearer),...(submitted?{'content-type':'application/json','x-outcome-csrf':binding.csrf}:{})},...(body?{body}:{})})
+ const value=await readJson<unknown>(response)
+ const exact=(v:unknown,keys:string[]):v is Record<string,unknown>=>!!v&&typeof v==='object'&&!Array.isArray(v)&&Object.keys(v).length===keys.length&&keys.every(k=>Object.hasOwn(v,k))
+ if(!exact(value,['discovery','completionAuthority'])||value.completionAuthority!==false)return fail()
+ let stored:StoredDiscovery|null=null
+ if(value.discovery!==null){
+  const row=value.discovery
+  if(!exact(row,['draftId','revision','intakeRevision','context','contextDigest','state','completionAuthority'])||row.draftId!==pinned.draftId||row.intakeRevision!==pinned.revision||!Number.isSafeInteger(row.revision)||Number(row.revision)<1||row.state!=='draft'||row.completionAuthority!==false||!exact(row.context,['source','mode','seedAnswers','unknowns','answers','askedQuestionIds','revision']))return fail()
+  const context=row.context as DiscoveryContext
+  if(context.revision!==row.revision||row.contextDigest!==await discoveryContextDigest(context)||!await matchesIntake(context))return fail()
+  stored=row as StoredDiscovery
+ }
+ if(binding!==privateDestinationBinding||generation!==privateDecisionBindingVersion)throw Error('destination_identity_changed')
+ if(submitted&&(!stored||stored.revision!==submitted.expectedRevision+1||stored.contextDigest!==expectedDigest))return fail()
+ return stored
+}
 export type DestinationAnalysisView = {requestId:string;state:'queued'|'dispatch_started'|'completed'|'failed'|'delivery_unknown';proposals:DestinationProposal[];conflicts:string[]}
 export async function destinationDraftDigest(doc:DestinationDraftDocument) {
  const answers=Object.fromEntries(destinationQuestions.filter(q=>Object.hasOwn(doc.answers,q.id)).map(q=>[q.id,doc.answers[q.id]]))

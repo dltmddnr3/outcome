@@ -85,9 +85,9 @@ export function createOutcomeServer(options = {}) {
         } catch { return json(response, 503, { error: 'authentication_unavailable' }) }
       }
       let body
-      if (/^\/api\/private\/destination\/(drafts|analysis)\//.test(url.pathname)) {
+      if (/^\/api\/private\/destination\/(drafts|analysis|discovery)\//.test(url.pathname)) {
         if (request.method === 'PUT' || request.method === 'POST') {
-          const maximumBytes = url.pathname.startsWith('/api/private/destination/analysis/') ? 4096 : 262144
+          const maximumBytes = url.pathname.startsWith('/api/private/destination/analysis/') ? 4096 : url.pathname.startsWith('/api/private/destination/discovery/') ? 4194304 : 262144
           const chunks = []; let size = 0
           try {
             for await (const chunk of request) {

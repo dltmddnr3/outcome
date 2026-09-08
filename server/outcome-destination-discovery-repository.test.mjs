@@ -2,6 +2,8 @@ import test from 'node:test'
 import assert from 'node:assert/strict'
 import {readFile} from 'node:fs/promises'
 import {PGlite} from '@electric-sql/pglite'
+import {once} from 'node:events'
+import {createOutcomeServer} from './index.mjs'
 import {createDestinationDraftRepository} from './outcome-destination-postgres.mjs'
 import {createDiscoveryRepository,parseDiscoveryContext,discoveryContextDigest} from './outcome-destination-discovery-repository.mjs'
 
@@ -12,6 +14,7 @@ test('server context digest matches the browser Unicode and ordering golden vect
 
 test('full discovery save/load survives repository reconstruction, replay and stale writers',async()=>{
  const db=await PGlite.create('memory://')
+ let http
  try {
   await db.exec('create role anon nologin;create role authenticated nologin')
   for(const file of ['20260908011009_outcome_destination_private_drafts.sql','20260908042838_outcome_destination_discovery_drafts.sql'])await db.exec(await readFile(new URL(`../supabase/migrations/${file}`,import.meta.url),'utf8'))
@@ -24,7 +27,20 @@ test('full discovery save/load survives repository reconstruction, replay and st
   const context={source:document.source,mode:document.mode,seedAnswers:document.answers,unknowns:document.unknowns,answers,askedQuestionIds:answers.map(a=>a.questionId),revision:1}
   const input={...scope,requestId:'00000000-0000-4000-8000-000000000003',expectedRevision:0,intakeRevision:1,context:JSON.stringify(context)}
   const repo=createDiscoveryRepository({transact})
-  const saved=await repo.save(input)
+  const headers={cookie:'__session=owner',origin:'https://preview.invalid','content-type':'application/json','x-outcome-csrf':'synthetic-discovery-csrf'}
+  http=createOutcomeServer({publicReadOnly:true,accountAccess:{authenticate:async token=>{if(!['owner','other'].includes(token))throw Error('unauthorized')},resolveBridgeAuthority:async({token})=>({workspace_id:'workspace',account_ref:token,project_ids:['outcome']})},destinationRuntime:{allowedOrigin:headers.origin,csrfSecret:headers['x-outcome-csrf'],discoveryRepository:repo}})
+  http.listen(0,'127.0.0.1');await once(http,'listening')
+  const url=`http://127.0.0.1:${http.address().port}/api/private/destination/discovery/${scope.draftId}`
+  const body=JSON.stringify({requestId:input.requestId,expectedRevision:input.expectedRevision,intakeRevision:input.intakeRevision,context:input.context})
+  assert.equal((await fetch(url)).status,401)
+  const put=await fetch(url,{method:'PUT',headers,body})
+  assert.equal(put.status,200);assert.equal(put.headers.get('cache-control'),'no-store')
+  const saved=(await put.json()).discovery
+  assert.deepEqual((await (await fetch(url,{headers})).json()).discovery,saved)
+  assert.equal((await (await fetch(url,{headers:{cookie:'__session=other'}})).json()).discovery,null)
+  for(const changed of [{origin:'https://wrong.invalid'},{'x-outcome-csrf':'wrong'}])assert.equal((await fetch(url,{method:'PUT',headers:{...headers,...changed},body})).status,403)
+  assert.equal((await fetch(url,{method:'PUT',headers,body:JSON.stringify({...JSON.parse(body),accountRef:'other'})})).status,400)
+  assert.equal((await fetch(url,{method:'PUT',headers,body:'x'.repeat(4194305)})).status,413)
   assert.deepEqual(saved.context,context);assert.equal(saved.completionAuthority,false)
   assert.deepEqual(await createDiscoveryRepository({transact}).load(scope),saved)
   assert.deepEqual(await repo.save(input),saved)
@@ -38,5 +54,5 @@ test('full discovery save/load survives repository reconstruction, replay and st
   await assert.rejects(()=>repo.save({...input,requestId:'00000000-0000-4000-8000-000000000007',expectedRevision:2,context:JSON.stringify({...context,revision:3})}),/discovery_intake_stale/)
   assert.equal((await repo.load(scope)).revision,2)
   for(const invalid of [{...context,completionAuthority:true},{...context,answers:[{questionId:'not-issued',gapId:'new',value:'answer'}]},{...context,answers:[{...answers[0],value:'password=private-value'}]},{...context,answers:[answers[0],answers[0]]}])assert.throws(()=>parseDiscoveryContext(JSON.stringify(invalid)))
- }finally{await db.close()}
+ }finally{if(http){http.closeAllConnections();await new Promise(resolve=>http.close(resolve))}await db.close()}
 })

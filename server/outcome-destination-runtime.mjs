@@ -2,12 +2,13 @@ import {types} from 'node:util'
 import {createDestinationDraftRepository} from './outcome-destination-postgres.mjs'
 import {createDestinationAnalysisRepository} from './outcome-destination-analysis-repository.mjs'
 import {validateDestinationAnalysisResult} from './outcome-destination-analysis-result.mjs'
+import {createDiscoveryRepository} from './outcome-destination-discovery-repository.mjs'
 
 const unavailable=()=>new Error('destination_unavailable')
 const knownError=error=>{
  if(!error||typeof error!=='object'||types.isProxy(error))return null
  const code=Object.getOwnPropertyDescriptor(error,'message')?.value
- return ['destination_revision_conflict','destination_request_conflict','destination_invalid'].includes(code)?code:null
+ return ['destination_revision_conflict','destination_request_conflict','destination_invalid','discovery_revision_conflict','discovery_request_conflict','discovery_intake_stale','discovery_invalid'].includes(code)?code:null
 }
 
 // An explicitly supplied dedicated pool only: no env reads, credentials or grants.
@@ -40,5 +41,5 @@ export function createDestinationRuntime({pool,allowedOrigin,csrfSecret}={}) {
  if(typeof csrfSecret!=='string'||csrfSecret.length<16)throw unavailable()
  try {const origin=new URL(allowedOrigin);if(origin.protocol!=='https:'||origin.origin!==allowedOrigin)throw unavailable()}catch{throw unavailable()}
  const transact=createDestinationTransactionPort({pool})
- return Object.freeze({allowedOrigin,csrfSecret,repository:createDestinationDraftRepository({transact}),analysisRepository:createDestinationAnalysisRepository({transact,validateResult:validateDestinationAnalysisResult})})
+ return Object.freeze({allowedOrigin,csrfSecret,repository:createDestinationDraftRepository({transact}),analysisRepository:createDestinationAnalysisRepository({transact,validateResult:validateDestinationAnalysisResult}),discoveryRepository:createDiscoveryRepository({transact})})
 }
