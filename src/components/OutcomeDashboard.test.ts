@@ -167,11 +167,11 @@ describe('OUTCOME Package dashboard', () => {
     for (const state of ['ready', 'stale', 'conflict', 'delivery_unknown', 'no_active_work'] as const) expect(approvalInboxProjection(modelV2({ state, now: { observedAt: '2026-09-04T02:00:00.000Z', state }, events }))).toEqual([])
     expect(approvalInboxProjection(modelV2({ state: 'blocked', now: { observedAt: '2026-09-04T02:00:00.000Z', state: 'blocked' }, events: events.filter((event) => event.role === 'ux_product_qa' || event.role === 'release_audit') }))).toEqual([])
   })
-  it('renders read-only approval evidence with native-disabled decision controls and the exact S2 reason', () => {
+  it('keeps unbound Cherry action read-only without decision controls', () => {
     const markup = renderToStaticMarkup(createElement(ApprovalInbox, { projection: modelV2({ cherryActionLabel: '후보 화면을 확인한다' }) }))
-    for (const value of ['요청', '요청자 → 권한', '차단 대상', '공개 pin', '공개 근거', '만료', '신선도', '계보 / 교체', '불변 이력', '결정 기록은 S2']) expect(markup).toContain(value)
+    for (const value of ['요청', '요청자 → 권한', '차단 대상', '공개 pin', '공개 근거', '만료', '신선도', '계보 / 교체', '불변 이력', '고정된 대상 식별자가 없어']) expect(markup).toContain(value)
     expect(markup).toContain('data-completion-authority="false"')
-    expect((markup.match(/<button[^>]*disabled=""/g) ?? [])).toHaveLength(2)
+    expect(markup).not.toContain('<button')
     expect(ApprovalInbox.toString()).not.toMatch(/onClick|onSubmit|fetch\(|XMLHttpRequest|form/)
   })
   it('keeps approval observation accent bounded and decision targets accessible without motion', () => {

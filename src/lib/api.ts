@@ -97,6 +97,7 @@ export async function endPrivateSession(): Promise<void> {
 }
 
 const decisionNonce = () => Array.from(crypto.getRandomValues(new Uint8Array(24)), (value) => value.toString(16).padStart(2, '0')).join('')
+export const privateDecisionRecordingAvailable = () => privateDecisionBinding !== null
 
 export async function recordPrivateDecision(input: { projectId: string; eventId: string; sequence: number; decision: 'approved' | 'rejected'; rejectionReason?: PrivateDecisionReason | null }): Promise<PrivateDecisionReceipt> {
   const binding = privateDecisionBinding
