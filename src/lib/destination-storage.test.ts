@@ -1,8 +1,16 @@
 import {afterEach,expect,it,vi} from 'vitest'
-import {activeDestinationDraftId,fetchPrivateWorkspace,requestDestinationDraft,validateStoredDestinationDraft,type DestinationDraftDocument} from './api'
+import {activeDestinationDraftId,fetchPrivateWorkspace,requestDestinationDraft,validateStoredDestinationDraft,destinationAnalysisRequestId,type DestinationDraftDocument,type StoredDestinationDraft} from './api'
 afterEach(()=>vi.unstubAllGlobals())
 const document:DestinationDraftDocument={schemaVersion:1,mode:'brief_gap',source:'기획서',answers:{problem:'문제'},unknowns:['기술 검증 필요']}
 const row={draftId:activeDestinationDraftId,revision:1,document,state:'draft',completionAuthority:false}
+it('reconstructs analysis identity after reload and changes it for a new source revision',async()=>{
+ const draft=row as StoredDestinationDraft
+ const id=await destinationAnalysisRequestId(draft)
+ expect(await destinationAnalysisRequestId(JSON.parse(JSON.stringify(draft)))).toBe(id)
+ expect(await destinationAnalysisRequestId({...draft,revision:2})).not.toBe(id)
+ expect(await destinationAnalysisRequestId({...draft,document:{...document,source:'changed'}})).not.toBe(id)
+ expect(id).toMatch(/^[a-f0-9]{8}-[a-f0-9]{4}-8[a-f0-9]{3}-[89ab][a-f0-9]{3}-[a-f0-9]{12}$/)
+})
 it('validates unconfirmed owner draft responses and rejects authority or malformed fields',()=>{
  expect(validateStoredDestinationDraft({draft:row,completionAuthority:false})).toEqual(row)
  for(const draft of [{...row,completionAuthority:true},{...row,revision:0},{...row,draftId:'other'},{...row,document:{...document,confirmed:true}},{...row,document:{...document,answers:{owner:'forged'}}}])expect(()=>validateStoredDestinationDraft({draft,completionAuthority:false})).toThrow('destination_response_invalid')

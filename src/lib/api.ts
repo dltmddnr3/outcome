@@ -40,6 +40,14 @@ export async function destinationDraftDigest(doc:DestinationDraftDocument) {
  if(bytes.length>131072)throw Error('destination_invalid')
  return [...new Uint8Array(await crypto.subtle.digest('SHA-256',bytes))].map(n=>n.toString(16).padStart(2,'0')).join('')
 }
+export async function destinationAnalysisRequestId(draft:StoredDestinationDraft) {
+ const value=JSON.stringify([draft.draftId,draft.revision,await destinationDraftDigest(draft.document)])
+ const digest=await crypto.subtle.digest('SHA-256',new TextEncoder().encode(value))
+ const bytes=new Uint8Array(digest).slice(0,16)
+ bytes[6]=(bytes[6]&15)|128;bytes[8]=(bytes[8]&63)|128
+ const hex=[...bytes].map(n=>n.toString(16).padStart(2,'0')).join('')
+ return `${hex.slice(0,8)}-${hex.slice(8,12)}-${hex.slice(12,16)}-${hex.slice(16,20)}-${hex.slice(20)}`
+}
 export async function requestDestinationAnalysis(draft:StoredDestinationDraft,requestId:string,submit=false):Promise<DestinationAnalysisView|null> {
  if(!/^[a-f0-9]{8}(?:-[a-f0-9]{4}){3}-[a-f0-9]{12}$/.test(requestId))throw Error('destination_invalid')
  const binding=privateDestinationBinding,generation=privateDecisionBindingVersion
