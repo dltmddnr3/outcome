@@ -17,6 +17,9 @@ const safeText = (value, bytes, empty = false) => {
     || /(?:\/(?:Users|home|private\/tmp|tmp)\/|-----BEGIN .*PRIVATE KEY-----|\b(?:bearer|basic)\s+\S+|\b(?:token|secret|password|api[_ -]?key|credential)\s*[:=]\s*\S+|\b(?:sk|pk|ghp|github_pat|xox[baprs]|vercel|sb_secret)[-_][A-Za-z0-9_-]{8,})/i.test(normalized)) fail()
   return value
 }
+// A generated private Package may include all 200 bounded discovery answers.
+// Reuse the same privacy rules without truncating them to one intake field.
+export const validateDestinationPackageText = value => safeText(value, 8388608)
 const uuid = value => { if (typeof value !== 'string' || !/^[a-f0-9]{8}(?:-[a-f0-9]{4}){3}-[a-f0-9]{12}$/.test(value)) fail(); return value }
 const scopeOf = input => {
   for (const key of ['workspaceId','accountRef']) if (typeof input[key] !== 'string' || !/^[A-Za-z0-9:_-]{1,128}$/.test(input[key])) fail()

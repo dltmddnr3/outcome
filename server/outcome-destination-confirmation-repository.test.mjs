@@ -12,7 +12,7 @@ import {once} from 'node:events'
 import {createOutcomeServer} from './index.mjs'
 import {createDestinationSourceVerifier} from './outcome-destination-source-verifier.mjs'
 import {createDestinationHostedRuntimeFactory} from './outcome-destination-hosted-runtime.mjs'
-import {mkdtempSync,readdirSync} from 'node:fs'
+import {mkdtempSync,readdirSync,readFileSync} from 'node:fs'
 import {tmpdir} from 'node:os'
 import {join} from 'node:path'
 import {createConfirmedPackagePublisher,readCreatedProjectEntries} from './outcome-creation-catalog.mjs'
@@ -20,6 +20,19 @@ import {buildPackageModel} from './outcome-package.mjs'
 
 const scope={workspaceId:'workspace',accountRef:'owner',draftId:'00000000-0000-4000-8000-000000000001'}
 const requestId='00000000-0000-4000-8000-000000000010'
+test('default renderer consumes real SQL confirmation without a synthetic rendering capability',async()=>{
+ const f=await fixture(),catalog=mkdtempSync(join(tmpdir(),'outcome-default-package-'));try{
+  const repository=createDestinationConfirmationRepository(f),publisher=createConfirmedPackagePublisher({catalog,confirmationRepository:repository})
+  await assert.rejects(()=>publisher.publish({...scope,requestId}));assert.deepEqual(readdirSync(catalog),[])
+  const review=await repository.review(scope);await repository.confirm({...scope,requestId,reviewDigest:review.reviewDigest,confirmed:true})
+  const created=await publisher.publish({...scope,requestId});assert.deepEqual(await publisher.publish({...scope,requestId}),created)
+  const [entry]=readCreatedProjectEntries(catalog),contract=readFileSync(join(entry.root,entry.contract_file),'utf8')
+  assert.deepEqual(JSON.parse(contract.match(/```destination-source\n([^\n]+)\n```/)[1]).document,f.document)
+  const model=buildPackageModel({root:entry.root,contractFile:entry.contract_file,mapFile:entry.map_file,sessionsFile:entry.sessions_file,gitEvidence:{state:'unknown'}})
+  assert.equal(model.status,'valid');assert.equal(model.project.outcome,f.document.answers.outcome);assert.equal(model.now.status,'unbound')
+  const stage=model.phases[0].scopes[0].stages[0];assert.equal(stage.gate.closed,0);assert.equal(stage.purpose,f.document.answers.acceptance)
+ }finally{await f.db.close()}
+})
 test('real restricted confirmation SQL gates local Package publication and immutable replay',async()=>{
  const f=await fixture(),catalog=mkdtempSync(join(tmpdir(),'outcome-confirmed-package-'));try{
   const repository=createDestinationConfirmationRepository(f);let renders=0

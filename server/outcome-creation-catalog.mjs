@@ -2,8 +2,9 @@ import {createHash} from 'node:crypto'
 import {closeSync,constants,existsSync,fsyncSync,fstatSync,linkSync,lstatSync,mkdtempSync,openSync,readFileSync,readdirSync,realpathSync,rmdirSync,unlinkSync,writeFileSync} from 'node:fs'
 import {basename,join} from 'node:path'
 import YAML from 'yaml'
-import {parseDestinationDraft} from './outcome-destination-postgres.mjs'
+import {validateDestinationPackageText} from './outcome-destination-postgres.mjs'
 import {buildPackageModel} from './outcome-package.mjs'
+import {renderConfirmedDestinationPackage} from './outcome-destination-package-renderer.mjs'
 
 const names=['GATES.md','OUTCOME_CONTRACT.md','OUTCOME_MAP.md','OUTCOME_SESSIONS.md']
 const hash=value=>createHash('sha256').update(value).digest('hex')
@@ -16,7 +17,7 @@ function privateDirectory(path){
  if(!stat.isDirectory()||(stat.mode&0o077)!==0||stat.uid!==process.getuid())fail()
  return realpathSync(path)
 }
-function readRegular(path,limit=524288){
+function readRegular(path,limit=8388608){
  const fd=openSync(path,constants.O_RDONLY|constants.O_NOFOLLOW)
  try{const stat=fstatSync(fd);if(!stat.isFile()||stat.size>limit)fail();return readFileSync(fd,'utf8')}finally{closeSync(fd)}
 }
@@ -48,9 +49,9 @@ export function readCreatedProjectEntries(path){
 }
 
 // All three dependencies are trusted host capabilities, never browser input.
-// renderPackage must map the verified immutable snapshot to a complete Package;
-// there is deliberately no guessed template or automatic technical assessment.
-export function createConfirmedPackagePublisher({catalog,confirmationRepository,renderPackage,checkpoint=()=>{}}={}){
+// A renderer override is a host-only capability. The default preserves the
+// verified snapshot; neither renderer invents a technical assessment.
+export function createConfirmedPackagePublisher({catalog,confirmationRepository,renderPackage=renderConfirmedDestinationPackage,checkpoint=()=>{}}={}){
  if(typeof catalog!=='string'||typeof confirmationRepository?.readConfirmedCreation!=='function'||typeof renderPackage!=='function'||typeof checkpoint!=='function')fail()
  const result=projectId=>({projectId,state:'package_registered',completionAuthority:false,executionAuthority:false})
  return Object.freeze({async publish(scope){
@@ -71,15 +72,15 @@ export function createConfirmedPackagePublisher({catalog,confirmationRepository,
    // No disk mutation until the repository revalidates the actual confirmation.
    const input=await confirmationRepository.readConfirmedCreation(scope)
    if(!input||input.draftId!==scope.draftId||input.requestId!==scope.requestId||input.completionAuthority!==false||input.executionAuthority!==false
-    ||!digest(input.reviewDigest)||!digest(input.evidenceDigest)||typeof input.serializedSnapshot!=='string'||Buffer.byteLength(input.serializedSnapshot)>524288||hash(input.serializedSnapshot)!==input.reviewDigest)fail()
+    ||!digest(input.reviewDigest)||!digest(input.evidenceDigest)||typeof input.serializedSnapshot!=='string'||Buffer.byteLength(input.serializedSnapshot)>8388608||hash(input.serializedSnapshot)!==input.reviewDigest)fail()
    root=privateDirectory(catalog)
    const key=hash(JSON.stringify([scope.workspaceId,scope.accountRef,scope.draftId])),projectId=`destination-${key}`,target=join(root,`${key}.json`)
    const same=()=>{const prior=readEntry(root,key).record;if(prior.reviewDigest!==input.reviewDigest||prior.evidenceDigest!==input.evidenceDigest)fail();return result(projectId)}
    if(existsSync(target))return same()
    const files=await renderPackage({projectId,serializedSnapshot:input.serializedSnapshot})
-   if(!exact(files,names)||names.some(name=>typeof files[name]!=='string'||Buffer.byteLength(files[name])>65536))fail()
+   if(!exact(files,names)||names.some(name=>typeof files[name]!=='string'||Buffer.byteLength(files[name])>8388608))fail()
    // Existing intake privacy rules apply before any candidate bytes reach disk.
-   for(const content of Object.values(files))parseDestinationDraft(JSON.stringify({schemaVersion:1,mode:'guided_200q',source:content,answers:{},unknowns:[]}))
+   for(const content of Object.values(files))validateDestinationPackageText(content)
    if(/^\s*-\s*\[[xX]\]/m.test(files['GATES.md']))fail()
    const map=YAML.parse(files['OUTCOME_MAP.md'].match(/```yaml\s*\n([\s\S]*?)\n```/)?.[1]??'')
    const stages=map?.phases?.flatMap(phase=>phase.scopes.flatMap(scope=>scope.stages))

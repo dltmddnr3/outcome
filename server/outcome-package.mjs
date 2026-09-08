@@ -76,6 +76,20 @@ export function parseGithubConnector(value, local = { state: 'unknown', branch: 
 }
 
 export function parseOutcomeContract(markdown) {
+  // Generated confirmed contracts use one strict structured block so multiline
+  // source prose cannot be truncated or interpreted as legacy metadata fields.
+  if (/^```outcome-contract\b/m.test(markdown)) {
+    const invalid = { projectId:null,projectName:null,outcome:null,acceptanceAuthority:null,phaseId:null,missing:['project_id','project_name','outcome','acceptance_authority'] }
+    try {
+      const blocks=[...markdown.matchAll(/^```outcome-contract\r?\n([^\r\n]+)\r?\n```[ \t]*$/gm)]
+      if(blocks.length!==1||(markdown.match(/^```outcome-contract\b/gm)??[]).length!==1)return invalid
+      const value=JSON.parse(blocks[0][1])
+      if(!value||Object.keys(value).sort().join(',')!=='acceptanceAuthority,outcome,phaseId,projectId,projectName,schemaVersion'||value.schemaVersion!==1
+        ||!['projectId','projectName','outcome','acceptanceAuthority','phaseId'].every(key=>typeof value[key]==='string'&&value[key].trim())
+        ||!STABLE_ID.test(value.projectId)||!STABLE_ID.test(value.phaseId)||value.acceptanceAuthority!=='Cherry')return invalid
+      return {projectId:value.projectId,projectName:value.projectName,outcome:value.outcome,acceptanceAuthority:value.acceptanceAuthority,phaseId:value.phaseId,missing:[]}
+    } catch {return invalid}
+  }
   const projectId = field(markdown, 'Project ID')
   const projectName = field(markdown, 'Project name') ?? markdown.match(/^#\s+(.+?)(?:\s+Outcome Contract|\s+Contract)/m)?.[1]?.trim() ?? null
   const outcome = field(markdown, 'Outcome')
