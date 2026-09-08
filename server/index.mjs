@@ -7,6 +7,7 @@ import { fileURLToPath } from 'node:url'
 import { collectCherryNoteDashboard, sanitizeRemotePayload } from './cherry-note-dashboard.mjs'
 import { collectOutcomePackages, loadBindingRegistry, projectPublicPackages } from './outcome-package.mjs'
 import { handlePrivateAccessRequest } from './account-access-api.mjs'
+import { handleDestinationDraftRequest } from './outcome-destination-api.mjs'
 import { cleanupPidRecord, writePidRecord } from './runtime-process.mjs'
 
 const projectRoot = resolve(fileURLToPath(new URL('..', import.meta.url)))
@@ -84,6 +85,21 @@ export function createOutcomeServer(options = {}) {
         } catch { return json(response, 503, { error: 'authentication_unavailable' }) }
       }
       let body
+      if (url.pathname.startsWith('/api/private/destination/drafts/')) {
+        if (request.method === 'PUT') {
+          const chunks = []; let size = 0
+          try {
+            for await (const chunk of request) {
+              size += chunk.length
+              if (size > 262144) return json(response, 413, { error: 'request_too_large' })
+              chunks.push(chunk)
+            }
+            body = Buffer.concat(chunks).toString('utf8')
+          } catch { return json(response, 400, { error: 'invalid_request' }) }
+        }
+        const value = await handleDestinationDraftRequest({ method: request.method, pathname: url.pathname, token: cookieValue(request, '__session'), identityService: accountAccess, runtime: options.destinationRuntime, headers: request.headers, body })
+        return json(response, value.status, value.body)
+      }
       if (url.pathname === '/api/private/decisions' && request.method === 'POST') {
         try { body = await readBody(request) } catch { return json(response, 400, { error: 'invalid_request' }) }
       }
