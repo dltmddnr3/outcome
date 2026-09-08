@@ -156,7 +156,7 @@ export function createAccountAccessService({ authProvider, store, ownerSubject, 
       const entries = [{ id: 'workspace_api', state: 'access_verified', observedAtMs: accessObservedAtMs },
         { id: 'execution_observer', state: observerState, observedAtMs: sourceAvailable ? observation.observedAtMs : null },
         ...['mcp', 'provider_api', 'cli', 'environment', 'deployment'].map(id => ({ id, state: 'not_observed', observedAtMs: null }))]
-      return { schemaVersion: 1, projectId: requestedProjectId, entries, completionAuthority: false, executionAuthority: false }
+      return { schemaVersion: 1, projectId: requestedProjectId, checkedAtMs: now(), entries, completionAuthority: false, executionAuthority: false }
     },
     async endSession({ token } = {}) {
       const identity = await authenticate(token)

@@ -16,8 +16,9 @@ const service = {
  readWorkObservation: async ({ requestedProjectId }) => ({ projectId: requestedProjectId, observation: null, completionAuthority: false }),
  readConnectionInventory: async ({ requestedProjectId }) => {
   reads.push(requestedProjectId)
-  return { schemaVersion: 1, projectId: requestedProjectId, completionAuthority: false, executionAuthority: false,
-   entries: ['workspace_api', 'execution_observer', 'mcp', 'provider_api', 'cli', 'environment', 'deployment'].map((id, i) => ({ id, state: i === 0 ? 'access_verified' : 'not_observed', observedAtMs: i === 0 ? Date.now() : null })) }
+  const checkedAtMs = Date.now()
+  return { schemaVersion: 1, projectId: requestedProjectId, checkedAtMs, completionAuthority: false, executionAuthority: false,
+   entries: ['workspace_api', 'execution_observer', 'mcp', 'provider_api', 'cli', 'environment', 'deployment'].map((id, i) => ({ id, state: i === 0 ? 'access_verified' : 'not_observed', observedAtMs: i === 0 ? checkedAtMs : null })) }
  },
 }
 const server = createOutcomeServer({ publicReadOnly: true, accountAccess: service })

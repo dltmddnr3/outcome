@@ -1,14 +1,22 @@
 import { afterEach, expect, it, vi } from 'vitest'
 import { parseConnectionInventory, connectionLabels } from './connection-inventory'
 import { captureConnectionInventoryReader, fetchPrivateWorkspace, clearPrivateSessionBindings, subscribePrivateAccessFailure } from './api'
-const snapshot = () => ({ schemaVersion: 1, projectId: 'outcome', completionAuthority: false, executionAuthority: false,
+const snapshot = () => ({ schemaVersion: 1, projectId: 'outcome', checkedAtMs: 2000, completionAuthority: false, executionAuthority: false,
  entries: Object.keys(connectionLabels).map((id, i) => ({ id, state: i === 0 ? 'access_verified' : 'not_observed', observedAtMs: i === 0 ? 1000 : null })) })
-afterEach(() => { clearPrivateSessionBindings(); vi.unstubAllGlobals() })
+afterEach(() => { clearPrivateSessionBindings(); vi.unstubAllGlobals(); vi.restoreAllMocks() })
 it('accepts only exact finite scoped inventory and rejects whole unsafe projections', () => {
- expect(parseConnectionInventory(snapshot(), 'outcome', 2000)).toEqual(snapshot())
+ expect(parseConnectionInventory(snapshot(), 'outcome')).toEqual(snapshot())
  const invalid = [null, {}, { ...snapshot(), projectId: 'cherry-note' }, { ...snapshot(), completionAuthority: true }, { ...snapshot(), executionAuthority: true }, { ...snapshot(), privateLocator: 'must-not-render' }]
  for (const mutate of [(v: ReturnType<typeof snapshot>) => { v.entries[1].state = 'connected' }, (v: ReturnType<typeof snapshot>) => { v.entries[0].observedAtMs = 3000 }, (v: ReturnType<typeof snapshot>) => { v.entries[1].observedAtMs = 1000 }, (v: ReturnType<typeof snapshot>) => { v.entries[2] = v.entries[1] }, (v: ReturnType<typeof snapshot>) => { v.entries.pop() }]) { const v = snapshot(); mutate(v); invalid.push(v) }
- for (const value of invalid) expect(parseConnectionInventory(value, 'outcome', 2000)).toBeNull()
+ for (const value of invalid) expect(parseConnectionInventory(value, 'outcome')).toBeNull()
+ for (const checkedAtMs of [null, -1, 999, 8640000000000001, '2000']) expect(parseConnectionInventory({ ...snapshot(), checkedAtMs }, 'outcome')).toBeNull()
+})
+it('validates timestamps in server clock domain, not a slower client wall clock', () => {
+ const value = { ...snapshot(), checkedAtMs: 5000, entries: snapshot().entries.map((e, i) => i === 0 ? { ...e, observedAtMs: 4900 } : e) }
+ for (const clientNow of [2000, 200000]) {
+  vi.spyOn(Date, 'now').mockReturnValue(clientNow)
+  expect(parseConnectionInventory(value, 'outcome')).not.toBeNull()
+ }
 })
 const workspace = () => new Response(JSON.stringify({ workspace: { projects: [{ project: { id: 'outcome' } }] } }))
 it('refreshes scoped credential, denies late identity and does not send control fields', async () => {

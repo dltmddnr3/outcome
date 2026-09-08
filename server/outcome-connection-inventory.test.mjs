@@ -16,7 +16,7 @@ test('connection inventory proves only scoped access; missing probes are not con
   const response = await handlePrivateAccessRequest({ pathname: '/api/private/connections/outcome', token: 'valid', service })
   assert.equal(response.status, 200)
   assert.deepEqual(response.headers, { 'cache-control': 'private, no-store', vary: 'Cookie, Authorization' })
-  assert.deepEqual(response.body, { schemaVersion: 1, projectId: 'outcome', completionAuthority: false, executionAuthority: false, entries: [
+  assert.deepEqual(response.body, { schemaVersion: 1, projectId: 'outcome', checkedAtMs: now, completionAuthority: false, executionAuthority: false, entries: [
     { id: 'workspace_api', state: 'access_verified', observedAtMs: now },
     ...['execution_observer', 'mcp', 'provider_api', 'cli', 'environment', 'deployment'].map(id => ({ id, state: 'not_observed', observedAtMs: null })),
   ] })

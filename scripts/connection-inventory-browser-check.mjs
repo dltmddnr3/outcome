@@ -36,12 +36,12 @@ try {
    if (url.includes('/api/private/connections/')) {
     reads++
     if (denied) return route.fulfill({ status: 401, json: { error: 'session_revoked' } })
-    return route.fulfill({ json: { schemaVersion: 1, projectId: url.split('/').at(-1), completionAuthority: false, executionAuthority: false,
+    return route.fulfill({ json: { schemaVersion: 1, projectId: url.split('/').at(-1), checkedAtMs: 20000, completionAuthority: false, executionAuthority: false,
      entries: ['workspace_api', 'execution_observer', 'mcp', 'provider_api', 'cli', 'environment', 'deployment'].map((id, i) => ({ id, state: i === 0 ? 'access_verified' : 'not_observed', observedAtMs: i === 0 ? 20000 : null })) } })
    }
    return route.continue()
   })
-  await page.clock.install({ time: new Date(20000) })
+  await page.clock.install({ time: new Date(18000) }) // Server clock is two seconds ahead.
   await page.goto(origin); await page.locator('summary').waitFor()
   assert.equal(reads, 0)
   await page.locator('summary').click(); await page.getByText('접근 확인됨 · 이 조회 기준', { exact: false }).waitFor()
