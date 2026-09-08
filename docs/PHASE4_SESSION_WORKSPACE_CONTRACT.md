@@ -50,6 +50,8 @@ These are program responsibilities, not new agents, schedules or products. The c
 
 #### Restart delivery readback correction · 2026-09-09
 
+AP-4-06 structural evidence prerequisite: before reserving or beginning qa_verifying/release_verifying, the terminal record must contain a syntactically valid evidence reference, even if an injected eligibility verifier returns true. This is only a necessary condition; a digest does not prove artifact content, issuer, authority or PASS. CHECK: missing-stage-evidence continuation regression plus journal/observer suites. EXPECT: zero reservations and zero dispatch on absent evidence. EVIDENCE: RED reproduced 2026-09-09 (missing reference incorrectly acknowledged); GREEN 21 tests passed including both implementing-to-QA and QA-to-release checks, diff check PASS. No live activation or full evidence-verifier claim.
+
 Scope: M4-1/AP-4-04 and AP-4-07. Preserve the current UI/design. When an exact existing continuation reservation is found after eligibility and source checks, read its durable dispatch outcome. A stored acknowledgement is delivery evidence only, never execution start or stage acceptance. Stored unknown remains unknown; reserved or dispatch_started remains reconciliation_required. No resend or result write is permitted on this recovery path. Original action/candidate/authority mismatches remain fail-closed.
 
 CHECK: node --test server/outcome-work-continuation.test.mjs server/outcome-work-journal.test.mjs

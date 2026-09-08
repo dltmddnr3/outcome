@@ -10,15 +10,31 @@ const time=20000,scope={projectId:'outcome',workId:'work-a',runId:'run-a',sessio
 const commit='a'.repeat(40),tree='b'.repeat(40),authority='c'.repeat(64),receipt='d'.repeat(64)
 const input=JSON.stringify({scopeJson,expectedSequence:3,candidateCommit:commit,candidateTree:tree,authorityRef:authority,action:'qa_verifying'})
 const ack=JSON.stringify({delivery:'acknowledged',sourceDigest:receipt})
-function setup(){
+function setup({evidenceRef=receipt}={}){
   const db=new DatabaseSync(':memory:'),journal=createWorkJournal(db)
   const first={sequence:1,observedAt:new Date(time-1000).toISOString(),stage:'queued',attempt:1,activity:'waiting',candidateCommit:null,candidateTree:null,evidenceRef:null,nextAction:null,blocker:null}
-  const last={...first,sequence:3,stage:'implementing',activity:'terminal',candidateCommit:commit,candidateTree:tree,evidenceRef:receipt,nextAction:'qa_verifying'}
+  const last={...first,sequence:3,stage:'implementing',activity:'terminal',candidateCommit:commit,candidateTree:tree,evidenceRef,nextAction:'qa_verifying'}
   journal.append(scopeJson,JSON.stringify(first),0,time)
   journal.append(scopeJson,JSON.stringify({...first,sequence:2,stage:'implementing',activity:'running'}),1,time)
   journal.append(scopeJson,JSON.stringify(last),2,time)
   return {db,journal,last,options:{enabled:true,journal,verifyEligibility:async()=>true,dispatch:async()=>ack,now:()=>time}}
 }
+test('missing stage evidence cannot dispatch even when eligibility port erroneously permits it',async()=>{
+  for(const action of ['qa_verifying','release_verifying']){
+    const s=setup({evidenceRef:action==='qa_verifying'?null:receipt});let sends=0
+    try{
+      let request=input
+      if(action==='release_verifying'){
+        s.journal.append(scopeJson,JSON.stringify({...s.last,sequence:4,stage:'qa_verifying',activity:'running',evidenceRef:null,nextAction:null}),3,time)
+        s.journal.append(scopeJson,JSON.stringify({...s.last,sequence:5,stage:'qa_verifying',evidenceRef:null,nextAction:action}),4,time)
+        request=JSON.stringify({...JSON.parse(input),expectedSequence:5,action})
+      }
+      const result=await create({...s.options,dispatch:async()=>{sends++;return ack}}).runOnce(request)
+      assert.notEqual(result.outcome,'acknowledged');assert.equal(sends,0)
+      assert.equal(s.db.prepare('SELECT count(*) AS n FROM outcome_work_reservations').get().n,0)
+    }finally{s.db.close()}
+  }
+})
 test('parallel controllers and reconstructed controller dispatch once; start is durable before transport',async()=>{
   const s=setup();let sends=0
   try{

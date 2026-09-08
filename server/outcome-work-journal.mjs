@@ -85,6 +85,7 @@ export function createWorkJournal(db) {
       const projection=projectSingleSessionWork(JSON.stringify(current.journal),bound.scopeJson,nowMs)
       if(current.sequence!==expectedSequence || projection.continuation!=='next_action_recorded'
         || last?.activity!=='terminal' || last.candidateCommit!==candidateCommit || last.candidateTree!==candidateTree) fail()
+      if(['qa_verifying','release_verifying'].includes(last.nextAction) && !sha(last.evidenceRef,64)) fail()
       const actionJson=JSON.stringify([bound.scopeJson,last.stage,last.attempt,last.nextAction,candidateCommit,candidateTree,authorityRef])
       const reservationDigest=digest(actionJson)
       const existing=db.prepare('SELECT reservation_digest,action_json FROM outcome_work_reservations WHERE project_id=? AND work_id=? AND stage=? AND attempt=?')
@@ -98,6 +99,7 @@ export function createWorkJournal(db) {
       const projection=projectSingleSessionWork(JSON.stringify(current.journal),bound.scopeJson,nowMs)
       if(current.sequence!==expectedSequence || projection.continuation!=='next_action_recorded' || last.nextAction==='awaiting_owner'
         || JSON.stringify([bound.scopeJson,last.stage,last.attempt,last.nextAction,last.candidateCommit,last.candidateTree,action[6]])!==JSON.stringify(action)) fail()
+      if(['qa_verifying','release_verifying'].includes(last.nextAction) && !sha(last.evidenceRef,64)) fail()
       const existing=db.prepare('SELECT state FROM outcome_work_dispatches WHERE reservation_digest=?').get(reservationDigest)
       if(existing) return Object.freeze({outcome:'already_started'})
       db.prepare("INSERT INTO outcome_work_dispatches VALUES(?,'dispatch_started',NULL)").run(reservationDigest)
