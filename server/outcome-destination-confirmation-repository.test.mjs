@@ -15,6 +15,35 @@ import {createDestinationHostedRuntimeFactory} from './outcome-destination-hoste
 
 const scope={workspaceId:'workspace',accountRef:'owner',draftId:'00000000-0000-4000-8000-000000000001'}
 const requestId='00000000-0000-4000-8000-000000000010'
+test('trusted inspection reads pending snapshot without verification, writes or inferred readiness',async()=>{
+ const f=await fixture({unknowns:['technical review pending'],coverage:[]});try{
+  const repo=createDestinationConfirmationRepository({transact:f.transact})
+  const inspected=await repo.inspect(scope)
+  assert.deepEqual(inspected.blockers,['residual_unknowns','coverage_or_material_gap'])
+  assert.equal(inspected.verificationState,'unverified');assert.equal(inspected.completionAuthority,false);assert.equal(inspected.executionAuthority,false)
+  assert.equal(createHash('sha256').update(inspected.serializedSnapshot).digest('hex'),inspected.reviewDigest)
+  const snapshot=JSON.parse(inspected.serializedSnapshot)
+  assert.deepEqual(snapshot.document.unknowns,['technical review pending']);assert.deepEqual(snapshot.questionReceipt.coverage,[])
+  assert.equal(await f.count(),0);assert.equal(f.verifications(),0)
+  await assert.rejects(()=>repo.review(scope));await assert.rejects(()=>repo.confirm({...scope,requestId,confirmed:true,reviewDigest:inspected.reviewDigest}))
+  await assert.rejects(()=>repo.inspect({...scope,accountRef:'other'}))
+  assert.equal(await f.count(),0)
+ }finally{await f.db.close()}
+})
+test('inspection digest is identical to verified review but cannot substitute for the verifier',async()=>{
+ const f=await fixture();try{
+  const repo=createDestinationConfirmationRepository(f),inspected=await repo.inspect(scope)
+  assert.deepEqual(inspected.blockers,[]);assert.equal(inspected.verificationState,'unverified');assert.equal(f.verifications(),0)
+  const review=await repo.review(scope)
+  assert.equal(review.reviewDigest,inspected.reviewDigest);assert.equal(f.verifications(),1);assert.equal(await f.count(),0)
+  await f.db.query('delete from outcome_destination_private.discovery_question_receipts')
+  const missing=await repo.inspect(scope)
+  assert.deepEqual(missing.blockers,['question_receipt_missing']);assert.equal(JSON.parse(missing.serializedSnapshot).questionReceipt,null)
+  await assert.rejects(()=>repo.review(scope));assert.equal(f.verifications(),1)
+  await f.drafts.save({...scope,requestId:'00000000-0000-4000-8000-000000000099',expectedRevision:1,document:JSON.stringify({...f.document,answers:{...f.document.answers,scope:'changed'}})})
+  await assert.rejects(()=>repo.inspect(scope));assert.equal(await f.count(),0)
+ }finally{await f.db.close()}
+})
 test('hosted factory composes explicit source readers with restricted confirmation SQL',async()=>{
  const f=await fixture();try{
   const original='Synthetic checked technical contract',contentDigest=createHash('sha256').update(original).digest('hex')
@@ -177,7 +206,10 @@ test('unknowns, missing technical coverage and unanswered material contradiction
  const question={id:'q-1',gapId:'owner',domain:'system_boundary',prompt:'누가 사용하나요?',choices:['소유자','팀'],recommendation:'소유자',reason:'사용자 결정',material:true}
  for(const options of [{unknowns:['미결정']},{coverage:[]},{questions:[question]}]){
   const f=await fixture(options);try{
-   await assert.rejects(()=>createDestinationConfirmationRepository(f).review(scope))
+   const repo=createDestinationConfirmationRepository(f),inspection=await repo.inspect(scope)
+   assert.ok(inspection.blockers.length>0);assert.equal(inspection.verificationState,'unverified')
+   assert.deepEqual(JSON.parse(inspection.serializedSnapshot).questionReceipt.questions,options.questions??[])
+   await assert.rejects(()=>repo.review(scope))
    assert.equal(f.verifications(),0);assert.equal(await f.count(),0)
   }finally{await f.db.close()}
  }

@@ -26,21 +26,30 @@ export function createDestinationConfirmationRepository({transact,verifyReview}=
    return work(query,scope)
   })
  }
- const prepare=async(query,scope)=>{
-  if(typeof verifyReview!=='function')fail()
+ const readSnapshot=async(query,scope)=>{
   const discovery=(await query('select * from outcome_destination_private.discovery_drafts where workspace_id=$1 and account_ref=$2 and draft_id=$3 for update',scope)).rows[0]
   const intake=(await query('select * from outcome_destination_private.drafts where workspace_id=$1 and account_ref=$2 and draft_id=$3 for share',scope)).rows[0]
   if(!discovery||!intake||discovery.intake_revision!==intake.revision||discovery.state!=='draft'||discovery.completion_authority!==false)fail()
   const document=parseDestinationDraft(JSON.stringify(intake.document)),context=parseDiscoveryContext(JSON.stringify(discovery.context))
-  if(fields.some(k=>!document.answers[k])||document.unknowns.length||context.unknowns.length||context.revision!==discovery.revision||discoveryContextDigest(context)!==discovery.context_digest)fail()
-  if(context.askedQuestionIds.some(id=>!context.answers.some(answer=>answer.questionId===id)))fail()
+  if(context.revision!==discovery.revision||discoveryContextDigest(context)!==discovery.context_digest)fail()
   if(canonical(document)!==canonical({schemaVersion:1,mode:context.mode,source:context.source,answers:context.seedAnswers,unknowns:context.unknowns}))fail()
   const row=(await query('select * from outcome_destination_private.discovery_question_receipts where workspace_id=$1 and account_ref=$2 and draft_id=$3 and context_digest=$4',[...scope,discovery.context_digest])).rows[0]
-  if(!row||row.context_revision!==discovery.revision||!digest(row.response_source_digest))fail()
-  const checked=validateDestinationQuestionReceipt({serializedContext:JSON.stringify(context),serializedReceipt:JSON.stringify(row.receipt)})
-  if(checked.plan.state!=='coverage_ready_for_review'||checked.plan.unresolvedDomains.length||checked.plan.batch.length)fail()
-  const snapshot={schemaVersion:1,draftId:scope[2],intakeRevision:intake.revision,contextRevision:discovery.revision,contextDigest:discovery.context_digest,document,context,questionReceipt:checked.receipt,responseSourceDigest:row.response_source_digest,completionAuthority:false,executionAuthority:false}
+  if(row&&(row.context_revision!==discovery.revision||!digest(row.response_source_digest)))fail()
+  const checked=row?validateDestinationQuestionReceipt({serializedContext:JSON.stringify(context),serializedReceipt:JSON.stringify(row.receipt)}):null
+  const blockers=[]
+  if(fields.some(k=>!document.answers[k]))blockers.push('intake_incomplete')
+  if(document.unknowns.length||context.unknowns.length)blockers.push('residual_unknowns')
+  if(context.askedQuestionIds.some(id=>!context.answers.some(answer=>answer.questionId===id)))blockers.push('issued_answers_missing')
+  if(!checked)blockers.push('question_receipt_missing')
+  else if(checked.plan.state!=='coverage_ready_for_review'||checked.plan.unresolvedDomains.length||checked.plan.batch.length)blockers.push('coverage_or_material_gap')
+  const snapshot={schemaVersion:1,draftId:scope[2],intakeRevision:intake.revision,contextRevision:discovery.revision,contextDigest:discovery.context_digest,document,context,questionReceipt:checked?.receipt??null,responseSourceDigest:row?.response_source_digest??null,completionAuthority:false,executionAuthority:false}
   const serialized=canonical(snapshot),reviewDigest=hash(serialized)
+  return {snapshot,serialized,reviewDigest,blockers}
+ }
+ const prepare=async(query,scope)=>{
+  if(typeof verifyReview!=='function')fail()
+  const {snapshot,serialized,reviewDigest,blockers}=await readSnapshot(query,scope)
+  if(blockers.length)fail()
   const raw=await verifyReview({workspaceId:scope[0],accountRef:scope[1],reviewDigest,serializedSnapshot:serialized,query})
   if(typeof raw!=='string'||Buffer.byteLength(raw)>2048)fail()
   let proof;try{proof=JSON.parse(raw)}catch{fail()}
@@ -48,6 +57,12 @@ export function createDestinationConfirmationRepository({transact,verifyReview}=
   return {snapshot,reviewDigest,evidenceDigest:proof.evidenceDigest}
  }
  return Object.freeze({
+  // Private assessment input only; never route this method to a browser API.
+  // Empty structural blockers still mean unverified, not source-ready.
+  inspect:input=>run(input,async(query,scope)=>{
+   const value=await readSnapshot(query,scope)
+   return {serializedSnapshot:value.serialized,reviewDigest:value.reviewDigest,blockers:value.blockers,verificationState:'unverified',completionAuthority:false,executionAuthority:false}
+  }),
   load:input=>run(input,async(query,scope)=>project((await query('select * from outcome_destination_private.confirmations where workspace_id=$1 and account_ref=$2 and draft_id=$3',scope)).rows[0])),
   review:input=>run(input,async(query,scope)=>{
    const ready=await prepare(query,scope)
