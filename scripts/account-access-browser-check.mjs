@@ -123,6 +123,8 @@ try {
     const context = await browser.newContext({ viewport: { width: 390, height: 844 }, reducedMotion: 'reduce' })
     const page = await context.newPage()
     let browserErrors = 0
+    // This fixture tests observed role lenses, not the separately verified durable chat service.
+    await page.route('**/api/private/chat/timeline?*', route => route.fulfill({ json: { events: [], csrf: null, target: { role: 'planner', binding_version: 1 }, completion_authority: false } }))
     page.on('pageerror', () => { browserErrors += 1 })
     page.on('console', (message) => { if (message.type() === 'error') browserErrors += 1 })
     await page.route('**/api/private/config', (route) => route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ enabled: true, access: 'private_read_only', providers: [], sessionMaximumDays: 7, completionAuthority: false }) }))
@@ -130,6 +132,10 @@ try {
     await page.route('**/api/private/workspace', (route) => route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ workspace: { viewState: 'ready', projects: hostileProjects, dashboard: readyDashboard } }) }))
     await page.goto(`${base}/workspace`)
     await page.locator('.current-projection').waitFor()
+    const compatibility = page.locator('details.oc-v1-compatibility')
+    if (await compatibility.count() && await compatibility.getAttribute('open') === null) await compatibility.locator(':scope > summary').click()
+    const conversationTab = page.getByRole('navigation', { name: '모바일 작업공간' }).getByRole('button', { name: '대화', exact: true })
+    if (await conversationTab.isVisible()) await conversationTab.click()
     for (const [index, label] of ['Planner', 'Builder', 'UX & Product QA', 'Release Audit'].entries()) {
       await page.getByRole('button', { name: label, exact: true }).click()
       const event = page.locator(`[data-event-id="${roleEvents[index].id}"]`)
