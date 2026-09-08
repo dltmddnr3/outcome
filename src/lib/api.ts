@@ -3,6 +3,7 @@ import type { OutcomeDashboardData } from '../components/OutcomeDashboard'
 import {destinationQuestions} from './destination-discovery'
 import {destinationSourceSha256,validateDestinationAnalysis,type DestinationProposal} from './destination-analysis'
 import {discoveryContextDigest,validateDiscoveryQuestionReceipt,type DiscoveryContext} from './destination-question-receipt'
+import { parseConnectionInventory } from './connection-inventory'
 
 type Session = { authenticated: boolean; publicReadOnly?: boolean }
 export type PrivateAccessConfig = { enabled: boolean; access: 'private_read_only'; providers: Array<{ id: string; mode: string }>; sessionMaximumDays: number; completionAuthority: false; publishableKey?: string }
@@ -46,6 +47,12 @@ export function subscribePrivateAccessFailure(listener: (code: string) => void) 
 type ObservationBinding = { projects: string[]; bearer?: string; refreshCredential?: () => Promise<string | null> }
 let privateObservationBinding: ObservationBinding | null = null
 export function captureWorkObservationReader(projectId: string) {
+ return captureProjectObservationReader(projectId, 'work-observation')
+}
+export function captureConnectionInventoryReader(projectId: string) {
+ return captureProjectObservationReader(projectId, 'connections')
+}
+function captureProjectObservationReader(projectId: string, resource: 'work-observation' | 'connections') {
  const binding = privateObservationBinding, generation = privateDecisionBindingVersion
  if (!binding || !['outcome', 'cherry-note'].includes(projectId) || !binding.projects.includes(projectId)) return null
  return async (signal: AbortSignal): Promise<unknown> => {
@@ -62,9 +69,14 @@ export function captureWorkObservationReader(projectId: string) {
     token = refreshed
    }
    check()
-   const response = await fetch(`/api/private/work-observation/${projectId}`, { credentials: 'same-origin', cache: 'no-store', headers: privateSessionHeaders(token), signal })
+   const response = await fetch(`/api/private/${resource}/${projectId}`, { credentials: 'same-origin', cache: 'no-store', headers: privateSessionHeaders(token), signal })
    const value = await readJson<{ projectId: string; observation: unknown; completionAuthority: false }>(response)
    check()
+   if (resource === 'connections') {
+    const inventory = parseConnectionInventory(value, projectId)
+    if (!inventory) throw Error()
+    return inventory
+   }
    if (!value || Object.keys(value).sort().join(',') !== 'completionAuthority,observation,projectId' || value.projectId !== projectId || value.completionAuthority !== false) throw Error()
    return value.observation
   } catch (error) {
