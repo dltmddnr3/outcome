@@ -3,6 +3,30 @@ const unavailable = () => { throw new Error('decision_store_unavailable') }
 const iso = (value) => value instanceof Date ? value.toISOString() : value
 const decision = (row) => row ? { ...row, id: row.decision_id, event_sequence: Number(row.event_sequence), revision: Number(row.revision), supersedes_revision: row.supersedes_revision === null ? null : Number(row.supersedes_revision), decided_at: iso(row.decided_at) } : null
 
+export function createDecisionTransactionPort({ pool } = {}) {
+  if (!pool || typeof pool.connect !== 'function') unavailable()
+  return async (work) => {
+    if (typeof work !== 'function') unavailable()
+    let client
+    try {
+      client = await pool.connect()
+      if (!client || typeof client.query !== 'function' || typeof client.release !== 'function') unavailable()
+      await client.query('BEGIN')
+      await client.query('SET LOCAL ROLE outcome_decision_backend')
+      const identity = (await client.query('select session_user, current_user')).rows[0]
+      if (identity?.session_user !== 'outcome_decision_runtime' || identity?.current_user !== 'outcome_decision_backend') unavailable()
+      const result = await work({ query: (sql, args) => client.query(sql, args) })
+      await client.query('COMMIT')
+      return result
+    } catch {
+      if (client) try { await client.query('ROLLBACK') } catch {}
+      unavailable()
+    } finally {
+      if (client) try { client.release() } catch {}
+    }
+  }
+}
+
 export function createDecisionPostgresStore({ transact, workspaceId, projectId, now = Date.now } = {}) {
   if (typeof transact !== 'function' || ![workspaceId, projectId].every((id) => typeof id === 'string' && /^[a-z0-9]+(?:[-_][a-z0-9]+)*$/.test(id))) unavailable()
   const scope = (workspace, project = projectId) => { if (workspace !== workspaceId || project !== projectId) unavailable() }
