@@ -147,7 +147,15 @@ export async function requestDestinationQuestions(discovery:StoredDiscovery):Pro
  if(binding!==privateDestinationBinding||generation!==privateDecisionBindingVersion)throw Error('destination_identity_changed')
  return receipt
 }
-export async function requestDestinationDiscovery(intake:StoredDestinationDraft,save?:{expectedRevision:number;context:DiscoveryContext}):Promise<StoredDiscovery|null> {
+export async function requestDestinationDiscovery(intake:StoredDestinationDraft,save?:{expectedRevision:number;context:DiscoveryContext},signal?:AbortSignal):Promise<StoredDiscovery|null> {
+ return readOrSaveDiscovery(intake,save,false,signal)
+}
+export async function requestPreviousDestinationDiscovery(intake:StoredDestinationDraft):Promise<{previous:StoredDiscovery;readOnly:true}|null>{
+ const currentRevision=intake.revision
+ const value=await readOrSaveDiscovery(intake,undefined,true)
+ return value&&value.intakeRevision<currentRevision?{previous:value,readOnly:true}:null
+}
+async function readOrSaveDiscovery(intake:StoredDestinationDraft,save?:{expectedRevision:number;context:DiscoveryContext},allowPrevious=false,signal?:AbortSignal):Promise<StoredDiscovery|null> {
  const binding=privateDestinationBinding,generation=privateDecisionBindingVersion
  const fail=():never=>{throw Error('discovery_response_invalid')}
  if(!binding||intake.draftId!==activeDestinationDraftId)throw Error('destination_unavailable')
@@ -164,16 +172,18 @@ export async function requestDestinationDiscovery(intake:StoredDestinationDraft,
  }
  if(binding!==privateDestinationBinding||generation!==privateDecisionBindingVersion)throw Error('destination_identity_changed')
  const sessionHeaders=await destinationSessionHeaders(binding,generation)
- const response=await fetch(`/api/private/destination/discovery/${activeDestinationDraftId}`,{method:submitted?'PUT':'GET',credentials:'same-origin',headers:{...sessionHeaders,...(submitted?{'content-type':'application/json','x-outcome-csrf':binding.csrf}:{})},...(body?{body}:{})})
+ signal?.throwIfAborted()
+ const response=await fetch(`/api/private/destination/discovery/${activeDestinationDraftId}`,{method:submitted?'PUT':'GET',credentials:'same-origin',signal,headers:{...sessionHeaders,...(submitted?{'content-type':'application/json','x-outcome-csrf':binding.csrf}:{})},...(body?{body}:{})})
  const value=await readJson<unknown>(response)
+ signal?.throwIfAborted()
  const exact=(v:unknown,keys:string[]):v is Record<string,unknown>=>!!v&&typeof v==='object'&&!Array.isArray(v)&&Object.keys(v).length===keys.length&&keys.every(k=>Object.hasOwn(v,k))
  if(!exact(value,['discovery','completionAuthority'])||value.completionAuthority!==false)return fail()
  let stored:StoredDiscovery|null=null
  if(value.discovery!==null){
   const row=value.discovery
-  if(!exact(row,['draftId','revision','intakeRevision','context','contextDigest','state','completionAuthority'])||row.draftId!==pinned.draftId||row.intakeRevision!==pinned.revision||!Number.isSafeInteger(row.revision)||Number(row.revision)<1||row.state!=='draft'||row.completionAuthority!==false||!exact(row.context,['source','mode','seedAnswers','unknowns','answers','askedQuestionIds','revision']))return fail()
+  if(!exact(row,['draftId','revision','intakeRevision','context','contextDigest','state','completionAuthority'])||row.draftId!==pinned.draftId||!Number.isSafeInteger(row.intakeRevision)||Number(row.intakeRevision)<1||Number(row.intakeRevision)>pinned.revision||(!allowPrevious&&row.intakeRevision!==pinned.revision)||!Number.isSafeInteger(row.revision)||Number(row.revision)<1||row.state!=='draft'||row.completionAuthority!==false||!exact(row.context,['source','mode','seedAnswers','unknowns','answers','askedQuestionIds','revision']))return fail()
   const context=row.context as DiscoveryContext
-  if(context.revision!==row.revision||row.contextDigest!==await discoveryContextDigest(context)||!await matchesIntake(context))return fail()
+  if(context.revision!==row.revision||row.contextDigest!==await discoveryContextDigest(context)||(row.intakeRevision===pinned.revision&&!await matchesIntake(context)))return fail()
   stored=row as StoredDiscovery
  }
  if(binding!==privateDestinationBinding||generation!==privateDecisionBindingVersion)throw Error('destination_identity_changed')

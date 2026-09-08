@@ -1,11 +1,32 @@
 import {afterEach,expect,it,vi} from 'vitest'
-import {activeDestinationDraftId,captureDestinationReviewBinding,fetchPrivateWorkspace,requestDestinationDiscovery,requestDestinationQuestions,requestDestinationQuestionRun,requestDestinationDecisionReview,type StoredDestinationDraft,type StoredDiscovery} from './api'
+import {activeDestinationDraftId,captureDestinationReviewBinding,fetchPrivateWorkspace,requestPreviousDestinationDiscovery,requestDestinationDiscovery,requestDestinationQuestions,requestDestinationQuestionRun,requestDestinationDecisionReview,type StoredDestinationDraft,type StoredDiscovery} from './api'
 import {discoveryContextDigest,type DiscoveryContext} from './destination-question-receipt'
 afterEach(()=>vi.unstubAllGlobals())
 const intake:StoredDestinationDraft={draftId:activeDestinationDraftId,revision:1,document:{schemaVersion:1,mode:'guided_200q',source:'',answers:{problem:'문제'},unknowns:['검증 필요']},state:'draft',completionAuthority:false}
 const context:DiscoveryContext={source:'',mode:'guided_200q',seedAnswers:{problem:'문제'},unknowns:['검증 필요'],revision:1,answers:[{questionId:'q-1',gapId:'gap-1',value:'소유자'}],askedQuestionIds:['q-1']}
 const row=async()=>({draftId:activeDestinationDraftId,revision:1,intakeRevision:1,context,contextDigest:await discoveryContextDigest(context),state:'draft',completionAuthority:false})
 const workspace=()=>new Response('{"workspace":{}}',{headers:{'x-outcome-destination-csrf':'synthetic-discovery'}})
+it('keeps old discovery read-only and does not weaken strict current loading',async()=>{
+ const stored=await row(),current={...intake,revision:2,document:{...intake.document,answers:{problem:'changed'}}}
+ const mock=vi.fn().mockImplementation((url:string)=>Promise.resolve(url.endsWith('/workspace')?workspace():new Response(JSON.stringify({discovery:stored,completionAuthority:false}))))
+ vi.stubGlobal('fetch',mock);await fetchPrivateWorkspace('owner')
+ await expect(requestDestinationDiscovery(current)).rejects.toThrow('discovery_response_invalid')
+ expect(await requestPreviousDestinationDiscovery(current)).toEqual({previous:stored,readOnly:true})
+ expect(mock.mock.calls.slice(1).every(([,options])=>options.method==='GET')).toBe(true)
+ for(const invalid of [{...stored,intakeRevision:3},{...stored,contextDigest:'forged'},{...stored,completionAuthority:true}]){
+  mock.mockImplementation((url:string)=>Promise.resolve(url.endsWith('/workspace')?workspace():new Response(JSON.stringify({discovery:invalid,completionAuthority:false}))))
+  await expect(requestPreviousDestinationDiscovery(current)).rejects.toThrow('discovery_response_invalid')
+ }
+})
+it('cancels a prepared discovery update before dispatch if the review closes during credential refresh',async()=>{
+ let release!:(v:string)=>void,started!:()=>void
+ const entered=new Promise<void>(resolve=>{started=resolve})
+ const mock=vi.fn().mockImplementation(()=>Promise.resolve(workspace()))
+ vi.stubGlobal('fetch',mock);await fetchPrivateWorkspace('owner',()=>new Promise<string>(resolve=>{release=resolve;started()}))
+ const controller=new AbortController(),pending=requestDestinationDiscovery(intake,{expectedRevision:0,context:{...context,answers:[],askedQuestionIds:[]}},controller.signal)
+ await entered;controller.abort();release('owner')
+ await expect(pending).rejects.toThrow();expect(mock).toHaveBeenCalledTimes(1)
+})
 it('reads exact current decision pairs without accepting changed values, source revision or authority',async()=>{
  const stored={...await row(),revision:2,context:{...context,revision:2}} as StoredDiscovery
  stored.contextDigest=await discoveryContextDigest(stored.context)
