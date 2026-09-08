@@ -84,6 +84,17 @@ export async function handlePrivateAccessRequest({ method = 'GET', pathname = '/
   }
   if (method !== 'GET') return response(405, { error: 'read_only' })
   if (pathname === '/api/private/config') return response(200, privateAccessPublicConfig(Boolean(service)))
+  const observationPath = /^\/api\/private\/work-observation\/(outcome|cherry-note)$/.exec(pathname)
+  if (observationPath) {
+    const headers = { 'cache-control': 'private, no-store', vary: 'Cookie, Authorization' }
+    if (!service) return response(401, { error: 'authentication_required' }, headers)
+    try {
+      return response(200, await service.readWorkObservation({ token, requestedProjectId: observationPath[1] }), headers)
+    } catch (error) {
+      if (error instanceof AccountAccessError) return response(error.status, { error: error.code }, headers)
+      return response(503, { error: 'work_observation_unavailable' }, headers)
+    }
+  }
   if (pathname !== '/api/private/workspace') return response(404, { error: 'not_found' })
   if (!service) return response(401, { error: 'authentication_required' })
   try {

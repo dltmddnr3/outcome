@@ -240,6 +240,11 @@ export function createStableHostRequestHandler({ environment = process.env, runt
         return error?.status ? result(error.status, { error: error.code }) : result(503, { error: 'private_workspace_unavailable' })
       }
     }
+    // Observation refresh must not initialize mutation runtimes or refresh
+    // workspace/decision/Destination bindings. Missing producer stays unknown.
+    if (pathname.startsWith('/api/private/work-observation/')) {
+      return handlePrivateAccessRequest({ method, pathname, token: privateSessionToken(headers), service: hosted.service })
+    }
     const destinationPath = /^\/api\/private\/destination\/(drafts|analysis|discovery|questions|question-requests|review|confirmation-review|confirmations)\//.test(pathname)
     if ((method === 'GET' && pathname === '/api/private/workspace') || pathname === '/api/private/decisions' || destinationPath) {
       const token = privateSessionToken(headers)

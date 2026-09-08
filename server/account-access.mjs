@@ -99,7 +99,7 @@ export function createAccountAccessService({ authProvider, store, ownerSubject, 
   if (!authProvider?.verify || !store || !ownerSubject) throw new Error('account_access_configuration_missing')
 
   const authenticate = (token) => verifyIdentity({ authProvider, token, ownerSubject, now })
-  return {
+  const service = {
     authenticationOptions: () => [
       { id: 'google', mode: 'primary' },
       { id: 'apple', mode: 'linked_only' },
@@ -135,6 +135,13 @@ export function createAccountAccessService({ authProvider, store, ownerSubject, 
         workspace_id: workspace.id,
         project_ids: Object.freeze(projectIds),
       })
+    },
+    async readWorkObservation({ token, requestedProjectId } = {}) {
+      const authority = await service.resolveBridgeAuthority({ token })
+      if (!authority.project_ids.includes(requestedProjectId)) throw new AccountAccessError('project_access_denied', 403)
+      const observation = await readScopedWorkObservation({ readSource: workObservationSource,
+        accountRef: authority.account_ref, workspaceId: authority.workspace_id, projectId: requestedProjectId, now })
+      return { projectId: requestedProjectId, observation, completionAuthority: false }
     },
     async endSession({ token } = {}) {
       const identity = await authenticate(token)
@@ -181,6 +188,7 @@ export function createAccountAccessService({ authProvider, store, ownerSubject, 
       }
     },
   }
+  return service
 }
 
 const sanitizedIncident = (value, detectedAt) => ({ severity: value.severity, reasonCode: value.reasonCode, detectedAt })
