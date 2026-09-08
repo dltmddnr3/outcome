@@ -62,7 +62,7 @@ export function createCodexQueueAdapter({ enabled = false, registryPath, spawnPr
         const currentMatches = () => loadRegistry(registryPath).bindings.filter(row => row.project_id === expected.projectId && row.role === 'planner' && ['active','idle'].includes(row.status))
         const matches = currentMatches()
         if (matches.length !== 1 || matches[0].binding_version !== expected.version || matches[0].locator_ref !== locator) return { outcome:'unavailable' }
-        const json = await reader(locator)
+        const json = await reader(locator, { requestEnvelope:plannerRequestEnvelope(request.message, request.correlation_id) })
         const after = currentMatches()
         if (after.length !== 1 || after[0].binding_version !== expected.version || after[0].locator_ref !== locator) return { outcome:'unavailable' }
         return projectCompletedPlannerResponse({json,threadId:locator,message:request.message,correlationId:request.correlation_id})
