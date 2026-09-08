@@ -13,19 +13,19 @@ const errorCode=error=>{
  return Object.getOwnPropertyDescriptor(error,'message')?.value
 }
 export async function handleDestinationDraftRequest({method='GET',pathname='',token,identityService,runtime,headers={},body}={}){
- const match=/^\/api\/private\/destination\/(drafts|analysis|discovery|questions|question-requests|review|confirmation-review|confirmations)\/([a-f0-9]{8}(?:-[a-f0-9]{4}){3}-[a-f0-9]{12})$/.exec(pathname)
+ const match=/^\/api\/private\/destination\/(drafts|analysis|discovery|questions|question-requests|review|confirmation-review|confirmations|creations)\/([a-f0-9]{8}(?:-[a-f0-9]{4}){3}-[a-f0-9]{12})$/.exec(pathname)
  if(!match)return result(404,'not_found')
- const confirmation=match[1]==='confirmations',confirmationReview=match[1]==='confirmation-review'
+ const confirmation=match[1]==='confirmations',confirmationReview=match[1]==='confirmation-review',creation=match[1]==='creations'
  const analysis=match[1]==='analysis',discovery=match[1]==='discovery',questions=match[1]==='questions',questionRequest=match[1]==='question-requests',writeMethod=analysis||questionRequest||confirmation?'POST':'PUT'
  const review=match[1]==='review'
- if((questions||review||confirmationReview)&&method!=='GET')return result(405,'method_not_allowed')
+ if((questions||review||confirmationReview||creation)&&method!=='GET')return result(405,'method_not_allowed')
  if(!['GET',writeMethod].includes(method))return result(405,'method_not_allowed')
  if(!token||!identityService)return result(401,'authentication_required')
  let authority
  try{await identityService.authenticate(token);authority=await identityService.resolveBridgeAuthority({token})}catch{return result(403,'destination_access_denied')}
  if(!authority?.workspace_id||!authority?.account_ref||!authority?.project_ids?.includes('outcome'))return result(403,'destination_access_denied')
- const repository=confirmation||confirmationReview?runtime?.confirmationRepository:analysis?runtime?.analysisRepository:questionRequest?runtime?.questionRequests:questions||review?runtime?.questionRepository:discovery?runtime?.discoveryRepository:runtime?.repository
- if(!repository||typeof repository.load!=='function'||(review||confirmationReview)&&typeof repository.review!=='function'||!questions&&!review&&!confirmationReview&&typeof repository[confirmation?'confirm':analysis||questionRequest?'enqueue':'save']!=='function')return result(503,'destination_unavailable')
+ const repository=creation?runtime?.creationRepository:confirmation||confirmationReview?runtime?.confirmationRepository:analysis?runtime?.analysisRepository:questionRequest?runtime?.questionRequests:questions||review?runtime?.questionRepository:discovery?runtime?.discoveryRepository:runtime?.repository
+ if(!repository||typeof repository.load!=='function'||(review||confirmationReview)&&typeof repository.review!=='function'||!creation&&!questions&&!review&&!confirmationReview&&typeof repository[confirmation?'confirm':analysis||questionRequest?'enqueue':'save']!=='function')return result(503,'destination_unavailable')
  const scope={workspaceId:authority.workspace_id,accountRef:authority.account_ref,[analysis?'requestId':'draftId']:match[2]}
  if(method===writeMethod){
   if(headers['content-type']!=='application/json')return result(415,'content_type_invalid')
@@ -33,6 +33,13 @@ export async function handleDestinationDraftRequest({method='GET',pathname='',to
   if(!runtime.csrfSecret||!equal(headers['x-outcome-csrf'],runtime.csrfSecret))return result(403,'csrf_invalid')
  }
  try{
+  if(creation){
+   const raw=await repository.load(scope)
+   if(raw===null)return {status:200,body:{creation:null,completionAuthority:false}}
+   const value=data(raw,['projectId','state','completionAuthority','executionAuthority'])
+   if(!value||typeof value.projectId!=='string'||!/^destination-[a-f0-9]{64}$/.test(value.projectId)||value.state!=='package_registered'||value.completionAuthority!==false||value.executionAuthority!==false)return result(503,'destination_unavailable')
+   return {status:200,body:{creation:value,completionAuthority:false}}
+  }
   if(review)return {status:200,body:{review:await repository.review(scope),completionAuthority:false}}
   if(confirmationReview)return {status:200,body:{confirmationReview:await repository.review(scope),completionAuthority:false}}
   const field=confirmation?'confirmation':analysis?'analysis':questionRequest?'questionRequest':questions?'questions':discovery?'discovery':'draft'

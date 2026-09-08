@@ -1,5 +1,5 @@
 import {createHash} from 'node:crypto'
-import {closeSync,constants,existsSync,fsyncSync,fstatSync,linkSync,lstatSync,mkdtempSync,openSync,readFileSync,readdirSync,realpathSync,rmdirSync,unlinkSync,writeFileSync} from 'node:fs'
+import {closeSync,constants,fsyncSync,fstatSync,linkSync,lstatSync,mkdtempSync,openSync,readFileSync,readdirSync,realpathSync,rmdirSync,unlinkSync,writeFileSync} from 'node:fs'
 import {basename,join} from 'node:path'
 import YAML from 'yaml'
 import {validateDestinationPackageText} from './outcome-destination-postgres.mjs'
@@ -12,6 +12,7 @@ const digest=value=>typeof value==='string'&&/^[a-f0-9]{64}$/.test(value)
 const uuid=value=>typeof value==='string'&&/^[a-f0-9]{8}(?:-[a-f0-9]{4}){3}-[a-f0-9]{12}$/.test(value)
 const fail=()=>{throw Error('creation_catalog_unavailable')}
 const exact=(value,keys)=>value&&typeof value==='object'&&!Array.isArray(value)&&Object.keys(value).sort().join(',')===[...keys].sort().join(',')
+function registrationExists(path){try{lstatSync(path);return true}catch(error){if(error.code==='ENOENT')return false;throw error}}
 function privateDirectory(path){
  const stat=lstatSync(path)
  if(!stat.isDirectory()||(stat.mode&0o077)!==0||stat.uid!==process.getuid())fail()
@@ -48,13 +49,43 @@ export function readCreatedProjectEntries(path){
  }catch{fail()}
 }
 
+// HTTP exposes only this read capability. The request id comes from the scoped
+// confirmation, not from a browser-supplied local locator or publication body.
+export function createDestinationCreationReader({confirmationRepository,publisher}={}){
+ if(typeof confirmationRepository?.load!=='function'||typeof publisher?.load!=='function')fail()
+ return Object.freeze({async load(scope){
+  const confirmation=await confirmationRepository.load(scope)
+  if(!confirmation)return null
+  return publisher.load({...scope,requestId:confirmation.requestId})
+ }})
+}
+
 // All three dependencies are trusted host capabilities, never browser input.
 // A renderer override is a host-only capability. The default preserves the
 // verified snapshot; neither renderer invents a technical assessment.
 export function createConfirmedPackagePublisher({catalog,confirmationRepository,renderPackage=renderConfirmedDestinationPackage,checkpoint=()=>{}}={}){
  if(typeof catalog!=='string'||typeof confirmationRepository?.readConfirmedCreation!=='function'||typeof renderPackage!=='function'||typeof checkpoint!=='function')fail()
  const result=projectId=>({projectId,state:'package_registered',completionAuthority:false,executionAuthority:false})
- return Object.freeze({async publish(scope){
+ const prepare=async scope=>{
+  if(!scope||!['workspaceId','accountRef'].every(key=>typeof scope[key]==='string'&&/^[A-Za-z0-9:_-]{1,128}$/.test(scope[key]))||!uuid(scope.draftId)||!uuid(scope.requestId))fail()
+  scope=Object.freeze({workspaceId:scope.workspaceId,accountRef:scope.accountRef,draftId:scope.draftId,requestId:scope.requestId})
+  const input=await confirmationRepository.readConfirmedCreation(scope)
+  if(!input||input.draftId!==scope.draftId||input.requestId!==scope.requestId||input.completionAuthority!==false||input.executionAuthority!==false
+   ||!digest(input.reviewDigest)||!digest(input.evidenceDigest)||typeof input.serializedSnapshot!=='string'||Buffer.byteLength(input.serializedSnapshot)>8388608||hash(input.serializedSnapshot)!==input.reviewDigest)fail()
+  const root=privateDirectory(catalog),key=hash(JSON.stringify([scope.workspaceId,scope.accountRef,scope.draftId])),projectId=`destination-${key}`,target=join(root,`${key}.json`)
+  const same=()=>{const prior=readEntry(root,key).record;if(prior.reviewDigest!==input.reviewDigest||prior.evidenceDigest!==input.evidenceDigest)fail();return result(projectId)}
+  return {input,root,key,projectId,target,same}
+ }
+ return Object.freeze({
+ async load(scope){
+  try{
+   const {target,same}=await prepare(scope)
+   // Absence is not a queued job or an automatic-retry authorization. No render,
+   // directory creation or publication occurs while recovering an unknown reply.
+   return registrationExists(target)?same():null
+  }catch{fail()}
+ },
+ async publish(scope){
   let attempt=null,published=false,root,owned={}
   const clean=()=>{
    if(!attempt)return
@@ -67,16 +98,9 @@ export function createConfirmedPackagePublisher({catalog,confirmationRepository,
    rmdirSync(attempt);attempt=null
   }
   try{
-   if(!scope||!['workspaceId','accountRef'].every(key=>typeof scope[key]==='string'&&/^[A-Za-z0-9:_-]{1,128}$/.test(scope[key]))||!uuid(scope.draftId)||!uuid(scope.requestId))fail()
-   scope=Object.freeze({workspaceId:scope.workspaceId,accountRef:scope.accountRef,draftId:scope.draftId,requestId:scope.requestId})
    // No disk mutation until the repository revalidates the actual confirmation.
-   const input=await confirmationRepository.readConfirmedCreation(scope)
-   if(!input||input.draftId!==scope.draftId||input.requestId!==scope.requestId||input.completionAuthority!==false||input.executionAuthority!==false
-    ||!digest(input.reviewDigest)||!digest(input.evidenceDigest)||typeof input.serializedSnapshot!=='string'||Buffer.byteLength(input.serializedSnapshot)>8388608||hash(input.serializedSnapshot)!==input.reviewDigest)fail()
-   root=privateDirectory(catalog)
-   const key=hash(JSON.stringify([scope.workspaceId,scope.accountRef,scope.draftId])),projectId=`destination-${key}`,target=join(root,`${key}.json`)
-   const same=()=>{const prior=readEntry(root,key).record;if(prior.reviewDigest!==input.reviewDigest||prior.evidenceDigest!==input.evidenceDigest)fail();return result(projectId)}
-   if(existsSync(target))return same()
+   const prepared=await prepare(scope),{input,key,projectId,target,same}=prepared;root=prepared.root
+   if(registrationExists(target))return same()
    const files=await renderPackage({projectId,serializedSnapshot:input.serializedSnapshot})
    if(!exact(files,names)||names.some(name=>typeof files[name]!=='string'||Buffer.byteLength(files[name])>8388608))fail()
    // Existing intake privacy rules apply before any candidate bytes reach disk.

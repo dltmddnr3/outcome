@@ -7,6 +7,21 @@ const path='/api/private/destination/drafts/00000000-0000-4000-8000-000000000001
 const identityService={authenticate:async()=>({subject:'owner'}),resolveBridgeAuthority:async()=>({workspace_id:'workspace',account_ref:'account',project_ids:['outcome']})}
 const headers={'content-type':'application/json',origin:'https://preview.invalid','x-outcome-csrf':'synthetic-csrf'}
 const body=JSON.stringify({requestId:'00000000-0000-4000-8000-000000000002',expectedRevision:0,document:'{}'})
+test('creation result GET is owner-scoped and finite; no publication or private receipt leaks',async()=>{
+ let reads=0
+ const creation={projectId:`destination-${'a'.repeat(64)}`,state:'package_registered',completionAuthority:false,executionAuthority:false}
+ const runtime={creationRepository:{load:async scope=>{reads++;assert.deepEqual(scope,{workspaceId:'workspace',accountRef:'account',draftId:path.split('/').at(-1)});return creation},publish:()=>{throw Error('forbidden')}}}
+ const request={pathname:path.replace('/drafts/','/creations/'),token:'valid',identityService,runtime}
+ assert.deepEqual(await handle(request),{status:200,body:{creation,completionAuthority:false}})
+ for(const method of ['POST','PUT','DELETE'])assert.equal((await handle({...request,method,body:'{}'})).status,405)
+ assert.equal((await handle({...request,token:''})).status,401);assert.equal(reads,1)
+ for(const raw of [{...creation,privatePath:'/private/example'},{...creation,executionAuthority:true},{...creation,projectId:'other'},{...creation,state:'complete'},new Proxy(creation,{get(){throw Error('do not invoke')}})]){
+  const reply=await handle({...request,runtime:{creationRepository:{load:async()=>raw}}})
+  assert.deepEqual(reply,{status:503,body:{error:'destination_unavailable'}})
+ }
+ assert.equal((await handle({...request,runtime:{}})).status,503)
+ assert.deepEqual(await handle({...request,runtime:{creationRepository:{load:async()=>null}}}),{status:200,body:{creation:null,completionAuthority:false}})
+})
 test('review HTTP is owner-scoped read-only with no ingestion or confirmation',async()=>{
  let reads=0
  const runtime={questionRepository:{load:async()=>null,review:async input=>{reads++;assert.equal(input.accountRef,'account');return {decisions:[],completionAuthority:false}},record:()=>{throw Error('forbidden')}}}

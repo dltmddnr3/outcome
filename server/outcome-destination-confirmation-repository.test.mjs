@@ -15,7 +15,7 @@ import {createDestinationHostedRuntimeFactory} from './outcome-destination-hoste
 import {mkdtempSync,readdirSync,readFileSync} from 'node:fs'
 import {tmpdir} from 'node:os'
 import {join} from 'node:path'
-import {createConfirmedPackagePublisher,readCreatedProjectEntries} from './outcome-creation-catalog.mjs'
+import {createConfirmedPackagePublisher,readCreatedProjectEntries,createDestinationCreationReader} from './outcome-creation-catalog.mjs'
 import {buildPackageModel} from './outcome-package.mjs'
 
 const scope={workspaceId:'workspace',accountRef:'owner',draftId:'00000000-0000-4000-8000-000000000001'}
@@ -25,12 +25,29 @@ test('default renderer consumes real SQL confirmation without a synthetic render
   const repository=createDestinationConfirmationRepository(f),publisher=createConfirmedPackagePublisher({catalog,confirmationRepository:repository})
   await assert.rejects(()=>publisher.publish({...scope,requestId}));assert.deepEqual(readdirSync(catalog),[])
   const review=await repository.review(scope);await repository.confirm({...scope,requestId,reviewDigest:review.reviewDigest,confirmed:true})
+  assert.equal(await publisher.load({...scope,requestId}),null)
+  await assert.rejects(()=>publisher.load({...scope,accountRef:'foreign',requestId}))
   const created=await publisher.publish({...scope,requestId});assert.deepEqual(await publisher.publish({...scope,requestId}),created)
+  assert.deepEqual(await publisher.load({...scope,requestId}),created)
   const [entry]=readCreatedProjectEntries(catalog),contract=readFileSync(join(entry.root,entry.contract_file),'utf8')
   assert.deepEqual(JSON.parse(contract.match(/```destination-source\n([^\n]+)\n```/)[1]).document,f.document)
   const model=buildPackageModel({root:entry.root,contractFile:entry.contract_file,mapFile:entry.map_file,sessionsFile:entry.sessions_file,gitEvidence:{state:'unknown'}})
   assert.equal(model.status,'valid');assert.equal(model.project.outcome,f.document.answers.outcome);assert.equal(model.now.status,'unbound')
   const stage=model.phases[0].scopes[0].stages[0];assert.equal(stage.gate.closed,0);assert.equal(stage.purpose,f.document.answers.acceptance)
+  const creationRepository=createDestinationCreationReader({confirmationRepository:repository,publisher:{load:input=>publisher.load(input),publish:()=>{throw Error('must not publish')}}})
+  const identityService={authenticate:async()=>({subject:'owner'}),resolveBridgeAuthority:async()=>({workspace_id:scope.workspaceId,account_ref:scope.accountRef,project_ids:['outcome']})}
+  const server=createOutcomeServer({publicReadOnly:true,accountAccess:identityService,destinationRuntime:{creationRepository}})
+  server.listen(0,'127.0.0.1');await once(server,'listening')
+  const url=`http://127.0.0.1:${server.address().port}/api/private/destination/creations/${scope.draftId}`
+  const before=readdirSync(catalog).sort()
+  try{
+   assert.equal((await fetch(url)).status,401)
+   const response=await fetch(url,{headers:{cookie:'__session=valid'}})
+   assert.equal(response.status,200);assert.equal(response.headers.get('cache-control'),'no-store')
+   assert.deepEqual(await response.json(),{creation:created,completionAuthority:false})
+   for(const method of ['POST','PUT','DELETE'])assert.equal((await fetch(url,{method,headers:{cookie:'__session=valid'}})).status,405)
+   assert.deepEqual(readdirSync(catalog).sort(),before)
+  }finally{server.closeAllConnections();await new Promise(resolve=>server.close(resolve))}
  }finally{await f.db.close()}
 })
 test('real restricted confirmation SQL gates local Package publication and immutable replay',async()=>{
@@ -54,6 +71,7 @@ test('real restricted confirmation SQL gates local Package publication and immut
   const model=buildPackageModel({root:entry.root,contractFile:entry.contract_file,mapFile:entry.map_file,sessionsFile:entry.sessions_file,gitEvidence:{state:'unknown'}})
   assert.equal(model.status,'valid');assert.equal(model.now.status,'unbound')
   await f.db.query('delete from outcome_destination_private.confirmations')
+  await assert.rejects(()=>publisher.load({...scope,requestId}))
   await assert.rejects(()=>publisher.publish({...scope,requestId}));assert.equal(readCreatedProjectEntries(catalog).length,1)
  }finally{await f.db.close()}
 })

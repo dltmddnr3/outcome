@@ -245,7 +245,7 @@ export function createStableHostRequestHandler({ environment = process.env, runt
     if (pathname.startsWith('/api/private/work-observation/') || pathname.startsWith('/api/private/connections/')) {
       return handlePrivateAccessRequest({ method, pathname, token: privateSessionToken(headers), service: hosted.service })
     }
-    const destinationPath = /^\/api\/private\/destination\/(drafts|analysis|discovery|questions|question-requests|review|confirmation-review|confirmations)\//.test(pathname)
+    const destinationPath = /^\/api\/private\/destination\/(drafts|analysis|discovery|questions|question-requests|review|confirmation-review|confirmations|creations)\//.test(pathname)
     if ((method === 'GET' && pathname === '/api/private/workspace') || pathname === '/api/private/decisions' || destinationPath) {
       const token = privateSessionToken(headers)
       if (!token) return result(401, { error: 'authentication_required' })
