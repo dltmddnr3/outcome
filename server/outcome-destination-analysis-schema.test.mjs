@@ -5,6 +5,7 @@ import {PGlite} from '@electric-sql/pglite'
 import {createDestinationAnalysisRepository} from './outcome-destination-analysis-repository.mjs'
 import {createDestinationDraftRepository} from './outcome-destination-postgres.mjs'
 import {destinationDocumentDigest} from './outcome-destination-analysis-source.mjs'
+import {runDestinationAnalysisOnce} from './outcome-destination-analysis-worker.mjs'
 test('analysis SQL pins source, enforces one claim and terminal hold, and isolates owners',async()=>{
  const db=await PGlite.create('memory://')
  try{
@@ -52,5 +53,12 @@ test('analysis SQL pins source, enforces one claim and terminal hold, and isolat
   assert.equal(completed.state,'completed');assert.deepEqual(completed.result,{completionAuthority:false,proposals:[]})
   assert.equal(await repo.claim(claimInput),null)
   assert.equal(await repo.finish({...claimInput,state:'failed'}),null)
+  const nextRequest={...request,requestId:'00000000-0000-4000-8000-000000000020'}
+  await repo.enqueue(nextRequest)
+  let dispatches=0
+  const worker={repository:repo,request:nextRequest,dispatch:async input=>{dispatches++;assert.deepEqual(JSON.parse(input.serializedDocument),document);return {delivery:'acknowledged'}}}
+  assert.equal((await runDestinationAnalysisOnce(worker)).state,'awaiting_result')
+  assert.equal((await runDestinationAnalysisOnce({...worker,repository:createDestinationAnalysisRepository({transact})})).state,'not_claimed')
+  assert.equal(dispatches,1);assert.equal((await repo.load(nextRequest)).state,'dispatch_started')
  }finally{await db.close()}
 })
