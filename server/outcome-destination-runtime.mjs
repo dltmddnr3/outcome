@@ -1,6 +1,7 @@
 import {types} from 'node:util'
 import {createDestinationDraftRepository} from './outcome-destination-postgres.mjs'
 import {createDestinationAnalysisRepository} from './outcome-destination-analysis-repository.mjs'
+import {validateDestinationAnalysisResult} from './outcome-destination-analysis-result.mjs'
 
 const unavailable=()=>new Error('destination_unavailable')
 const knownError=error=>{
@@ -39,5 +40,5 @@ export function createDestinationRuntime({pool,allowedOrigin,csrfSecret}={}) {
  if(typeof csrfSecret!=='string'||csrfSecret.length<16)throw unavailable()
  try {const origin=new URL(allowedOrigin);if(origin.protocol!=='https:'||origin.origin!==allowedOrigin)throw unavailable()}catch{throw unavailable()}
  const transact=createDestinationTransactionPort({pool})
- return Object.freeze({allowedOrigin,csrfSecret,repository:createDestinationDraftRepository({transact}),analysisRepository:createDestinationAnalysisRepository({transact})})
+ return Object.freeze({allowedOrigin,csrfSecret,repository:createDestinationDraftRepository({transact}),analysisRepository:createDestinationAnalysisRepository({transact,validateResult:validateDestinationAnalysisResult})})
 }

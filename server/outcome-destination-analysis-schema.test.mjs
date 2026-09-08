@@ -8,6 +8,7 @@ import {destinationDocumentDigest} from './outcome-destination-analysis-source.m
 import {runDestinationAnalysisOnce} from './outcome-destination-analysis-worker.mjs'
 import {createOutcomeServer} from './index.mjs'
 import {once} from 'node:events'
+import {validateDestinationAnalysisResult} from './outcome-destination-analysis-result.mjs'
 test('analysis SQL pins source, enforces one claim and terminal hold, and isolates owners',async()=>{
  const db=await PGlite.create('memory://')
  try{
@@ -77,12 +78,13 @@ test('analysis SQL pins source, enforces one claim and terminal hold, and isolat
    assert.equal((await fetch(url)).status,401)
    assert.deepEqual(await (await fetch(url,{headers:{cookie:'__session=other'}})).json(),{analysis:null,completionAuthority:false})
    let actualDispatches=0
-   const execute={repository:validated,request:submitted,dispatch:async()=>{actualDispatches++;return {delivery:'acknowledged',result:'synthetic validated response'}}}
+   const execute={repository:createDestinationAnalysisRepository({transact,validateResult:validateDestinationAnalysisResult}),request:submitted,dispatch:async()=>{actualDispatches++;return {delivery:'acknowledged',result:JSON.stringify({schemaVersion:1,documentDigest:request.documentDigest,draftRevision:1,proposals:[],completionAuthority:false})}}}
    assert.equal((await runDestinationAnalysisOnce(execute)).state,'result_recorded')
    assert.equal((await runDestinationAnalysisOnce(execute)).state,'not_claimed')
    const readback=await (await fetch(url,{headers})).json()
    assert.equal(readback.analysis.state,'completed');assert.equal(readback.completionAuthority,false)
-   assert.deepEqual(readback.analysis.result,{completionAuthority:false,proposals:[]});assert.equal(actualDispatches,1)
+   assert.deepEqual(readback.analysis.result.proposals,[]);assert.deepEqual(readback.analysis.result.confirmedAnswers,{})
+   assert.equal(readback.analysis.result.semanticVerification,'owner_review_required');assert.equal(readback.analysis.result.gaps.length,8);assert.equal(actualDispatches,1)
    assert.equal((await fetch(url,{method:'POST',headers,body:'x'.repeat(4097)})).status,413)
   }finally{http.closeAllConnections();await new Promise(resolve=>http.close(resolve))}
  }finally{await db.close()}
