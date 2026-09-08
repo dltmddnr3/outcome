@@ -29,3 +29,8 @@ it('binds all 200 full-length answers without reusing the source-file byte limit
  expect(await discoveryContextDigest({...full,answers:answers.map((a,i)=>i===199?{...a,value:a.value.slice(0,-1)+'나'}:a)})).not.toBe(digest)
  await expect(discoveryContextDigest({...full,source:'x'.repeat(65537)})).rejects.toThrow()
 })
+it('uses the same complete context identity in browser policy and durable server repository',async()=>{
+ const fixture={...context,seedAnswers:{outcome:'결과',problem:'문제'},answers:[{questionId:'q-2',gapId:'g-2',value:'나'},{questionId:'q-1',gapId:'g-1',value:'가'}],askedQuestionIds:['q-2','q-1']}
+ // Shared golden vector also asserted by the server repository test.
+ expect(await discoveryContextDigest(fixture)).toBe('5785cb3038097cfdb6950deafbb7e842ab9c1a800510e2dfb92b92bbe8e97f72')
+})
