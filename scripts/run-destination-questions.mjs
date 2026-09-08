@@ -21,14 +21,18 @@ const privateDirectory=async directory=>{
  const stat=await lstat(directory)
  if(!stat.isDirectory()||stat.isSymbolicLink()||(stat.mode&0o777)!==0o700||stat.uid!==process.getuid()||await realpath(directory)!==directory)fail()
 }
-export async function readDestinationProtectedBytes(path){
+async function readProtectedBytes(path,maxBytes){
  try{
   if(typeof path!=='string'||!isAbsolute(path)||await realpath(path)!==path)fail()
   await privateDirectory(dirname(path))
   const file=await open(path,constants.O_RDONLY|constants.O_NOFOLLOW)
-  try{const stat=await file.stat();if(!stat.isFile()||(stat.mode&0o777)!==0o600||stat.uid!==process.getuid()||stat.nlink!==1||stat.size>65536)fail();return await file.readFile()}finally{await file.close()}
+  try{const stat=await file.stat();if(!stat.isFile()||(stat.mode&0o777)!==0o600||stat.uid!==process.getuid()||stat.nlink!==1||stat.size>maxBytes)fail();const bytes=await file.readFile();if(bytes.length>maxBytes)fail();return bytes}finally{await file.close()}
  }catch{fail()}
 }
+export const readDestinationProtectedBytes=path=>readProtectedBytes(path,65536)
+// Append-only registry history is not a secret configuration file. Its existing
+// schema and exact active binding are separately validated by the queue adapter.
+export const readDestinationRegistryBytes=path=>readProtectedBytes(path,2*1024*1024)
 export async function readDestinationServiceConfiguration(path){
  try{
   const value=JSON.parse((await readDestinationProtectedBytes(path)).toString('utf8'))
@@ -50,7 +54,7 @@ export async function runConfiguredDestinationQuestions({configPath,mode,signal,
   const git=args=>execFileSync('git',args,{cwd:checkout,encoding:'utf8',stdio:['ignore','pipe','ignore'],timeout:5000,maxBuffer:100000}).trim()
   if(git(['rev-parse','HEAD'])!==config.candidatePin||git(['status','--porcelain','--untracked-files=all']))fail()
   if(await realpath(config.ownerCwd)!==config.ownerCwd)fail()
-  await readDestinationProtectedBytes(config.registryPath)
+  await readDestinationRegistryBytes(config.registryPath)
   const readerPath=join(config.ownerCwd,'.outcome-runtime','read-destination-input.mjs')
   const readerReady=async()=>{
    await privateDirectory(config.inputDirectory)
