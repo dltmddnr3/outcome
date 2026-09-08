@@ -71,9 +71,11 @@ try {
     console.log(JSON.stringify({ width, guided: true, backEditRetained: true, conflictQuestionOnly: true, sourceRanges: 9, confirmationDisabled: true, requests, overflow: false }))
     await page.close()
     const storagePage = await browser.newPage({ viewport: {width,height:900} })
-    let stored=null, writes=0, failSave=false
+    let stored=null, writes=0, failSave=false, freshCredentialRequests=0
     await storagePage.route('**/api/**', async route=>{
       if(route.request().url().endsWith('/workspace')) return route.fulfill({json:{workspace:{}},headers:{'x-outcome-destination-csrf':'synthetic-only-csrf'}})
+      assert.match(route.request().headers().authorization??'',/^Bearer fresh-fixture-\d+$/)
+      freshCredentialRequests++
       if(route.request().method()==='PUT') {
         writes++
         if(failSave) return route.fulfill({status:503,json:{error:'destination_unavailable'}})
@@ -82,7 +84,7 @@ try {
       }
       return route.fulfill({json:{draft:stored,completionAuthority:false}})
     })
-    await storagePage.goto(`${base}/scripts/fixtures/destination-browser.html?storage`)
+    await storagePage.goto(`${base}/scripts/fixtures/destination-browser.html?storage&refresh`)
     await storagePage.getByRole('button',{name:'목적지 설정',exact:true}).click()
     await storagePage.getByRole('button',{name:/질문으로 시작/}).click()
     await storagePage.getByRole('textbox',{name:'직접 입력',exact:true}).fill('저장할 미완료 답변')
@@ -108,7 +110,8 @@ try {
     assert.equal(writes,2)
     assert.equal(await storagePage.locator('.destination-studio').evaluate(node=>node.scrollWidth<=node.clientWidth),true)
     assert.equal(await storagePage.evaluate(()=>localStorage.length+sessionStorage.length),0)
-    console.log(JSON.stringify({width,storageSaveReload:true,failurePreservesInput:true,writes,automaticRetry:false}))
+    assert.ok(freshCredentialRequests>=3)
+    console.log(JSON.stringify({width,storageSaveReload:true,failurePreservesInput:true,writes,freshCredentialRequests,cachedCredentialRejected:true,automaticRetry:false}))
     await storagePage.close()
     const analysisPage=await browser.newPage({viewport:{width,height:900}})
     let analysisRow=null,analysisWrites=0,analysisDraft=null

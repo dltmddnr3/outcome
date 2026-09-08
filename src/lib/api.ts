@@ -29,7 +29,20 @@ export type PrivateChatSubmit = { accepted: true; sequence: number; event_id: st
 
 let privateDecisionBinding: { etag: string; csrf: string; bearer?: string } | null = null
 let privateDecisionBindingVersion = 0
-let privateDestinationBinding: { csrf: string; bearer?: string } | null = null
+type DestinationBinding = { csrf: string; bearer?: string; refreshCredential?: () => Promise<string | null> }
+let privateDestinationBinding: DestinationBinding | null = null
+async function destinationSessionHeaders(binding: DestinationBinding, generation: number) {
+ let token = binding.bearer
+ if (binding.refreshCredential) {
+  try {
+   const refreshed = await binding.refreshCredential()
+   if (typeof refreshed !== 'string' || !/^[A-Za-z0-9._~-]+$/.test(refreshed)) throw Error()
+   token = refreshed
+  } catch { throw Error('destination_session_unavailable') }
+ }
+ if (binding !== privateDestinationBinding || generation !== privateDecisionBindingVersion) throw Error('destination_identity_changed')
+ return privateSessionHeaders(token)
+}
 export const privateDestinationStorageAvailable = () => privateDestinationBinding !== null
 export const captureDestinationReviewBinding=()=>{
  const binding=privateDestinationBinding,generation=privateDecisionBindingVersion
@@ -44,7 +57,8 @@ export async function requestDestinationQuestionRun(discovery:StoredDiscovery,su
  const binding=privateDestinationBinding,generation=privateDecisionBindingVersion
  if(!binding||discovery.draftId!==activeDestinationDraftId)throw Error('destination_unavailable')
  const {contextDigest,revision}=discovery
- const response=await fetch(`/api/private/destination/question-requests/${activeDestinationDraftId}`,{method:submit?'POST':'GET',credentials:'same-origin',headers:{...privateSessionHeaders(binding.bearer),...(submit?{'content-type':'application/json','x-outcome-csrf':binding.csrf}:{})},...(submit?{body:JSON.stringify({contextDigest})}:{})})
+ const sessionHeaders=await destinationSessionHeaders(binding,generation)
+ const response=await fetch(`/api/private/destination/question-requests/${activeDestinationDraftId}`,{method:submit?'POST':'GET',credentials:'same-origin',headers:{...sessionHeaders,...(submit?{'content-type':'application/json','x-outcome-csrf':binding.csrf}:{})},...(submit?{body:JSON.stringify({contextDigest})}:{})})
  const value=await readJson<unknown>(response)
  if(binding!==privateDestinationBinding||generation!==privateDecisionBindingVersion)throw Error('destination_identity_changed')
  const exact=(v:unknown,keys:string[]):v is Record<string,unknown>=>!!v&&typeof v==='object'&&!Array.isArray(v)&&Object.keys(v).length===keys.length&&keys.every(k=>Object.hasOwn(v,k))
@@ -58,7 +72,8 @@ export async function requestDestinationQuestions(discovery:StoredDiscovery):Pro
  const binding=privateDestinationBinding,generation=privateDecisionBindingVersion
  if(!binding||discovery.draftId!==activeDestinationDraftId)throw Error('destination_unavailable')
  const pinned=JSON.parse(JSON.stringify(discovery)) as StoredDiscovery
- const response=await fetch(`/api/private/destination/questions/${activeDestinationDraftId}`,{credentials:'same-origin',headers:privateSessionHeaders(binding.bearer)})
+ const sessionHeaders=await destinationSessionHeaders(binding,generation)
+ const response=await fetch(`/api/private/destination/questions/${activeDestinationDraftId}`,{credentials:'same-origin',headers:sessionHeaders})
  const value=await readJson<unknown>(response)
  const exact=(v:unknown,keys:string[]):v is Record<string,unknown>=>!!v&&typeof v==='object'&&!Array.isArray(v)&&Object.keys(v).length===keys.length&&keys.every(k=>Object.hasOwn(v,k))
  if(!exact(value,['questions','completionAuthority'])||value.completionAuthority!==false)throw Error('discovery_response_invalid')
@@ -88,7 +103,8 @@ export async function requestDestinationDiscovery(intake:StoredDestinationDraft,
   if(new TextEncoder().encode(body).length>4194304)throw Error('discovery_request_too_large')
  }
  if(binding!==privateDestinationBinding||generation!==privateDecisionBindingVersion)throw Error('destination_identity_changed')
- const response=await fetch(`/api/private/destination/discovery/${activeDestinationDraftId}`,{method:submitted?'PUT':'GET',credentials:'same-origin',headers:{...privateSessionHeaders(binding.bearer),...(submitted?{'content-type':'application/json','x-outcome-csrf':binding.csrf}:{})},...(body?{body}:{})})
+ const sessionHeaders=await destinationSessionHeaders(binding,generation)
+ const response=await fetch(`/api/private/destination/discovery/${activeDestinationDraftId}`,{method:submitted?'PUT':'GET',credentials:'same-origin',headers:{...sessionHeaders,...(submitted?{'content-type':'application/json','x-outcome-csrf':binding.csrf}:{})},...(body?{body}:{})})
  const value=await readJson<unknown>(response)
  const exact=(v:unknown,keys:string[]):v is Record<string,unknown>=>!!v&&typeof v==='object'&&!Array.isArray(v)&&Object.keys(v).length===keys.length&&keys.every(k=>Object.hasOwn(v,k))
  if(!exact(value,['discovery','completionAuthority'])||value.completionAuthority!==false)return fail()
@@ -125,7 +141,8 @@ export async function requestDestinationAnalysis(draft:StoredDestinationDraft,re
  if(!binding)throw Error('destination_unavailable')
  const documentDigest=await destinationDraftDigest(draft.document)
  if(binding!==privateDestinationBinding||generation!==privateDecisionBindingVersion)throw Error('destination_identity_changed')
- const response=await fetch(`/api/private/destination/analysis/${requestId}`,{method:submit?'POST':'GET',credentials:'same-origin',headers:{...privateSessionHeaders(binding.bearer),...(submit?{'content-type':'application/json','x-outcome-csrf':binding.csrf}:{})},...(submit?{body:JSON.stringify({draftId:draft.draftId,draftRevision:draft.revision,documentDigest})}:{})})
+ const sessionHeaders=await destinationSessionHeaders(binding,generation)
+ const response=await fetch(`/api/private/destination/analysis/${requestId}`,{method:submit?'POST':'GET',credentials:'same-origin',headers:{...sessionHeaders,...(submit?{'content-type':'application/json','x-outcome-csrf':binding.csrf}:{})},...(submit?{body:JSON.stringify({draftId:draft.draftId,draftRevision:draft.revision,documentDigest})}:{})})
  const body=await readJson<{analysis:Record<string,unknown>|null;completionAuthority:false}>(response)
  if(binding!==privateDestinationBinding||generation!==privateDecisionBindingVersion)throw Error('destination_identity_changed')
  if(!body||body.completionAuthority!==false)throw Error('destination_response_invalid')
@@ -163,7 +180,8 @@ export function validateStoredDestinationDraft(value: unknown): StoredDestinatio
 export async function requestDestinationDraft(save?: { expectedRevision: number; document: DestinationDraftDocument }): Promise<StoredDestinationDraft | null> {
   const binding = privateDestinationBinding; const generation = privateDecisionBindingVersion
   if (!binding) throw new Error('destination_unavailable')
-  const response = await fetch(`/api/private/destination/drafts/${activeDestinationDraftId}`, { method: save ? 'PUT' : 'GET', credentials: 'same-origin', headers: { ...privateSessionHeaders(binding.bearer), ...(save ? { 'content-type':'application/json','x-outcome-csrf':binding.csrf } : {}) }, ...(save ? { body:JSON.stringify({requestId:crypto.randomUUID(),expectedRevision:save.expectedRevision,document:JSON.stringify(save.document)}) } : {}) })
+  const sessionHeaders = await destinationSessionHeaders(binding,generation)
+  const response = await fetch(`/api/private/destination/drafts/${activeDestinationDraftId}`, { method: save ? 'PUT' : 'GET', credentials: 'same-origin', headers: { ...sessionHeaders, ...(save ? { 'content-type':'application/json','x-outcome-csrf':binding.csrf } : {}) }, ...(save ? { body:JSON.stringify({requestId:crypto.randomUUID(),expectedRevision:save.expectedRevision,document:JSON.stringify(save.document)}) } : {}) })
   const value = await readJson<unknown>(response)
   if (generation !== privateDecisionBindingVersion || binding !== privateDestinationBinding) throw new Error('destination_identity_changed')
   const draft = validateStoredDestinationDraft(value)
@@ -208,7 +226,7 @@ export async function fetchPrivateAccessConfig(): Promise<PrivateAccessConfig> {
   return readJson<PrivateAccessConfig>(await fetch('/api/private/config', { credentials: 'same-origin', headers: { accept: 'application/json' } }))
 }
 
-export async function fetchPrivateWorkspace(sessionToken?: string): Promise<{ workspace: PrivateWorkspaceView }> {
+export async function fetchPrivateWorkspace(sessionToken?: string, refreshCredential?: () => Promise<string | null>): Promise<{ workspace: PrivateWorkspaceView }> {
   const bindingVersion=++privateDecisionBindingVersion
   privateDecisionBinding=null
   privateDestinationBinding=null
@@ -218,7 +236,7 @@ export async function fetchPrivateWorkspace(sessionToken?: string): Promise<{ wo
   const csrf = response.headers.get('x-outcome-csrf') ?? ''
   if(bindingVersion===privateDecisionBindingVersion)privateDecisionBinding = etag && csrf ? { etag, csrf, ...(sessionToken ? { bearer: sessionToken } : {}) } : null
   const destinationCsrf=response.headers.get('x-outcome-destination-csrf')
-  if(bindingVersion===privateDecisionBindingVersion)privateDestinationBinding=destinationCsrf ? {csrf:destinationCsrf,...(sessionToken ? {bearer:sessionToken} : {})} : null
+  if(bindingVersion===privateDecisionBindingVersion)privateDestinationBinding=destinationCsrf ? {csrf:destinationCsrf,...(sessionToken ? {bearer:sessionToken} : {}),...(refreshCredential ? {refreshCredential} : {})} : null
   return value
 }
 

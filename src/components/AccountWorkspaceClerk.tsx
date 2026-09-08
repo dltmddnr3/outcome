@@ -135,7 +135,15 @@ function HostedWorkspaceSession() {
     void requireHostedSessionToken(getToken)
       .then((sessionToken) => {
         if (!current) throw new Error('session_superseded')
-        return confirmHostedOwnerWorkspace(sessionToken, undefined, undefined, () => { if (current) setOwnerVerified(true) }, () => current)
+        return confirmHostedOwnerWorkspace(sessionToken, undefined, {
+          owner: fetchPrivateOwnerSession,
+          workspace: token => fetchPrivateWorkspace(token, async () => {
+            if (!current) throw new Error('session_superseded')
+            const fresh = await requireHostedSessionToken(getToken)
+            if (!current) throw new Error('session_superseded')
+            return fresh
+          }),
+        }, () => { if (current) setOwnerVerified(true) }, () => current)
       })
       .then((value) => { if (current) { setOwnerWasReady(true); setWorkspace(value); setState('ready') } })
       .catch((reason) => {
