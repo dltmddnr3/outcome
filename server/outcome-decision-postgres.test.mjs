@@ -27,6 +27,8 @@ test('real SQL decision store preserves replay and history across service recons
     assert.deepEqual(history.body.decisions,[first.body])
     const withdrawal = {actorSubject:'owner',workspaceId:'workspace-a',projectId:'outcome',decisionId:first.body.decisionId,nonce:'withdrawal-nonce-that-is-long-enough-123',sourcePrecondition:'revision',currentSourcePrecondition:'revision'}
     assert.equal((await make('workspace-a').withdraw(withdrawal)).status,201)
+    const refreshed = await make('workspace-a').history({actorSubject:'owner',workspaceId:'workspace-a',projectIds:['outcome']})
+    assert.deepEqual(refreshed.body.decisions,[{receipt:first.body,target:{projectId:'outcome',eventId:'event-blocked',sequence:7},withdrawn:true}])
     assert.equal((await make('workspace-b').withdraw({...withdrawal,workspaceId:'workspace-b'})).status,409)
     assert.equal((await db.query('select count(*)::int n from outcome_private.decision_records')).rows[0].n,2)
     assert.equal((await db.query('select count(*)::int n from outcome_private.decision_tombstones')).rows[0].n,1)

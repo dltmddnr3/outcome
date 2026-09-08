@@ -35,7 +35,7 @@ export const privateAccessPublicConfig = (enabled) => ({
 
 export async function handlePrivateAccessRequest({ method = 'GET', pathname = '/', token, service, decisionRuntime, headers = {}, origin = '', body } = {}) {
   if (pathname === '/api/private/decisions') {
-    if (method !== 'POST') return response(405, { error: 'read_only' })
+    if (!['GET','POST'].includes(method)) return response(405, { error: 'read_only' })
     if (!service) return response(401, { error: 'authentication_required' })
     let identity
     let workspace
@@ -45,6 +45,11 @@ export async function handlePrivateAccessRequest({ method = 'GET', pathname = '/
     } catch (error) {
       if (error instanceof AccountAccessError) return response(error.status, { error: error.code })
       return response(503, { error: 'private_workspace_unavailable' })
+    }
+    if (method === 'GET') {
+      if (typeof decisionRuntime?.service?.history !== 'function') return response(503,{error:'decision_store_unavailable'})
+      try { return await decisionRuntime.service.history({actorSubject:identity.subject,workspaceId:workspace.workspace.id,projectIds:workspace.projects.map(project=>project.project.id)}) }
+      catch { return response(503,{error:'decision_store_unavailable'}) }
     }
     if (!decisionRuntime?.service?.record || !decisionRuntime.allowedOrigin || !decisionRuntime.csrfSecret) return response(503, { error: 'decision_store_unavailable' })
     if (header(headers, 'content-type').toLowerCase() !== 'application/json') return response(415, { error: 'content_type_invalid' })

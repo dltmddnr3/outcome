@@ -145,6 +145,19 @@ export function createDecisionRecordService({ store, now = Date.now, identifier 
       if (typeof actorSubject !== 'string' || typeof workspaceId !== 'string') return fail('invalid_request', 400)
       return transact(async (tx) => ({ status: 200, body: { decisions: (await tx.decisionsForWorkspace(workspaceId)).map(publicRecord), completionAuthority: false } }))
     },
+    async history({ actorSubject, workspaceId, projectIds } = {}) {
+      if (![actorSubject,workspaceId].every(value => typeof value === 'string' && SAFE_ID.test(value)) || !Array.isArray(projectIds) || !projectIds.every(id => typeof id === 'string' && SAFE_ID.test(id))) return fail('invalid_request',400)
+      return transact(async tx => {
+        const rows = await tx.decisionsForWorkspace(workspaceId)
+        const decisions = []
+        for (const row of rows) {
+          if (row.workspace_id !== workspaceId || !projectIds.includes(row.project_id)) continue
+          const withdrawn = Boolean(await tx.tombstoneFor(row.id))
+          decisions.push({ receipt: publicRecord(row), target: {projectId:row.project_id,eventId:row.event_id,sequence:row.event_sequence}, withdrawn })
+        }
+        return {status:200,body:{decisions,completionAuthority:false}}
+      })
+    },
   })
 }
 
