@@ -7,11 +7,19 @@ const server=await createServer({configFile:false,server:{host:'127.0.0.1',port:
 await server.listen()
 const browser=await chromium.launch({headless:true,executablePath:'/Applications/Google Chrome.app/Contents/MacOS/Google Chrome'})
 try {
- for(const width of [390,1440])for(const scenario of ['success','failure','malformed','unavailable']){
+ for(const width of [390,1440])for(const scenario of ['success','failure','malformed','unavailable','withdrawn']){
   const page=await browser.newPage({viewport:{width,height:900}});let posts=0;const errors=[];page.on('pageerror',error=>errors.push(error.message))
   await page.route('**/api/private/workspace',route=>route.fulfill({json:{workspace:{}},headers:scenario==='unavailable'?{}:{etag:'"synthetic"','x-outcome-csrf':'synthetic-csrf-token'}}))
-  await page.route('**/api/private/decisions',async route=>{posts++;const input=route.request().postDataJSON();assert.equal(input.eventId,'event-blocked');await route.fulfill(scenario==='failure'?{status:503,json:{error:'decision_store_unavailable'}}:{status:201,json:{decisionState:'recorded',decisionId:scenario==='malformed'?'private-untrusted-value':'00000000-0000-4000-8000-000000000001',decision:input.decision,rejectionReason:input.rejectionReason,decidedAt:'2026-09-08T00:00:00.000Z',decisionActorClass:'owner',notice:'기록됨 · 전달은 이 범위 밖',supersedesId:null,completionAuthority:false}})})
+  let saved=scenario==='withdrawn'?{decisionState:'recorded',decisionId:'00000000-0000-4000-8000-000000000001',decision:'approved',rejectionReason:null,decidedAt:'2026-09-08T00:00:00.000Z',decisionActorClass:'owner',notice:'기록됨 · 전달은 이 범위 밖',supersedesId:null,completionAuthority:false}:null
+  await page.route('**/api/private/decisions',async route=>{
+   if(route.request().method()==='GET'){await route.fulfill({json:{decisions:saved?[{receipt:saved,target:{projectId:'outcome',eventId:'event-blocked',sequence:1},withdrawn:scenario==='withdrawn'}]:[],completionAuthority:false}});return}
+   posts++;const input=route.request().postDataJSON();assert.equal(input.eventId,'event-blocked')
+   const receipt={decisionState:'recorded',decisionId:scenario==='malformed'?'private-untrusted-value':'00000000-0000-4000-8000-000000000001',decision:input.decision,rejectionReason:input.rejectionReason,decidedAt:'2026-09-08T00:00:00.000Z',decisionActorClass:'owner',notice:'기록됨 · 전달은 이 범위 밖',supersedesId:null,completionAuthority:false}
+   if(scenario==='success')saved=receipt
+   await route.fulfill(scenario==='failure'?{status:503,json:{error:'decision_store_unavailable'}}:{status:201,json:receipt})
+  })
   await page.goto(`http://127.0.0.1:${server.httpServer.address().port}/__decision-test`)
+  if(scenario==='withdrawn'){await page.getByText('철회된 결정 · 원래 기록 보존',{exact:false}).waitFor();assert.equal(await page.getByRole('button',{name:'승인 기록',exact:true}).count(),0);assert.equal(posts,0);assert.deepEqual(errors,[]);console.log(`PASS ${width} withdrawn posts=0`);await page.close();continue}
   const approve=page.getByRole('button',{name:'승인 기록',exact:true});await approve.waitFor()
   if(scenario==='unavailable'){assert.equal(await approve.isDisabled(),true);assert.equal(posts,0)}else{
    await approve.click();await page.getByRole('alertdialog').waitFor();assert.equal(posts,0)
@@ -20,6 +28,7 @@ try {
    await approve.click();await page.getByRole('button',{name:'확인 기록',exact:true}).click()
    await page.getByRole(['failure','malformed'].includes(scenario)?'alert':'status').waitFor()
    assert.equal(posts,1);assert.equal(await page.getByRole('button',{name:'확인 기록',exact:true}).count(),0)
+   if(scenario==='success'){await page.reload();await page.getByText('기록 ID · 00000000-0000-4000-8000-000000000001').waitFor();assert.equal(await page.getByRole('button',{name:'승인 기록',exact:true}).count(),0);assert.equal(posts,1)}
   }
   assert.equal((await page.locator('body').innerText()).includes('private-untrusted-value'),false)
   assert.deepEqual(errors,[]);console.log(`PASS ${width} ${scenario} posts=${posts}`);await page.close()

@@ -99,6 +99,38 @@ export async function endPrivateSession(): Promise<void> {
 const decisionNonce = () => Array.from(crypto.getRandomValues(new Uint8Array(24)), (value) => value.toString(16).padStart(2, '0')).join('')
 export const privateDecisionRecordingAvailable = () => privateDecisionBinding !== null
 
+export type PrivateDecisionHistoryEntry = {receipt:PrivateDecisionReceipt; target:{projectId:string;eventId:string;sequence:number};withdrawn:boolean}
+export function validatePrivateDecisionHistory(value:unknown): PrivateDecisionHistoryEntry[] {
+  const invalid=():never=>{throw new Error('decision_history_invalid')}
+  const closed=(value:unknown,keys:string[]):Record<string,unknown>=>{
+    if(!value||typeof value!=='object'||Array.isArray(value)||Object.getPrototypeOf(value)!==Object.prototype)return invalid()
+    const fields=Object.getOwnPropertyDescriptors(value)
+    if(Reflect.ownKeys(value).length!==keys.length||keys.some(key=>!fields[key]?.enumerable||!Object.hasOwn(fields[key],'value')))return invalid()
+    return Object.fromEntries(keys.map(key=>[key,fields[key].value]))
+  }
+  const body=closed(value,['decisions','completionAuthority'])
+  if(body.completionAuthority!==false||!Array.isArray(body.decisions))return invalid()
+  const seen=new Set<string>()
+  return body.decisions.map(value=>{
+    const entry=closed(value,['receipt','target','withdrawn'])
+    const target=closed(entry.target,['projectId','eventId','sequence'])
+    if(typeof entry.withdrawn!=='boolean'||![target.projectId,target.eventId].every(id=>typeof id==='string'&&/^[a-z0-9]+(?:[-_][a-z0-9]+)*$/.test(id))||!Number.isSafeInteger(target.sequence)||Number(target.sequence)<1)return invalid()
+    const raw=closed(entry.receipt,['decisionState','decisionId','decision','rejectionReason','decidedAt','decisionActorClass','notice','supersedesId','completionAuthority'])
+    if(!['approved','rejected'].includes(String(raw.decision))||(raw.decision==='rejected'&&!['evidence_insufficient','scope_not_authorized','superseded_by_newer_observation','defer_pending_external_input'].includes(String(raw.rejectionReason))))return invalid()
+    if(raw.supersedesId!==null&&(typeof raw.supersedesId!=='string'||!/^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/.test(raw.supersedesId)))return invalid()
+    const receipt=validatePrivateDecisionReceipt({...raw,supersedesId:null},{decision:raw.decision as 'approved'|'rejected',rejectionReason:raw.rejectionReason as PrivateDecisionReason|null})
+    const key=JSON.stringify([target.projectId,target.eventId,target.sequence])
+    if(seen.has(key)||seen.has(receipt.decisionId))return invalid()
+    seen.add(key);seen.add(receipt.decisionId)
+    return {receipt:{...receipt,supersedesId:raw.supersedesId as string|null},target:target as PrivateDecisionHistoryEntry['target'],withdrawn:entry.withdrawn}
+  })
+}
+export async function fetchPrivateDecisionHistory():Promise<PrivateDecisionHistoryEntry[]> {
+  const binding=privateDecisionBinding
+  if(!binding)throw new Error('decision_store_unavailable')
+  return validatePrivateDecisionHistory(await readJson<unknown>(await fetch('/api/private/decisions',{credentials:'same-origin',headers:privateSessionHeaders(binding.bearer)})))
+}
+
 export function validatePrivateDecisionReceipt(value: unknown, expected: {decision:'approved'|'rejected'; rejectionReason?:PrivateDecisionReason|null}): PrivateDecisionReceipt {
   const invalid = (): never => { throw new Error('decision_receipt_invalid') }
   if(!value||typeof value!=='object'||Array.isArray(value)||Object.getPrototypeOf(value)!==Object.prototype)return invalid()
