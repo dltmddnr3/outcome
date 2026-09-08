@@ -4,18 +4,27 @@ import {createPlannerResponseConsumer} from './outcome-chat-response-consumer.mj
 
 const scope={workspace_id:'workspace-one',project_id:'outcome',binding_version:3}
 const request={correlation_id:'message-0123456789abcdef',message:'question'}
-function fixture({outcome='completed',version=3,correlation=request.correlation_id,failWrite=false}={}){
+function fixture({outcome='completed',version=3,correlation=request.correlation_id,failWrite=false,diagnostic=()=>{}}={}){
   const writes=[];let reads=0
   const repository={pendingPlannerResponses:async value=>{assert.deepEqual(value,scope);return [request]},appendPlannerResponse:async value=>{if(failWrite)throw Error('private');writes.push(value)}}
   const queueAdapter={bindingResolver:async()=>({project_id:'outcome',role:'planner',binding_version:version,status:'active',freshness:'fresh',destination:{}}),
     readPlannerResponse:async()=>{reads++;return {outcome,response:{correlation_id:correlation,source_digest:'a'.repeat(64),message:'answer',observed_at:'2026-09-08T00:00:00.000Z'}}},
     transport:()=>{throw Error('must not dispatch')}}
-  return {consumer:createPlannerResponseConsumer({repository,queueAdapter,scope}),writes,reads:()=>reads}
+  return {consumer:createPlannerResponseConsumer({repository,queueAdapter,scope,diagnostic}),writes,reads:()=>reads}
 }
 test('matching completion is stored under server scope once without dispatch',async()=>{
   const f=fixture();assert.deepEqual(await f.consumer.runOnce(),{outcome:'checked',stored:1,pending:0,unavailable:0})
   assert.equal(f.writes.length,1);assert.equal(f.writes[0].workspace_id,scope.workspace_id)
   assert.deepEqual(await f.consumer.runOnce(),{outcome:'unavailable'});assert.equal(f.reads(),1)
+})
+test('failure diagnostics identify only a fixed stage and never source data',async()=>{
+  for(const [options,phase] of [[{version:4},'binding'],[{outcome:'unavailable'},'source_read'],[{failWrite:true},'response_append']]){
+    const logs=[];const f=fixture({...options,diagnostic:value=>logs.push(value)})
+    assert.equal((await f.consumer.runOnce()).unavailable,1)
+    assert.deepEqual(logs,[{phase,code:'unavailable'}])
+  }
+  const f=fixture({failWrite:true,diagnostic:()=>{throw Error('sink failure')}})
+  assert.equal((await f.consumer.runOnce()).unavailable,1)
 })
 test('pending, failed source, binding drift and correlation mismatch never store answers',async()=>{
   for(const options of [{outcome:'pending'},{outcome:'unavailable'},{version:4},{correlation:'message-0000000000000000'},{failWrite:true}]){

@@ -9,25 +9,28 @@ export async function runOutcomeChatService({ enabled = false, runOnce = runOutc
   write = line => process.stdout.write(line), environment = process.env } = {}) {
   if (enabled !== true || typeof runOnce !== 'function' || !signal || typeof signal.aborted !== 'boolean'
     || !Number.isSafeInteger(intervalMs) || intervalMs < 1000 || intervalMs > 60000) return 64
-  let dispatch = true
+  let dispatch = true, phase = 'DISPATCH'
   const emit = state => { try { write(`OUTCOME_CHAT_SERVICE_${state}\n`) } catch {} }
   emit('STARTED')
   try {
     while (!signal.aborted) {
       if (dispatch) {
+        phase = 'DISPATCH'
         const result = await runOnce({ environment, argv: [], write: () => {} })
         if (result === 2) { dispatch = false; emit('DISPATCH_UNKNOWN_RESPONSE_ONLY') }
-        else if (result !== 0) { emit('SAFE_HOLD'); return 70 }
+        else if (result !== 0) { emit('DISPATCH_SAFE_HOLD'); return 70 }
       }
       if (signal.aborted) break
+      phase = 'RESPONSES'
       const result = await runOnce({ environment, argv: ['--responses'], write: () => {} })
-      if (result !== 0) { emit('SAFE_HOLD'); return 70 }
+      if (result !== 0) { emit('RESPONSES_SAFE_HOLD'); return 70 }
+      phase = 'WAIT'
       if (!signal.aborted) await wait(intervalMs, signal)
     }
     emit('STOPPED'); return 0
   } catch {
     if (signal.aborted) { emit('STOPPED'); return 0 }
-    emit('SAFE_HOLD'); return 70
+    emit(`${phase}_SAFE_HOLD`); return 70
   }
 }
 

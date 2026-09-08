@@ -77,26 +77,31 @@ export async function runOutcomeChatConsumerOnce({
   responseRuntimeFactory = createPlannerResponseConsumer,
   write = (text) => process.stdout.write(text),
   pathStat = lstatSync,
+  diagnostic = () => {},
 } = {}) {
   if (!Array.isArray(argv) || types.isProxy(argv) || !(argv.length===0 || argv.length===1 && argv[0]==='--responses')) return emit('config', write)
   const collectResponses = argv.length===1
   const configuration = readOutcomeChatConsumerConfiguration(environment, { pathStat })
   if (!configuration.enabled) return emit('config', write)
   if (collectResponses && (!configuration.responsesEnabled || !/^[a-z][a-z0-9-]{1,63}$/.test(configuration.workspaceId) || configuration.bindingVersion===null)) return emit('config',write)
-  let pool, outcome = 'runtime'
+  let pool, outcome = 'runtime', phase = 'driver'
+  const report = (code) => { try { diagnostic({ phase, code }) } catch {} }
   try {
     const driver = await driverLoader()
     if (typeof driver?.Pool !== 'function') throw new Error('unavailable')
+    phase = 'construction'
     const connectionUrl = new URL(configuration.databaseUrl)
     connectionUrl.search = ''
     pool = new driver.Pool({ connectionString: connectionUrl.toString(), ssl: { ca: configuration.databaseCaPem, rejectUnauthorized: true }, max: 1, allowExitOnIdle: true, connectionTimeoutMillis: configuration.timeoutMs })
     const repository = repositoryFactory({ transact: transactionFactory({ pool }) })
     const queueAdapter = queueAdapterFactory({ enabled: true, registryPath: configuration.registryPath, timeoutMs: configuration.timeoutMs, codexExecutable:configuration.executable })
     const runtime = collectResponses
-      ? responseRuntimeFactory({repository,queueAdapter,scope:{workspace_id:configuration.workspaceId,project_id:'outcome',binding_version:configuration.bindingVersion}})
+      ? responseRuntimeFactory({repository,queueAdapter,diagnostic,scope:{workspace_id:configuration.workspaceId,project_id:'outcome',binding_version:configuration.bindingVersion}})
       : runtimeFactory({ consumerEnabled: true, repository, queueAdapter, consumerId: configuration.consumerId, leaseMs: configuration.leaseMs })
     if (!runtime || typeof runtime.runOnce !== 'function') throw new Error('unavailable')
+    phase = collectResponses ? 'response_run' : 'dispatch_run'
     const result = await runtime.runOnce()
+    phase = collectResponses ? 'response_result' : 'dispatch_result'
     if (collectResponses) {
       if (!result || !['idle','checked'].includes(result.outcome) || ![result.stored,result.pending,result.unavailable].every(value=>Number.isSafeInteger(value)&&value>=0) || result.unavailable!==0) throw new Error('unavailable')
       outcome=result.outcome==='idle'?'idle':'responses'
@@ -104,8 +109,8 @@ export async function runOutcomeChatConsumerOnce({
       if (!result || !['idle','acknowledged','delivery_unknown','rejected','failed'].includes(result.outcome)) throw new Error('unavailable')
       outcome=result.outcome
     }
-  } catch { outcome = 'runtime' }
-  if (pool) try { await pool.end() } catch { outcome = 'runtime' }
+  } catch { report('unavailable'); outcome = 'runtime' }
+  if (pool) try { await pool.end() } catch { phase = 'close'; report('unavailable'); outcome = 'runtime' }
   return emit(outcome, write)
 }
 
