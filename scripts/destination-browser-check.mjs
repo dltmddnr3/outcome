@@ -70,5 +70,45 @@ try {
     assert.deepEqual(errors, [])
     console.log(JSON.stringify({ width, guided: true, backEditRetained: true, conflictQuestionOnly: true, sourceRanges: 9, confirmationDisabled: true, requests, overflow: false }))
     await page.close()
+    const storagePage = await browser.newPage({ viewport: {width,height:900} })
+    let stored=null, writes=0, failSave=false
+    await storagePage.route('**/api/**', async route=>{
+      if(route.request().url().endsWith('/workspace')) return route.fulfill({json:{workspace:{}},headers:{'x-outcome-destination-csrf':'synthetic-only-csrf'}})
+      if(route.request().method()==='PUT') {
+        writes++
+        if(failSave) return route.fulfill({status:503,json:{error:'destination_unavailable'}})
+        const input=route.request().postDataJSON()
+        stored={draftId:'00000000-0000-4000-8000-000000000001',revision:input.expectedRevision+1,document:JSON.parse(input.document),state:'draft',completionAuthority:false}
+      }
+      return route.fulfill({json:{draft:stored,completionAuthority:false}})
+    })
+    await storagePage.goto(`${base}/scripts/fixtures/destination-browser.html?storage`)
+    await storagePage.getByRole('button',{name:'목적지 설정',exact:true}).click()
+    await storagePage.getByRole('button',{name:/질문으로 시작/}).click()
+    await storagePage.getByRole('textbox',{name:'직접 입력',exact:true}).fill('저장할 미완료 답변')
+    await storagePage.getByRole('button',{name:'초안 저장',exact:true}).click()
+    await storagePage.getByRole('status').filter({hasText:'초안 버전 1 저장됨'}).waitFor()
+    assert.equal(stored.document.answers.problem,'저장할 미완료 답변')
+    await storagePage.reload()
+    await storagePage.getByRole('button',{name:'목적지 설정',exact:true}).click()
+    await storagePage.getByRole('button',{name:'서버 초안 불러오기 · 현재 입력 대체',exact:true}).click()
+    await storagePage.getByRole('status').filter({hasText:'초안 버전 1 불러옴'}).waitFor()
+    for(let index=0;index<7;index++) {
+      await storagePage.getByRole('radio').first().check()
+      await storagePage.getByRole('button',{name:index===6?'Destination 검토':'다음 질문',exact:true}).click()
+    }
+    await storagePage.getByText('저장할 미완료 답변',{exact:true}).waitFor()
+    await storagePage.getByRole('button',{name:'문제 수정',exact:true}).click()
+    await storagePage.getByRole('textbox',{name:'직접 입력',exact:true}).fill('실패해도 유지할 답변')
+    failSave=true
+    await storagePage.getByRole('button',{name:'초안 저장',exact:true}).click()
+    await storagePage.getByRole('status').filter({hasText:'저장 결과를 확인하지 못했습니다'}).waitFor()
+    assert.equal(await storagePage.getByRole('textbox',{name:'직접 입력',exact:true}).inputValue(),'실패해도 유지할 답변')
+    assert.equal(await storagePage.getByRole('button',{name:'초안 저장',exact:true}).isDisabled(),true)
+    assert.equal(writes,2)
+    assert.equal(await storagePage.locator('.destination-studio').evaluate(node=>node.scrollWidth<=node.clientWidth),true)
+    assert.equal(await storagePage.evaluate(()=>localStorage.length+sessionStorage.length),0)
+    console.log(JSON.stringify({width,storageSaveReload:true,failurePreservesInput:true,writes,automaticRetry:false}))
+    await storagePage.close()
   }
 } finally { await browser?.close(); server.kill('SIGTERM') }

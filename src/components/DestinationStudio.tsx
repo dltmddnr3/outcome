@@ -1,5 +1,6 @@
 import { sensitiveContentHint } from './PlannerConversation'
 import './DestinationStudio.css'
+import { privateDestinationStorageAvailable, requestDestinationDraft, type DestinationDraftDocument } from '../lib/api'
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { ArrowLeft, Check, FileText, Lightbulb, Sparkles, X } from 'lucide-react'
 import { createDestinationReview, destinationQuestions, analyzeDestinationBrief, unansweredDestinationQuestions, type DestinationAnswers, type DestinationDomainId, type DestinationMode, type BriefEvidence } from '../lib/destination-discovery'
@@ -23,6 +24,13 @@ export function DestinationStudio({ open, onClose }: { open: boolean; onClose: (
   const fileRead = useRef(0)
   const dialogRef = useRef<HTMLElement>(null)
   const closeRef = useRef<HTMLButtonElement>(null)
+  const [revision, setRevision] = useState(0)
+  const [storageBusy, setStorageBusy] = useState(false)
+  const storageLock = useRef(false)
+  const [storageHold, setStorageHold] = useState(false)
+  const [storageNotice, setStorageNotice] = useState<string | null>(null)
+  const [unknowns, setUnknowns] = useState(['기술·실행 가능성 및 문서 의미 검증 미완료'])
+  const latestDraft = useRef('')
 
   useEffect(() => {
     if (!open) return
@@ -48,6 +56,41 @@ export function DestinationStudio({ open, onClose }: { open: boolean; onClose: (
 
   const currentQuestion = destinationQuestions.find((item) => item.id === questionQueue[questionIndex]) ?? null
   const review = useMemo(() => { try { return createDestinationReview(answers) } catch { return null } }, [answers])
+  const pendingAnswers = {...answers}
+  if (step === 'question' && currentQuestion) {
+    if (draftAnswer.trim()) pendingAnswers[currentQuestion.id] = draftAnswer.trim()
+    else delete pendingAnswers[currentQuestion.id]
+  }
+  const storageDocument: DestinationDraftDocument = {schemaVersion:1,mode,source:briefText,answers:pendingAnswers,unknowns}
+  latestDraft.current = JSON.stringify(storageDocument)
+  const useStorage = async (save: boolean) => {
+    if (storageLock.current) return
+    if (save && (sensitiveContentHint(latestDraft.current) || /\/(?:Users|home|private\/tmp|tmp)\//.test(latestDraft.current.normalize('NFKC')))) {
+      setStorageNotice('민감한 값이나 로컬 경로를 제거한 뒤 저장해 주세요. 서버에 전송하지 않았습니다.'); return
+    }
+    storageLock.current = true; setStorageBusy(true); setStorageNotice(null)
+    const captured = latestDraft.current
+    try {
+      const stored = await requestDestinationDraft(save ? {expectedRevision:revision,document:storageDocument} : undefined)
+      if (save) {
+        setRevision(stored!.revision)
+        setStorageNotice(`초안 버전 ${stored!.revision} 저장됨 · 저장 이후 수정한 내용은 다시 저장해야 합니다. 확정은 아닙니다.`)
+      } else {
+        if (latestDraft.current !== captured) throw new Error('draft_changed_during_load')
+        if (!stored) { setRevision(0); setStorageHold(false); setStorageNotice('저장된 초안이 없습니다. 현재 입력은 유지합니다.'); return }
+        const doc = stored.document
+        setMode(doc.mode); setBriefText(doc.source); setAnswers(doc.answers); setUnknowns(doc.unknowns)
+        const queue = unansweredDestinationQuestions(doc.answers).map(item=>item.id)
+        setQuestionQueue(queue); setQuestionIndex(0); setDraftAnswer(''); setStep(queue.length ? 'question' : 'review')
+        setEvidence(doc.mode === 'brief_gap' ? analyzeDestinationBrief(doc.source).evidence : [])
+        setSourceNote(null); setError(null); setRevision(stored.revision); setStorageHold(false)
+        setStorageNotice(`초안 버전 ${stored.revision} 불러옴 · 미확정`)
+      }
+    } catch {
+      if (save) setStorageHold(true)
+      setStorageNotice(save ? '저장 결과를 확인하지 못했습니다. 입력은 유지됩니다. 자동 재시도하지 않습니다. 서버 초안을 확인한 뒤 계속해 주세요.' : '초안을 불러오지 못했습니다. 현재 입력은 유지됩니다.')
+    } finally { storageLock.current=false; setStorageBusy(false) }
+  }
 
   if (!open) return null
 
@@ -99,7 +142,7 @@ export function DestinationStudio({ open, onClose }: { open: boolean; onClose: (
       </header>
 
       {step === 'entry' && <div className="destination-studio__entry">
-        <p>아이디어 또는 제목이 명시된 기획서에서 목적지 초안을 정리합니다. 초안은 이 화면의 메모리에만 있으며 새로고침하면 사라집니다.</p>
+        <p>아이디어 또는 제목이 명시된 기획서에서 목적지 초안을 정리합니다. 저장하지 않은 입력은 이 화면의 메모리에만 있으며 새로고침하면 사라집니다.</p>
         <div className="destination-studio__entry-grid">
           <button type="button" onClick={() => { setSourceNote(null); setEvidence([]); beginQuestions('guided_200q') }}><Sparkles size={22} aria-hidden="true" /><span><strong>질문으로 시작</strong><small>기본 8개 항목을 정리합니다. 적응형 200Q는 연결 준비 중이에요.</small></span></button>
           <button type="button" onClick={() => { setMode('brief_gap'); setStep('brief'); setError(null) }}><FileText size={22} aria-hidden="true" /><span><strong>기획서에서 빈칸 찾기</strong><small>텍스트·Markdown을 이 기기에서만 읽고, 없거나 충돌하는 항목만 묻습니다.</small></span></button>
@@ -110,7 +153,7 @@ export function DestinationStudio({ open, onClose }: { open: boolean; onClose: (
       {step === 'brief' && <div className="destination-studio__brief">
         <button className="destination-studio__back" type="button" onClick={() => setStep('entry')}><ArrowLeft size={17} aria-hidden="true" />시작 방식</button>
         <div><h3>기획서의 빈칸만 찾을게요</h3><p>헤더에 `문제`, `대상 사용자`, `결과`, `범위`, `비목표`, `제약`, `수용 기준`, `복구`를 쓰면 더 정확해요.</p></div>
-        <label className="destination-studio__file"><span>이 기기에서 파일 읽기</span><input type="file" accept=".md,.markdown,.txt,text/plain,text/markdown" onChange={(event) => void readLocalFile(event.currentTarget.files?.[0])} /><small>서버 업로드 없음 · 64KB 이하</small></label>
+        <label className="destination-studio__file"><span>이 기기에서 파일 읽기</span><input type="file" accept=".md,.markdown,.txt,text/plain,text/markdown" onChange={(event) => void readLocalFile(event.currentTarget.files?.[0])} /><small>읽기만으로는 서버 업로드 없음 · 초안 저장은 별도 · 64KB 이하</small></label>
         <label><span>또는 내용 붙여넣기</span><textarea rows={12} value={briefText} disabled={reading} onChange={(event) => setBriefText(event.currentTarget.value)} placeholder="텍스트 또는 Markdown 기획서" /></label>
         {sourceNote && <p className="destination-studio__note" role="status">{sourceNote}</p>}
         {error && <p className="destination-studio__error" role="alert">{error}</p>}
@@ -131,10 +174,19 @@ export function DestinationStudio({ open, onClose }: { open: boolean; onClose: (
         <div className="destination-studio__review-intro"><span><Check size={18} aria-hidden="true" /></span><div><h3>Destination 초안을 확인해주세요</h3><p>두 시작 경로는 같은 형식으로 수렴합니다. 아직 프로젝트를 만들지 않았어요.</p></div></div>
         <dl>{reviewRows.map(({ id, label }) => <div key={id}><dt>{label}</dt><dd>{review[id]}{evidence.filter(item => item.field === id).map((item, index) => <small key={index}>문서 근거 {item.startLine}–{item.endLine}행 · 현재 답변은 직접 검토 필요</small>)}</dd><button type="button" onClick={() => editAnswer(id)}>{label} 수정</button></div>)}</dl>
         <section className="destination-studio__unknowns" aria-label="잔여 미상"><strong>잔여 미상</strong><span>기본 항목 입력됨 · 기술·실행 가능성 및 문서 의미 검증 미완료</span></section>
-        <p className="destination-studio__boundary"><Lightbulb size={16} aria-hidden="true" />서버 저장·확정 요청이 아직 연결되지 않았습니다. 프로젝트·세션·Gate는 생성하지 않습니다.</p>
+        <p className="destination-studio__boundary"><Lightbulb size={16} aria-hidden="true" />초안 저장은 Destination 확정이 아닙니다. 프로젝트·세션·Gate는 생성하지 않습니다.</p>
         <div className="destination-studio__actions"><button type="button" onClick={() => { const last = destinationQuestions[destinationQuestions.length - 1].id; editAnswer(last) }}><ArrowLeft size={17} aria-hidden="true" />답변 다시 보기</button><button className="destination-studio__primary" type="button" disabled>Destination 확정 · 연결 준비 중</button></div>
       </div>}
 
+      <section className="destination-studio__unknowns" aria-label="초안 보관" aria-busy={storageBusy}>
+        <strong>계정별 진행 중 초안 1개</strong>
+        <span>{privateDestinationStorageAvailable() ? '저장 시 기획서 본문과 답변이 비공개 서버에 보관됩니다. 불러오기는 현재 입력을 대체합니다.' : '서버 초안 저장 연결 준비 중 · 현재 입력은 이 화면에서만 유지됩니다.'}</span>
+        <div className="destination-studio__actions">
+          <button type="button" disabled={storageBusy || storageHold || !privateDestinationStorageAvailable()} onClick={()=>void useStorage(true)}>초안 저장</button>
+          <button type="button" disabled={storageBusy || !privateDestinationStorageAvailable()} onClick={()=>void useStorage(false)}>서버 초안 불러오기 · 현재 입력 대체</button>
+        </div>
+        {storageNotice && <p role="status">{storageNotice}</p>}
+      </section>
     </section>
   </div>
 }

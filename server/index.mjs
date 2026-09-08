@@ -104,6 +104,9 @@ export function createOutcomeServer(options = {}) {
         try { body = await readBody(request) } catch { return json(response, 400, { error: 'invalid_request' }) }
       }
       const value = await handlePrivateAccessRequest({ method: request.method, pathname: url.pathname, token: cookieValue(request, '__session'), service: accountAccess, decisionRuntime: options.decisionRuntime, headers: request.headers, origin: request.headers.origin, body })
+      if (url.pathname === '/api/private/workspace' && value.status === 200 && options.destinationRuntime?.csrfSecret && options.destinationRuntime?.repository) {
+        value.headers = { ...value.headers, 'x-outcome-destination-csrf': options.destinationRuntime.csrfSecret }
+      }
       return json(response, value.status, value.body, value.headers)
     }
     if (request.method === 'POST' && url.pathname === '/api/auth/login') {

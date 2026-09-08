@@ -26,6 +26,35 @@ export type PrivateChatSubmit = { accepted: true; sequence: number; event_id: st
 
 let privateDecisionBinding: { etag: string; csrf: string; bearer?: string } | null = null
 let privateDecisionBindingVersion = 0
+let privateDestinationBinding: { csrf: string; bearer?: string } | null = null
+export const privateDestinationStorageAvailable = () => privateDestinationBinding !== null
+export const activeDestinationDraftId = '00000000-0000-4000-8000-000000000001'
+export type DestinationDraftDocument = { schemaVersion: 1; mode: 'guided_200q' | 'brief_gap'; source: string; answers: import('./destination-discovery').DestinationAnswers; unknowns: string[] }
+export type StoredDestinationDraft = { draftId: string; revision: number; document: DestinationDraftDocument; state: 'draft'; completionAuthority: false }
+
+export function validateStoredDestinationDraft(value: unknown): StoredDestinationDraft | null {
+  const object = (v: unknown, keys: string[]): v is Record<string, unknown> => !!v && typeof v === 'object' && !Array.isArray(v) && Object.keys(v).length === keys.length && keys.every(k => Object.hasOwn(v, k))
+  if (!object(value, ['draft', 'completionAuthority']) || value.completionAuthority !== false) throw new Error('destination_response_invalid')
+  if (value.draft === null) return null
+  const row = value.draft
+  if (!object(row, ['draftId','revision','document','state','completionAuthority']) || row.draftId !== activeDestinationDraftId || !Number.isSafeInteger(row.revision) || Number(row.revision) < 1 || row.state !== 'draft' || row.completionAuthority !== false) throw new Error('destination_response_invalid')
+  const doc = row.document
+  const fields = ['problem','targetUser','outcome','scope','nonGoals','constraints','acceptance','failureRecovery']
+  if (!object(doc, ['schemaVersion','mode','source','answers','unknowns']) || doc.schemaVersion !== 1 || !['guided_200q','brief_gap'].includes(String(doc.mode)) || typeof doc.source !== 'string' || new TextEncoder().encode(doc.source).length > 65536 || !doc.answers || typeof doc.answers !== 'object' || Array.isArray(doc.answers) || Object.entries(doc.answers).some(([k,v]) => !fields.includes(k) || typeof v !== 'string' || new TextEncoder().encode(v).length > 16000) || !Array.isArray(doc.unknowns) || doc.unknowns.length > 200 || doc.unknowns.some(v => typeof v !== 'string' || new TextEncoder().encode(v).length > 2000)) throw new Error('destination_response_invalid')
+  return row as StoredDestinationDraft
+}
+
+export async function requestDestinationDraft(save?: { expectedRevision: number; document: DestinationDraftDocument }): Promise<StoredDestinationDraft | null> {
+  const binding = privateDestinationBinding; const generation = privateDecisionBindingVersion
+  if (!binding) throw new Error('destination_unavailable')
+  const response = await fetch(`/api/private/destination/drafts/${activeDestinationDraftId}`, { method: save ? 'PUT' : 'GET', credentials: 'same-origin', headers: { ...privateSessionHeaders(binding.bearer), ...(save ? { 'content-type':'application/json','x-outcome-csrf':binding.csrf } : {}) }, ...(save ? { body:JSON.stringify({requestId:crypto.randomUUID(),expectedRevision:save.expectedRevision,document:JSON.stringify(save.document)}) } : {}) })
+  const value = await readJson<unknown>(response)
+  if (generation !== privateDecisionBindingVersion || binding !== privateDestinationBinding) throw new Error('destination_identity_changed')
+  const draft = validateStoredDestinationDraft(value)
+  const canonical = (doc: DestinationDraftDocument) => JSON.stringify([doc.schemaVersion,doc.mode,doc.source,Object.entries(doc.answers).sort(([a],[b])=>a.localeCompare(b)),doc.unknowns])
+  if (save && (!draft || draft.revision !== save.expectedRevision + 1 || canonical(draft.document) !== canonical(save.document))) throw new Error('destination_response_invalid')
+  return draft
+}
 
 async function readJson<T>(response: Response): Promise<T> {
   const body = await response.json() as T & { error?: string }
@@ -66,11 +95,14 @@ export async function fetchPrivateAccessConfig(): Promise<PrivateAccessConfig> {
 export async function fetchPrivateWorkspace(sessionToken?: string): Promise<{ workspace: PrivateWorkspaceView }> {
   const bindingVersion=++privateDecisionBindingVersion
   privateDecisionBinding=null
+  privateDestinationBinding=null
   const response = await fetch('/api/private/workspace', { credentials: 'same-origin', headers: privateSessionHeaders(sessionToken) })
   const value = await readJson<{ workspace: PrivateWorkspaceView }>(response)
   const etag = response.headers.get('etag') ?? ''
   const csrf = response.headers.get('x-outcome-csrf') ?? ''
   if(bindingVersion===privateDecisionBindingVersion)privateDecisionBinding = etag && csrf ? { etag, csrf, ...(sessionToken ? { bearer: sessionToken } : {}) } : null
+  const destinationCsrf=response.headers.get('x-outcome-destination-csrf')
+  if(bindingVersion===privateDecisionBindingVersion)privateDestinationBinding=destinationCsrf ? {csrf:destinationCsrf,...(sessionToken ? {bearer:sessionToken} : {})} : null
   return value
 }
 
@@ -97,6 +129,7 @@ export async function beginPrivateSession(provider: 'google' | 'email_code', nav
 export async function endPrivateSession(): Promise<void> {
   privateDecisionBindingVersion++
   privateDecisionBinding = null
+  privateDestinationBinding = null
   await readJson(await fetch('/api/private/auth/logout', { method: 'POST', credentials: 'same-origin' }))
 }
 
