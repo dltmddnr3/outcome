@@ -126,7 +126,7 @@ const privateSessionDiagnostic = (logger, input, error, configuredOrigin) => {
   try { logger?.info?.('outcome_private_session', { authSource: input.authSource, ...tokenState, ...(sdkReason ? { sdkReason } : {}), ...safeError }) } catch {}
 }
 
-export function createStableHostRequestHandler({ environment = process.env, runtimeFactory = createHostedIdentityRuntime, bridgeRuntimeFactory, chatRuntimeFactory, clerkClientFactory, clerkTokenVerifier, logger } = {}) {
+export function createStableHostRequestHandler({ environment = process.env, runtimeFactory = createHostedIdentityRuntime, bridgeRuntimeFactory, chatRuntimeFactory, decisionRuntimeFactory, clerkClientFactory, clerkTokenVerifier, logger } = {}) {
   const configured = readHostedIdentityConfiguration(environment).enabled
   const configuredOrigin = typeof environment?.[HOSTED_IDENTITY_ENV.privateAllowedOrigin] === 'string' ? environment[HOSTED_IDENTITY_ENV.privateAllowedOrigin].trim() : ''
   const chatOrigins = hostedAuthorizedParties(environment)
@@ -137,6 +137,7 @@ export function createStableHostRequestHandler({ environment = process.env, runt
     && typeof value?.service?.authenticate === 'function'
   let runtimePromise
   let chatRuntimePromise
+  let decisionRuntimePromise
   const selectedChatRuntimeFactory = chatRuntimeFactory ?? createOutcomeChatHostedRuntimeFactory({ environment })
   const bridgeControl = createObserverBridgeRuntimeControl({ environment, runtimeFactory: bridgeRuntimeFactory ?? createManagedObserverBridgeRuntimeFactory({ environment }) })
   const selectedRuntime = async () => {
@@ -234,7 +235,24 @@ export function createStableHostRequestHandler({ environment = process.env, runt
         return error?.status ? result(error.status, { error: error.code }) : result(503, { error: 'private_workspace_unavailable' })
       }
     }
-    if (method === 'GET' && pathname === '/api/private/workspace') return handlePrivateAccessRequest({ method, pathname, token: privateSessionToken(headers), service: hosted.service })
+    if ((method === 'GET' && pathname === '/api/private/workspace') || pathname === '/api/private/decisions') {
+      const token = privateSessionToken(headers)
+      if (!token) return result(401, { error: 'authentication_required' })
+      let decisionRuntime
+      if (typeof decisionRuntimeFactory === 'function') {
+        try { await hosted.service.authenticate(token) } catch { return result(401, { error: 'authentication_required' }) }
+        decisionRuntimePromise ??= Promise.resolve().then(() => decisionRuntimeFactory({ accountRuntime: hosted, allowedOrigin: configuredOrigin })).catch(() => null)
+        const candidate = await decisionRuntimePromise
+        if (candidate?.allowedOrigin === configuredOrigin && typeof candidate?.csrfSecret === 'string' && candidate.csrfSecret.length >= 16 && typeof candidate?.service?.record === 'function') decisionRuntime = candidate
+      }
+      let parsedBody = body
+      if (pathname === '/api/private/decisions' && method === 'POST' && (typeof body === 'string' || Buffer.isBuffer(body))) {
+        if (Buffer.byteLength(body) > 10_000) return result(400, { error: 'invalid_request' })
+        try { parsedBody = JSON.parse(body.toString()) } catch { return result(400, { error: 'invalid_request' }) }
+      }
+      const decisionHeaders = Object.fromEntries(['content-type','origin','x-outcome-csrf','if-match'].map((name) => [name,String(header(headers,name))]))
+      return handlePrivateAccessRequest({ method, pathname, token, service: hosted.service, decisionRuntime, headers: decisionHeaders, origin, body: parsedBody })
+    }
     return method === 'GET' ? result(404, { error: 'not_found' }) : result(405, { error: 'read_only' })
   }
 }
@@ -257,9 +275,10 @@ const MAXIMUM_STABLE_BRIDGE_BODY_BYTES = 1_048_576
 export const rawBridgeBody = async (request, pathname) => {
   const target = bridgeRequestTarget(pathname)
   const chatMessage = pathname === '/api/private/chat/messages' && request.method === 'POST'
-  const maximumBytes = chatMessage ? 10_000 : MAXIMUM_STABLE_BRIDGE_BODY_BYTES
+  const decisionMessage = pathname === '/api/private/decisions' && request.method === 'POST'
+  const maximumBytes = chatMessage || decisionMessage ? 10_000 : MAXIMUM_STABLE_BRIDGE_BODY_BYTES
   const body = request.body
-  if ((!chatMessage && (!target.candidate || !target.valid)) || request.method === 'GET' || typeof body === 'string' || Buffer.isBuffer(body)) return body
+  if ((!chatMessage && !decisionMessage && (!target.candidate || !target.valid)) || request.method === 'GET' || typeof body === 'string' || Buffer.isBuffer(body)) return body
   const chunks = []
   let bytes = 0
   try {

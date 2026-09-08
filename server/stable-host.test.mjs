@@ -91,6 +91,31 @@ const identityEnvironment = {
   OUTCOME_PRIVATE_ROLLBACK_DEPLOYMENT: 'rollback-preview',
 }
 
+test('hosted decision boundary requires authentication, authentic origin and explicit runtime', async () => {
+  const {createAccountModelV2Projection}=await import('./account-model-v2-projection.mjs')
+  const {createDecisionRecordService,createInMemoryDecisionRecordStore}=await import('./outcome-decision-record.mjs')
+  const projection=createAccountModelV2Projection({project:{id:'outcome',name:'OUTCOME',outcome:'safe result'},blocked:true,events:[{id:'event-blocked',sequence:1,role:'planner',type:'result_observed',summary:'검토 필요',observedAt:'2026-09-08T00:00:00.000Z',status:'safe_hold'}]},{observedAt:'2026-09-08T00:00:00.000Z'})
+  const workspace={workspace:{id:'workspace'},projects:[{project:{id:'outcome'},modelV2:projection}],completionAuthority:false}
+  let factories=0
+  const runtimeFactory=async()=>({allowedOrigin:identityEnvironment.OUTCOME_PRIVATE_ALLOWED_ORIGIN,publishableKey:'pk_test_boundary',service:{authenticate:async(token)=>{if(token!=='valid') throw Error('invalid');return {subject:'owner'}},readWorkspace:async()=>workspace}})
+  const handler=createStableHostRequestHandler({environment:identityEnvironment,runtimeFactory,decisionRuntimeFactory:async()=>{factories++;return {allowedOrigin:identityEnvironment.OUTCOME_PRIVATE_ALLOWED_ORIGIN,csrfSecret:'csrf-value-long-enough',service:createDecisionRecordService({store:createInMemoryDecisionRecordStore()})}}})
+  assert.equal((await handler({method:'POST',pathname:'/api/private/decisions'})).status,401)
+  assert.equal(factories,0)
+  const headers={cookie:'__session=valid'}
+  const current=await handler({pathname:'/api/private/workspace',headers})
+  assert.equal(current.status,200)
+  const request={method:'POST',pathname:'/api/private/decisions',headers:{...headers,'content-type':'application/json',origin:'https://preview.invalid','x-outcome-csrf':current.headers['x-outcome-csrf'],'if-match':current.headers.etag},origin:'https://preview.invalid',body:JSON.stringify({projectId:'outcome',eventId:'event-blocked',sequence:1,decision:'approved',nonce:'nonce-value-that-is-long-enough-123'})}
+  assert.equal((await handler(request)).status,201)
+  assert.equal((await handler({...request,origin:'https://evil.invalid'})).status,403)
+  assert.equal((await handler({...request,body:'{'})).status,400)
+  assert.equal((await handler({...request,body:'x'.repeat(10001)})).status,400)
+  assert.equal(factories,1)
+  const disabled=createStableHostRequestHandler({environment:identityEnvironment,runtimeFactory})
+  assert.equal((await disabled(request)).status,503)
+  const stream={method:'POST',async *[Symbol.asyncIterator](){yield Buffer.alloc(10001)}}
+  assert.equal((await rawBridgeBody(stream,'/api/private/decisions')).length,10001)
+})
+
 test('production chat ingress reads streamed UTF-8 bodies and caps bytes before service invocation', async () => {
   const payload = Buffer.from(JSON.stringify({ project_id:'outcome', message:'안녕하세요' }))
   const request = { method:'POST', async *[Symbol.asyncIterator]() { yield payload.subarray(0, 42); yield payload.subarray(42) } }
