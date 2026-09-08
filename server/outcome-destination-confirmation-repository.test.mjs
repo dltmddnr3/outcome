@@ -15,6 +15,26 @@ import {createDestinationHostedRuntimeFactory} from './outcome-destination-hoste
 
 const scope={workspaceId:'workspace',accountRef:'owner',draftId:'00000000-0000-4000-8000-000000000001'}
 const requestId='00000000-0000-4000-8000-000000000010'
+test('creation reader requires exact confirmed request and preserves confirmed snapshot after draft edits',async()=>{
+ const f=await fixture();try{
+  const repo=createDestinationConfirmationRepository(f)
+  assert.equal(await repo.readConfirmedCreation({...scope,requestId}),null)
+  const review=await repo.review(scope)
+  await repo.confirm({...scope,requestId,reviewDigest:review.reviewDigest,confirmed:true})
+  const input=await repo.readConfirmedCreation({...scope,requestId})
+  assert.equal(input.reviewDigest,review.reviewDigest);assert.equal(input.executionAuthority,false);assert.equal(input.completionAuthority,false)
+  assert.equal(createHash('sha256').update(input.serializedSnapshot).digest('hex'),review.reviewDigest)
+  assert.equal(await repo.readConfirmedCreation({...scope,accountRef:'foreign',requestId}),null)
+  assert.equal(await repo.readConfirmedCreation({...scope,requestId:'00000000-0000-4000-8000-000000000099'}),null)
+  await f.drafts.save({...scope,requestId:'00000000-0000-4000-8000-000000000099',expectedRevision:1,document:JSON.stringify({...f.document,answers:{...f.document.answers,outcome:'unconfirmed changed outcome'}})})
+  assert.deepEqual(await repo.readConfirmedCreation({...scope,requestId}),input)
+  assert.equal(await f.count(),1)
+  await assert.rejects(()=>createDestinationConfirmationRepository({transact:f.transact}).readConfirmedCreation({...scope,requestId}))
+  await assert.rejects(()=>createDestinationConfirmationRepository({...f,verifyReview:async()=>JSON.stringify({verified:true,reviewDigest:review.reviewDigest,evidenceDigest:'f'.repeat(64),completionAuthority:false})}).readConfirmedCreation({...scope,requestId}))
+  await f.db.query("update outcome_destination_private.confirmations set snapshot=jsonb_set(snapshot,'{executionAuthority}','true')")
+  await assert.rejects(()=>repo.readConfirmedCreation({...scope,requestId}))
+ }finally{await f.db.close()}
+})
 test('trusted inspection reads pending snapshot without verification, writes or inferred readiness',async()=>{
  const f=await fixture({unknowns:['technical review pending'],coverage:[]});try{
   const repo=createDestinationConfirmationRepository({transact:f.transact})

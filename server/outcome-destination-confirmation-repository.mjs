@@ -46,17 +46,35 @@ export function createDestinationConfirmationRepository({transact,verifyReview}=
   const serialized=canonical(snapshot),reviewDigest=hash(serialized)
   return {snapshot,serialized,reviewDigest,blockers}
  }
- const prepare=async(query,scope)=>{
-  const {snapshot,serialized,reviewDigest,blockers}=await readSnapshot(query,scope)
-  if(blockers.length)throw Error(`destination_confirmation_${blockers[0]}`)
+ const verifySnapshot=async(query,scope,serialized,reviewDigest)=>{
   if(typeof verifyReview!=='function')throw Error('destination_confirmation_verification_pending')
   const raw=await verifyReview({workspaceId:scope[0],accountRef:scope[1],reviewDigest,serializedSnapshot:serialized,query})
   if(typeof raw!=='string'||Buffer.byteLength(raw)>2048)fail()
   let proof;try{proof=JSON.parse(raw)}catch{fail()}
   if(!proof||Object.keys(proof).sort().join(',')!=='completionAuthority,evidenceDigest,reviewDigest,verified'||proof.verified!==true||proof.completionAuthority!==false||proof.reviewDigest!==reviewDigest||!digest(proof.evidenceDigest))fail()
-  return {snapshot,reviewDigest,evidenceDigest:proof.evidenceDigest}
+  return proof.evidenceDigest
+ }
+ const prepare=async(query,scope)=>{
+  const {snapshot,serialized,reviewDigest,blockers}=await readSnapshot(query,scope)
+  if(blockers.length)throw Error(`destination_confirmation_${blockers[0]}`)
+  return {snapshot,reviewDigest,evidenceDigest:await verifySnapshot(query,scope,serialized,reviewDigest)}
  }
  return Object.freeze({
+  // Trusted creation consumer only. Never expose the private snapshot through a
+  // browser endpoint, or replace it with an unconfirmed newer draft.
+  readConfirmedCreation:input=>run(input,async(query,scope)=>{
+   if(!uuid(input.requestId))fail()
+   const row=(await query('select * from outcome_destination_private.confirmations where workspace_id=$1 and account_ref=$2 and draft_id=$3 and request_id=$4',[...scope,input.requestId])).rows[0]
+   if(!row)return null
+   const snapshot=row.snapshot,serialized=canonical(snapshot)
+   if(row.workspace_id!==scope[0]||row.account_ref!==scope[1]||row.draft_id!==scope[2]||row.request_id!==input.requestId
+    ||!digest(row.review_digest)||!digest(row.evidence_digest)||hash(serialized)!==row.review_digest
+    ||snapshot?.schemaVersion!==1||snapshot.draftId!==scope[2]||snapshot.completionAuthority!==false||snapshot.executionAuthority!==false
+    ||snapshot.intakeRevision!==row.intake_revision||snapshot.contextRevision!==row.context_revision)fail()
+   const evidenceDigest=await verifySnapshot(query,scope,serialized,row.review_digest)
+   if(evidenceDigest!==row.evidence_digest)fail()
+   return {requestId:row.request_id,draftId:row.draft_id,reviewDigest:row.review_digest,evidenceDigest,serializedSnapshot:serialized,completionAuthority:false,executionAuthority:false}
+  }),
   // Private assessment input only; never route this method to a browser API.
   // Empty structural blockers still mean unverified, not source-ready.
   inspect:input=>run(input,async(query,scope)=>{
