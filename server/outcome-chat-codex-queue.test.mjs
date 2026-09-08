@@ -76,6 +76,18 @@ test('public locator injection and stale or non-Planner targets fail before spaw
   assert.equal(calls, 0)
 })
 
+test('CLI receipt requires exact destination and UUID, with no extra text or nonzero exit', async () => {
+  const valid='Queued message 11111111-1111-4111-8111-111111111111 for thread synthetic-private-destination.'
+  for(const [output,code,delivery] of [[valid,0,'acknowledged'],[valid,1,'delivery_unknown'],[valid.replace('synthetic-private-destination','other'),0,'delivery_unknown'],[valid.replace('11111111-1111-4111-8111-111111111111','invalid'),0,'delivery_unknown'],[valid+' extra',0,'delivery_unknown'],['warning\n'+valid,0,'delivery_unknown']]) {
+    const spawnProcess=childFixture(()=>{})
+    const adapter=createCodexQueueAdapter({enabled:true,registryPath:registry(),now:()=>now,spawnProcess:(...args)=>{
+      const child=spawnProcess(...args);queueMicrotask(()=>{child.stdout.emit('data',Buffer.from(output+'\n'));child.emit('close',code,null)});return child
+    }})
+    const binding=await adapter.bindingResolver({project_id:'outcome',role:'planner'})
+    assert.deepEqual(await adapter.transport({destination:binding.destination,message:'receipt check',correlation_id:'message-0123456789abcdef'}),{delivery})
+  }
+})
+
 test('timeout kills once and raw output nonzero ambiguous and duplicate attempts stay unknown', async () => {
   for (const mode of ['timeout', 'nonzero', 'ambiguous', 'error']) {
     let active, timer, calls = 0

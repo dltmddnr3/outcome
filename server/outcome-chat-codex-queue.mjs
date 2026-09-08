@@ -14,6 +14,11 @@ const exact = (value, keys) => {
   return Object.fromEntries(keys.map((key) => [key, descriptors[key].value]))
 }
 const unknown = Object.freeze({ delivery: 'delivery_unknown' })
+const queuedReceipt = (status, locator) => {
+  if (status === 'queued' || status === 'acknowledged') return true
+  const match = /^Queued message ([a-f0-9]{8}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{12}) for thread (.+)\.$/.exec(status)
+  return Boolean(match && match[2] === locator)
+}
 
 export function createCodexQueueAdapter({ enabled = false, registryPath, spawnProcess = spawn, codexExecutable = 'codex', readThread, now = () => new Date().toISOString(), maxFreshMs = 15 * 60_000, timeoutMs = 5_000, maxOutputBytes = 256, setTimer = setTimeout, clearTimer = clearTimeout } = {}) {
   if (enabled !== true) return null
@@ -77,7 +82,7 @@ export function createCodexQueueAdapter({ enabled = false, registryPath, spawnPr
           if (!child || typeof child.once !== 'function' || !child.stdout || !child.stderr || typeof child.stdout.on !== 'function' || typeof child.stderr.on !== 'function' || typeof child.kill !== 'function') { finish(); return }
           child.stdout.on('data', collect); child.stderr.on('data', collect)
           child.once('error', () => finish())
-          child.once('close', (code, signal) => { if (settled) return; const status = output.toString('utf8').trim(); finish(code === 0 && signal == null && (status === 'queued' || status === 'acknowledged') ? { delivery: 'acknowledged' } : unknown) })
+          child.once('close', (code, signal) => { if (settled) return; const status = output.toString('utf8').trim(); finish(code === 0 && signal == null && queuedReceipt(status, locator) ? { delivery: 'acknowledged' } : unknown) })
           timer = setTimer(() => { kill(); finish() }, timeoutMs)
         } catch { kill(); finish() }
       })
