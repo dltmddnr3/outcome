@@ -50,6 +50,11 @@ These are program responsibilities, not new agents, schedules or products. The c
 
 #### Candidate-bound stage receipt check · 2026-09-09
 
+- [x] Native local sandbox feasibility: actual child writes only the explicit test-owned subtree; outside sentinel is preserved. This probe does not prove privacy/read isolation, command pinning, descendant cleanup or stage execution.
+  CHECK: node --test server/outcome-work-sandbox.test.mjs
+  EXPECT: fail 0
+  EVIDENCE: 2026-09-09 native macOS child-process probes 2 PASS, 0 skipped: explicit subtree write succeeds, outside sentinel write returns EPERM/EACCES and bytes remain unchanged; connection to a real listening loopback test server returns EPERM/EACCES. Test-only temporary files/server removed after checks. Profile uses allow-default plus write/network restrictions, so unrestricted reads remain and this MUST NOT be activated as the final private-work executor. No stage commands executed.
+
 - [x] V2 grant binds explicit checkout reference, per-stage argv/timeouts and exact relative write paths to approval bytes. V1 remains transport/reservation compatibility only; no automatic conversion to command permission. Contract parsing is not an OS sandbox or executable trust proof.
   CHECK: node --test server/outcome-work-execution-grant.test.mjs server/outcome-work-grant-store.test.mjs
   EXPECT: fail 0
