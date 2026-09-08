@@ -5,8 +5,22 @@ import {join} from 'node:path'
 import {tmpdir} from 'node:os'
 import {createDestinationInputStore} from './outcome-destination-input-store.mjs'
 import {destinationDocumentDigest} from './outcome-destination-analysis-source.mjs'
+import {discoveryContextDigest} from './outcome-destination-discovery-repository.mjs'
+import {readDestinationAnalysisInput} from '../scripts/read-destination-analysis-input.mjs'
 import {execFileSync,spawnSync} from 'node:child_process'
 import {fileURLToPath} from 'node:url'
+test('private question input retains full 200-answer context through the existing reader',async()=>{
+ const directory=await realpath(await mkdtemp(join(tmpdir(),'outcome-question-store-test-')));await chmod(directory,0o700)
+ const answers=Array.from({length:200},(_,i)=>({questionId:`q-${i}`,gapId:`gap-${i}`,value:'가'.repeat(4000)}))
+ const context={source:'',mode:'guided_200q',seedAnswers:{problem:'문제'},unknowns:['검증 필요'],revision:1,answers,askedQuestionIds:answers.map(a=>a.questionId)}
+ const input={requestId:'00000000-0000-4000-8000-000000000010',draftId:'00000000-0000-4000-8000-000000000011',contextRevision:1,contextDigest:discoveryContextDigest(context),serializedContext:JSON.stringify(context),purpose:'destination_questions_only',executionAuthority:false}
+ const store=createDestinationInputStore({directory,scopeKey:'a'.repeat(64)})
+ const publication=await store.publish(input)
+ assert.equal(publication.contextDigest,input.contextDigest)
+ const recovered=await readDestinationAnalysisInput({reference:publication.reference,environment:{OUTCOME_DESTINATION_INPUT_READER_ENABLED:'1',OUTCOME_DESTINATION_INPUT_DIRECTORY:directory,OUTCOME_DESTINATION_INPUT_SCOPE_SHA256:'a'.repeat(64)}})
+ assert.equal(recovered.serializedContext,input.serializedContext);assert.equal(recovered.purpose,'destination_questions_only')
+ for(const invalid of [{...input,contextDigest:'b'.repeat(64)},{...input,contextRevision:2},{...input,executionAuthority:true},{...input,serializedDocument:'unexpected'}])await assert.rejects(()=>store.publish(invalid),/destination_input_unavailable/)
+})
 test('private input store persists exact reference, denies scope/permission/symlink/content drift',async()=>{
  const directory=await realpath(await mkdtemp(join(tmpdir(),'outcome-analysis-store-test-')))
  await chmod(directory,0o700)
