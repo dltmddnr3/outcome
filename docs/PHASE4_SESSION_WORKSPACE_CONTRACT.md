@@ -48,6 +48,13 @@ These are program responsibilities, not new agents, schedules or products. The c
 
 ### Existing Phase 4 acceptance additions
 
+#### Candidate-bound stage receipt check · 2026-09-09
+
+M4-2/AP-4-06: add a bounded read-only JSON receipt checker. Trusted caller supplies expected digest, project/work/run identity, candidate commit/tree, stage, verification mode and nonempty required check IDs; receipt must match all fields and contain exactly one passing result per required check. Reject oversized/malformed input, additional fields, duplicate checks, empty requirements, candidate/scope/mode drift and failed results. Digest integrity is not issuer trust or execution approval; caller must separately resolve current authorized source and authority. No HTTP route, scheduler, live reader, signature issuer, approval or dispatch is created.
+CHECK: node --test server/outcome-work-stage-receipt.test.mjs
+EXPECT: matching receipt accepted only as content match; hostile/mismatched input rejected; no execution/completion authority.
+EVIDENCE: 2026-09-09 receipt/continuation/journal suites 16 PASS. Receipt cases cover all identity/candidate/stage/mode fields, altered bytes, failed/missing/duplicate/extra checks, empty requirements and invalid input. Source callsite inspection still finds no production caller for the receipt checker or current-authority resolver for the continuation controller. These are implemented local prerequisites, not integrated continuous execution. No new permission or live activation is inferred.
+
 #### Restart delivery readback correction · 2026-09-09
 
 AP-4-06 structural evidence prerequisite: before reserving or beginning qa_verifying/release_verifying, the terminal record must contain a syntactically valid evidence reference, even if an injected eligibility verifier returns true. This is only a necessary condition; a digest does not prove artifact content, issuer, authority or PASS. CHECK: missing-stage-evidence continuation regression plus journal/observer suites. EXPECT: zero reservations and zero dispatch on absent evidence. EVIDENCE: RED reproduced 2026-09-09 (missing reference incorrectly acknowledged); GREEN 21 tests passed including both implementing-to-QA and QA-to-release checks, diff check PASS. No live activation or full evidence-verifier claim.
