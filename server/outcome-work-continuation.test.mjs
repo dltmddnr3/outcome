@@ -1,5 +1,7 @@
 import test from 'node:test'
 import assert from 'node:assert/strict'
+import {createHash} from 'node:crypto'
+import {createAuthorizedWorkContinuationController} from './outcome-work-continuation.mjs'
 import {DatabaseSync} from 'node:sqlite'
 import {mkdtempSync,rmSync} from 'node:fs'
 import {join} from 'node:path'
@@ -19,6 +21,32 @@ function setup({evidenceRef=receipt}={}){
   journal.append(scopeJson,JSON.stringify(last),2,time)
   return {db,journal,last,options:{enabled:true,journal,verifyEligibility:async()=>true,dispatch:async()=>ack,now:()=>time}}
 }
+test('authorized composition checks grant and evidence before each claim/send and never replays',async()=>{
+  for(const mode of ['valid','missing','revoked','changed-owner','changed-candidate','expired','evidence-fail','revoke-before-send']){
+    const s=setup();let sends=0,reads=0
+    const ownerRef='e'.repeat(64)
+    const grantJson=JSON.stringify({schemaVersion:1,...scope,ownerRef,candidateCommit:commit,candidateTree:tree,allowedStages:['qa_verifying'],issuedAt:time-100,expiresAt:mode==='expired'?time:time+100})
+    const request=JSON.stringify({...JSON.parse(input),authorityRef:createHash('sha256').update(grantJson).digest('hex'),...(mode==='changed-candidate'?{candidateCommit:'f'.repeat(40)}:{})})
+    const resolveExecutionGrant=mode==='missing'?undefined:async()=>{reads++;return JSON.stringify({grantJson,ownerRef:mode==='changed-owner'?'f'.repeat(64):ownerRef,status:mode==='revoked'||(mode==='revoke-before-send'&&reads===2)?'revoked':'active'})}
+    try{
+      const c=createAuthorizedWorkContinuationController({...s.options,resolveExecutionGrant,verifyEligibility:async()=>mode!=='evidence-fail',dispatch:async()=>{sends++;return ack}})
+      const r=await c.runOnce(request)
+      assert.equal(r.outcome==='acknowledged',mode==='valid',mode)
+      assert.equal(sends,mode==='valid'?1:0,mode)
+      if(mode==='valid'){assert.equal(reads,2);assert.equal((await c.runOnce(request)).outcome,'acknowledged');assert.equal(sends,1)}
+    }finally{s.db.close()}
+  }
+})
+test('approval expiring during evidence verification cannot reserve or send',async()=>{
+  const s=setup();let clock=time,sends=0
+  const ownerRef='e'.repeat(64),grantJson=JSON.stringify({schemaVersion:1,...scope,ownerRef,candidateCommit:commit,candidateTree:tree,allowedStages:['qa_verifying'],issuedAt:time-1,expiresAt:time+1})
+  try{
+    const request=JSON.stringify({...JSON.parse(input),authorityRef:createHash('sha256').update(grantJson).digest('hex')})
+    const c=createAuthorizedWorkContinuationController({...s.options,now:()=>clock,resolveExecutionGrant:async()=>JSON.stringify({grantJson,ownerRef,status:'active'}),verifyEligibility:async()=>{clock++;return true},dispatch:async()=>{sends++;return ack}})
+    assert.equal((await c.runOnce(request)).outcome,'authority_hold');assert.equal(sends,0)
+    assert.equal(s.db.prepare('SELECT count(*) AS n FROM outcome_work_reservations').get().n,0)
+  }finally{s.db.close()}
+})
 test('missing stage evidence cannot dispatch even when eligibility port erroneously permits it',async()=>{
   for(const action of ['qa_verifying','release_verifying']){
     const s=setup({evidenceRef:action==='qa_verifying'?null:receipt});let sends=0

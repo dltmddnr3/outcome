@@ -1,5 +1,25 @@
+import {verifyWorkExecutionGrant} from './outcome-work-execution-grant.mjs'
+
 const result = outcome => Object.freeze({outcome,completionAuthority:false,executionAuthority:false})
 const hash=(value,length)=>typeof value==='string'&&new RegExp(`^[a-f0-9]{${length}}$`).test(value)
+
+// Local composition only. Resolver must authenticate the owner and read current
+// revocation state from trusted storage on every call. No cached grant fallback.
+export function createAuthorizedWorkContinuationController({resolveExecutionGrant,verifyEligibility,now=Date.now,...options}={}){
+  return createWorkContinuationController({...options,now,verifyEligibility:async(input,context)=>{
+    if(typeof resolveExecutionGrant!=='function'||typeof verifyEligibility!=='function')return false
+    const raw=await resolveExecutionGrant(input,context)
+    if(context.signal.aborted||typeof raw!=='string'||Buffer.byteLength(raw)>16384)return false
+    const resolved=JSON.parse(raw),scope=JSON.parse(input.scopeJson)
+    if(!resolved||Array.isArray(resolved)||Object.keys(resolved).sort().join(',')!=='grantJson,ownerRef,status')return false
+    const expected=JSON.stringify({...scope,ownerRef:resolved.ownerRef,candidateCommit:input.candidateCommit,
+      candidateTree:input.candidateTree,authorityRef:input.authorityRef,action:input.action,status:resolved.status})
+    if(!verifyWorkExecutionGrant(resolved.grantJson,expected,now()).matches)return false
+    if(await verifyEligibility(input,context)!==true||context.signal.aborted)return false
+    // Evidence reads may take time. Never carry an expired approval forward.
+    return verifyWorkExecutionGrant(resolved.grantJson,expected,now()).matches
+  }})
+}
 
 // All ports are trusted local composition, never supplied by an HTTP caller.
 // verifyEligibility must actually verify authority, dependencies, immutable

@@ -50,6 +50,11 @@ These are program responsibilities, not new agents, schedules or products. The c
 
 #### Candidate-bound stage receipt check · 2026-09-09
 
+- [x] Grant-controller composition checks fresh approval both before reservation and dispatch; missing resolver, revoked/expired/mismatched grant or failed evidence prevents sending.
+  CHECK: node --test server/outcome-work-continuation.test.mjs
+  EXPECT: fail 0
+  EVIDENCE: 2026-09-09 same-session targeted controller/grant/journal/receipt 22 PASS, diff check PASS. Real in-memory journal plus injected resolver/transport verifies eight approval/evidence scenarios, reservation-to-dispatch revocation, expiry during evidence read and durable no-replay. Local composition only; live approval issuer/storage remains unconnected. No claim of atomic revocation across external dispatch or actual owner execution.
+
 Execution grant local contract · Cherry approved 2026-09-09 · M4-2/AP-4-05, AP-4-06. Separate from recorded inbox decisions. Bind project/work/run, current session/binding, owner, candidate/tree, allowed local stages, validity interval and grant digest. Trusted local caller must supply freshly resolved active/revoked status and current owner; grant bytes alone confer no authority. Dependency/evidence verification remains separately mandatory. No live issuer, HTTP endpoint, database migration, activation or deployment.
 - [x] Local grant rejects expiry, revocation, candidate/owner/binding drift and legacy decisions.
   CHECK: node --test server/outcome-work-execution-grant.test.mjs
