@@ -99,13 +99,27 @@ export async function endPrivateSession(): Promise<void> {
 const decisionNonce = () => Array.from(crypto.getRandomValues(new Uint8Array(24)), (value) => value.toString(16).padStart(2, '0')).join('')
 export const privateDecisionRecordingAvailable = () => privateDecisionBinding !== null
 
+export function validatePrivateDecisionReceipt(value: unknown, expected: {decision:'approved'|'rejected'; rejectionReason?:PrivateDecisionReason|null}): PrivateDecisionReceipt {
+  const invalid = (): never => { throw new Error('decision_receipt_invalid') }
+  if(!value||typeof value!=='object'||Array.isArray(value)||Object.getPrototypeOf(value)!==Object.prototype)return invalid()
+  const fields=Object.getOwnPropertyDescriptors(value)
+  const keys=['decisionState','decisionId','decision','rejectionReason','decidedAt','decisionActorClass','notice','supersedesId','completionAuthority']
+  if(Reflect.ownKeys(value).length!==keys.length||keys.some(key=>!fields[key]?.enumerable||!Object.hasOwn(fields[key],'value')))return invalid()
+  const record=Object.fromEntries(keys.map(key=>[key,fields[key].value]))
+  if(record.decisionState!=='recorded'||record.decision!==expected.decision||record.rejectionReason!==(expected.decision==='rejected'?expected.rejectionReason??null:null)||record.decisionActorClass!=='owner'||record.notice!=='기록됨 · 전달은 이 범위 밖'||record.completionAuthority!==false||record.supersedesId!==null)return invalid()
+  if(typeof record.decisionId!=='string'||!/^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/.test(record.decisionId))return invalid()
+  if(typeof record.decidedAt!=='string'||!Number.isFinite(Date.parse(record.decidedAt))||new Date(record.decidedAt).toISOString()!==record.decidedAt)return invalid()
+  return Object.freeze(record) as PrivateDecisionReceipt
+}
+
 export async function recordPrivateDecision(input: { projectId: string; eventId: string; sequence: number; decision: 'approved' | 'rejected'; rejectionReason?: PrivateDecisionReason | null }): Promise<PrivateDecisionReceipt> {
   const binding = privateDecisionBinding
   if (!binding) throw new Error('decision_store_unavailable')
-  return readJson<PrivateDecisionReceipt>(await fetch('/api/private/decisions', {
+  const receipt = await readJson<unknown>(await fetch('/api/private/decisions', {
     method: 'POST',
     credentials: 'same-origin',
     headers: { ...privateSessionHeaders(binding.bearer), 'content-type': 'application/json', 'x-outcome-csrf': binding.csrf, 'if-match': binding.etag },
     body: JSON.stringify({ projectId: input.projectId, eventId: input.eventId, sequence: input.sequence, decision: input.decision, rejectionReason: input.decision === 'rejected' ? input.rejectionReason ?? null : null, nonce: decisionNonce() }),
   }))
+  return validatePrivateDecisionReceipt(receipt,input)
 }
