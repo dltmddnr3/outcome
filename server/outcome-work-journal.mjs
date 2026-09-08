@@ -27,6 +27,11 @@ export function createWorkJournal(db) {
       attempt INTEGER NOT NULL, reservation_digest TEXT NOT NULL,
       action_json TEXT NOT NULL, PRIMARY KEY(project_id,work_id,stage,attempt)
     ) STRICT;
+    CREATE TABLE IF NOT EXISTS outcome_work_dispatches (
+      reservation_digest TEXT PRIMARY KEY, state TEXT NOT NULL
+        CHECK(state IN ('dispatch_started','acknowledged','delivery_unknown')),
+      receipt_digest TEXT
+    ) STRICT;
   `))
   const normalize=(scopeJson,nowMs)=>{
     if(typeof scopeJson!=='string' || Buffer.byteLength(scopeJson)>2048) fail()
@@ -43,6 +48,15 @@ export function createWorkJournal(db) {
     const journal=JSON.parse(row.journal_json)
     if(journal.events.length!==row.sequence || journal.events.some((event,index)=>event.sequence!==index+1)) fail()
     return {sequence:row.sequence,journal}
+  }
+  const reservation=(bound,reservationDigest)=>{
+    if(!sha(reservationDigest,64)) fail()
+    const row=db.prepare('SELECT action_json FROM outcome_work_reservations WHERE project_id=? AND work_id=? AND reservation_digest=?')
+      .get(bound.scope.projectId,bound.scope.workId,reservationDigest)
+    if(!row || digest(row.action_json)!==reservationDigest) fail()
+    const action=JSON.parse(row.action_json)
+    if(!Array.isArray(action)||action.length!==7||action[0]!==bound.scopeJson||!sha(action[6],64)) fail()
+    return action
   }
   return Object.freeze({
     read(scopeJson,nowMs){return guarded(()=>{
@@ -78,6 +92,33 @@ export function createWorkJournal(db) {
       if(existing && (existing.reservation_digest!==reservationDigest || existing.action_json!==actionJson)) fail()
       if(!existing) db.prepare('INSERT INTO outcome_work_reservations VALUES(?,?,?,?,?,?)').run(bound.scope.projectId,bound.scope.workId,last.stage,last.attempt,reservationDigest,actionJson)
       return Object.freeze({outcome:existing?'already_reserved':'reserved',reservationDigest,completionAuthority:false,executionAuthority:false})
+    })},
+    beginContinuationDispatch(scopeJson,expectedSequence,reservationDigest,nowMs){return transact(()=>{
+      const bound=normalize(scopeJson,nowMs),current=load(bound,nowMs),action=reservation(bound,reservationDigest),last=current.journal.events.at(-1)
+      const projection=projectSingleSessionWork(JSON.stringify(current.journal),bound.scopeJson,nowMs)
+      if(current.sequence!==expectedSequence || projection.continuation!=='next_action_recorded' || last.nextAction==='awaiting_owner'
+        || JSON.stringify([bound.scopeJson,last.stage,last.attempt,last.nextAction,last.candidateCommit,last.candidateTree,action[6]])!==JSON.stringify(action)) fail()
+      const existing=db.prepare('SELECT state FROM outcome_work_dispatches WHERE reservation_digest=?').get(reservationDigest)
+      if(existing) return Object.freeze({outcome:'already_started'})
+      db.prepare("INSERT INTO outcome_work_dispatches VALUES(?,'dispatch_started',NULL)").run(reservationDigest)
+      return Object.freeze({outcome:'dispatch_started'})
+    })},
+    readContinuationDispatch(scopeJson,reservationDigest,nowMs){return guarded(()=>{
+      const bound=normalize(scopeJson,nowMs);load(bound,nowMs);reservation(bound,reservationDigest)
+      const row=db.prepare('SELECT state,receipt_digest FROM outcome_work_dispatches WHERE reservation_digest=?').get(reservationDigest)
+      if(!row) return Object.freeze({state:'reserved',receiptDigest:null})
+      if(!['dispatch_started','acknowledged','delivery_unknown'].includes(row.state)
+        || (row.state==='acknowledged'?!sha(row.receipt_digest,64):row.receipt_digest!==null)) fail()
+      return Object.freeze({state:row.state,receiptDigest:row.receipt_digest})
+    })},
+    recordContinuationResult(scopeJson,reservationDigest,state,receiptDigest,nowMs){return transact(()=>{
+      if(!['acknowledged','delivery_unknown'].includes(state)||(state==='acknowledged'?!sha(receiptDigest,64):receiptDigest!==null)) fail()
+      const bound=normalize(scopeJson,nowMs);load(bound,nowMs);reservation(bound,reservationDigest)
+      const row=db.prepare('SELECT state,receipt_digest FROM outcome_work_dispatches WHERE reservation_digest=?').get(reservationDigest)
+      if(!row || row.state!=='dispatch_started' && (row.state!==state||row.receipt_digest!==receiptDigest)) fail()
+      if(row.state==='dispatch_started') db.prepare('UPDATE outcome_work_dispatches SET state=?,receipt_digest=? WHERE reservation_digest=? AND state=\'dispatch_started\'')
+        .run(state,receiptDigest,reservationDigest)
+      return Object.freeze({state,receiptDigest})
     })},
   })
 }

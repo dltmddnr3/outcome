@@ -24,10 +24,15 @@ test('disk journal and reservation survive close/reopen; second connection canno
     assert.throws(()=>reserve(second),/^Error: work_journal_unavailable$/)
     a.exec('ROLLBACK')
     assert.equal(reserve(first).outcome,'reserved');assert.equal(reserve(second).outcome,'already_reserved')
+    const reservation=reserve(first).reservationDigest
+    assert.equal(first.beginContinuationDispatch(scopeJson,3,reservation,now).outcome,'dispatch_started')
+    assert.equal(second.beginContinuationDispatch(scopeJson,3,reservation,now).outcome,'already_started')
     assert.equal(second.read(scopeJson,now).sequence,3)
     a.close();a=null;b.close();b=null
     a=new DatabaseSync(path);const reopened=createWorkJournal(a)
     assert.equal(reserve(reopened).outcome,'already_reserved');assert.equal(reopened.read(scopeJson,now).projection.stage,'implementing')
+    assert.equal(reopened.readContinuationDispatch(scopeJson,reservation,now).state,'dispatch_started')
+    assert.equal(reopened.beginContinuationDispatch(scopeJson,3,reservation,now).outcome,'already_started')
     assert.equal(a.prepare('SELECT count(*) AS n FROM outcome_work_reservations').get().n,1)
     assert.equal(reserve(reopened).executionAuthority,false)
   }finally{a?.close();b?.close();rmSync(dir,{recursive:true,force:true})}
