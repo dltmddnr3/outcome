@@ -45,3 +45,17 @@ test('destination runtime pool failure returns only unavailable without retry',a
  const factory=createDestinationHostedRuntimeFactory({environment:environment(),driverLoader:async()=>{loads++;return{Pool:class{constructor(){throw Error('secret connection details')}}}}})
  assert.equal(await factory(context()),null);assert.equal(loads,1)
 })
+test('hosted evidence readers are explicit capabilities and invalid descriptors never execute',async()=>{
+ let hits=0,loads=0
+ const read=async()=>{hits++;throw Error('must not run')}
+ const getter={readSource:read};Object.defineProperty(getter,'readAssessment',{enumerable:true,get(){hits++;return read}})
+ for(const sourceReaders of [null,{},getter,{readAssessment:read,readSource:'not a function'},{readAssessment:read,readSource:read,extra:true},new Proxy({},{ownKeys(){hits++;throw Error()}})]){
+  const factory=createDestinationHostedRuntimeFactory({environment:environment(),sourceReaders,driverLoader:async()=>{loads++;throw Error()}})
+  assert.equal(await factory(context()),null)
+ }
+ for(const env of [{}, {...environment(),VERCEL_ENV:'production'}]){
+  const factory=createDestinationHostedRuntimeFactory({environment:env,sourceReaders:{readAssessment:read,readSource:read},driverLoader:async()=>{loads++;throw Error()}})
+  assert.equal(await factory(context()),null)
+ }
+ assert.equal(hits,0);assert.equal(loads,0)
+})

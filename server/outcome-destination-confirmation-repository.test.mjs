@@ -11,9 +11,44 @@ import {discoveryDomains} from '../src/lib/destination-question-policy.mjs'
 import {once} from 'node:events'
 import {createOutcomeServer} from './index.mjs'
 import {createDestinationSourceVerifier} from './outcome-destination-source-verifier.mjs'
+import {createDestinationHostedRuntimeFactory} from './outcome-destination-hosted-runtime.mjs'
 
 const scope={workspaceId:'workspace',accountRef:'owner',draftId:'00000000-0000-4000-8000-000000000001'}
 const requestId='00000000-0000-4000-8000-000000000010'
+test('hosted factory composes explicit source readers with restricted confirmation SQL',async()=>{
+ const f=await fixture();try{
+  const original='Synthetic checked technical contract',contentDigest=createHash('sha256').update(original).digest('hex')
+  let content=original,assessments=0,sourceReads=0
+  const sourceReaders={
+   readAssessment:async({workspaceId,accountRef,reviewDigest})=>{
+    assessments++;assert.equal(workspaceId,scope.workspaceId);assert.equal(accountRef,scope.accountRef)
+    return JSON.stringify({schemaVersion:1,workspaceId,accountRef,reviewDigest,verdict:'supported_for_owner_review',domains:discoveryDomains.map(domain=>({domain,state:'contract_ready',assessment:'supported',evidence:[{ref:'synthetic-contract',contentDigest,startLine:1,endLine:1,quote:original}]})),completionAuthority:false})
+   },
+   readSource:async({workspaceId,accountRef,ref})=>{sourceReads++;assert.equal(workspaceId,scope.workspaceId);assert.equal(accountRef,scope.accountRef);assert.equal(ref,'synthetic-contract');return content},
+  }
+  // Driver identity is synthetic; all domain queries use real restricted PGlite
+  // SQL. This verifies factory composition, not hosted TLS or actual owner use.
+  class Pool{on(){}async connect(){return{query:async(sql,args)=>sql==='select session_user, current_user'?{rows:[{session_user:'outcome_destination_runtime',current_user:'outcome_destination_backend'}]}:f.db.query(sql,args),release(){}}}}
+  const environment={VERCEL_ENV:'preview',VERCEL_URL:'outcome-synthetic-unique.vercel.app',OUTCOME_DESTINATION_DURABLE_ENABLED:'1',OUTCOME_DESTINATION_DATABASE_URL:'postgresql://outcome_destination_runtime.abcdefghijklmnopqrst:synthetic@aws-0-us-east-1.pooler.supabase.com:6543/postgres?sslmode=verify-full',OUTCOME_DESTINATION_DATABASE_CA_PEM:'-----BEGIN CERTIFICATE-----\nQUJD\n-----END CERTIFICATE-----',OUTCOME_DESTINATION_CSRF_SECRET:'synthetic-csrf-destination-123456789',OUTCOME_SUPABASE_URL:'https://abcdefghijklmnopqrst.supabase.co'}
+  const host={allowedOrigin:`https://${environment.VERCEL_URL}`,accountRuntime:{service:{resolveBridgeAuthority(){}}}}
+  const factory=createDestinationHostedRuntimeFactory({environment,sourceReaders,driverLoader:async()=>({Pool})})
+  sourceReaders.readAssessment=async()=>{throw Error('changed capability must not be used')}
+  const runtime=await factory(host);assert.ok(runtime)
+  const review=await runtime.confirmationRepository.review(scope)
+  assert.equal(assessments,1);assert.equal(sourceReads,1);assert.equal(await f.count(),0)
+  content+=' drift'
+  const input={...scope,requestId,reviewDigest:review.reviewDigest,confirmed:true}
+  await assert.rejects(()=>runtime.confirmationRepository.confirm(input),/destination_unavailable/)
+  assert.equal(await f.count(),0)
+  content=original
+  const saved=await runtime.confirmationRepository.confirm(input)
+  assert.equal(saved.state,'creation_requested');assert.equal(saved.executionAuthority,false);assert.equal(await f.count(),1)
+  const unavailable=await createDestinationHostedRuntimeFactory({environment,driverLoader:async()=>({Pool})})(host)
+  await assert.rejects(()=>unavailable.confirmationRepository.review(scope),/destination_unavailable/)
+  assert.deepEqual(await unavailable.confirmationRepository.load(scope),saved)
+  assert.equal(await f.count(),1)
+ }finally{await f.db.close()}
+})
 test('content-verified assessment composes with confirmation SQL and source drift leaves no record',async()=>{
  const f=await fixture();try{
   const original='Synthetic checked technical contract';let content=original

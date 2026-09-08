@@ -128,7 +128,7 @@ const privateSessionDiagnostic = (logger, input, error, configuredOrigin) => {
   try { logger?.info?.('outcome_private_session', { authSource: input.authSource, ...tokenState, ...(sdkReason ? { sdkReason } : {}), ...safeError }) } catch {}
 }
 
-export function createStableHostRequestHandler({ environment = process.env, runtimeFactory = createHostedIdentityRuntime, bridgeRuntimeFactory, chatRuntimeFactory, decisionRuntimeFactory, destinationRuntimeFactory, clerkClientFactory, clerkTokenVerifier, logger } = {}) {
+export function createStableHostRequestHandler({ environment = process.env, runtimeFactory = createHostedIdentityRuntime, bridgeRuntimeFactory, chatRuntimeFactory, decisionRuntimeFactory, destinationRuntimeFactory, destinationSourceReaders, clerkClientFactory, clerkTokenVerifier, logger } = {}) {
   const configured = readHostedIdentityConfiguration(environment).enabled
   const configuredOrigin = typeof environment?.[HOSTED_IDENTITY_ENV.privateAllowedOrigin] === 'string' ? environment[HOSTED_IDENTITY_ENV.privateAllowedOrigin].trim() : ''
   const chatOrigins = hostedAuthorizedParties(environment)
@@ -142,7 +142,7 @@ export function createStableHostRequestHandler({ environment = process.env, runt
   let decisionRuntimePromise
   let destinationRuntimePromise
   const selectedChatRuntimeFactory = chatRuntimeFactory ?? createOutcomeChatHostedRuntimeFactory({ environment })
-  const selectedDestinationRuntimeFactory = destinationRuntimeFactory ?? createDestinationHostedRuntimeFactory({ environment })
+  const selectedDestinationRuntimeFactory = destinationRuntimeFactory ?? createDestinationHostedRuntimeFactory({ environment, sourceReaders: destinationSourceReaders })
   const destinationOrigin = destinationRuntimeFactory ? configuredOrigin : readDestinationHostedConfiguration(environment).allowedOrigin
   const bridgeControl = createObserverBridgeRuntimeControl({ environment, runtimeFactory: bridgeRuntimeFactory ?? createManagedObserverBridgeRuntimeFactory({ environment }) })
   const selectedRuntime = async () => {

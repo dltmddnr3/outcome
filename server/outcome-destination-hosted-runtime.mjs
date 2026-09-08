@@ -1,6 +1,7 @@
 import {types} from 'node:util'
 import {createDestinationRuntime} from './outcome-destination-runtime.mjs'
 import {readOutcomeSupabaseProjectRef} from './outcome-chat-database-url.mjs'
+import {createDestinationSourceVerifier} from './outcome-destination-source-verifier.mjs'
 
 export const DESTINATION_HOSTED_ENV=Object.freeze({enabled:'OUTCOME_DESTINATION_DURABLE_ENABLED',databaseUrl:'OUTCOME_DESTINATION_DATABASE_URL',databaseCaPem:'OUTCOME_DESTINATION_DATABASE_CA_PEM',csrfSecret:'OUTCOME_DESTINATION_CSRF_SECRET',supabaseUrl:'OUTCOME_SUPABASE_URL'})
 const disabled=()=>({enabled:false})
@@ -28,10 +29,21 @@ export const readDestinationHostedConfiguration=environment=>{
  const value=configuration(environment)
  return value?{enabled:true,allowedOrigin:value.allowedOrigin}:disabled()
 }
-export function createDestinationHostedRuntimeFactory({environment=process.env,driverLoader=()=>import('pg')}={}){
+export function createDestinationHostedRuntimeFactory({environment=process.env,driverLoader=()=>import('pg'),sourceReaders}={}){
  const value=configuration(environment)
+ // Explicit server capabilities only. Neither environment strings nor request
+ // payloads can install a verifier or turn an unreviewed source into evidence.
+ let verifyDestinationReview,invalidReaders=false
+ if(sourceReaders!==undefined)try{
+  if(!sourceReaders||typeof sourceReaders!=='object'||types.isProxy(sourceReaders))throw Error()
+  const descriptors=Object.getOwnPropertyDescriptors(sourceReaders)
+  if(Object.keys(descriptors).sort().join(',')!=='readAssessment,readSource')throw Error()
+  const readAssessment=descriptors.readAssessment.value,readSource=descriptors.readSource.value
+  if(typeof readAssessment!=='function'||typeof readSource!=='function'||types.isProxy(readAssessment)||types.isProxy(readSource))throw Error()
+  verifyDestinationReview=createDestinationSourceVerifier({readAssessment,readSource})
+ }catch{invalidReaders=true}
  return async({accountRuntime,allowedOrigin}={})=>{
-  if(!value||allowedOrigin!==value.allowedOrigin||typeof accountRuntime?.service?.resolveBridgeAuthority!=='function')return null
+  if(!value||invalidReaders||allowedOrigin!==value.allowedOrigin||typeof accountRuntime?.service?.resolveBridgeAuthority!=='function')return null
   let pool
   try{
    const driver=await driverLoader()
@@ -39,7 +51,7 @@ export function createDestinationHostedRuntimeFactory({environment=process.env,d
    pool=new driver.Pool({connectionString:value.connectionString,ssl:{ca:value.databaseCaPem,rejectUnauthorized:true},max:2,allowExitOnIdle:true,connectionTimeoutMillis:5000,statement_timeout:10000,query_timeout:15000})
    // Idle connection failures must not print provider details or crash a function.
    pool.on?.('error',()=>{})
-   return createDestinationRuntime({pool,allowedOrigin:value.allowedOrigin,csrfSecret:value.csrfSecret})
+   return createDestinationRuntime({pool,allowedOrigin:value.allowedOrigin,csrfSecret:value.csrfSecret,verifyDestinationReview})
   }catch{if(pool)try{await pool.end()}catch{};return null}
  }
 }
