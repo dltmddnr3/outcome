@@ -8,9 +8,44 @@ import {createDiscoveryRepository} from './outcome-destination-discovery-reposit
 import {createDiscoveryQuestionRepository} from './outcome-destination-question-repository.mjs'
 import {createDestinationConfirmationRepository} from './outcome-destination-confirmation-repository.mjs'
 import {discoveryDomains} from '../src/lib/destination-question-policy.mjs'
+import {once} from 'node:events'
+import {createOutcomeServer} from './index.mjs'
 
 const scope={workspaceId:'workspace',accountRef:'owner',draftId:'00000000-0000-4000-8000-000000000001'}
 const requestId='00000000-0000-4000-8000-000000000010'
+test('owner HTTP confirmation composes real restricted SQL, CSRF, exact body and durable readback',async()=>{
+ const f=await fixture()
+ const runtime={allowedOrigin:'https://preview.invalid',csrfSecret:'synthetic-confirmation-csrf',confirmationRepository:createDestinationConfirmationRepository(f)}
+ const identity={authenticate:async token=>{if(token!=='valid')throw Error('denied')},resolveBridgeAuthority:async()=>({workspace_id:scope.workspaceId,account_ref:scope.accountRef,project_ids:['outcome']})}
+ const server=createOutcomeServer({publicReadOnly:true,accountAccess:identity,destinationRuntime:runtime})
+ server.listen(0,'127.0.0.1');await once(server,'listening')
+ const root=`http://127.0.0.1:${server.address().port}/api/private/destination`,url=`${root}/confirmations/${scope.draftId}`,reviewUrl=`${root}/confirmation-review/${scope.draftId}`
+ const headers={cookie:'__session=valid',origin:runtime.allowedOrigin,'x-outcome-csrf':runtime.csrfSecret,'content-type':'application/json'}
+ try{
+  assert.equal((await fetch(reviewUrl)).status,401)
+  assert.equal((await fetch(url,{headers:{cookie:'__session=wrong'}})).status,403)
+  assert.equal((await fetch(reviewUrl,{method:'POST',headers})).status,405)
+  const response=await fetch(reviewUrl,{headers});assert.equal(response.status,200);assert.equal(response.headers.get('cache-control'),'no-store')
+  const {confirmationReview:review}=await response.json();assert.equal(await f.count(),0)
+  const body={requestId,reviewDigest:review.reviewDigest,confirmed:true}
+  for(const changed of [{confirmed:false},{confirmed:'true'},{reviewDigest:'invalid'},{evidenceDigest:'forged'},{accountRef:'other'}]){
+   assert.equal((await fetch(url,{method:'POST',headers,body:JSON.stringify({...body,...changed})})).status,400)
+  }
+  for(const changed of [{origin:'https://other.invalid'},{'x-outcome-csrf':'wrong'}])assert.equal((await fetch(url,{method:'POST',headers:{...headers,...changed},body:JSON.stringify(body)})).status,403)
+  assert.equal((await fetch(url,{method:'POST',headers,body:'x'.repeat(4097)})).status,413)
+  assert.equal((await fetch(url,{method:'POST',headers,body:JSON.stringify({...body,reviewDigest:'f'.repeat(64)})})).status,503)
+  assert.equal(await f.count(),0)
+  const confirmed=await fetch(url,{method:'POST',headers,body:JSON.stringify(body)});assert.equal(confirmed.status,202)
+  const saved=await confirmed.json();assert.equal(saved.confirmation.executionAuthority,false)
+  assert.deepEqual(await (await fetch(url,{headers})).json(),saved)
+  assert.deepEqual(await (await fetch(url,{method:'POST',headers,body:JSON.stringify(body)})).json(),saved)
+  assert.equal(await f.count(),1)
+  runtime.confirmationRepository=createDestinationConfirmationRepository({transact:f.transact})
+  assert.equal((await fetch(reviewUrl,{headers})).status,503)
+  assert.equal((await fetch(url,{method:'POST',headers,body:JSON.stringify(body)})).status,503)
+  assert.equal(await f.count(),1)
+ }finally{server.closeAllConnections();await new Promise(resolve=>server.close(resolve));await f.db.close()}
+})
 async function fixture({unknowns=[],questions=[],coverage=discoveryDomains.map(domain=>({domain,state:'contract_ready',evidenceRefs:['synthetic-contract']}))}={}){
  const db=await PGlite.create('memory://')
  await db.exec('create role anon nologin;create role authenticated nologin')

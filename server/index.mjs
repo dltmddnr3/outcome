@@ -85,9 +85,9 @@ export function createOutcomeServer(options = {}) {
         } catch { return json(response, 503, { error: 'authentication_unavailable' }) }
       }
       let body
-      if (/^\/api\/private\/destination\/(drafts|analysis|discovery|questions|question-requests|review)\//.test(url.pathname)) {
+      if (/^\/api\/private\/destination\/(drafts|analysis|discovery|questions|question-requests|review|confirmation-review|confirmations)\//.test(url.pathname)) {
         if (request.method === 'PUT' || request.method === 'POST') {
-          const maximumBytes = /^\/api\/private\/destination\/(analysis|question-requests)\//.test(url.pathname) ? 4096 : url.pathname.startsWith('/api/private/destination/discovery/') ? 4194304 : 262144
+          const maximumBytes = /^\/api\/private\/destination\/(analysis|question-requests|confirmations)\//.test(url.pathname) ? 4096 : url.pathname.startsWith('/api/private/destination/discovery/') ? 4194304 : 262144
           const chunks = []; let size = 0
           try {
             for await (const chunk of request) {

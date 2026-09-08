@@ -17,7 +17,7 @@ const { config: stableConfig, createStableHostRequestHandler, default: stableHan
 
 test('destination discovery and question requests admit bounded raw streaming bodies', async () => {
   const id='00000000-0000-4000-8000-000000000001'
-  for(const [family,method,maximum] of [['discovery','PUT',4194304],['question-requests','POST',4096]]){
+  for(const [family,method,maximum] of [['discovery','PUT',4194304],['question-requests','POST',4096],['confirmations','POST',4096]]){
     const path=`/api/private/destination/${family}/${id}`
     const payload=Buffer.from(JSON.stringify({value:'후속 답변'}))
     const stream={method,async *[Symbol.asyncIterator](){yield payload.subarray(0,7);yield payload.subarray(7)}}
@@ -166,6 +166,27 @@ test('hosted destination stays default-off and routes authenticated bearer save/
  const unavailable=createStableHostRequestHandler({...args,destinationRuntimeFactory:async()=>{failed++;throw Error('private provider detail')}})
  for(let i=0;i<2;i++)assert.deepEqual(await unavailable({pathname,headers}),{status:503,body:{error:'destination_unavailable'}})
  assert.equal(failed,1)
+})
+
+test('hosted confirmation routes require explicit owner action and never accept browser evidence',async()=>{
+ let writes=0
+ const runtimeFactory=async()=>({allowedOrigin:'https://preview.invalid',publishableKey:'pk_test_boundary',service:{authenticate:async token=>{if(token!=='valid')throw Error('denied')},readWorkspace:async()=>({projects:[]}),resolveBridgeAuthority:async()=>({workspace_id:'workspace',account_ref:'account',project_ids:['outcome']})}})
+ const confirmation={requestId:'00000000-0000-4000-8000-000000000002',state:'creation_requested',completionAuthority:false,executionAuthority:false}
+ const runtime={allowedOrigin:'https://preview.invalid',csrfSecret:'synthetic-destination-csrf',repository:{load:async()=>null,save:async()=>null},confirmationRepository:{load:async()=>null,review:async()=>({reviewDigest:'a'.repeat(64),completionAuthority:false}),confirm:async input=>{assert.equal(input.accountRef,'account');writes++;return confirmation}}}
+ const handler=createStableHostRequestHandler({environment:identityEnvironment,runtimeFactory,destinationRuntimeFactory:async()=>runtime})
+ const pathname='/api/private/destination/confirmations/00000000-0000-4000-8000-000000000001'
+ const headers={authorization:'Bearer valid',origin:runtime.allowedOrigin,'x-outcome-csrf':runtime.csrfSecret,'content-type':'application/json'}
+ assert.equal((await handler({pathname})).status,401)
+ assert.equal((await handler({pathname:pathname.replace('/confirmations/','/confirmation-review/'),headers})).status,200)
+ assert.equal(writes,0)
+ const body=JSON.stringify({requestId:confirmation.requestId,reviewDigest:'a'.repeat(64),confirmed:true})
+ const input={method:'POST',pathname,headers,body}
+ assert.equal((await handler({...input,headers:{...headers,origin:'https://other.invalid'}})).status,403)
+ assert.equal((await handler({...input,body:JSON.stringify({...JSON.parse(body),evidenceDigest:'forged'})})).status,400)
+ assert.equal((await handler({...input,body:JSON.stringify({...JSON.parse(body),confirmed:false})})).status,400)
+ assert.equal(writes,0)
+ assert.deepEqual(await handler(input),{status:202,body:{confirmation,completionAuthority:false}})
+ assert.equal(writes,1)
 })
 
 test('default destination factory uses the unique Preview origin, never the prior identity origin or Production',async()=>{
