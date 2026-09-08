@@ -71,6 +71,23 @@ test('the one decision route authenticates, enforces origin CSRF and freshness, 
   const common = { method: 'POST', pathname: '/api/private/decisions', token: 'valid', service: identityService, decisionRuntime, body: request, origin: 'https://private.example', headers: { 'content-type': 'application/json', 'x-outcome-csrf': 'csrf-secret-value', 'if-match': workspace.headers.etag } }
   const first = await handlePrivateAccessRequest(common)
   assert.equal(first.status, 201)
+  const http = createOutcomeServer({ publicReadOnly: true, accountAccess: identityService, decisionRuntime })
+  http.listen(0, '127.0.0.1'); await once(http, 'listening')
+  try {
+    const base = `http://127.0.0.1:${http.address().port}`
+    const visible = await fetch(`${base}/api/private/workspace`, { headers: { cookie: '__session=valid' } })
+    assert.equal(visible.headers.get('etag'), workspace.headers.etag)
+    const received = await fetch(`${base}/api/private/decisions`, { method:'POST',headers:{...common.headers,origin:common.origin,cookie:'__session=valid'},body:JSON.stringify(request) })
+    assert.equal(received.status,201)
+    assert.equal(received.headers.get('cache-control'),'no-store')
+    assert.deepEqual(await received.json(),first.body)
+    const malformed = await fetch(`${base}/api/private/decisions`, {method:'POST',headers:{...common.headers,cookie:'__session=valid'},body:'{'})
+    assert.equal(malformed.status,400)
+    const deniedOrigin = await fetch(`${base}/api/private/decisions`, {method:'POST',headers:{...common.headers,origin:'https://evil.example',cookie:'__session=valid'},body:JSON.stringify(request)})
+    assert.equal(deniedOrigin.status,403)
+    const oversized = await fetch(`${base}/api/private/decisions`, {method:'POST',headers:{...common.headers,cookie:'__session=valid'},body:JSON.stringify({nonce:'x'.repeat(10_001)})})
+    assert.equal(oversized.status,400)
+  } finally { http.close(); await once(http,'close') }
   const correction = await handlePrivateAccessRequest({ ...common, body: { ...request, eventId: 'event-builder-corrected', sequence: 8, nonce: 'correction-nonce-that-is-long-enough-123', supersedesId: first.body.decisionId } })
   assert.equal(correction.status, 201)
   assert.equal(correction.body.supersedesId, first.body.decisionId)

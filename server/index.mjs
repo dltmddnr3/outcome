@@ -83,8 +83,12 @@ export function createOutcomeServer(options = {}) {
           return json(response, 200, { state: 'signed_out', mode: 'injected_adapter' }, { 'set-cookie': cookie('', 0) })
         } catch { return json(response, 503, { error: 'authentication_unavailable' }) }
       }
-      const value = await handlePrivateAccessRequest({ method: request.method, pathname: url.pathname, token: cookieValue(request, '__session'), service: accountAccess })
-      return json(response, value.status, value.body)
+      let body
+      if (url.pathname === '/api/private/decisions' && request.method === 'POST') {
+        try { body = await readBody(request) } catch { return json(response, 400, { error: 'invalid_request' }) }
+      }
+      const value = await handlePrivateAccessRequest({ method: request.method, pathname: url.pathname, token: cookieValue(request, '__session'), service: accountAccess, decisionRuntime: options.decisionRuntime, headers: request.headers, origin: request.headers.origin, body })
+      return json(response, value.status, value.body, value.headers)
     }
     if (request.method === 'POST' && url.pathname === '/api/auth/login') {
       if (publicReadOnly || !auth) return json(response, 405, { error: 'read_only' })
