@@ -7,7 +7,8 @@ let browser
 try{
  const base=await new Promise((resolve,reject)=>{const timer=setTimeout(()=>reject(Error('fixture_timeout')),15000);server.once('exit',()=>{clearTimeout(timer);reject(Error('fixture_exit'))});server.stdout.on('data',chunk=>{const match=String(chunk).match(/http:\/\/127.0.0.1:\d+/);if(match){clearTimeout(timer);resolve(match[0])}})})
  browser=await chromium.launch({channel:'chrome',headless:true})
- for(const width of [390,1440])for(const mode of ['success','pending','ambiguous','private']){
+ for(const width of [390,1440])for(const mode of ['success','pending','pending-ambiguous','ambiguous','private']){
+  const pendingMode=mode.startsWith('pending'),ambiguousMode=mode.includes('ambiguous')
   const page=await browser.newPage({viewport:{width,height:900}}),errors=[]
   page.on('pageerror',e=>errors.push(e.message))
   const draftId='00000000-0000-4000-8000-000000000001'
@@ -22,9 +23,9 @@ try{
     if(method==='PUT'){
      puts++;const input=route.request().postDataJSON(),next=JSON.parse(input.context)
      assert.equal(input.expectedRevision,2);assert.equal(input.intakeRevision,2);assert.equal(next.revision,3)
-     assert.deepEqual(next.answers,context.answers);assert.deepEqual(next.askedQuestionIds,context.askedQuestionIds);assert.deepEqual(next.unknowns,context.unknowns);assert.deepEqual(next.seedAnswers,document.answers)
+     assert.deepEqual(next.answers,pendingMode?[...context.answers,{questionId:'q-2',gapId:'offline',value:'차단'}]:context.answers);assert.deepEqual(next.askedQuestionIds,pendingMode?[...context.askedQuestionIds,'q-2']:context.askedQuestionIds);assert.deepEqual(next.unknowns,context.unknowns);assert.deepEqual(next.seedAnswers,document.answers)
      discovery={...discovery,intakeRevision:2,revision:3,context:next,contextDigest:discoveryContextDigest(next)}
-     if(mode==='ambiguous'){await route.abort('failed');return}
+     if(ambiguousMode){await route.abort('failed');return}
     }else assert.equal(method,'GET')
     body={discovery,completionAuthority:false}
    }else if(path.includes('/review/')){
@@ -32,7 +33,7 @@ try{
    }else if(path.includes('/questions/')){
     assert.equal(method,'GET')
     const receipt={schemaVersion:1,contextDigest:discovery.contextDigest,coverage:[],questions:[{id:'q-2',gapId:'offline',domain:'infrastructure',prompt:'오프라인에서는?',choices:['보관','차단'],recommendation:'보관',reason:'요청 보존',material:true}],completionAuthority:false}
-    body={questions:mode==='pending'?{contextDigest:discovery.contextDigest,contextRevision:2,receipt:JSON.stringify(receipt),sourceVerification:'required',completionAuthority:false}:null,completionAuthority:false}
+    body={questions:pendingMode?{contextDigest:discovery.contextDigest,contextRevision:2,receipt:JSON.stringify(receipt),sourceVerification:'required',completionAuthority:false}:null,completionAuthority:false}
    }else throw Error(`unexpected fixture route ${path}`)
    await route.fulfill({status:200,contentType:'application/json',headers:{'x-outcome-destination-csrf':'synthetic'},body:JSON.stringify(body)})
   })
@@ -55,24 +56,33 @@ try{
    const comparisonSession=await page.context().newCDPSession(page),comparisonAx=await comparisonSession.send('Accessibility.getFullAXTree')
    assert.ok(comparisonAx.nodes.some(n=>n.name?.value==='기본 초안 버전 1 → 2 · 후속 답변 버전 2'));await comparisonSession.detach()
    assert.equal(puts,0);assert.equal(await page.getByRole('region',{name:'Destination 확정 요청',exact:true}).count(),0)
-   if(mode==='pending'){
+   if(pendingMode){
     await panel.getByText('이전 맥락에 미답변 질문이 남아 갱신을 보류합니다.',{exact:false}).waitFor()
     assert.equal(await panel.getByRole('checkbox').count(),0)
-   }else{
+    const stage=panel.getByRole('button',{name:'이전 질문 답변 검토 · 아직 미저장',exact:true})
+    await panel.getByRole('radio',{name:'차단',exact:true}).waitFor();assert.equal(await stage.isDisabled(),true)
+    assert.equal(await panel.getByRole('radio',{name:'차단',exact:true}).isChecked(),false)
+    await panel.getByRole('radio',{name:'차단',exact:true}).check();await stage.click();assert.equal(puts,0)
+    await panel.getByText('답변을 이 화면에 보관했습니다.',{exact:false}).waitFor()
+    await panel.getByRole('button',{name:'비교 닫기',exact:true}).click();assert.equal(puts,0)
+    await open.click();await panel.getByRole('radio',{name:'차단',exact:true}).waitFor();assert.equal(await panel.getByRole('radio',{name:'차단',exact:true}).isChecked(),false)
+    await panel.getByRole('radio',{name:'차단',exact:true}).check();await stage.click()
+   }
+   {
     const checkbox=panel.getByRole('checkbox'),update=panel.getByRole('button',{name:'기존 답변 보존하여 버전 갱신',exact:true})
     assert.equal(await checkbox.isChecked(),false);assert.equal(await update.isDisabled(),true)
-    await checkbox.check();await panel.getByRole('button',{name:'비교 닫기',exact:true}).click();assert.equal(puts,0)
-    await open.click();await checkbox.waitFor();assert.equal(await checkbox.isChecked(),false)
+    if(!pendingMode){await checkbox.check();await panel.getByRole('button',{name:'비교 닫기',exact:true}).click();assert.equal(puts,0)
+    await open.click();await checkbox.waitFor();assert.equal(await checkbox.isChecked(),false)}
     await checkbox.check();await update.click()
-    if(mode==='ambiguous'){
+    if(ambiguousMode){
      await panel.getByText('갱신 결과를 확인하지 못했습니다.',{exact:false}).waitFor();assert.equal(await update.isDisabled(),true)
      await page.getByRole('button',{name:'후속 답변 불러오기',exact:true}).click()
     }
-    await page.getByText('보관된 후속 답변 1개',{exact:false}).waitFor();assert.equal(await panel.count(),0);assert.equal(puts,1)
+    await page.getByText(`보관된 후속 답변 ${pendingMode?2:1}개`,{exact:false}).waitFor();assert.equal(await panel.count(),0);assert.equal(puts,1)
     assert.equal(discovery.revision,3);assert.equal(discovery.intakeRevision,2)
    }
    const cdp=await page.context().newCDPSession(page),ax=await cdp.send('Accessibility.getFullAXTree')
-   assert.ok(ax.nodes.some(n=>String(n.name?.value??'').includes(mode==='pending'?'미답변 질문이 남아':'보관된 후속 답변')));await cdp.detach()
+   assert.ok(ax.nodes.some(n=>String(n.name?.value??'').includes('보관된 후속 답변')));await cdp.detach()
   }
   assert.deepEqual(errors,[]);assert.equal(await page.evaluate(()=>document.documentElement.scrollWidth>innerWidth),false)
   console.log(JSON.stringify({width,mode,puts,actualStudio:true,preserved:true,noAutomaticUpdate:true,overflow:false,pageErrors:0}))

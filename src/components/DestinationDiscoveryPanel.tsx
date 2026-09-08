@@ -12,7 +12,7 @@ export function DestinationDiscoveryPanel({intake}:{intake:StoredDestinationDraf
  const [checked,setChecked]=useState(false),[busy,setBusy]=useState(false),[hold,setHold]=useState(false)
  const [receipt,setReceipt]=useState<string|null>(null)
  const [decisionReview,setDecisionReview]=useState<DiscoveryDecisionReview|null>(null)
- const [previous,setPrevious]=useState<{value:StoredDiscovery;decisions:DiscoveryDecisionReview;pending:boolean}|null>(null)
+ const [previous,setPrevious]=useState<{value:StoredDiscovery;decisions:DiscoveryDecisionReview;pending:boolean;pendingReceipt:string|null}|null>(null)
  const [run,setRun]=useState<DiscoveryQuestionRun|null>(null),[runChecked,setRunChecked]=useState(false),[runHold,setRunHold]=useState(false)
  const [notice,setNotice]=useState('저장된 후속 답변을 먼저 확인해 주세요. 질문 준비는 목적지 확정이 아닙니다.')
  const lock=useRef(false)
@@ -32,9 +32,10 @@ export function DestinationDiscoveryPanel({intake}:{intake:StoredDestinationDraf
     const text=JSON.stringify({context:value.context,decisions})
     if(sensitiveContentHint(text)||/\/(?:Users|home|private\/tmp|tmp)\//.test(text.normalize('NFKC')))throw Error('private_review_rejected')
     const plan=questions?(await validateDiscoveryQuestionReceipt(value.context,questions)).plan:null
-    const pending=!!plan?.batch.length||value.context.askedQuestionIds.some(id=>!value.context.answers.some(a=>a.questionId===id))
+    const missingHistory=value.context.askedQuestionIds.some(id=>!value.context.answers.some(a=>a.questionId===id))
+    const pending=!!plan?.batch.length||missingHistory
     if(!reviewIsCurrent())throw Error('identity_changed')
-    setPrevious({value,decisions,pending});setNotice('이전 버전을 비교용으로 불러왔습니다. 현재 버전으로 자동 갱신하지 않았습니다.')
+    setPrevious({value,decisions,pending,pendingReceipt:plan?.batch.length&&!missingHistory?questions:null});setNotice('이전 버전을 비교용으로 불러왔습니다. 현재 버전으로 자동 갱신하지 않았습니다.')
    }else if(kind==='review'){
     setDecisionReview(null)
     if(!discovery)throw Error('missing_context')
@@ -82,7 +83,7 @@ export function DestinationDiscoveryPanel({intake}:{intake:StoredDestinationDraf
    <button type="button" disabled={busy||!discovery} onClick={()=>void act('review')}>저장된 추가 결정 검토</button>
    <button type="button" disabled={busy||!discovery||!runChecked||!!run||runHold||!!receipt} onClick={()=>void act('request')}>Planner 후속 질문 요청</button>
   </div>
-  {previous&&<DestinationPreviousReview key={previous.value.contextDigest} intake={intake} previous={previous.value} decisions={previous.decisions} pending={previous.pending} isCurrent={reviewIsCurrent} onCancel={()=>setPrevious(null)} onUpdated={value=>{setPrevious(null);setDiscovery(value);setDecisionReview(null);setReceipt(null);setChecked(true);setHold(false);setRun(null);setRunChecked(false);setRunHold(false);setNotice('기존 답변을 보존해 현재 초안 버전에 연결했습니다. 새 맥락의 질문과 근거를 다시 검토해 주세요.')}}/>}
+  {previous&&<DestinationPreviousReview key={previous.value.contextDigest} intake={intake} previous={previous.value} decisions={previous.decisions} pending={previous.pending} pendingReceipt={previous.pendingReceipt} isCurrent={reviewIsCurrent} onCancel={()=>setPrevious(null)} onUpdated={value=>{setPrevious(null);setDiscovery(value);setDecisionReview(null);setReceipt(null);setChecked(true);setHold(false);setRun(null);setRunChecked(false);setRunHold(false);setNotice('기존 답변을 보존해 현재 초안 버전에 연결했습니다. 새 맥락의 질문과 근거를 다시 검토해 주세요.')}}/>}
   {run&&<p role="status">{{queued:'요청 접수 · 실행 대기',dispatch_started:'질문 처리 중 · 응답 미확인',completed:'질문 응답 기록됨 · 목적지 확정 아님',failed:'질문 요청 실패 · 자동 재전송 없음',delivery_unknown:'전달 상태 불명 · 자동 재전송 없음'}[run.state]}</p>}
   {discovery&&<p>보관된 후속 답변 {discovery.context.answers.length}개 · 질문 한도 200개 · 달성률이 아닙니다</p>}
   {discovery&&decisionReview&&decisionReview.contextDigest===discovery.contextDigest&&<section aria-label="저장된 추가 결정">
