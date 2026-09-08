@@ -9,6 +9,7 @@ import { createObserverBridgeRuntimeControl } from '../server/phase3-observer-br
 import { createManagedObserverBridgeRuntimeFactory } from '../server/phase3-observer-bridge-managed-runtime.mjs'
 import { handlePrivateChatRequest } from '../server/outcome-chat-api.mjs'
 import { createOutcomeChatHostedRuntimeFactory } from '../server/outcome-chat-hosted-runtime.mjs'
+import { createDestinationHostedRuntimeFactory, readDestinationHostedConfiguration } from '../server/outcome-destination-hosted-runtime.mjs'
 
 const result = (status, body) => ({ status, body })
 
@@ -141,6 +142,8 @@ export function createStableHostRequestHandler({ environment = process.env, runt
   let decisionRuntimePromise
   let destinationRuntimePromise
   const selectedChatRuntimeFactory = chatRuntimeFactory ?? createOutcomeChatHostedRuntimeFactory({ environment })
+  const selectedDestinationRuntimeFactory = destinationRuntimeFactory ?? createDestinationHostedRuntimeFactory({ environment })
+  const destinationOrigin = destinationRuntimeFactory ? configuredOrigin : readDestinationHostedConfiguration(environment).allowedOrigin
   const bridgeControl = createObserverBridgeRuntimeControl({ environment, runtimeFactory: bridgeRuntimeFactory ?? createManagedObserverBridgeRuntimeFactory({ environment }) })
   const selectedRuntime = async () => {
     if (!configured || typeof runtimeFactory !== 'function') return null
@@ -242,11 +245,11 @@ export function createStableHostRequestHandler({ environment = process.env, runt
       const token = privateSessionToken(headers)
       if (!token) return result(401, { error: 'authentication_required' })
       let destinationRuntime
-      if (typeof destinationRuntimeFactory === 'function' && pathname !== '/api/private/decisions') {
+      if (typeof selectedDestinationRuntimeFactory === 'function' && destinationOrigin && pathname !== '/api/private/decisions') {
         try { await hosted.service.authenticate(token) } catch { return result(401, { error: 'authentication_required' }) }
-        destinationRuntimePromise ??= Promise.resolve().then(() => destinationRuntimeFactory({ accountRuntime: hosted, allowedOrigin: configuredOrigin })).catch(() => null)
+        destinationRuntimePromise ??= Promise.resolve().then(() => selectedDestinationRuntimeFactory({ accountRuntime: hosted, allowedOrigin: destinationOrigin })).catch(() => null)
         const candidate = await destinationRuntimePromise
-        if (candidate?.allowedOrigin === configuredOrigin && typeof candidate?.csrfSecret === 'string' && candidate.csrfSecret.length >= 16 && typeof candidate?.repository?.load === 'function' && typeof candidate?.repository?.save === 'function') destinationRuntime = candidate
+        if (candidate?.allowedOrigin === destinationOrigin && typeof candidate?.csrfSecret === 'string' && candidate.csrfSecret.length >= 16 && typeof candidate?.repository?.load === 'function' && typeof candidate?.repository?.save === 'function') destinationRuntime = candidate
       }
       if (destinationPath) return handleDestinationDraftRequest({ method, pathname, token, identityService: hosted.service, runtime: destinationRuntime, headers: selectedHeaders(headers), body: Buffer.isBuffer(body) ? body.toString('utf8') : body })
       let decisionRuntime

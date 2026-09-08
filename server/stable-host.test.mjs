@@ -164,6 +164,26 @@ test('hosted destination stays default-off and routes authenticated bearer save/
  assert.equal(failed,1)
 })
 
+test('default destination factory uses the unique Preview origin, never the prior identity origin or Production',async()=>{
+ const environment={...identityEnvironment,VERCEL_ENV:'preview',VERCEL_URL:'outcome-synthetic-unique.vercel.app',OUTCOME_DESTINATION_DURABLE_ENABLED:'1',OUTCOME_DESTINATION_DATABASE_URL:'postgresql://outcome_destination_runtime.abcdefghijklmnopqrst:synthetic%2Dpassword@aws-0-us-east-1.pooler.supabase.com:6543/postgres?sslmode=verify-full',OUTCOME_DESTINATION_DATABASE_CA_PEM:'-----BEGIN CERTIFICATE-----\nQUJDREVGR0hJSktMTU5PUFFSU1RVVldYWVo=\n-----END CERTIFICATE-----',OUTCOME_DESTINATION_CSRF_SECRET:'synthetic-csrf-destination-123456789',OUTCOME_SUPABASE_URL:'https://abcdefghijklmnopqrst.supabase.co'}
+ const runtimeFactory=async()=>({allowedOrigin:identityEnvironment.OUTCOME_PRIVATE_ALLOWED_ORIGIN,publishableKey:'pk_test_boundary',service:{authenticate:async token=>{if(token!=='valid')throw Error('private')},readWorkspace:async()=>({projects:[]}),resolveBridgeAuthority:async()=>({workspace_id:'workspace',account_ref:'account',project_ids:['outcome']})}})
+ const handler=createStableHostRequestHandler({environment,runtimeFactory})
+ const headers={authorization:'Bearer valid'}
+ const workspace=await handler({pathname:'/api/private/workspace',headers})
+ assert.equal(workspace.status,200);assert.equal(workspace.headers['x-outcome-destination-csrf'],environment.OUTCOME_DESTINATION_CSRF_SECRET)
+ assert.equal(JSON.stringify(workspace.body).includes('synthetic-csrf'),false)
+ const request={method:'PUT',pathname:'/api/private/destination/drafts/00000000-0000-4000-8000-000000000001',headers:{...headers,'content-type':'application/json','x-outcome-csrf':workspace.headers['x-outcome-destination-csrf'],origin:'https://outcome-synthetic-unique.vercel.app'},body:'{'}
+ // Both failures occur before repository/pool.connect; no synthetic network calls.
+ assert.equal((await handler(request)).status,400)
+ assert.equal((await handler({...request,headers:{...request.headers,origin:identityEnvironment.OUTCOME_PRIVATE_ALLOWED_ORIGIN}})).status,403)
+ for(const VERCEL_ENV of ['production','development']){
+  const disabled=createStableHostRequestHandler({environment:{...environment,VERCEL_ENV},runtimeFactory})
+  const current=await disabled({pathname:'/api/private/workspace',headers})
+  assert.equal(current.headers?.['x-outcome-destination-csrf'],undefined)
+  assert.equal((await disabled(request)).status,503)
+ }
+})
+
 test('production chat ingress reads streamed UTF-8 bodies and caps bytes before service invocation', async () => {
   const payload = Buffer.from(JSON.stringify({ project_id:'outcome', message:'안녕하세요' }))
   const request = { method:'POST', async *[Symbol.asyncIterator]() { yield payload.subarray(0, 42); yield payload.subarray(42) } }
