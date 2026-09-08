@@ -7,6 +7,21 @@ const path='/api/private/destination/drafts/00000000-0000-4000-8000-000000000001
 const identityService={authenticate:async()=>({subject:'owner'}),resolveBridgeAuthority:async()=>({workspace_id:'workspace',account_ref:'account',project_ids:['outcome']})}
 const headers={'content-type':'application/json',origin:'https://preview.invalid','x-outcome-csrf':'synthetic-csrf'}
 const body=JSON.stringify({requestId:'00000000-0000-4000-8000-000000000002',expectedRevision:0,document:'{}'})
+test('review HTTP is owner-scoped read-only with no ingestion or confirmation',async()=>{
+ let reads=0
+ const runtime={questionRepository:{load:async()=>null,review:async input=>{reads++;assert.equal(input.accountRef,'account');return {decisions:[],completionAuthority:false}},record:()=>{throw Error('forbidden')}}}
+ const server=createOutcomeServer({publicReadOnly:true,accountAccess:identityService,destinationRuntime:runtime})
+ server.listen(0,'127.0.0.1');await once(server,'listening')
+ const url=`http://127.0.0.1:${server.address().port}${path.replace('/drafts/','/review/')}`
+ try{
+  assert.equal((await fetch(url)).status,401)
+  const response=await fetch(url,{headers:{cookie:'__session=valid'}})
+  assert.equal(response.status,200);assert.equal(response.headers.get('cache-control'),'no-store')
+  assert.deepEqual(await response.json(),{review:{decisions:[],completionAuthority:false},completionAuthority:false})
+  for(const method of ['POST','PUT','DELETE'])assert.equal((await fetch(url,{method,headers:{cookie:'__session=valid'}})).status,405)
+  assert.equal(reads,1)
+ }finally{server.closeAllConnections();await new Promise(resolve=>server.close(resolve))}
+})
 test('questions are owner-scoped read-only and cannot invoke internal ingestion',async()=>{
  let reads=0,writes=0
  const runtime={questionRepository:{load:async input=>{reads++;assert.equal(input.accountRef,'account');assert.equal(input.draftId,path.split('/').at(-1));return null},record:async()=>{writes++}}}

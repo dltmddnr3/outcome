@@ -52,6 +52,26 @@ export const activeDestinationDraftId = '00000000-0000-4000-8000-000000000001'
 export type DestinationDraftDocument = { schemaVersion: 1; mode: 'guided_200q' | 'brief_gap'; source: string; answers: import('./destination-discovery').DestinationAnswers; unknowns: string[] }
 export type StoredDestinationDraft = { draftId: string; revision: number; document: DestinationDraftDocument; state: 'draft'; completionAuthority: false }
 export type StoredDiscovery = {draftId:string;revision:number;intakeRevision:number;context:DiscoveryContext;contextDigest:string;state:'draft';completionAuthority:false}
+export type DiscoveryDecisionReview={contextDigest:string;contextRevision:number;intakeRevision:number;decisions:Array<{questionId:string;gapId:string;value:string;prompt:string;sourceContextRevision:number}>;sourceVerification:'required';completionAuthority:false}
+export async function requestDestinationDecisionReview(discovery:StoredDiscovery):Promise<DiscoveryDecisionReview>{
+ const binding=privateDestinationBinding,generation=privateDecisionBindingVersion
+ if(!binding||discovery.draftId!==activeDestinationDraftId)throw Error('destination_unavailable')
+ const pinned=JSON.parse(JSON.stringify(discovery)) as StoredDiscovery
+ const headers=await destinationSessionHeaders(binding,generation)
+ const response=await fetch(`/api/private/destination/review/${activeDestinationDraftId}`,{credentials:'same-origin',headers})
+ const value=await readJson<unknown>(response)
+ if(binding!==privateDestinationBinding||generation!==privateDecisionBindingVersion)throw Error('destination_identity_changed')
+ const exact=(v:unknown,keys:string[]):v is Record<string,unknown>=>!!v&&typeof v==='object'&&!Array.isArray(v)&&Object.keys(v).length===keys.length&&keys.every(k=>Object.hasOwn(v,k))
+ const fail=():never=>{throw Error('discovery_response_invalid')}
+ if(!exact(value,['review','completionAuthority'])||value.completionAuthority!==false)return fail()
+ const row=value.review
+ if(!exact(row,['contextDigest','contextRevision','intakeRevision','decisions','sourceVerification','completionAuthority'])||row.contextDigest!==pinned.contextDigest||row.contextRevision!==pinned.revision||row.intakeRevision!==pinned.intakeRevision||row.sourceVerification!=='required'||row.completionAuthority!==false||!Array.isArray(row.decisions)||row.decisions.length!==pinned.context.answers.length)return fail()
+ for(const [index,item] of row.decisions.entries()){
+  const answer=pinned.context.answers[index]
+  if(!exact(item,['questionId','gapId','value','prompt','sourceContextRevision'])||item.questionId!==answer.questionId||item.gapId!==answer.gapId||item.value!==answer.value||typeof item.prompt!=='string'||!item.prompt.trim()||item.prompt.length>4000||!Number.isSafeInteger(item.sourceContextRevision)||Number(item.sourceContextRevision)<1||Number(item.sourceContextRevision)>=pinned.revision)return fail()
+ }
+ return row as DiscoveryDecisionReview
+}
 export type DiscoveryQuestionRun={requestId:string;draftId:string;contextDigest:string;contextRevision:number;state:'queued'|'dispatch_started'|'completed'|'failed'|'delivery_unknown';completionAuthority:false}
 export async function requestDestinationQuestionRun(discovery:StoredDiscovery,submit=false):Promise<DiscoveryQuestionRun|null>{
  const binding=privateDestinationBinding,generation=privateDecisionBindingVersion

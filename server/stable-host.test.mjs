@@ -133,7 +133,7 @@ test('hosted decision boundary requires authentication, authentic origin and exp
 test('hosted destination stays default-off and routes authenticated bearer save/load with bounded raw body',async()=>{
  let factories=0,writes=0,saved=null
  const runtimeFactory=async()=>({allowedOrigin:'https://preview.invalid',publishableKey:'pk_test_boundary',service:{authenticate:async token=>{if(token!=='valid')throw Error('private detail')},readWorkspace:async()=>({projects:[]}),resolveBridgeAuthority:async()=>({workspace_id:'workspace',account_ref:'account',project_ids:['outcome']})}})
- const destinationRuntimeFactory=async()=>{factories++;return {allowedOrigin:'https://preview.invalid',csrfSecret:'synthetic-destination-csrf',repository:{load:async()=>saved,save:async input=>{writes++;saved={document:input.document};return saved}}}}
+ const destinationRuntimeFactory=async()=>{factories++;return {allowedOrigin:'https://preview.invalid',csrfSecret:'synthetic-destination-csrf',repository:{load:async()=>saved,save:async input=>{writes++;saved={document:input.document};return saved}},questionRepository:{load:async()=>null,review:async()=>({decisions:[],completionAuthority:false})}}}
  const args={environment:identityEnvironment,runtimeFactory,destinationRuntimeFactory}
  const handler=createStableHostRequestHandler(args)
  const pathname='/api/private/destination/drafts/00000000-0000-4000-8000-000000000001'
@@ -143,6 +143,10 @@ test('hosted destination stays default-off and routes authenticated bearer save/
  const headers={authorization:'Bearer valid'}
  const workspace=await handler({pathname:'/api/private/workspace',headers})
  assert.equal(workspace.headers['x-outcome-destination-csrf'],'synthetic-destination-csrf')
+ const reviewPath=pathname.replace('/drafts/','/review/')
+ assert.equal((await handler({pathname:reviewPath})).status,401)
+ assert.deepEqual(await handler({pathname:reviewPath,headers}),{status:200,body:{review:{decisions:[],completionAuthority:false},completionAuthority:false}})
+ assert.equal((await handler({method:'POST',pathname:reviewPath,headers})).status,405)
  const payload=Buffer.from(JSON.stringify({requestId:'00000000-0000-4000-8000-000000000002',expectedRevision:0,document:'한글'.repeat(10000)}))
  const stream={method:'PUT',async *[Symbol.asyncIterator](){yield payload.subarray(0,101);yield payload.subarray(101)}}
  const body=await rawBridgeBody(stream,pathname)

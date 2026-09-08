@@ -1,5 +1,6 @@
 import {validateDestinationQuestionReceipt} from './outcome-destination-question-receipt.mjs'
 import {discoveryContextDigest,parseDiscoveryContext} from './outcome-destination-discovery-repository.mjs'
+import {parseDestinationDraft} from './outcome-destination-postgres.mjs'
 const fail=()=>{throw Error('discovery_questions_unavailable')}
 const hash=v=>typeof v==='string'&&/^[a-f0-9]{64}$/.test(v)
 export function createDiscoveryQuestionRepository({transact}={}) {
@@ -25,6 +26,26 @@ export function createDiscoveryQuestionRepository({transact}={}) {
   return {contextDigest:current.context_digest,contextRevision:current.revision,receipt:JSON.stringify(value.receipt),sourceVerification:'required',completionAuthority:false}
  }
  return Object.freeze({
+  review:input=>run(input,async(query,scope,current)=>{
+   const context=parseDiscoveryContext(JSON.stringify(current.context))
+   const ids=context.answers.map(answer=>answer.questionId)
+   const rows=ids.length?(await query(`select q.value->>'id' as question_id,
+    min(q.value->>'gapId') as gap_id,min(q.value->>'prompt') as prompt,
+    count(distinct q.value->>'gapId')::int as gap_variants,count(distinct q.value->>'prompt')::int as prompt_variants,
+    min(r.context_revision)::int as source_revision
+    from outcome_destination_private.discovery_question_receipts r
+    cross join lateral jsonb_array_elements(r.receipt->'questions') q(value)
+    where r.workspace_id=$1 and r.account_ref=$2 and r.draft_id=$3
+     and r.context_revision<$4 and q.value->>'id'=any($5::text[])
+    group by q.value->>'id'`,[...scope,current.revision,ids])).rows:[]
+   const decisions=context.answers.map(answer=>{
+    const matches=rows.filter(row=>row.question_id===answer.questionId),row=matches[0]
+    if(matches.length!==1||row.gap_id!==answer.gapId||row.gap_variants!==1||row.prompt_variants!==1||typeof row.prompt!=='string'||!row.prompt.trim()||row.prompt.length>4000||!Number.isSafeInteger(row.source_revision)||row.source_revision<1||row.source_revision>=current.revision)fail()
+    parseDestinationDraft(JSON.stringify({schemaVersion:1,mode:'guided_200q',source:'',answers:{problem:row.prompt},unknowns:[]}))
+    return {...answer,prompt:row.prompt,sourceContextRevision:row.source_revision}
+   })
+   return {contextDigest:current.context_digest,contextRevision:current.revision,intakeRevision:current.intake_revision,decisions,sourceVerification:'required',completionAuthority:false}
+  }),
   load:input=>run(input,async(query,scope,current)=>validate((await query('select * from outcome_destination_private.discovery_question_receipts where workspace_id=$1 and account_ref=$2 and draft_id=$3 and context_digest=$4',[...scope,current.context_digest])).rows[0],current)),
   // Trusted internal ingestion only. Metadata is not independent proof of origin.
   record:input=>run(input,async(query,scope,current)=>{

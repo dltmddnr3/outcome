@@ -1,11 +1,31 @@
 import {afterEach,expect,it,vi} from 'vitest'
-import {activeDestinationDraftId,captureDestinationReviewBinding,fetchPrivateWorkspace,requestDestinationDiscovery,requestDestinationQuestions,requestDestinationQuestionRun,type StoredDestinationDraft,type StoredDiscovery} from './api'
+import {activeDestinationDraftId,captureDestinationReviewBinding,fetchPrivateWorkspace,requestDestinationDiscovery,requestDestinationQuestions,requestDestinationQuestionRun,requestDestinationDecisionReview,type StoredDestinationDraft,type StoredDiscovery} from './api'
 import {discoveryContextDigest,type DiscoveryContext} from './destination-question-receipt'
 afterEach(()=>vi.unstubAllGlobals())
 const intake:StoredDestinationDraft={draftId:activeDestinationDraftId,revision:1,document:{schemaVersion:1,mode:'guided_200q',source:'',answers:{problem:'문제'},unknowns:['검증 필요']},state:'draft',completionAuthority:false}
 const context:DiscoveryContext={source:'',mode:'guided_200q',seedAnswers:{problem:'문제'},unknowns:['검증 필요'],revision:1,answers:[{questionId:'q-1',gapId:'gap-1',value:'소유자'}],askedQuestionIds:['q-1']}
 const row=async()=>({draftId:activeDestinationDraftId,revision:1,intakeRevision:1,context,contextDigest:await discoveryContextDigest(context),state:'draft',completionAuthority:false})
 const workspace=()=>new Response('{"workspace":{}}',{headers:{'x-outcome-destination-csrf':'synthetic-discovery'}})
+it('reads exact current decision pairs without accepting changed values, source revision or authority',async()=>{
+ const stored={...await row(),revision:2,context:{...context,revision:2}} as StoredDiscovery
+ stored.contextDigest=await discoveryContextDigest(stored.context)
+ const valid={contextDigest:stored.contextDigest,contextRevision:2,intakeRevision:1,decisions:[{...context.answers[0],prompt:'누가 확인하나요?',sourceContextRevision:1}],sourceVerification:'required',completionAuthority:false}
+ for(const [review,pass] of [[valid,true],[{...valid,contextRevision:1},false],[{...valid,intakeRevision:2},false],[{...valid,completionAuthority:true},false],[{...valid,decisions:[]},false],[{...valid,decisions:[{...valid.decisions[0],value:'forged'}]},false],[{...valid,decisions:[{...valid.decisions[0],sourceContextRevision:2}]},false]] as const){
+  const mock=vi.fn().mockImplementation((url:string)=>Promise.resolve(url.endsWith('/workspace')?workspace():new Response(JSON.stringify({review,completionAuthority:false}))))
+  vi.stubGlobal('fetch',mock);await fetchPrivateWorkspace('owner',async()=>'fresh-owner')
+  if(pass)expect(await requestDestinationDecisionReview(stored)).toEqual(valid)
+  else await expect(requestDestinationDecisionReview(stored)).rejects.toThrow('discovery_response_invalid')
+  expect(mock).toHaveBeenCalledTimes(2);expect(mock.mock.calls[1][0]).toContain('/review/');expect(mock.mock.calls[1][1].headers.authorization).toBe('Bearer fresh-owner')
+ }
+})
+it('discards delayed decision review after owner changes',async()=>{
+ const stored=await row() as StoredDiscovery;let finish!:(r:Response)=>void,started!:()=>void
+ const issued=new Promise<void>(resolve=>{started=resolve})
+ vi.stubGlobal('fetch',vi.fn().mockImplementation((url:string)=>url.endsWith('/workspace')?Promise.resolve(workspace()):new Promise<Response>(resolve=>{finish=resolve;started()})))
+ await fetchPrivateWorkspace('owner-one');const pending=requestDestinationDecisionReview(stored);await issued;await fetchPrivateWorkspace('owner-two')
+ finish(new Response(JSON.stringify({review:null,completionAuthority:false})))
+ await expect(pending).rejects.toThrow('destination_identity_changed')
+})
 it('sends one reference-only question request and rejects mismatched status without retry',async()=>{
  const stored=await row() as StoredDiscovery
  const status={requestId:activeDestinationDraftId,draftId:activeDestinationDraftId,contextDigest:stored.contextDigest,contextRevision:1,state:'queued',completionAuthority:false}
