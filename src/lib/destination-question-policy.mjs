@@ -26,11 +26,12 @@ export function planDestinationQuestions(input) {
   if(question&&question.gapId!==answer.gapId)invalid()
   answeredQuestions.add(answer.questionId);answeredGaps.add(answer.gapId)
  }
+ // A readiness label cannot erase a contradictory unanswered material gap.
+ const pending=questions.filter(question=>question.material&&!answeredGaps.has(question.gapId)&&!answeredQuestions.has(question.id))
  const unresolvedDomains=discoveryDomains.filter(domain=>{
   const entry=coverage.find(item=>item.domain===domain)
-  return !entry||!['contract_ready','non_goal'].includes(entry.state)||entry.evidenceRefs.length===0
+  return !entry||!['contract_ready','non_goal'].includes(entry.state)||entry.evidenceRefs.length===0||pending.some(question=>question.domain===domain)
  })
- const pending=questions.filter(question=>question.material&&!answeredGaps.has(question.gapId)&&!answeredQuestions.has(question.id)&&unresolvedDomains.includes(question.domain))
  // Redisplay an unanswered issued question without spending another question slot.
  const active=pending.filter(question=>askedQuestionIds.includes(question.id))
  const remainingBudget=200-askedQuestionIds.length

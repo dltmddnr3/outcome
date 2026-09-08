@@ -2,12 +2,13 @@ import assert from 'node:assert/strict'
 import {spawn} from 'node:child_process'
 import {chromium} from '@playwright/test'
 import {parseDiscoveryContext,discoveryContextDigest} from '../server/outcome-destination-discovery-repository.mjs'
+import {discoveryDomains} from '../src/lib/destination-question-policy.mjs'
 const server=spawn(process.execPath,['scripts/chat-browser-fixture.mjs'],{stdio:['ignore','pipe','inherit']})
 let browser,activePage
 try{
  const base=await new Promise((resolve,reject)=>{const timer=setTimeout(()=>reject(Error('fixture_timeout')),15000);server.once('exit',()=>{clearTimeout(timer);reject(Error('fixture_exit'))});server.stdout.on('data',chunk=>{const match=String(chunk).match(/http:\/\/127.0.0.1:\d+/);if(match){clearTimeout(timer);resolve(match[0])}})})
  browser=await chromium.launch({channel:'chrome',headless:true})
- for(const width of [390,1440])for(const reviewMode of ['success','request-failure','review-stale','review-private','review-failure']){
+ for(const width of [390,1440])for(const reviewMode of ['success','request-failure','review-stale','review-private','review-failure','contract_ready','non_goal']){
   if(process.env.OUTCOME_REVIEW_CASE&&process.env.OUTCOME_REVIEW_CASE!==`${width}:${reviewMode}`)continue
   const requestFailure=reviewMode==='request-failure'
   const page=await browser.newPage({viewport:{width,height:900}})
@@ -44,7 +45,8 @@ try{
     body={review:{contextDigest:reviewMode==='review-stale'?'0'.repeat(64):discovery.contextDigest,contextRevision:discovery.revision,intakeRevision:1,decisions:discovery.context.answers.map(answer=>({...answer,prompt:reviewMode==='review-private'?'password=synthetic-private':'결과 확인 담당자는 누구인가요?',sourceContextRevision:1})),sourceVerification:'required',completionAuthority:false},completionAuthority:false}
    }else if(path.includes('/questions/')){
     assert.equal(route.request().method(),'GET')
-    const receipt={schemaVersion:1,contextDigest:discovery?.contextDigest,coverage:[],questions:[{id:'q-1',gapId:'owner',domain:'system_boundary',prompt:'결과 확인 담당자는 누구인가요?',choices:['소유자','내부 팀'],recommendation:'소유자',reason:'확인 주체를 정합니다.',material:true}],completionAuthority:false}
+    const coverage=['contract_ready','non_goal'].includes(reviewMode)?discoveryDomains.map(domain=>({domain,state:reviewMode,evidenceRefs:['synthetic-contract']})):[]
+    const receipt={schemaVersion:1,contextDigest:discovery?.contextDigest,coverage,questions:[{id:'q-1',gapId:'owner',domain:'system_boundary',prompt:'결과 확인 담당자는 누구인가요?',choices:['소유자','내부 팀'],recommendation:'소유자',reason:'확인 주체를 정합니다.',material:true}],completionAuthority:false}
     body={questions:discovery?.revision===1&&runs.has(discovery.contextDigest)?{contextDigest:discovery.contextDigest,contextRevision:1,receipt:JSON.stringify(receipt),sourceVerification:'required',completionAuthority:false}:null,completionAuthority:false}
    }else throw Error(`unexpected fixture route ${path}`)
    await route.fulfill({status:200,contentType:'application/json',headers:{'x-outcome-destination-csrf':'synthetic'},body:JSON.stringify(body)})
@@ -72,6 +74,9 @@ try{
   await page.getByText('요청 접수 · 실행 대기',{exact:true}).waitFor()
   assert.equal(await page.getByRole('button',{name:'Planner 후속 질문 요청',exact:true}).isDisabled(),true)
   await page.getByRole('button',{name:'현재 후속 질문 확인',exact:true}).click()
+  await page.getByRole('heading',{name:'결과 확인 담당자는 누구인가요?',exact:true}).waitFor()
+  assert.equal(await page.getByRole('radio',{name:/소유자/}).isChecked(),false)
+  assert.equal(await page.getByRole('button',{name:'Destination 확정 · 연결 준비 중',exact:true}).isDisabled(),true)
   await page.getByRole('radio',{name:/소유자/}).check()
   await page.getByRole('button',{name:'후속 답변 저장',exact:true}).click()
   await page.getByText('보관된 후속 답변 1개',{exact:false}).waitFor()
@@ -80,7 +85,7 @@ try{
   await page.getByText('보관된 후속 답변 1개',{exact:false}).waitFor()
   await page.getByRole('button',{name:'저장된 추가 결정 검토',exact:true}).click()
   const review=page.getByRole('region',{name:'저장된 추가 결정',exact:true})
-  if(reviewMode==='success'){
+  if(['success','contract_ready','non_goal'].includes(reviewMode)){
    await review.getByText('결과 확인 담당자는 누구인가요?',{exact:true}).waitFor()
    assert.equal(await review.getByText('소유자',{exact:true}).isVisible(),true)
    assert.match(await review.innerText(),/기본 초안 버전 1 · 후속 답변 버전 2/)

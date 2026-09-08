@@ -24,8 +24,23 @@ it('separates reversible defaults and refuses bare requirements or ungrounded co
  expect(result.batch).toEqual([]);expect(result.defaults).toHaveLength(1);expect(result.state).toBe('analysis_required')
  const coverage=discoveryDomains.map(domain=>({domain,state:'contract_ready' as const,evidenceRefs:[]}))
  expect(planDestinationQuestions({...base(),coverage}).unresolvedDomains).toHaveLength(8)
- const ready=planDestinationQuestions({...base(),coverage:coverage.map(item=>({...item,evidenceRefs:['contract-pin']}))})
+ const ready=planDestinationQuestions({...base(),questions:[],coverage:coverage.map(item=>({...item,evidenceRefs:['contract-pin']}))})
  expect(ready.state).toBe('coverage_ready_for_review');expect(ready.confirmedDestination).toBe(false)
+})
+it('unanswered material gaps override ready and non-goal labels without resetting the issued budget',()=>{
+ for(const state of ['contract_ready','non_goal'] as const){
+  const coverage=discoveryDomains.map(domain=>({domain,state,evidenceRefs:['contract-pin']}))
+  const result=planDestinationQuestions({...base(),coverage,askedQuestionIds:['q-1']})
+  expect(result.state).toBe('questions_pending')
+  expect(result.unresolvedDomains).toEqual(['system_boundary'])
+  expect(result.batch.map(q=>q.id)).toEqual(['q-1','q-2','q-3'])
+  expect(result.remainingBudget).toBe(199)
+  const answered=planDestinationQuestions({...base(),questions:[question(1)],coverage,askedQuestionIds:['old-question'],answers:[{questionId:'old-question',gapId:'gap-1',value:'기존 결정'}]})
+  expect(answered.state).toBe('coverage_ready_for_review')
+  expect(answered.confirmedDestination).toBe(false)
+  const capped=planDestinationQuestions({...base(),coverage,askedQuestionIds:Array.from({length:200},(_,i)=>`old-${i}`)})
+  expect(capped.batch).toEqual([]);expect(capped.state).toBe('question_limit_reached')
+ }
 })
 it('rejects duplicate gaps and unsupported recommendations instead of silently selecting',()=>{
  expect(()=>planDestinationQuestions({...base(),questions:[question(1),{...question(2),gapId:'gap-1'}]})).toThrow('discovery_plan_invalid')

@@ -2,10 +2,18 @@ import test from 'node:test'
 import assert from 'node:assert/strict'
 import {validateDestinationQuestionReceipt as validate} from './outcome-destination-question-receipt.mjs'
 import {discoveryContextDigest} from './outcome-destination-discovery-repository.mjs'
+import {discoveryDomains} from '../src/lib/destination-question-policy.mjs'
 const context={source:'',mode:'guided_200q',seedAnswers:{problem:'문제'},unknowns:['검증 필요'],revision:1,answers:[],askedQuestionIds:[]}
 const q={id:'q-1',gapId:'owner',domain:'system_boundary',prompt:'누가 사용하나요?',choices:['소유자','내부 팀'],recommendation:'소유자',reason:'사용 주체를 정합니다.',material:true}
 const receipt={schemaVersion:1,contextDigest:discoveryContextDigest(context),coverage:[],questions:[q],completionAuthority:false}
 const run=(r=receipt,c=context)=>validate({serializedContext:JSON.stringify(c),serializedReceipt:JSON.stringify(r)})
+test('a ready-labelled receipt cannot hide its own unanswered material question',()=>{
+ for(const state of ['contract_ready','non_goal']){
+  const result=run({...receipt,coverage:discoveryDomains.map(domain=>({domain,state,evidenceRefs:['contract-pin']}))})
+  assert.deepEqual(result.plan.batch,[q]);assert.equal(result.plan.state,'questions_pending')
+  assert.deepEqual(result.plan.unresolvedDomains,['system_boundary']);assert.equal(result.sourceVerification,'required')
+ }
+})
 test('server shares the browser question plan without claiming evidence or completion',()=>{
  const result=run();assert.deepEqual(result.plan.batch,[q]);assert.equal(result.sourceVerification,'required');assert.equal(result.completionAuthority,false)
  assert.equal(result.plan.confirmedDestination,false)
