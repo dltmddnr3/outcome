@@ -35,7 +35,13 @@ test('internal desktop one-shot reads exact owner snapshot, never starts a turn 
     })
     try {
       server.listen(socketPath); await once(server, 'listening'); chmodSync(socketPath, 0o600)
-      const result = await createDesktopObservationReader({ socketPath, timeoutMs: 100, maxBytes: 100000, now: () => 20000 })(thread)
+      const diagnostics = []
+      const result = await createDesktopObservationReader({ socketPath, timeoutMs: 100, maxBytes: 100000, now: () => 20000, onDiagnostic: value => diagnostics.push(value) })(thread)
+      assert.equal(diagnostics.length, 1)
+      assert.equal(diagnostics[0].phase, 'snapshot')
+      assert.equal(diagnostics[0].reason, mode === 'valid' ? 'observed' : mode === 'patch' ? 'snapshot_invalid' : mode === 'invalid_status' ? 'runtime_status_invalid' : mode === 'oversize' ? 'payload_limit' : 'timeout')
+      assert.deepEqual(Object.keys(diagnostics[0]).sort(), ['bytes', 'phase', 'reason'])
+      assert(Number.isSafeInteger(diagnostics[0].bytes)); assert(!JSON.stringify(diagnostics).includes(thread))
       if (mode === 'valid') {
         assert.equal(result.observedAtMs, 20000); assert.equal(result.revision, 3)
         assert.deepEqual(JSON.parse(result.runtimeJson), { thread: { id: thread, status: { type: 'active', activeFlags: [] } } })
@@ -49,4 +55,5 @@ test('missing socket and invalid identity fail without startup or mutation', asy
   const reader = createDesktopObservationReader({ socketPath: '/nonexistent/outcome-observation.sock' })
   assert.equal(await reader(thread), null); assert.equal(await reader('invalid'), null)
   assert.throws(() => createDesktopObservationReader({ socketPath: 'relative' }), /configuration/)
+  assert.equal(await createDesktopObservationReader({ socketPath: '/nonexistent/outcome-observation.sock', onDiagnostic: () => { throw Error('private') } })(thread), null)
 })
