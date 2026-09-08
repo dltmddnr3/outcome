@@ -1,4 +1,26 @@
 import {randomUUID,createHash} from 'node:crypto'
+import {discoveryQuestionMessage} from './outcome-destination-question-dispatch.mjs'
+
+// Explicit recovery of an already-started request. No claim, publish or transport.
+// The existing durable claim plus an exact completed source turn replace the lost
+// process-local capability; we do not invent an acknowledgement or reset the request.
+export async function reconcileDiscoveryQuestionOnce({requests,questions,queueAdapter,inputStore,scope,reference}={}){
+ const unavailable={state:'unavailable',completionAuthority:false}
+ try{
+  const input=await inputStore.read(reference)
+  if(input.draftId!==scope.draftId)return unavailable
+  const message=discoveryQuestionMessage(input,reference)
+  const identity={...scope,contextDigest:input.contextDigest,requestId:input.requestId}
+  const row=await requests.readPendingClaim(identity)
+  if(!row||row.contextRevision!==input.contextRevision)return unavailable
+  const binding=await queueAdapter.bindingResolver({project_id:'outcome',role:'planner'})
+  if(binding?.project_id!=='outcome'||binding.role!=='planner'||binding.status!=='active'||binding.freshness!=='fresh'||!Number.isSafeInteger(binding.binding_version)||binding.binding_version<1||!binding.destination)return unavailable
+  const correlation_id=`message-${createHash('sha256').update(JSON.stringify(['destination-questions',input.requestId,input.contextDigest])).digest('hex').slice(0,16)}`
+  // The regular collector performs fresh binding and full source verification,
+  // then records an idempotent receipt before the original-token terminal update.
+  return await collectDiscoveryQuestionOnce({requests,questions,queueAdapter,request:{...identity,dispatchToken:row.dispatchToken},readReceipt:{requestId:row.requestId,contextDigest:row.contextDigest,contextRevision:row.contextRevision,bindingVersion:binding.binding_version,destination:binding.destination,correlation_id,message}})
+ }catch{return unavailable}
+}
 
 export async function runDiscoveryQuestionOnce({requests,dispatch,request,dispatchToken=randomUUID()}={}){
  if(typeof requests?.claim!=='function'||typeof requests?.finish!=='function'||typeof dispatch!=='function')throw Error('discovery_request_unavailable')

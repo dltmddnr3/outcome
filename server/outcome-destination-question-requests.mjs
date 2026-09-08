@@ -29,6 +29,13 @@ export function createDiscoveryQuestionRequests({transact}={}){
    const row=await read(query,scope)
    return row?.state==='dispatch_started'&&row.dispatch_token===input.dispatchToken?project(row):null
   }),
+  // Internal collection-only reconciliation; never exposed in the public projection.
+  readPendingClaim:input=>run(input,async(query,scope)=>{
+   if(!uuid(input.requestId))fail()
+   const source=await current(query,scope),row=await read(query,scope)
+   if(row?.state!=='dispatch_started'||row.request_id!==input.requestId||row.context_revision!==source.revision||!uuid(row.dispatch_token))return null
+   return {...project(row),dispatchToken:row.dispatch_token}
+  }),
   enqueue:input=>run(input,async(query,scope)=>{
    const row=await current(query,scope)
    await query('insert into outcome_destination_private.discovery_question_requests(workspace_id,account_ref,draft_id,context_digest,context_revision,request_id) values($1,$2,$3,$4,$5,$6) on conflict do nothing',[...scope,row.revision,randomUUID()])
