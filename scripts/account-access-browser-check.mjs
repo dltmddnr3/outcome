@@ -170,8 +170,8 @@ try {
     if (await page.locator('[data-private-project]').count() !== 2) throw new Error(`${viewport.name} project controls missing`)
     const shell = await page.evaluate(() => {
       const projection = document.querySelector('.current-projection'); const conversation = document.querySelector('.planner-conversation')
-      const projectionBox = projection?.getBoundingClientRect(); const conversationBox = conversation?.getBoundingClientRect()
-      return { sidebar: Boolean(document.querySelector('.oc-global-nav')), journey: Boolean(document.querySelector('.oc-outcome-map')), current: document.querySelectorAll('[aria-current=step]').length, overflow: document.documentElement.scrollWidth - document.documentElement.clientWidth, approvedBoundaryLabels: [...document.querySelectorAll('[data-projection-field=boundary] li')].map((item) => item.textContent?.trim()).filter(Boolean), semanticProjectionFirst: Boolean(projection && conversation && (projection.compareDocumentPosition(conversation) & Node.DOCUMENT_POSITION_FOLLOWING)), visualProjectionFirst: innerWidth <= 760 ? Boolean(projectionBox && conversationBox && projectionBox.top < conversationBox.top) : Boolean(projectionBox && conversationBox && conversationBox.left < projectionBox.left), rawActionSlugVisible: ['q2-independent-qa', 'verify-coherent-slice', 'resolve-blocker', 'resolve_blocker'].some((value) => document.body.innerText.includes(value)) }
+      const projectionBox = projection?.getBoundingClientRect()
+      return { sidebar: Boolean(document.querySelector('.oc-global-nav')), journey: Boolean(document.querySelector('.oc-outcome-map')), current: document.querySelectorAll('[aria-current=step]').length, overflow: document.documentElement.scrollWidth - document.documentElement.clientWidth, approvedBoundaryLabels: [...document.querySelectorAll('[data-projection-field=boundary] li')].map((item) => item.textContent?.trim()).filter(Boolean), semanticProjectionFirst: Boolean(projection && conversation && (projection.compareDocumentPosition(conversation) & Node.DOCUMENT_POSITION_FOLLOWING)), visualProjectionFirst: Boolean(projectionBox && projectionBox.height > 0 && document.querySelector('details.oc-v1-compatibility:not([open])') && projectionBox.bottom <= document.querySelector('details.oc-v1-compatibility').getBoundingClientRect().top + 1), rawActionSlugVisible: ['q2-independent-qa', 'verify-coherent-slice', 'resolve-blocker', 'resolve_blocker'].some((value) => document.body.innerText.includes(value)) }
     })
     if (!shell.sidebar || !shell.journey || shell.current < 3 || shell.overflow !== 0 || shell.approvedBoundaryLabels.length === 0 || !shell.semanticProjectionFirst || !shell.visualProjectionFirst || shell.rawActionSlugVisible) throw new Error(`${viewport.name} existing shell failed ${JSON.stringify(shell)}`)
     if (viewport.width === 1440) {
@@ -180,6 +180,14 @@ try {
       if (zoom.overflow !== 0 || !zoom.semanticProjectionFirst) throw new Error(`${viewport.name} ready 200% reflow failed ${JSON.stringify(zoom)}`)
       await page.setViewportSize({ width: 1440, height: 900 })
     }
+    await page.locator('details.oc-v1-compatibility > summary').click()
+    if (await page.locator('details.oc-v1-compatibility').getAttribute('open') === null) throw new Error('compatibility disclosure did not open')
+    if (viewport.width <= 390) {
+      const tabs = page.getByRole('navigation', { name: '모바일 작업공간' })
+      await tabs.getByRole('button', { name: '대화', exact: true }).click()
+      await page.locator('.planner-conversation').waitFor({ state: 'visible' })
+      await tabs.getByRole('button', { name: '지도', exact: true }).click()
+    } else await page.locator('.planner-conversation').waitFor({ state: 'visible' })
     if (viewport.width <= 390) {
       await page.locator('.oc-outcome-map').evaluate((element) => element.scrollIntoView({ block: 'start' }))
       await page.evaluate(() => window.scrollBy(0, 320))
