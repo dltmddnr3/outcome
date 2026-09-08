@@ -6,6 +6,7 @@ import {readFile} from 'node:fs/promises'
 import {PGlite} from '@electric-sql/pglite'
 import {createDestinationDraftRepository,parseDestinationDraft} from './outcome-destination-postgres.mjs'
 import {handleDestinationDraftRequest} from './outcome-destination-api.mjs'
+import {createDestinationAnalysisSourceResolver,destinationDocumentDigest} from './outcome-destination-analysis-source.mjs'
 
 const document=()=>JSON.stringify({schemaVersion:1,mode:'brief_gap',source:'목적: 실행 결과 확인',answers:{problem:'작업 결과를 확인하기 어렵다'},unknowns:['수용 기준 확인 필요']})
 test('destination draft parser preserves unknowns and rejects secret-like or oversized content',()=>{
@@ -76,6 +77,11 @@ test('private draft SQL preserves revisions, rejects stale saves and isolates ac
    assert.deepEqual(await (await fetch(base+request.pathname,{headers:{cookie:'__session=other'}})).json(),{draft:null,completionAuthority:false})
    assert.equal((await fetch(base+request.pathname)).status,401)
    assert.equal((await make().load(scope)).revision,4)
+   const resolver=createDestinationAnalysisSourceResolver({repository:make()})
+   const reference={...scope,revision:4,documentDigest:destinationDocumentDigest(receipt.draft.document)}
+   const resolved=await resolver(reference)
+   assert.deepEqual(JSON.parse(resolved.serializedDocument),receipt.draft.document)
+   await assert.rejects(()=>resolver({...reference,accountRef:'other-owner'}),/destination_analysis_source_unavailable/)
    assert.equal((await db.query('select count(*)::int n from outcome_destination_private.drafts')).rows[0].n,1)
   }finally{http.closeAllConnections();await new Promise(resolve=>http.close(resolve))}
  }finally{await db.close()}
