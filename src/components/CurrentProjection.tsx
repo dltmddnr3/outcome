@@ -41,7 +41,7 @@ export function CurrentProjection({ projection, workObservation }: { projection:
       <article data-projection-field="now"><small>Now</small><strong>{stateCopy[projection.now.state]}</strong><span>{projection.now.observedAt}</span></article>
       <article data-projection-field="boundary"><small>다음 경계</small>{projection.readyBoundaryLabels.length ? <ul>{projection.readyBoundaryLabels.map((label) => <li key={label}>{label}</li>)}</ul> : <p>준비된 경계 없음</p>}{projection.nextActionLabel && <p className="current-projection__next-action">{projection.nextActionLabel}</p>}</article>
       {projection.cherryActionLabel !== null && <article data-projection-field="cherry-action"><small>Cherry action</small><strong>{projection.cherryActionLabel}</strong></article>}
-      <SingleSessionObservation observation={workObservation} />
+      <SingleSessionObservation key={projection.project.id} projectId={projection.project.id} observation={workObservation} />
       {(projection.executionLoopItems ?? []).slice(0, 1).map((item) => <article key={item.itemId} data-projection-field="execution-loop" data-item-state={item.state} data-completion-authority="false">
         <dl>
           <dt>확인한 근거</dt><dd>{factCopy(item.checked, '확인 근거 없음')}</dd>

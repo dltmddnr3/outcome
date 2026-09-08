@@ -29,6 +29,36 @@ export type PrivateChatSubmit = { accepted: true; sequence: number; event_id: st
 
 let privateDecisionBinding: { etag: string; csrf: string; bearer?: string } | null = null
 let privateDecisionBindingVersion = 0
+type ObservationBinding = { projects: string[]; bearer?: string; refreshCredential?: () => Promise<string | null> }
+let privateObservationBinding: ObservationBinding | null = null
+export function captureWorkObservationReader(projectId: string) {
+ const binding = privateObservationBinding, generation = privateDecisionBindingVersion
+ if (!binding || !['outcome', 'cherry-note'].includes(projectId) || !binding.projects.includes(projectId)) return null
+ return async (signal: AbortSignal): Promise<unknown> => {
+  const check = () => {
+   if (binding !== privateObservationBinding || generation !== privateDecisionBindingVersion) throw Error('work_observation_identity_changed')
+   if (signal.aborted) throw Error('work_observation_unavailable')
+  }
+  check()
+  try {
+   let token = binding.bearer
+   if (binding.refreshCredential) {
+    const refreshed = await binding.refreshCredential()
+    if (typeof refreshed !== 'string' || !/^[A-Za-z0-9._~-]+$/.test(refreshed)) throw Error()
+    token = refreshed
+   }
+   check()
+   const response = await fetch(`/api/private/work-observation/${projectId}`, { credentials: 'same-origin', cache: 'no-store', headers: privateSessionHeaders(token), signal })
+   const value = await readJson<{ projectId: string; observation: unknown; completionAuthority: false }>(response)
+   check()
+   if (!value || Object.keys(value).sort().join(',') !== 'completionAuthority,observation,projectId' || value.projectId !== projectId || value.completionAuthority !== false) throw Error()
+   return value.observation
+  } catch {
+   check()
+   throw Error('work_observation_unavailable')
+  }
+ }
+}
 type DestinationBinding = { csrf: string; bearer?: string; refreshCredential?: () => Promise<string | null> }
 let privateDestinationBinding: DestinationBinding | null = null
 async function destinationSessionHeaders(binding: DestinationBinding, generation: number) {
@@ -300,6 +330,7 @@ export async function fetchPrivateWorkspace(sessionToken?: string, refreshCreden
   const bindingVersion=++privateDecisionBindingVersion
   privateDecisionBinding=null
   privateDestinationBinding=null
+  privateObservationBinding=null
   const response = await fetch('/api/private/workspace', { credentials: 'same-origin', headers: privateSessionHeaders(sessionToken) })
   const value = await readJson<{ workspace: PrivateWorkspaceView }>(response)
   const etag = response.headers.get('etag') ?? ''
@@ -307,6 +338,10 @@ export async function fetchPrivateWorkspace(sessionToken?: string, refreshCreden
   if(bindingVersion===privateDecisionBindingVersion)privateDecisionBinding = etag && csrf ? { etag, csrf, ...(sessionToken ? { bearer: sessionToken } : {}) } : null
   const destinationCsrf=response.headers.get('x-outcome-destination-csrf')
   if(bindingVersion===privateDecisionBindingVersion)privateDestinationBinding=destinationCsrf ? {csrf:destinationCsrf,...(sessionToken ? {bearer:sessionToken} : {}),...(refreshCredential ? {refreshCredential} : {})} : null
+  if(bindingVersion===privateDecisionBindingVersion)privateObservationBinding = {
+    projects: (value.workspace.projects ?? []).map(project => project.project?.id).filter(id => ['outcome', 'cherry-note'].includes(id)),
+    ...(sessionToken ? { bearer: sessionToken } : {}), ...(refreshCredential ? { refreshCredential } : {}),
+  }
   return value
 }
 
@@ -334,6 +369,7 @@ export async function endPrivateSession(): Promise<void> {
   privateDecisionBindingVersion++
   privateDecisionBinding = null
   privateDestinationBinding = null
+  privateObservationBinding = null
   await readJson(await fetch('/api/private/auth/logout', { method: 'POST', credentials: 'same-origin' }))
 }
 

@@ -1,4 +1,6 @@
 import { useEffect, useState } from 'react'
+import { captureWorkObservationReader } from '../lib/api'
+import { startWorkObservationPolling } from '../lib/work-observation-poll'
 
 const stages = { queued: '작업 대기', implementing: '구현', qa_verifying: 'QA 검증', release_verifying: '릴리즈 검증', awaiting_owner: 'Cherry 확인 대기' }
 const runtimes = { active: '실행 관측됨', idle: '현재 실행 없음', waiting_approval: '권한 승인 대기', waiting_user: '답변 대기', waiting_approval_and_user: '권한 승인·답변 대기', unknown: '실행 상태 확인 불가' }
@@ -28,14 +30,21 @@ function parse(value: unknown): Snapshot | null {
 
 // The server supplies the ORIGINAL observation time. Rendering/polling must not
 // replace it with Date.now(). This card never treats an evidence reference as PASS.
-export function SingleSessionObservation({ observation }: { observation?: unknown }) {
+export function SingleSessionObservation({ observation, projectId }: { observation?: unknown; projectId?: string }) {
   const [now, setNow] = useState(Date.now)
+  const [received, setReceived] = useState<{ initial: unknown; projectId?: string; value: unknown } | null>(null)
+  const current = received && received.projectId === projectId && received.initial === observation ? received.value : observation
   useEffect(() => {
-    if (!parse(observation)) return
+    const read = projectId ? captureWorkObservationReader(projectId) : null
+    if (!read) return
+    return startWorkObservationPolling({ read, publish: value => { setNow(Date.now()); setReceived({ initial: observation, projectId, value }) } })
+  }, [projectId, observation])
+  useEffect(() => {
+    if (!parse(current)) return
     const timer = setInterval(() => setNow(Date.now()), 1000)
     return () => clearInterval(timer)
-  }, [observation])
-  const snapshot = parse(observation)
+  }, [current])
+  const snapshot = parse(current)
   const age = snapshot ? now - snapshot.observedAtMs : null
   const fresh = age !== null && age >= 0 && age <= 15000 && snapshot?.work.freshness === 'fresh'
   const status = !snapshot ? '연결 확인 전' : !fresh ? '새 관측 필요' : runtimes[snapshot.runtime.state]
