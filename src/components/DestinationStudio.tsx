@@ -1,5 +1,6 @@
 import { sensitiveContentHint } from './PlannerConversation'
 import {DestinationDiscoveryPanel} from './DestinationDiscoveryPanel'
+import {DestinationUnknownEditor} from './DestinationUnknownEditor'
 import {captureDestinationReviewBinding} from '../lib/api'
 import './DestinationStudio.css'
 import { privateDestinationStorageAvailable, requestDestinationDraft, requestDestinationAnalysis, destinationDraftDigest, destinationAnalysisRequestId, type DestinationDraftDocument, type StoredDestinationDraft, type DestinationAnalysisView } from '../lib/api'
@@ -213,6 +214,7 @@ export function DestinationStudio({ open, onClose }: { open: boolean; onClose: (
         <div className="destination-studio__review-intro"><span><Check size={18} aria-hidden="true" /></span><div><h3>Destination 초안을 확인해주세요</h3><p>두 시작 경로는 같은 형식으로 수렴합니다. 아직 프로젝트를 만들지 않았어요.</p></div></div>
         <dl>{reviewRows.map(({ id, label }) => <div key={id}><dt>{label}</dt><dd>{review[id]}{evidence.filter(item => item.field === id).map((item, index) => <small key={index}>문서 근거 {item.startLine}–{item.endLine}행 · 현재 답변은 직접 검토 필요</small>)}</dd><button type="button" onClick={() => editAnswer(id)}>{label} 수정</button></div>)}</dl>
         <section className="destination-studio__unknowns" aria-label="잔여 미상"><strong>잔여 미상</strong>{review.residualUnknowns.map(item=><span key={item}>{item}</span>)}</section>
+        <DestinationUnknownEditor key={`${savedDraftGeneration}:${JSON.stringify(unknowns)}`} unknowns={unknowns} disabled={storageBusy||analysisBusy} onChange={setUnknowns}/>
         {savedDraft&&savedIntakeMatches&&<DestinationDiscoveryPanel key={`${savedDraft.draftId}:${savedDraft.revision}:${savedDraftGeneration}`} intake={savedDraft}/>}
         <p className="destination-studio__boundary"><Lightbulb size={16} aria-hidden="true" />초안 저장은 Destination 확정이 아닙니다. 프로젝트·세션·Gate는 생성하지 않습니다.</p>
         <div className="destination-studio__actions"><button type="button" onClick={() => { const last = destinationQuestions[destinationQuestions.length - 1].id; editAnswer(last) }}><ArrowLeft size={17} aria-hidden="true" />답변 다시 보기</button></div>
