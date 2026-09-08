@@ -2,6 +2,8 @@ import test from 'node:test'
 import assert from 'node:assert/strict'
 import {readFile} from 'node:fs/promises'
 import {PGlite} from '@electric-sql/pglite'
+import {once} from 'node:events'
+import {createOutcomeServer} from './index.mjs'
 import {createDiscoveryRepository} from './outcome-destination-discovery-repository.mjs'
 import {createDestinationDraftRepository} from './outcome-destination-postgres.mjs'
 import {createDiscoveryQuestionRepository} from './outcome-destination-question-repository.mjs'
@@ -10,6 +12,7 @@ import {createDiscoveryQuestionDispatch} from './outcome-destination-question-di
 import {runDiscoveryQuestionOnce,collectDiscoveryQuestionOnce} from './outcome-destination-question-worker.mjs'
 test('durable question claim and real receipt ingestion prevent duplicate transport and false completion',async()=>{
  const db=await PGlite.create('memory://')
+ let http
  try{
   await db.exec('create role anon nologin;create role authenticated nologin')
   for(const file of ['20260908011009_outcome_destination_private_drafts.sql','20260908042838_outcome_destination_discovery_drafts.sql','20260908044800_outcome_discovery_question_receipts.sql','20260908050252_outcome_discovery_question_requests.sql'])await db.exec(await readFile(new URL(`../supabase/migrations/${file}`,import.meta.url),'utf8'))
@@ -20,8 +23,20 @@ test('durable question claim and real receipt ingestion prevent duplicate transp
   const context={source:'',mode:'guided_200q',seedAnswers:document.answers,unknowns:document.unknowns,revision:1,answers:[],askedQuestionIds:[]}
   const discovery=await createDiscoveryRepository({transact}).save({...scope,requestId:scope.draftId,expectedRevision:0,intakeRevision:1,context:JSON.stringify(context)})
   const request={...scope,contextDigest:discovery.contextDigest},requests=createDiscoveryQuestionRequests({transact}),questions=createDiscoveryQuestionRepository({transact})
-  const queued=await Promise.all([requests.enqueue(request),requests.enqueue(request)])
+  const headers={cookie:'__session=owner',origin:'https://preview.invalid','content-type':'application/json','x-outcome-csrf':'synthetic-question-request'}
+  http=createOutcomeServer({publicReadOnly:true,accountAccess:{authenticate:async token=>{if(!['owner','other'].includes(token))throw Error('invalid')},resolveBridgeAuthority:async({token})=>({workspace_id:'workspace',account_ref:token,project_ids:['outcome']})},destinationRuntime:{allowedOrigin:headers.origin,csrfSecret:headers['x-outcome-csrf'],questionRequests:requests,questionRepository:questions,discoveryRepository:createDiscoveryRepository({transact})}})
+  http.listen(0,'127.0.0.1');await once(http,'listening')
+  const url=`http://127.0.0.1:${http.address().port}/api/private/destination/question-requests/${scope.draftId}`
+  const body=JSON.stringify({contextDigest:request.contextDigest})
+  const enqueue=async()=>{const response=await fetch(url,{method:'POST',headers,body});assert.equal(response.status,202);assert.equal(response.headers.get('cache-control'),'no-store');return (await response.json()).questionRequest}
+  const queued=await Promise.all([enqueue(),enqueue()])
   assert.deepEqual(queued[0],queued[1]);assert.equal(queued[0].state,'queued')
+  assert.deepEqual((await (await fetch(url,{headers})).json()).questionRequest,queued[0])
+  assert.equal((await fetch(url)).status,401)
+  assert.equal((await (await fetch(url,{headers:{cookie:'__session=other'}})).json()).questionRequest,null)
+  assert.equal((await fetch(url,{method:'POST',headers:{...headers,origin:'https://wrong.invalid'},body})).status,403)
+  assert.equal((await fetch(url,{method:'POST',headers,body:JSON.stringify({contextDigest:request.contextDigest,accountRef:'other'})})).status,400)
+  assert.equal((await fetch(url,{method:'POST',headers,body:'x'.repeat(4097)})).status,413)
   let sends=0,mode='pending',original
   const queueAdapter={bindingResolver:async()=>({project_id:'outcome',role:'planner',binding_version:1,status:'active',freshness:'fresh',destination:{opaque:true}}),transport:async({destination})=>{original=destination;sends++;return {delivery:'acknowledged'}},readPlannerResponse:async({destination,correlation_id})=>{
    assert.equal(destination,original)
@@ -40,6 +55,8 @@ test('durable question claim and real receipt ingestion prevent duplicate transp
   mode='wrong';assert.equal((await collect()).state,'unavailable');assert.equal(await questions.load(scope),null)
   mode='valid';assert.equal((await collect()).state,'result_recorded')
   assert.equal((await requests.load(request)).state,'completed');assert.equal((await questions.load(scope)).completionAuthority,false)
+  assert.equal((await (await fetch(url,{headers})).json()).questionRequest.state,'completed')
+  assert.equal((await (await fetch(url.replace('/question-requests/','/questions/'),{headers})).json()).questions.contextDigest,request.contextDigest)
   assert.equal((await collect()).state,'not_pending')
   assert.equal((await runDiscoveryQuestionOnce({requests,dispatch,request})).state,'not_claimed');assert.equal(sends,1)
   assert.equal(await requests.load({...request,accountRef:'other'}),null)
@@ -53,5 +70,5 @@ test('durable question claim and real receipt ingestion prevent duplicate transp
   assert.equal((await runDiscoveryQuestionOnce({requests,dispatch:uncertainDispatch,request:nextRequest})).state,'delivery_unknown')
   assert.equal((await runDiscoveryQuestionOnce({requests:createDiscoveryQuestionRequests({transact}),dispatch:uncertainDispatch,request:nextRequest})).state,'not_claimed')
   assert.equal(uncertainSends,1);assert.equal((await requests.load(nextRequest)).state,'delivery_unknown')
- }finally{await db.close()}
+ }finally{if(http){http.closeAllConnections();await new Promise(resolve=>http.close(resolve))}await db.close()}
 })

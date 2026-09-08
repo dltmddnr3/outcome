@@ -237,7 +237,7 @@ export function createStableHostRequestHandler({ environment = process.env, runt
         return error?.status ? result(error.status, { error: error.code }) : result(503, { error: 'private_workspace_unavailable' })
       }
     }
-    const destinationPath = /^\/api\/private\/destination\/(drafts|analysis|discovery|questions)\//.test(pathname)
+    const destinationPath = /^\/api\/private\/destination\/(drafts|analysis|discovery|questions|question-requests)\//.test(pathname)
     if ((method === 'GET' && pathname === '/api/private/workspace') || pathname === '/api/private/decisions' || destinationPath) {
       const token = privateSessionToken(headers)
       if (!token) return result(401, { error: 'authentication_required' })
@@ -290,11 +290,11 @@ export const rawBridgeBody = async (request, pathname) => {
   const chatMessage = pathname === '/api/private/chat/messages' && request.method === 'POST'
   const decisionMessage = pathname === '/api/private/decisions' && request.method === 'POST'
   const destinationMessage = pathname.startsWith('/api/private/destination/drafts/') && request.method === 'PUT'
-  const analysisMessage = pathname.startsWith('/api/private/destination/analysis/') && request.method === 'POST'
+  const analysisMessage = /^\/api\/private\/destination\/(analysis|question-requests)\//.test(pathname) && request.method === 'POST'
   const discoveryMessage = pathname.startsWith('/api/private/destination/discovery/') && request.method === 'PUT'
   const maximumBytes = analysisMessage ? 4096 : discoveryMessage ? 4194304 : destinationMessage ? 262144 : chatMessage || decisionMessage ? 10_000 : MAXIMUM_STABLE_BRIDGE_BODY_BYTES
   const body = request.body
-  if ((!chatMessage && !decisionMessage && !destinationMessage && !analysisMessage && (!target.candidate || !target.valid)) || request.method === 'GET' || typeof body === 'string' || Buffer.isBuffer(body)) return body
+  if ((!chatMessage && !decisionMessage && !destinationMessage && !analysisMessage && !discoveryMessage && (!target.candidate || !target.valid)) || request.method === 'GET' || typeof body === 'string' || Buffer.isBuffer(body)) return body
   const chunks = []
   let bytes = 0
   try {

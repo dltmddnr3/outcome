@@ -39,6 +39,21 @@ export const activeDestinationDraftId = '00000000-0000-4000-8000-000000000001'
 export type DestinationDraftDocument = { schemaVersion: 1; mode: 'guided_200q' | 'brief_gap'; source: string; answers: import('./destination-discovery').DestinationAnswers; unknowns: string[] }
 export type StoredDestinationDraft = { draftId: string; revision: number; document: DestinationDraftDocument; state: 'draft'; completionAuthority: false }
 export type StoredDiscovery = {draftId:string;revision:number;intakeRevision:number;context:DiscoveryContext;contextDigest:string;state:'draft';completionAuthority:false}
+export type DiscoveryQuestionRun={requestId:string;draftId:string;contextDigest:string;contextRevision:number;state:'queued'|'dispatch_started'|'completed'|'failed'|'delivery_unknown';completionAuthority:false}
+export async function requestDestinationQuestionRun(discovery:StoredDiscovery,submit=false):Promise<DiscoveryQuestionRun|null>{
+ const binding=privateDestinationBinding,generation=privateDecisionBindingVersion
+ if(!binding||discovery.draftId!==activeDestinationDraftId)throw Error('destination_unavailable')
+ const {contextDigest,revision}=discovery
+ const response=await fetch(`/api/private/destination/question-requests/${activeDestinationDraftId}`,{method:submit?'POST':'GET',credentials:'same-origin',headers:{...privateSessionHeaders(binding.bearer),...(submit?{'content-type':'application/json','x-outcome-csrf':binding.csrf}:{})},...(submit?{body:JSON.stringify({contextDigest})}:{})})
+ const value=await readJson<unknown>(response)
+ if(binding!==privateDestinationBinding||generation!==privateDecisionBindingVersion)throw Error('destination_identity_changed')
+ const exact=(v:unknown,keys:string[]):v is Record<string,unknown>=>!!v&&typeof v==='object'&&!Array.isArray(v)&&Object.keys(v).length===keys.length&&keys.every(k=>Object.hasOwn(v,k))
+ if(!exact(value,['questionRequest','completionAuthority'])||value.completionAuthority!==false)throw Error('discovery_response_invalid')
+ if(value.questionRequest===null){if(submit)throw Error('discovery_response_invalid');return null}
+ const row=value.questionRequest
+ if(!exact(row,['requestId','draftId','contextDigest','contextRevision','state','completionAuthority'])||typeof row.requestId!=='string'||!/^[a-f0-9]{8}(?:-[a-f0-9]{4}){3}-[a-f0-9]{12}$/.test(row.requestId)||row.draftId!==activeDestinationDraftId||row.contextDigest!==contextDigest||row.contextRevision!==revision||!['queued','dispatch_started','completed','failed','delivery_unknown'].includes(String(row.state))||row.completionAuthority!==false)throw Error('discovery_response_invalid')
+ return row as DiscoveryQuestionRun
+}
 export async function requestDestinationQuestions(discovery:StoredDiscovery):Promise<string|null> {
  const binding=privateDestinationBinding,generation=privateDecisionBindingVersion
  if(!binding||discovery.draftId!==activeDestinationDraftId)throw Error('destination_unavailable')

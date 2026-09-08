@@ -14,6 +14,20 @@ if (process.env.OUTCOME_ASSERT_BUILT !== '1') {
   writeFileSync(new URL('../api/deployment-snapshot.mjs', import.meta.url), `export default ${JSON.stringify(fixture)}\n`, 'utf8')
 }
 const { config: stableConfig, createStableHostRequestHandler, default: stableHandler, handleStableHostRequest, requestPath, rawBridgeBody } = await import('../api/index.mjs')
+
+test('destination discovery and question requests admit bounded raw streaming bodies', async () => {
+  const id='00000000-0000-4000-8000-000000000001'
+  for(const [family,method,maximum] of [['discovery','PUT',4194304],['question-requests','POST',4096]]){
+    const path=`/api/private/destination/${family}/${id}`
+    const payload=Buffer.from(JSON.stringify({value:'후속 답변'}))
+    const stream={method,async *[Symbol.asyncIterator](){yield payload.subarray(0,7);yield payload.subarray(7)}}
+    assert.deepEqual(await rawBridgeBody(stream,path),payload)
+    const oversized={method,async *[Symbol.asyncIterator](){yield Buffer.alloc(maximum);yield Buffer.from('x')}}
+    assert.equal((await rawBridgeBody(oversized,path)).length,maximum+1)
+    const wrongMethod={method:'DELETE',async *[Symbol.asyncIterator](){throw Error('must_not_read')}}
+    assert.equal(await rawBridgeBody(wrongMethod,path),undefined)
+  }
+})
 const { default: snapshot } = await import('../api/deployment-snapshot.mjs')
 
 const request = (method, pathname) => handleStableHostRequest({ method, pathname })

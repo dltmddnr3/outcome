@@ -1,11 +1,35 @@
 import {afterEach,expect,it,vi} from 'vitest'
-import {activeDestinationDraftId,captureDestinationReviewBinding,fetchPrivateWorkspace,requestDestinationDiscovery,requestDestinationQuestions,type StoredDestinationDraft,type StoredDiscovery} from './api'
+import {activeDestinationDraftId,captureDestinationReviewBinding,fetchPrivateWorkspace,requestDestinationDiscovery,requestDestinationQuestions,requestDestinationQuestionRun,type StoredDestinationDraft,type StoredDiscovery} from './api'
 import {discoveryContextDigest,type DiscoveryContext} from './destination-question-receipt'
 afterEach(()=>vi.unstubAllGlobals())
 const intake:StoredDestinationDraft={draftId:activeDestinationDraftId,revision:1,document:{schemaVersion:1,mode:'guided_200q',source:'',answers:{problem:'문제'},unknowns:['검증 필요']},state:'draft',completionAuthority:false}
 const context:DiscoveryContext={source:'',mode:'guided_200q',seedAnswers:{problem:'문제'},unknowns:['검증 필요'],revision:1,answers:[{questionId:'q-1',gapId:'gap-1',value:'소유자'}],askedQuestionIds:['q-1']}
 const row=async()=>({draftId:activeDestinationDraftId,revision:1,intakeRevision:1,context,contextDigest:await discoveryContextDigest(context),state:'draft',completionAuthority:false})
 const workspace=()=>new Response('{"workspace":{}}',{headers:{'x-outcome-destination-csrf':'synthetic-discovery'}})
+it('sends one reference-only question request and rejects mismatched status without retry',async()=>{
+ const stored=await row() as StoredDiscovery
+ const status={requestId:activeDestinationDraftId,draftId:activeDestinationDraftId,contextDigest:stored.contextDigest,contextRevision:1,state:'queued',completionAuthority:false}
+ for(const [value,valid] of [[status,true],[{...status,contextDigest:'0'.repeat(64)},false],[{...status,contextRevision:2},false],[{...status,state:'accepted'},false],[{...status,completionAuthority:true},false],[{...status,executionAuthority:true},false],[null,false]] as const){
+  const mock=vi.fn().mockImplementation((url:string)=>Promise.resolve(url.endsWith('/workspace')?workspace():new Response(JSON.stringify({questionRequest:value,completionAuthority:false}))))
+  vi.stubGlobal('fetch',mock);await fetchPrivateWorkspace('owner')
+  if(valid)expect(await requestDestinationQuestionRun(stored,true)).toEqual(status)
+  else await expect(requestDestinationQuestionRun(stored,true)).rejects.toThrow('discovery_response_invalid')
+  expect(mock).toHaveBeenCalledTimes(2)
+  const [url,options]=mock.mock.calls[1]
+  expect(url).toContain('/question-requests/');expect(options.method).toBe('POST')
+  expect(JSON.parse(options.body)).toEqual({contextDigest:stored.contextDigest})
+  expect(options.headers).toMatchObject({'x-outcome-csrf':'synthetic-discovery'})
+ }
+})
+it('does not attach a delayed question request status to a changed owner',async()=>{
+ const stored=await row() as StoredDiscovery;let finish!:(response:Response)=>void,started!:()=>void
+ const issued=new Promise<void>(resolve=>{started=resolve})
+ vi.stubGlobal('fetch',vi.fn().mockImplementation((url:string)=>url.endsWith('/workspace')?Promise.resolve(workspace()):new Promise<Response>(resolve=>{finish=resolve;started()})))
+ await fetchPrivateWorkspace('owner-one')
+ const pending=requestDestinationQuestionRun(stored);await issued;await fetchPrivateWorkspace('owner-two')
+ finish(new Response(JSON.stringify({questionRequest:null,completionAuthority:false})))
+ await expect(pending).rejects.toThrow('destination_identity_changed')
+})
 it('invalidates the visible review capability when workspace identity refreshes',async()=>{
  vi.stubGlobal('fetch',vi.fn().mockImplementation(()=>Promise.resolve(workspace())))
  await fetchPrivateWorkspace('owner-one');const current=captureDestinationReviewBinding();expect(current()).toBe(true)
