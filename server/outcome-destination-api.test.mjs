@@ -7,6 +7,15 @@ const path='/api/private/destination/drafts/00000000-0000-4000-8000-000000000001
 const identityService={authenticate:async()=>({subject:'owner'}),resolveBridgeAuthority:async()=>({workspace_id:'workspace',account_ref:'account',project_ids:['outcome']})}
 const headers={'content-type':'application/json',origin:'https://preview.invalid','x-outcome-csrf':'synthetic-csrf'}
 const body=JSON.stringify({requestId:'00000000-0000-4000-8000-000000000002',expectedRevision:0,document:'{}'})
+test('questions are owner-scoped read-only and cannot invoke internal ingestion',async()=>{
+ let reads=0,writes=0
+ const runtime={questionRepository:{load:async input=>{reads++;assert.equal(input.accountRef,'account');assert.equal(input.draftId,path.split('/').at(-1));return null},record:async()=>{writes++}}}
+ const request={pathname:path.replace('/drafts/','/questions/'),token:'valid',identityService,runtime}
+ assert.deepEqual(await handle(request),{status:200,body:{questions:null,completionAuthority:false}})
+ for(const method of ['PUT','POST','DELETE'])assert.equal((await handle({...request,method,body:'{}'})).status,405)
+ assert.equal((await handle({...request,token:''})).status,401)
+ assert.equal(reads,1);assert.equal(writes,0)
+})
 test('analysis API accepts only an owner-scoped reference and never invokes worker capabilities',async()=>{
  let enqueues=0;const calls=[]
  const analysis={requestId:path.split('/').at(-1),state:'queued',completionAuthority:false}

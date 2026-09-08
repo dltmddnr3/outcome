@@ -1,4 +1,6 @@
 import { sensitiveContentHint } from './PlannerConversation'
+import {DestinationDiscoveryPanel} from './DestinationDiscoveryPanel'
+import {captureDestinationReviewBinding} from '../lib/api'
 import './DestinationStudio.css'
 import { privateDestinationStorageAvailable, requestDestinationDraft, requestDestinationAnalysis, destinationDraftDigest, destinationAnalysisRequestId, type DestinationDraftDocument, type StoredDestinationDraft, type DestinationAnalysisView } from '../lib/api'
 import { destinationUnverifiedQuestions } from '../lib/destination-discovery'
@@ -33,6 +35,7 @@ export function DestinationStudio({ open, onClose }: { open: boolean; onClose: (
   const [unknowns, setUnknowns] = useState<string[]>([...destinationUnverifiedQuestions])
   const latestDraft = useRef('')
   const [savedDraft,setSavedDraft]=useState<StoredDestinationDraft|null>(null)
+  const [savedDraftGeneration,setSavedDraftGeneration]=useState(0)
   const [analysis,setAnalysis]=useState<DestinationAnalysisView|null>(null)
   const [analysisRequest,setAnalysisRequest]=useState<{id:string;draft:StoredDestinationDraft;input:string}|null>(null)
   const [analysisBusy,setAnalysisBusy]=useState(false)
@@ -71,16 +74,21 @@ export function DestinationStudio({ open, onClose }: { open: boolean; onClose: (
   }
   const storageDocument: DestinationDraftDocument = {schemaVersion:1,mode,source:briefText,answers:pendingAnswers,unknowns}
   latestDraft.current = JSON.stringify(storageDocument)
+  const canonicalIntake=(doc:DestinationDraftDocument)=>JSON.stringify([doc.mode,doc.source,Object.entries(doc.answers).sort(([a],[b])=>a.localeCompare(b)),doc.unknowns])
+  const savedIntakeMatches=savedDraft&&canonicalIntake(savedDraft.document)===canonicalIntake(storageDocument)
   const useStorage = async (save: boolean) => {
     if (storageLock.current || analysisLock.current) return
     if (save && (sensitiveContentHint(latestDraft.current) || /\/(?:Users|home|private\/tmp|tmp)\//.test(latestDraft.current.normalize('NFKC')))) {
       setStorageNotice('민감한 값이나 로컬 경로를 제거한 뒤 저장해 주세요. 서버에 전송하지 않았습니다.'); return
     }
     storageLock.current = true; setStorageBusy(true); setStorageNotice(null)
+    const identityIsCurrent=captureDestinationReviewBinding()
     const captured = latestDraft.current
     try {
       const stored = await requestDestinationDraft(save ? {expectedRevision:revision,document:storageDocument} : undefined)
       const restoredAnalysisId=stored?await destinationAnalysisRequestId(stored):null
+      if(!identityIsCurrent())throw Error('destination_identity_changed')
+      setSavedDraftGeneration(value=>value+1)
       if (save) {
         setSavedDraft(stored)
         setAnalysis(null);setAnalysisAttempted(false);setAnalysisRequest({id:restoredAnalysisId!,draft:stored!,input:captured});setAnalysisNotice(null)
@@ -205,6 +213,7 @@ export function DestinationStudio({ open, onClose }: { open: boolean; onClose: (
         <div className="destination-studio__review-intro"><span><Check size={18} aria-hidden="true" /></span><div><h3>Destination 초안을 확인해주세요</h3><p>두 시작 경로는 같은 형식으로 수렴합니다. 아직 프로젝트를 만들지 않았어요.</p></div></div>
         <dl>{reviewRows.map(({ id, label }) => <div key={id}><dt>{label}</dt><dd>{review[id]}{evidence.filter(item => item.field === id).map((item, index) => <small key={index}>문서 근거 {item.startLine}–{item.endLine}행 · 현재 답변은 직접 검토 필요</small>)}</dd><button type="button" onClick={() => editAnswer(id)}>{label} 수정</button></div>)}</dl>
         <section className="destination-studio__unknowns" aria-label="잔여 미상"><strong>잔여 미상</strong>{review.residualUnknowns.map(item=><span key={item}>{item}</span>)}</section>
+        {savedDraft&&savedIntakeMatches&&<DestinationDiscoveryPanel key={`${savedDraft.draftId}:${savedDraft.revision}:${savedDraftGeneration}`} intake={savedDraft}/>}
         <p className="destination-studio__boundary"><Lightbulb size={16} aria-hidden="true" />초안 저장은 Destination 확정이 아닙니다. 프로젝트·세션·Gate는 생성하지 않습니다.</p>
         <div className="destination-studio__actions"><button type="button" onClick={() => { const last = destinationQuestions[destinationQuestions.length - 1].id; editAnswer(last) }}><ArrowLeft size={17} aria-hidden="true" />답변 다시 보기</button><button className="destination-studio__primary" type="button" disabled>Destination 확정 · 연결 준비 중</button></div>
       </div>}

@@ -13,16 +13,17 @@ const errorCode=error=>{
  return Object.getOwnPropertyDescriptor(error,'message')?.value
 }
 export async function handleDestinationDraftRequest({method='GET',pathname='',token,identityService,runtime,headers={},body}={}){
- const match=/^\/api\/private\/destination\/(drafts|analysis|discovery)\/([a-f0-9]{8}(?:-[a-f0-9]{4}){3}-[a-f0-9]{12})$/.exec(pathname)
+ const match=/^\/api\/private\/destination\/(drafts|analysis|discovery|questions)\/([a-f0-9]{8}(?:-[a-f0-9]{4}){3}-[a-f0-9]{12})$/.exec(pathname)
  if(!match)return result(404,'not_found')
- const analysis=match[1]==='analysis',discovery=match[1]==='discovery',writeMethod=analysis?'POST':'PUT'
+ const analysis=match[1]==='analysis',discovery=match[1]==='discovery',questions=match[1]==='questions',writeMethod=analysis?'POST':'PUT'
+ if(questions&&method!=='GET')return result(405,'method_not_allowed')
  if(!['GET',writeMethod].includes(method))return result(405,'method_not_allowed')
  if(!token||!identityService)return result(401,'authentication_required')
  let authority
  try{await identityService.authenticate(token);authority=await identityService.resolveBridgeAuthority({token})}catch{return result(403,'destination_access_denied')}
  if(!authority?.workspace_id||!authority?.account_ref||!authority?.project_ids?.includes('outcome'))return result(403,'destination_access_denied')
- const repository=analysis?runtime?.analysisRepository:discovery?runtime?.discoveryRepository:runtime?.repository
- if(!repository||typeof repository.load!=='function'||typeof repository[analysis?'enqueue':'save']!=='function')return result(503,'destination_unavailable')
+ const repository=analysis?runtime?.analysisRepository:questions?runtime?.questionRepository:discovery?runtime?.discoveryRepository:runtime?.repository
+ if(!repository||typeof repository.load!=='function'||!questions&&typeof repository[analysis?'enqueue':'save']!=='function')return result(503,'destination_unavailable')
  const scope={workspaceId:authority.workspace_id,accountRef:authority.account_ref,[analysis?'requestId':'draftId']:match[2]}
  if(method===writeMethod){
   if(headers['content-type']!=='application/json')return result(415,'content_type_invalid')
@@ -30,7 +31,7 @@ export async function handleDestinationDraftRequest({method='GET',pathname='',to
   if(!runtime.csrfSecret||!equal(headers['x-outcome-csrf'],runtime.csrfSecret))return result(403,'csrf_invalid')
  }
  try{
-  const field=analysis?'analysis':discovery?'discovery':'draft'
+  const field=analysis?'analysis':questions?'questions':discovery?'discovery':'draft'
   if(method==='GET')return {status:200,body:{[field]:await repository.load(scope),completionAuthority:false}}
   if(typeof body!=='string'||Buffer.byteLength(body)>(analysis?4096:discovery?4194304:262144))return result(400,'invalid_request')
   let parsed;try{parsed=JSON.parse(body)}catch{return result(400,'invalid_request')}

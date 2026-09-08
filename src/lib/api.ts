@@ -2,7 +2,7 @@ import type { CherryNoteDashboardData } from '../components/CherryNoteDashboard'
 import type { OutcomeDashboardData } from '../components/OutcomeDashboard'
 import {destinationQuestions} from './destination-discovery'
 import {destinationSourceSha256,validateDestinationAnalysis,type DestinationProposal} from './destination-analysis'
-import {discoveryContextDigest,type DiscoveryContext} from './destination-question-receipt'
+import {discoveryContextDigest,validateDiscoveryQuestionReceipt,type DiscoveryContext} from './destination-question-receipt'
 
 type Session = { authenticated: boolean; publicReadOnly?: boolean }
 export type PrivateAccessConfig = { enabled: boolean; access: 'private_read_only'; providers: Array<{ id: string; mode: string }>; sessionMaximumDays: number; completionAuthority: false; publishableKey?: string }
@@ -31,10 +31,32 @@ let privateDecisionBinding: { etag: string; csrf: string; bearer?: string } | nu
 let privateDecisionBindingVersion = 0
 let privateDestinationBinding: { csrf: string; bearer?: string } | null = null
 export const privateDestinationStorageAvailable = () => privateDestinationBinding !== null
+export const captureDestinationReviewBinding=()=>{
+ const binding=privateDestinationBinding,generation=privateDecisionBindingVersion
+ return ()=>binding!==null&&binding===privateDestinationBinding&&generation===privateDecisionBindingVersion
+}
 export const activeDestinationDraftId = '00000000-0000-4000-8000-000000000001'
 export type DestinationDraftDocument = { schemaVersion: 1; mode: 'guided_200q' | 'brief_gap'; source: string; answers: import('./destination-discovery').DestinationAnswers; unknowns: string[] }
 export type StoredDestinationDraft = { draftId: string; revision: number; document: DestinationDraftDocument; state: 'draft'; completionAuthority: false }
 export type StoredDiscovery = {draftId:string;revision:number;intakeRevision:number;context:DiscoveryContext;contextDigest:string;state:'draft';completionAuthority:false}
+export async function requestDestinationQuestions(discovery:StoredDiscovery):Promise<string|null> {
+ const binding=privateDestinationBinding,generation=privateDecisionBindingVersion
+ if(!binding||discovery.draftId!==activeDestinationDraftId)throw Error('destination_unavailable')
+ const pinned=JSON.parse(JSON.stringify(discovery)) as StoredDiscovery
+ const response=await fetch(`/api/private/destination/questions/${activeDestinationDraftId}`,{credentials:'same-origin',headers:privateSessionHeaders(binding.bearer)})
+ const value=await readJson<unknown>(response)
+ const exact=(v:unknown,keys:string[]):v is Record<string,unknown>=>!!v&&typeof v==='object'&&!Array.isArray(v)&&Object.keys(v).length===keys.length&&keys.every(k=>Object.hasOwn(v,k))
+ if(!exact(value,['questions','completionAuthority'])||value.completionAuthority!==false)throw Error('discovery_response_invalid')
+ let receipt:string|null=null
+ if(value.questions!==null){
+  const row=value.questions
+  if(!exact(row,['contextDigest','contextRevision','receipt','sourceVerification','completionAuthority'])||row.contextDigest!==pinned.contextDigest||row.contextRevision!==pinned.revision||typeof row.receipt!=='string'||row.sourceVerification!=='required'||row.completionAuthority!==false)throw Error('discovery_response_invalid')
+  await validateDiscoveryQuestionReceipt(pinned.context,row.receipt)
+  receipt=row.receipt
+ }
+ if(binding!==privateDestinationBinding||generation!==privateDecisionBindingVersion)throw Error('destination_identity_changed')
+ return receipt
+}
 export async function requestDestinationDiscovery(intake:StoredDestinationDraft,save?:{expectedRevision:number;context:DiscoveryContext}):Promise<StoredDiscovery|null> {
  const binding=privateDestinationBinding,generation=privateDecisionBindingVersion
  const fail=():never=>{throw Error('discovery_response_invalid')}

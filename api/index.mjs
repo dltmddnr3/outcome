@@ -237,7 +237,7 @@ export function createStableHostRequestHandler({ environment = process.env, runt
         return error?.status ? result(error.status, { error: error.code }) : result(503, { error: 'private_workspace_unavailable' })
       }
     }
-    const destinationPath = /^\/api\/private\/destination\/(drafts|analysis|discovery)\//.test(pathname)
+    const destinationPath = /^\/api\/private\/destination\/(drafts|analysis|discovery|questions)\//.test(pathname)
     if ((method === 'GET' && pathname === '/api/private/workspace') || pathname === '/api/private/decisions' || destinationPath) {
       const token = privateSessionToken(headers)
       if (!token) return result(401, { error: 'authentication_required' })
