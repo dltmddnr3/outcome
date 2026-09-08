@@ -197,12 +197,12 @@ export function createSupabaseRestGateway({ url, publishableKey, fetchImpl = fet
   }
 }
 
-export function createHostedPreviewRuntime({ environment = {}, providerGateway, storeGateway, now = Date.now } = {}) {
+export function createHostedPreviewRuntime({ environment = {}, providerGateway, storeGateway, now = Date.now, workObservationSource } = {}) {
   if (!readHostedIdentityConfiguration(environment).enabled || !readHostedDataConfiguration(environment).enabled || !providerGateway || !storeGateway) return null
   const bindings = readBindings(environment)
   const provider = createClerkHostedAuthProvider({ gateway: providerGateway, ownerSubject: bindings.ownerSubject, now })
   const store = createSupabaseHostedStore({ gateway: storeGateway, allowedProjects: ALLOWED_PROJECTS })
-  const service = createAccountAccessService({ authProvider: { verify: provider.verify, signOut: provider.signOut, revokeAll: ({ subject: _subject }) => provider.revokeAll({ operatorAuthorized: true }) }, store, ownerSubject: bindings.ownerSubject, now })
+  const service = createAccountAccessService({ authProvider: { verify: provider.verify, signOut: provider.signOut, revokeAll: ({ subject: _subject }) => provider.revokeAll({ operatorAuthorized: true }) }, store, ownerSubject: bindings.ownerSubject, now, workObservationSource })
   return {
     service,
     allowedOrigin: bindings.privateAllowedOrigin,
@@ -225,13 +225,13 @@ export function createSealedPackageStore({ sealedSnapshot, ownerSubject } = {}) 
   })
 }
 
-export function createHostedIdentityRuntime({ environment = {}, sealedSnapshot, clerkClientFactory = createClerkClient, tokenVerifier = verifyToken, now = Date.now } = {}) {
+export function createHostedIdentityRuntime({ environment = {}, sealedSnapshot, clerkClientFactory = createClerkClient, tokenVerifier = verifyToken, now = Date.now, workObservationSource } = {}) {
   if (!readHostedIdentityConfiguration(environment).enabled) return null
   const bindings = readBindings(environment, HOSTED_IDENTITY_ENV)
   const gateway = createClerkBackendGateway({ environment, clerkClientFactory, tokenVerifier })
   const provider = createClerkHostedAuthProvider({ gateway, ownerSubject: bindings.ownerSubject, now })
   const store = createSealedPackageStore({ sealedSnapshot, ownerSubject: bindings.ownerSubject })
-  const service = createAccountAccessService({ authProvider: { verify: provider.verify, signOut: provider.signOut, revokeAll: ({ subject: _subject }) => provider.revokeAll({ operatorAuthorized: true }) }, store, ownerSubject: bindings.ownerSubject, now })
+  const service = createAccountAccessService({ authProvider: { verify: provider.verify, signOut: provider.signOut, revokeAll: ({ subject: _subject }) => provider.revokeAll({ operatorAuthorized: true }) }, store, ownerSubject: bindings.ownerSubject, now, workObservationSource })
   return {
     service,
     allowedOrigin: bindings.privateAllowedOrigin,

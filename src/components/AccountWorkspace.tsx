@@ -89,7 +89,7 @@ export function AccountWorkspace({ state = 'unavailable', workspace, ownerVerifi
     {state === 'ready' && project && <section className="account-workspace__ready" aria-label="비공개 프로젝트 결과 위계">
       <nav className="account-workspace__projects" aria-label="비공개 프로젝트 전환">{projects.map((item) => <button type="button" key={item.project.id} data-private-project={item.project.id} aria-pressed={item.project.id === project.project.id} onClick={() => chooseProject(item)}>{item.project.name}</button>)}</nav>
       <div className="account-workspace__regions">
-        {project.modelV2 ? <CurrentProjection projection={project.modelV2} /> : <section className="current-projection current-projection--missing" role="status"><h2>Current Projection을 표시할 수 없습니다</h2><p>서버가 검증한 Model v2 projection이 없어 v1 정보로 대신 계산하지 않습니다.</p></section>}
+        {project.modelV2 ? <CurrentProjection projection={project.modelV2} workObservation={project.workObservation} /> : <section className="current-projection current-projection--missing" role="status"><h2>Current Projection을 표시할 수 없습니다</h2><p>서버가 검증한 Model v2 projection이 없어 v1 정보로 대신 계산하지 않습니다.</p></section>}
         <details className="account-workspace__compatibility">
           <summary><span>v1 호환 정보</span><small>역할·기술 근거는 필요할 때만 확인</small></summary>
           <div className="account-workspace__compatibility-content">

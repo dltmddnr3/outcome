@@ -12,6 +12,20 @@ const readyWorkspace = { projects: [
 ] }
 
 describe('account workspace presentation contract', () => {
+  it('passes only the selected private project observation through legacy and dashboard layouts', () => {
+    const observation = { schemaVersion: 1, observedAtMs: Date.now(), completionAuthority: false, executionAuthority: false,
+      work: { stage: 'implementing', activity: 'running', freshness: 'fresh', evidenceStatus: 'missing', continuation: 'observing' }, runtime: { state: 'waiting_approval' } }
+    const projects = readyWorkspace.projects.map(project => ({ ...project, workObservation: project.project.id === 'outcome' ? observation : undefined }))
+    for (const dashboard of [undefined, { ...deploymentFixture, build: { repository: 'test/repo', ref: 'test', commit: null, tree: null, asset: null, runtimeNowPinned: false } } as unknown as OutcomeDashboardData]) {
+      const html = renderToStaticMarkup(<AccountWorkspace state="ready" workspace={{ projects: projects.filter(project => project.project.id === 'outcome'), ...(dashboard ? { dashboard } : {}) }} />)
+      expect(html).toContain('권한 승인 대기')
+      expect(html).toContain('한 세션 · 작업 관측')
+      expect(html).not.toContain('실행 관측됨')
+    }
+    const other = renderToStaticMarkup(<AccountWorkspace state="ready" workspace={{ projects: projects.filter(project => project.project.id === 'cherry-note') }} />)
+    expect(other).not.toContain('권한 승인 대기')
+    expect(other).toContain('연결 확인 전')
+  })
   it('renders every safe private state with Korean primary copy and a private/read-only distinction', () => {
     for (const state of ['login', 'empty', 'stale', 'conflict', 'unavailable', 'session_expired', 'access_denied', 'safe_degraded'] as const) {
       const html = render(state)

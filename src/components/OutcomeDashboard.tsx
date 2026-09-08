@@ -209,11 +209,12 @@ export function OutcomeDashboard({ onUnauthorized, initialData, onLogout, privat
           <nav className="oc-management" aria-label="관리">{workspaceManagementItems.map((item) => <button key={item.id} type="button" disabled aria-label={`${item.label} · 준비 중`}>{item.id === 'archive' ? <Archive size={18} aria-hidden="true" /> : <Plug size={18} aria-hidden="true" />}<span>{item.label}</span><small>준비 중</small></button>)}</nav></div>
         {onLogout ? <button className="oc-nav-account" type="button" data-private-logout="true" onClick={() => void onLogout()}><UserRound size={18} aria-hidden="true" /><span><strong>Cherry 계정</strong><small>로그아웃</small></span></button> : <a className="oc-nav-account" href="/workspace" onClick={() => closePrivateNavigation()}><UserRound size={18} aria-hidden="true" /><span><strong>로그인 또는 계정 관리</strong><small>비공개 워크스페이스</small></span></a>}
       </aside>
-      <main ref={contentRef} id="oc-main-content" className="oc-dashboard-content" tabIndex={-1}><header className="oc-topbar"><button ref={menuButtonRef} className="oc-nav-trigger" aria-label="전역 탐색 열기" aria-expanded={navigationOpen} onClick={() => setNavigationOpen(true)}><Menu size={20} aria-hidden="true" /></button></header><div className="oc-primary-workspace"><CurrentProjection projection={privateOnlyProject.modelV2} />{roleChat(privateOnlyProject.modelV2.events)}</div><details className="oc-v1-compatibility"><summary><span>v1 호환 정보</span><small>현재 projection에는 호환 위계가 없습니다</small></summary><div className="oc-v1-compatibility__content" role="status"><h2>v1 호환 정보 없음</h2><p>서버가 제공한 호환 위계가 없어 페이즈·범위·스테이지를 대신 계산하지 않습니다.</p></div></details></main>
+      <main ref={contentRef} id="oc-main-content" className="oc-dashboard-content" tabIndex={-1}><header className="oc-topbar"><button ref={menuButtonRef} className="oc-nav-trigger" aria-label="전역 탐색 열기" aria-expanded={navigationOpen} onClick={() => setNavigationOpen(true)}><Menu size={20} aria-hidden="true" /></button></header><div className="oc-primary-workspace"><CurrentProjection projection={privateOnlyProject.modelV2} workObservation={privateOnlyProject.workObservation} />{roleChat(privateOnlyProject.modelV2.events)}</div><details className="oc-v1-compatibility"><summary><span>v1 호환 정보</span><small>현재 projection에는 호환 위계가 없습니다</small></summary><div className="oc-v1-compatibility__content" role="status"><h2>v1 호환 정보 없음</h2><p>서버가 제공한 호환 위계가 없어 페이즈·범위·스테이지를 대신 계산하지 않습니다.</p></div></details></main>
       <DestinationStudio open={destinationOpen} onClose={() => setDestinationOpen(false)} />
     </section>
   }
   const privateProjection = project ? privateProjects?.find((item) => item.project.id === project.project.id)?.modelV2 : undefined
+  const privateWorkObservation = project ? privateProjects?.find((item) => item.project.id === project.project.id)?.workObservation : undefined
   if (!data || !project) return <section className="cn-dashboard cn-loading"><h2>{error ?? 'OUTCOME 원본 묶음을 검증하고 있습니다'}</h2>{error && <button onClick={() => void load()}>다시 확인</button>}</section>
   const closeNavigation = (restoreFocus = false) => { setNavigationOpen(false); if (restoreFocus) window.requestAnimationFrame(() => menuButtonRef.current?.focus()) }; const switchProject = (id: string) => { setSelectedProjectId(id); setSelection(null); setMobileLevel(0); setStagesExpanded(false); closeNavigation() }
   const normalizedProjectQuery = projectQuery.trim().toLocaleLowerCase('ko-KR'); const sidebarProjects = normalizedProjectQuery ? dashboardProjects.filter((item) => item.project.name.toLocaleLowerCase('ko-KR').includes(normalizedProjectQuery)) : dashboardProjects
@@ -232,7 +233,7 @@ export function OutcomeDashboard({ onUnauthorized, initialData, onLogout, privat
     </aside>
     <main ref={contentRef} id="oc-main-content" className="oc-dashboard-content" tabIndex={-1}>
       <header className="oc-topbar"><button ref={menuButtonRef} className="oc-nav-trigger" aria-label="전역 탐색 열기" aria-expanded={navigationOpen} onClick={() => setNavigationOpen(true)}><Menu size={20} aria-hidden="true" /></button></header>
-      <div className="oc-primary-workspace"><CurrentProjection projection={privateProjection} />{roleChat(privateProjection.events)}</div>
+      <div className="oc-primary-workspace"><CurrentProjection projection={privateProjection} workObservation={privateWorkObservation} />{roleChat(privateProjection.events)}</div>
       <details className="oc-v1-compatibility"><summary><span>v1 호환 정보</span><small>현재 projection에는 호환 위계가 없습니다</small></summary><div className="oc-v1-compatibility__content" role="status"><h2>v1 호환 정보 없음</h2><p>서버가 제공한 호환 위계가 없어 페이즈·범위·스테이지를 대신 계산하지 않습니다.</p></div></details>
     </main>
     <DestinationStudio open={destinationOpen} onClose={() => setDestinationOpen(false)} />
@@ -272,7 +273,7 @@ export function OutcomeDashboard({ onUnauthorized, initialData, onLogout, privat
     <section className="oc-workbench" aria-label="프로젝트 작업대" data-conversation-peer-breakpoint={desktopConversationBreakpoint - 1}>
       <div className="oc-map-workspace" data-workspace-panel="지도" data-workspace-active={workspaceTab === '지도' ? 'true' : 'false'}>
     {project.resultView && <OutcomeResultView view={project.resultView} onPlannerNavigate={navigatePlanner} />}
-    {privateProjection && <div className="oc-primary-workspace"><CurrentProjection projection={privateProjection} /></div>}
+    {privateProjection && <div className="oc-primary-workspace"><CurrentProjection projection={privateProjection} workObservation={privateWorkObservation} /></div>}
     <details className="oc-v1-compatibility" open={!privateProjection}>
       {privateProjection && <summary><span>v1 호환 정보</span><small>역할 연결과 기술 근거는 필요할 때만 확인</small></summary>}
       <div className="oc-v1-compatibility__content">

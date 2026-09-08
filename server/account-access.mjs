@@ -1,5 +1,6 @@
 import { createAccountModelV2Projection } from './account-model-v2-projection.mjs'
 import { createHash } from 'node:crypto'
+import { readScopedWorkObservation } from './outcome-work-observation-access.mjs'
 
 const DAY_MS = 24 * 60 * 60 * 1000
 const PRIVATE_PROJECT_ALLOWLIST = Object.freeze(['cherry-note', 'outcome'])
@@ -94,7 +95,7 @@ const verifyIdentity = async ({ authProvider, token, ownerSubject, now }) => {
   return identity
 }
 
-export function createAccountAccessService({ authProvider, store, ownerSubject, now = Date.now } = {}) {
+export function createAccountAccessService({ authProvider, store, ownerSubject, now = Date.now, workObservationSource } = {}) {
   if (!authProvider?.verify || !store || !ownerSubject) throw new Error('account_access_configuration_missing')
 
   const authenticate = (token) => verifyIdentity({ authProvider, token, ownerSubject, now })
@@ -166,11 +167,14 @@ export function createAccountAccessService({ authProvider, store, ownerSubject, 
       return {
         access: 'private_read_only',
         workspace: { id: workspace.id, role: membership.role },
-        projects: selected.map((project) => {
+        projects: await Promise.all(selected.map(async (project) => {
           const modelV2 = createAccountModelV2Projection(project.projection, { observedAt: new Date(now()).toISOString() })
           const projection = clone(project.projection)
-          return { ...projection, modelV2 }
-        }),
+          const workObservation = projection.project?.id === project.id ? await readScopedWorkObservation({ readSource: workObservationSource,
+            accountRef: createHash('sha256').update('outcome-bridge-account-v1\0').update(identity.subject).digest('hex'),
+            workspaceId: workspace.id, projectId: project.id, now }) : null
+          return { ...projection, modelV2, workObservation }
+        })),
         ...(dashboard ? { dashboard: clone(dashboard) } : {}),
         session: { expiresAt: new Date(Math.min(identity.expiresAt, now() + 7 * DAY_MS)).toISOString(), revocable: true },
         completionAuthority: false,
