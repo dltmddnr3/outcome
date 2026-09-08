@@ -1,6 +1,6 @@
 import { AuthenticateWithRedirectCallback, ClerkProvider, useAuth, useSignIn, useUser } from '@clerk/react'
 import { type FormEvent, useEffect, useRef, useState } from 'react'
-import { fetchPrivateOwnerSession, fetchPrivateWorkspace, type PrivateWorkspaceView } from '../lib/api'
+import { clearPrivateSessionBindings, fetchPrivateOwnerSession, fetchPrivateWorkspace, subscribePrivateAccessFailure, type PrivateWorkspaceView } from '../lib/api'
 import { AccountWorkspace, type AccountWorkspaceState } from './AccountWorkspace'
 import { PlannerConversationSession } from './PlannerConversation'
 
@@ -159,6 +159,15 @@ function HostedWorkspaceSession() {
     if (signInErrors.global || signInErrors.raw) setError('인증을 시작하지 못했습니다. 다시 시도해 주세요.')
   }, [signInErrors.global, signInErrors.raw])
 
+  useEffect(() => {
+    if (state !== 'ready' || !workspace) return
+    return subscribePrivateAccessFailure(code => {
+      setOwnerVerified(false)
+      setWorkspace(undefined)
+      setState(code === 'authentication_required' && ownerWasReady ? 'session_expired' : hostedFailureState(new Error(code)))
+    })
+  }, [state, workspace, ownerWasReady])
+
   const google = async () => {
     if (googleBusy || googleLock.current) return
     setError(null)
@@ -185,6 +194,7 @@ function HostedWorkspaceSession() {
     if (redirect) window.location.assign(redirect.href)
   }
   const returnToLogin = async () => {
+    clearPrivateSessionBindings()
     clearHostedOwnerReady()
     setOwnerWasReady(false)
     setOwnerVerified(false)

@@ -1,5 +1,5 @@
 import { afterEach, expect, it, vi } from 'vitest'
-import { captureWorkObservationReader, capturePrivateDecisionBindingVersion, captureDestinationReviewBinding, endPrivateSession, fetchPrivateWorkspace } from './api'
+import { captureWorkObservationReader, capturePrivateDecisionBindingVersion, captureDestinationReviewBinding, endPrivateSession, fetchPrivateWorkspace, subscribePrivateAccessFailure } from './api'
 afterEach(() => vi.unstubAllGlobals())
 const workspace = () => new Response(JSON.stringify({ workspace: { projects: [{ project: { id: 'outcome' } }] } }), { headers: { etag: '"source"', 'x-outcome-csrf': 'decision', 'x-outcome-destination-csrf': 'destination' } })
 const response = (projectId = 'outcome') => new Response(JSON.stringify({ projectId, observation: { source: 'synthetic' }, completionAuthority: false }))
@@ -37,4 +37,36 @@ it('aborted credential refresh and mismatched response fail closed without leaki
   abort.abort(); finish('new-token'); await expect(pending).rejects.toThrow('work_observation_unavailable'); expect(mock).toHaveBeenCalledTimes(1)
   await fetchPrivateWorkspace('owner'); mock.mockResolvedValueOnce(response('cherry-note'))
   await expect(captureWorkObservationReader('outcome')!(new AbortController().signal)).rejects.toThrow('work_observation_unavailable')
+})
+it('current authenticated denial invalidates all private bindings and notifies only its generation', async () => {
+ const mock = vi.fn().mockImplementation(async () => workspace()); vi.stubGlobal('fetch', mock)
+ await fetchPrivateWorkspace('previous')
+ const old = vi.fn(), detachOld = subscribePrivateAccessFailure(old)
+ await fetchPrivateWorkspace('owner')
+ const current = vi.fn(), detach = subscribePrivateAccessFailure(current), review = captureDestinationReviewBinding()
+ const detachThrowing = subscribePrivateAccessFailure(() => { throw Error('view failed') })
+ const afterThrow = vi.fn(), detachAfter = subscribePrivateAccessFailure(afterThrow)
+ try {
+  mock.mockResolvedValueOnce(new Response(JSON.stringify({ error: 'session_revoked' }), { status: 401 }))
+  await expect(captureWorkObservationReader('outcome')!(new AbortController().signal)).rejects.toThrow('work_observation_identity_changed')
+  expect(current).toHaveBeenCalledExactlyOnceWith('session_revoked'); expect(afterThrow).toHaveBeenCalledExactlyOnceWith('session_revoked'); expect(old).not.toHaveBeenCalled()
+  expect(review()).toBe(false); expect(capturePrivateDecisionBindingVersion()).toBeNull(); expect(captureWorkObservationReader('outcome')).toBeNull()
+ } finally { detachOld(); detach(); detachThrowing(); detachAfter() }
+})
+it('late denial and source/network failure cannot revoke a newer identity', async () => {
+ let finish!: (value: Response) => void
+ const mock = vi.fn().mockResolvedValueOnce(workspace()).mockImplementationOnce(() => new Promise(resolve => { finish = resolve })).mockImplementation(async () => workspace())
+ vi.stubGlobal('fetch', mock); await fetchPrivateWorkspace('old')
+ const pending = captureWorkObservationReader('outcome')!(new AbortController().signal)
+ await fetchPrivateWorkspace('new')
+ const notify = vi.fn(), detach = subscribePrivateAccessFailure(notify), version = capturePrivateDecisionBindingVersion()
+ try {
+  finish(new Response(JSON.stringify({ error: 'session_revoked' }), { status: 401 }))
+  await expect(pending).rejects.toThrow('work_observation_identity_changed')
+  for (const error of ['work_observation_unavailable', 'private-detail']) {
+   mock.mockResolvedValueOnce(new Response(JSON.stringify({ error }), { status: 503 }))
+   await expect(captureWorkObservationReader('outcome')!(new AbortController().signal)).rejects.toThrow('work_observation_unavailable')
+  }
+  expect(notify).not.toHaveBeenCalled(); expect(capturePrivateDecisionBindingVersion()).toBe(version)
+ } finally { detach() }
 })

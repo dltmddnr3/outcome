@@ -29,6 +29,20 @@ export type PrivateChatSubmit = { accepted: true; sequence: number; event_id: st
 
 let privateDecisionBinding: { etag: string; csrf: string; bearer?: string } | null = null
 let privateDecisionBindingVersion = 0
+const privateAccessFailures = new Set(['authentication_required', 'session_expired', 'session_revoked', 'authentication_unavailable', 'owner_mismatch', 'membership_inactive', 'membership_conflict', 'workspace_inactive', 'project_access_denied'])
+const privateAccessListeners = new Set<(code: string, generation: number) => void>()
+export function clearPrivateSessionBindings() {
+ privateDecisionBindingVersion++
+ privateDecisionBinding = null
+ privateDestinationBinding = null
+ privateObservationBinding = null
+}
+export function subscribePrivateAccessFailure(listener: (code: string) => void) {
+ const generation = privateDecisionBindingVersion
+ const bound = (code: string, failedGeneration: number) => { if (generation === failedGeneration) listener(code) }
+ privateAccessListeners.add(bound)
+ return () => { privateAccessListeners.delete(bound) }
+}
 type ObservationBinding = { projects: string[]; bearer?: string; refreshCredential?: () => Promise<string | null> }
 let privateObservationBinding: ObservationBinding | null = null
 export function captureWorkObservationReader(projectId: string) {
@@ -53,8 +67,13 @@ export function captureWorkObservationReader(projectId: string) {
    check()
    if (!value || Object.keys(value).sort().join(',') !== 'completionAuthority,observation,projectId' || value.projectId !== projectId || value.completionAuthority !== false) throw Error()
    return value.observation
-  } catch {
+  } catch (error) {
    check()
+   if (error instanceof Error && privateAccessFailures.has(error.message)) {
+    clearPrivateSessionBindings()
+    for (const listener of privateAccessListeners) { try { listener(error.message, generation) } catch { /* one view cannot prevent invalidation */ } }
+    throw Error('work_observation_identity_changed')
+   }
    throw Error('work_observation_unavailable')
   }
  }
@@ -366,10 +385,7 @@ export async function beginPrivateSession(provider: 'google' | 'email_code', nav
 }
 
 export async function endPrivateSession(): Promise<void> {
-  privateDecisionBindingVersion++
-  privateDecisionBinding = null
-  privateDestinationBinding = null
-  privateObservationBinding = null
+  clearPrivateSessionBindings()
   await readJson(await fetch('/api/private/auth/logout', { method: 'POST', credentials: 'same-origin' }))
 }
 

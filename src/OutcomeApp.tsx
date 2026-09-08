@@ -3,7 +3,7 @@ import { OutcomeDashboard } from './components/OutcomeDashboard'
 import { AccountWorkspace, accountWorkspaceStateCopy, type AccountWorkspaceState } from './components/AccountWorkspace'
 import { HostedClerkWorkspace } from './components/AccountWorkspaceClerk'
 import { loginErrorPresentation } from './components/outcomeKorean'
-import { beginPrivateSession, endPrivateSession, fetchPrivateAccessConfig, fetchPrivateWorkspace, fetchSession, login, logout, type PrivateWorkspaceView } from './lib/api'
+import { beginPrivateSession, endPrivateSession, fetchPrivateAccessConfig, fetchPrivateWorkspace, fetchSession, login, logout, subscribePrivateAccessFailure, type PrivateWorkspaceView } from './lib/api'
 
 const privateErrorState = (reason: unknown): AccountWorkspaceState => {
   const code = reason instanceof Error ? reason.message : ''
@@ -33,6 +33,13 @@ function InjectedPrivateWorkspaceEntry() {
       .then((value) => { setWorkspace(value.workspace); setState(privateResultState(value)) })
       .catch((reason) => { setWorkspace(undefined); setState(privateErrorState(reason)); throw reason })
   useEffect(() => { void load().catch(() => undefined) }, [])
+  useEffect(() => {
+    if (state !== 'ready' || !workspace) return
+    return subscribePrivateAccessFailure(code => {
+      setWorkspace(undefined)
+      setState(code === 'authentication_required' ? 'session_expired' : privateErrorState(new Error(code)))
+    })
+  }, [state, workspace])
   const authenticate = async (provider: 'google' | 'email_code') => { setState('loading'); setTransitionError(null); try { await beginPrivateSession(provider); await load() } catch { setTransitionError('검증용 인증 전환을 완료하지 못했습니다.'); setState('login') } }
   const signOut = async () => { setState('loading'); setTransitionError(null); try { await endPrivateSession(); setWorkspace(undefined); setState('login') } catch { setTransitionError('로그아웃을 완료하지 못했습니다.'); setState('unavailable') } }
   return <AccountWorkspace state={state} workspace={workspace} ownerVerified={state === 'ready'} sessionPresent={state === 'ready'} onLogin={authenticate} onLogout={signOut} transitionError={transitionError} />
