@@ -50,3 +50,11 @@ test('question service stops after one unclear operation and never evicts an occ
  }
  assert.equal(await runDestinationQuestionService(),64)
 })
+test('read-only observation outages back off with a cap and reset without terminating the original request',async()=>{
+ const signal=new AbortController(),delays=[],output=[];let step=0
+ const states=[...Array(7).fill('awaiting_observation'),'awaiting_result','result_recorded']
+ const code=await runDestinationQuestionService({enabled:true,signal:signal.signal,coordinator:{runOnce:async()=>({state:states[step++],completionAuthority:false})},acquireLease:async()=>async()=>{},write:line=>output.push(line),wait:async ms=>{delays.push(ms);if(step===states.length)signal.abort()}})
+ assert.equal(code,0);assert.deepEqual(delays,[4000,8000,16000,32000,60000,60000,60000,2000,2000])
+ assert.equal(output.filter(line=>line.includes('AWAITING_OBSERVATION')).length,1)
+ assert.equal(output.some(line=>line.includes('SAFE_HOLD')),false)
+})

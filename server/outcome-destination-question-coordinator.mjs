@@ -28,6 +28,7 @@ export function createDestinationQuestionCoordinator({scope,discovery,requests,q
   try{
    if(collection){
     const value=await collectDiscoveryQuestionOnce({requests,questions,queueAdapter,...collection})
+    if(value.state==='observation_unavailable')return result('awaiting_observation')
     if(value.state==='pending')return result('awaiting_result')
     if(value.state!=='result_recorded')return hold()
     collection=null;return result('result_recorded')

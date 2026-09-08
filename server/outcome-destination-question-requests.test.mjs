@@ -43,6 +43,7 @@ test('durable question claim and real receipt ingestion prevent duplicate transp
   const queueAdapter={bindingResolver:async()=>({project_id:'outcome',role:'planner',binding_version:1,status:'active',freshness:'fresh',destination:activeDestination}),transport:async({destination})=>{original=destination;sends++;return {delivery:'acknowledged'}},readPlannerResponse:async({destination,correlation_id})=>{
    assert.equal(destination,original)
    if(mode==='pending')return {outcome:'pending'}
+   if(mode==='unavailable')return {outcome:'unavailable'}
    return {outcome:'completed',response:{correlation_id,source_digest:'a'.repeat(64),message:JSON.stringify({schemaVersion:1,contextDigest:mode==='wrong'?'wrong':responseDigest,coverage:[],questions:[],completionAuthority:false})}}
   }}
   const publishInput=async input=>({state:'ready',reference:`analysis-${'a'.repeat(64)}`,requestId:input.requestId,contextDigest:input.contextDigest,contextRevision:input.contextRevision})
@@ -55,6 +56,7 @@ test('durable question claim and real receipt ingestion prevent duplicate transp
   assert.equal((await collectDiscoveryQuestionOnce({requests,questions,queueAdapter,...collection,request:{...collection.request,dispatchToken:'00000000-0000-4000-8000-000000000099'}})).state,'not_pending')
   assert.equal(await questions.load(scope),null)
   assert.equal((await collect()).state,'pending')
+  mode='unavailable';assert.equal((await collect()).state,'observation_unavailable');assert.equal(await questions.load(scope),null);assert.equal(sends,1)
   mode='wrong';assert.equal((await collect()).state,'unavailable');assert.equal(await questions.load(scope),null)
   mode='valid';assert.equal((await collect()).state,'result_recorded')
   assert.equal((await requests.load(request)).state,'completed');assert.equal((await questions.load(scope)).completionAuthority,false)
@@ -84,6 +86,8 @@ test('durable question claim and real receipt ingestion prevent duplicate transp
    assert.equal((await live.runOnce()).state,'awaiting_result')
    assert.equal((await coordinator().runOnce()).state,'safe_hold') // Restart cannot reclaim a started request.
    assert.equal((await live.runOnce()).state,'awaiting_result');assert.equal(sends,revision-1)
+   mode='unavailable';assert.equal((await live.runOnce()).state,'awaiting_observation');assert.equal(sends,revision-1)
+   mode='pending';assert.equal((await live.runOnce()).state,'awaiting_result');assert.equal(sends,revision-1)
    mode='valid'
    if(revision===4){
     const row=await requests.load({...scope,contextDigest:responseDigest})

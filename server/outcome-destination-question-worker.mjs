@@ -48,6 +48,9 @@ export async function collectDiscoveryQuestionOnce({requests,questions,queueAdap
   const binding=await queueAdapter.bindingResolver({project_id:'outcome',role:'planner'})
   if(binding?.project_id!=='outcome'||binding.role!=='planner'||binding.status!=='active'||binding.freshness!=='fresh'||binding.binding_version!==receipt.bindingVersion||!receipt.destination)return unavailable
   const value=await queueAdapter.readPlannerResponse({destination:receipt.destination,message:receipt.message,correlation_id:correlation})
+  // A failed read is not a failed delivery or an ambiguous database write.
+  // Retain the original claim; only its read-only observation may be repeated.
+  if(value?.outcome==='unavailable')return {state:'observation_unavailable',completionAuthority:false}
   if(value?.outcome==='pending')return {state:'pending',completionAuthority:false}
   const response=value?.response
   if(value?.outcome!=='completed'||response?.correlation_id!==correlation||typeof response.message!=='string'||typeof response.source_digest!=='string'||!/^[a-f0-9]{64}$/.test(response.source_digest))return unavailable
