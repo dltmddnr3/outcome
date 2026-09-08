@@ -9,6 +9,8 @@ import {runDestinationAnalysisOnce} from './outcome-destination-analysis-worker.
 import {createOutcomeServer} from './index.mjs'
 import {once} from 'node:events'
 import {validateDestinationAnalysisResult} from './outcome-destination-analysis-result.mjs'
+import {createDestinationPlannerDispatch} from './outcome-destination-planner-dispatch.mjs'
+import {collectDestinationAnalysisOnce} from './outcome-destination-analysis-collector.mjs'
 test('analysis SQL pins source, enforces one claim and terminal hold, and isolates owners',async()=>{
  const db=await PGlite.create('memory://')
  try{
@@ -86,6 +88,37 @@ test('analysis SQL pins source, enforces one claim and terminal hold, and isolat
    assert.deepEqual(readback.analysis.result.proposals,[]);assert.deepEqual(readback.analysis.result.confirmedAnswers,{})
    assert.equal(readback.analysis.result.semanticVerification,'owner_review_required');assert.equal(readback.analysis.result.gaps.length,8);assert.equal(actualDispatches,1)
    assert.equal((await fetch(url,{method:'POST',headers,body:'x'.repeat(4097)})).status,413)
+   const asyncRequest={...submitted,requestId:'00000000-0000-4000-8000-000000000040'}
+   const asyncUrl=url.replace(submitted.requestId,asyncRequest.requestId)
+   const asyncRepo=createDestinationAnalysisRepository({transact,validateResult:validateDestinationAnalysisResult})
+   await asyncRepo.enqueue(asyncRequest)
+   let sends=0,responseMode='pending',originalDestination
+   const queueAdapter={
+    bindingResolver:async()=>({project_id:'outcome',role:'planner',binding_version:1,status:'active',freshness:'fresh',destination:Object.freeze({opaque:true})}),
+    transport:async({destination})=>{originalDestination=destination;sends++;return {delivery:'acknowledged'}},
+    readPlannerResponse:async({destination,correlation_id})=>{
+     assert.equal(destination,originalDestination)
+     if(responseMode==='pending')return {outcome:'pending'}
+     return {outcome:'completed',response:{correlation_id,message:JSON.stringify({schemaVersion:1,documentDigest:request.documentDigest,draftRevision:1,proposals:responseMode==='forged'?[{field:'problem',value:'invented',startLine:1,endLine:1,quote:'not in source'}]:[],completionAuthority:false})}}
+    },
+   }
+   const dispatch=createDestinationPlannerDispatch({queueAdapter,publishInput:async input=>({...input,state:'ready',reference:`analysis-${'c'.repeat(64)}`})})
+   const asyncWorker={repository:asyncRepo,request:asyncRequest,dispatch}
+   const started=await runDestinationAnalysisOnce(asyncWorker)
+   assert.equal(started.state,'awaiting_result');assert.ok(started.collection)
+   const collect=()=>collectDestinationAnalysisOnce({repository:asyncRepo,queueAdapter,...started.collection})
+   assert.equal((await collect()).state,'pending')
+   responseMode='forged';assert.equal((await collect()).state,'unavailable')
+   assert.equal((await asyncRepo.load(asyncRequest)).state,'dispatch_started')
+   responseMode='valid';assert.equal((await collect()).state,'result_recorded')
+   const asyncReadback=await (await fetch(asyncUrl,{headers})).json()
+   assert.equal(asyncReadback.analysis.state,'completed')
+   assert.equal(asyncReadback.analysis.result.completionAuthority,false)
+   assert.equal(asyncReadback.analysis.result.gaps.length,8)
+   assert.deepEqual(asyncReadback.analysis.result.confirmedAnswers,{})
+   assert.equal((await collect()).state,'not_pending')
+   assert.equal((await runDestinationAnalysisOnce(asyncWorker)).state,'not_claimed')
+   assert.equal(sends,1)
   }finally{http.closeAllConnections();await new Promise(resolve=>http.close(resolve))}
  }finally{await db.close()}
 })
