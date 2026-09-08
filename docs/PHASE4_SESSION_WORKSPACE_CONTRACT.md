@@ -50,6 +50,11 @@ These are program responsibilities, not new agents, schedules or products. The c
 
 #### Candidate-bound stage receipt check · 2026-09-09
 
+- [ ] Native read-data restriction permits exact test input and runtime libraries but denies an outside file; inherited environment is minimal.
+  CHECK: node --test server/outcome-work-sandbox.test.mjs
+  EXPECT: fail 0
+  EVIDENCE: FAIL 2026-09-09: Node aborts before the read probe under file-read-data restriction (status null; direct probe exit 134). One bounded correction adding /dev/null, /dev/random and /dev/urandom did not resolve startup. Dependency inspection lists system CoreFoundation/Security/libc++/libSystem only; root cause remains unproven. Existing write/network probes still pass. Retained executable reproducer is marked TODO so the known unmet platform gate is explicit, not silently removed; TODO is NOT PASS and forbids activating this profile. Next route must establish runtime-required reads from evidence or use a verified supported sandbox, not broaden to unrestricted reading.
+
 - [x] Native local sandbox feasibility: actual child writes only the explicit test-owned subtree; outside sentinel is preserved. This probe does not prove privacy/read isolation, command pinning, descendant cleanup or stage execution.
   CHECK: node --test server/outcome-work-sandbox.test.mjs
   EXPECT: fail 0
