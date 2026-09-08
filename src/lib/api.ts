@@ -52,6 +52,46 @@ export const activeDestinationDraftId = '00000000-0000-4000-8000-000000000001'
 export type DestinationDraftDocument = { schemaVersion: 1; mode: 'guided_200q' | 'brief_gap'; source: string; answers: import('./destination-discovery').DestinationAnswers; unknowns: string[] }
 export type StoredDestinationDraft = { draftId: string; revision: number; document: DestinationDraftDocument; state: 'draft'; completionAuthority: false }
 export type StoredDiscovery = {draftId:string;revision:number;intakeRevision:number;context:DiscoveryContext;contextDigest:string;state:'draft';completionAuthority:false}
+export type DestinationConfirmationReview={reviewDigest:string;intakeRevision:number;contextRevision:number;completionAuthority:false;executionAuthority:false}
+export type DestinationConfirmation={requestId:string;draftId:string;reviewDigest:string;intakeRevision:number;contextRevision:number;state:'creation_requested';completionAuthority:false;executionAuthority:false}
+const confirmationReviews=new WeakMap<DestinationConfirmationReview,{binding:DestinationBinding;generation:number;contextDigest:string;attempted:boolean}>()
+const confirmationExact=(v:unknown,keys:string[]):v is Record<string,unknown>=>!!v&&typeof v==='object'&&!Array.isArray(v)&&Object.keys(v).length===keys.length&&keys.every(k=>Object.hasOwn(v,k))
+const confirmationHash=(v:unknown):v is string=>typeof v==='string'&&/^[a-f0-9]{64}$/.test(v)
+export async function requestDestinationConfirmationReview(discovery:StoredDiscovery,signal?:AbortSignal):Promise<DestinationConfirmationReview>{
+ const binding=privateDestinationBinding,generation=privateDecisionBindingVersion
+ const pinned={draftId:discovery.draftId,revision:discovery.revision,intakeRevision:discovery.intakeRevision,contextDigest:discovery.contextDigest}
+ if(!binding||pinned.draftId!==activeDestinationDraftId)throw Error('destination_unavailable')
+ const headers=await destinationSessionHeaders(binding,generation)
+ signal?.throwIfAborted()
+ const value=await readJson<unknown>(await fetch(`/api/private/destination/confirmation-review/${pinned.draftId}`,{credentials:'same-origin',headers,signal}))
+ signal?.throwIfAborted()
+ if(binding!==privateDestinationBinding||generation!==privateDecisionBindingVersion)throw Error('destination_identity_changed')
+ if(!confirmationExact(value,['confirmationReview','completionAuthority'])||value.completionAuthority!==false)throw Error('confirmation_invalid')
+ const row=value.confirmationReview
+ if(!confirmationExact(row,['reviewDigest','intakeRevision','contextRevision','completionAuthority','executionAuthority'])||!confirmationHash(row.reviewDigest)||row.intakeRevision!==pinned.intakeRevision||row.contextRevision!==pinned.revision||row.completionAuthority!==false||row.executionAuthority!==false)throw Error('confirmation_invalid')
+ const review=Object.freeze({...row}) as DestinationConfirmationReview
+ confirmationReviews.set(review,{binding,generation,contextDigest:pinned.contextDigest,attempted:false})
+ return review
+}
+export async function requestDestinationConfirmation(discovery:StoredDiscovery,review?:DestinationConfirmationReview,signal?:AbortSignal):Promise<DestinationConfirmation|null>{
+ const binding=privateDestinationBinding,generation=privateDecisionBindingVersion
+ const pinned={draftId:discovery.draftId,revision:discovery.revision,intakeRevision:discovery.intakeRevision,contextDigest:discovery.contextDigest}
+ if(!binding||pinned.draftId!==activeDestinationDraftId)throw Error('destination_unavailable')
+ const capability=review?confirmationReviews.get(review):null
+ if(review&&(!capability||capability.attempted||capability.binding!==binding||capability.generation!==generation||capability.contextDigest!==pinned.contextDigest||review.intakeRevision!==pinned.intakeRevision||review.contextRevision!==pinned.revision))throw Error('confirmation_review_changed')
+ // Consume before awaiting credentials: no concurrent/repeated POST on ambiguity.
+ if(capability)capability.attempted=true
+ const headers=await destinationSessionHeaders(binding,generation)
+ signal?.throwIfAborted()
+ const value=await readJson<unknown>(await fetch(`/api/private/destination/confirmations/${pinned.draftId}`,{method:review?'POST':'GET',credentials:'same-origin',signal,headers:{...headers,...(review?{'content-type':'application/json','x-outcome-csrf':binding.csrf}:{})},...(review?{body:JSON.stringify({requestId:crypto.randomUUID(),reviewDigest:review.reviewDigest,confirmed:true})}:{})}))
+ signal?.throwIfAborted()
+ if(binding!==privateDestinationBinding||generation!==privateDecisionBindingVersion)throw Error('destination_identity_changed')
+ if(!confirmationExact(value,['confirmation','completionAuthority'])||value.completionAuthority!==false)throw Error('confirmation_invalid')
+ const row=value.confirmation
+ if(row===null&&!review)return null
+ if(!confirmationExact(row,['requestId','draftId','reviewDigest','intakeRevision','contextRevision','state','completionAuthority','executionAuthority'])||typeof row.requestId!=='string'||!/^[a-f0-9]{8}(?:-[a-f0-9]{4}){3}-[a-f0-9]{12}$/.test(row.requestId)||row.draftId!==pinned.draftId||!confirmationHash(row.reviewDigest)||review&&row.reviewDigest!==review.reviewDigest||row.intakeRevision!==pinned.intakeRevision||row.contextRevision!==pinned.revision||row.state!=='creation_requested'||row.completionAuthority!==false||row.executionAuthority!==false)throw Error('confirmation_invalid')
+ return row as DestinationConfirmation
+}
 export type DiscoveryDecisionReview={contextDigest:string;contextRevision:number;intakeRevision:number;decisions:Array<{questionId:string;gapId:string;value:string;prompt:string;sourceContextRevision:number}>;sourceVerification:'required';completionAuthority:false}
 export async function requestDestinationDecisionReview(discovery:StoredDiscovery):Promise<DiscoveryDecisionReview>{
  const binding=privateDestinationBinding,generation=privateDecisionBindingVersion

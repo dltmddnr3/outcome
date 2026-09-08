@@ -30,7 +30,7 @@ try {
       }
     }
     assert.equal(await page.locator('dl>div').count(), 8)
-    assert.equal(await page.getByRole('button', { name: 'Destination 확정 · 연결 준비 중' }).isDisabled(), true)
+    assert.equal(await page.getByRole('button', { name: '이 버전으로 확정 요청', exact: true }).count(), 0)
     await page.getByRole('button', { name: '문제 수정', exact: true }).click()
     await page.getByRole('textbox', { name: '직접 입력', exact: true }).fill('수정한 사용자 문제')
     await page.getByRole('button', { name: 'Destination 검토', exact: true }).click()

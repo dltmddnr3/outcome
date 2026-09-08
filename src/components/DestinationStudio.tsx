@@ -215,7 +215,8 @@ export function DestinationStudio({ open, onClose }: { open: boolean; onClose: (
         <section className="destination-studio__unknowns" aria-label="잔여 미상"><strong>잔여 미상</strong>{review.residualUnknowns.map(item=><span key={item}>{item}</span>)}</section>
         {savedDraft&&savedIntakeMatches&&<DestinationDiscoveryPanel key={`${savedDraft.draftId}:${savedDraft.revision}:${savedDraftGeneration}`} intake={savedDraft}/>}
         <p className="destination-studio__boundary"><Lightbulb size={16} aria-hidden="true" />초안 저장은 Destination 확정이 아닙니다. 프로젝트·세션·Gate는 생성하지 않습니다.</p>
-        <div className="destination-studio__actions"><button type="button" onClick={() => { const last = destinationQuestions[destinationQuestions.length - 1].id; editAnswer(last) }}><ArrowLeft size={17} aria-hidden="true" />답변 다시 보기</button><button className="destination-studio__primary" type="button" disabled>Destination 확정 · 연결 준비 중</button></div>
+        <div className="destination-studio__actions"><button type="button" onClick={() => { const last = destinationQuestions[destinationQuestions.length - 1].id; editAnswer(last) }}><ArrowLeft size={17} aria-hidden="true" />답변 다시 보기</button></div>
+        <p>확정하려면 현재 기본 초안과 후속 답변을 불러오고, 저장된 추가 결정을 검토해 주세요.</p>
       </div>}
 
       <section className="destination-studio__unknowns" aria-label="초안 보관" aria-busy={storageBusy}>

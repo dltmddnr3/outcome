@@ -1,6 +1,7 @@
 import {useRef,useState} from 'react'
 import {captureDestinationReviewBinding,requestDestinationDiscovery,requestDestinationQuestions,requestDestinationQuestionRun,requestDestinationDecisionReview,type DiscoveryDecisionReview,type DiscoveryQuestionRun,type StoredDestinationDraft,type StoredDiscovery} from '../lib/api'
 import {DestinationQuestionBatch} from './DestinationQuestionBatch'
+import {DestinationConfirmationPanel} from './DestinationConfirmationPanel'
 import type {DiscoveryContext} from '../lib/destination-question-receipt'
 import {sensitiveContentHint} from './PlannerConversation'
 
@@ -49,7 +50,7 @@ export function DestinationDiscoveryPanel({intake}:{intake:StoredDestinationDraf
  }
  const save=async(next:DiscoveryContext)=>{
   if(!reviewIsCurrent()||lock.current||!discovery)throw Error('discovery_busy')
-  lock.current=true;setBusy(true)
+  lock.current=true;setBusy(true);setDecisionReview(null)
   try{
    const stored=await requestDestinationDiscovery(intake,{expectedRevision:discovery.revision,context:next})
    if(!stored)throw Error('not_saved')
@@ -71,6 +72,7 @@ export function DestinationDiscoveryPanel({intake}:{intake:StoredDestinationDraf
    <h4>저장된 추가 결정</h4><p>기본 초안 버전 {decisionReview.intakeRevision} · 후속 답변 버전 {decisionReview.contextRevision}</p>
    {decisionReview.decisions.length?<dl>{decisionReview.decisions.map(item=><div key={item.questionId}><dt>{item.prompt}</dt><dd>{item.value}</dd></div>)}</dl>:<p>아직 저장된 추가 결정이 없습니다. 권장안은 자동 채택하지 않습니다.</p>}
    <p>질문 원문과 답변의 연결만 확인했습니다. 근거 내용 검증·Destination 확정·실행 승인은 별도입니다.</p>
+   <DestinationConfirmationPanel key={discovery.contextDigest} discovery={discovery}/>
   </section>}
   {discovery&&receipt&&<DestinationQuestionBatch context={discovery.context} receipt={receipt} onSave={save}/>}
  </section>

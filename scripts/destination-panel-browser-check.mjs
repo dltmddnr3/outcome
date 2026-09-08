@@ -76,7 +76,7 @@ try{
   await page.getByRole('button',{name:'현재 후속 질문 확인',exact:true}).click()
   await page.getByRole('heading',{name:'결과 확인 담당자는 누구인가요?',exact:true}).waitFor()
   assert.equal(await page.getByRole('radio',{name:/소유자/}).isChecked(),false)
-  assert.equal(await page.getByRole('button',{name:'Destination 확정 · 연결 준비 중',exact:true}).isDisabled(),true)
+  assert.equal(await page.getByRole('button',{name:'이 버전으로 확정 요청',exact:true}).count(),0)
   await page.getByRole('radio',{name:/소유자/}).check()
   await page.getByRole('button',{name:'후속 답변 저장',exact:true}).click()
   await page.getByText('보관된 후속 답변 1개',{exact:false}).waitFor()
