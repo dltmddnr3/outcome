@@ -12,18 +12,21 @@ try {
     server.stdout.on('data', chunk => { const match = String(chunk).match(/http:\/\/127\.0\.0\.1:\d+\/scripts\/fixtures\/chat-browser.html/); if (match) { clearTimeout(timer); resolve(match[0]) } })
   })
   browser = await chromium.launch({ channel: 'chrome', headless: true })
-  for (const width of [390, 1440]) for (const edited of [false, true]) for (const confirmation of ['answer', 'acknowledgement']) {
+  for (const width of [390, 1440]) for (const edited of [false, true]) for (const confirmation of ['direct', 'answer', 'acknowledgement']) {
     const page = await browser.newPage({ viewport: { width, height: 900 } })
     const errors = []
     page.on('pageerror', error => errors.push(error.message))
     let events = [], posts = 0
+    let releasePost
+    const postRelease = new Promise(resolve => { releasePost = resolve })
     await page.route('**/api/private/chat/**', async route => {
       const request = route.request()
       if (request.method() === 'POST') {
         posts++
         const correlation_id = request.headers()['idempotency-key']
         events = [{ event_id: 'event-0000000000000001', sequence: 1, observed_at: '2026-09-08T00:00:00.000Z', kind: 'user_message', state: 'queued', correlation_id, payload: { private_content: { text: request.postDataJSON().message } }, delivery: 'delivery_unknown', dispatch_state: 'invoked' }]
-        return route.fulfill({ json: { accepted: true, event_id: events[0].event_id, sequence: 1, delivery: 'delivery_unknown', dispatch_state: 'invoked', execution_started: false, result_attached: false, evidence_attached: false } })
+        if (confirmation === 'direct') { await postRelease; events[0].delivery = 'acknowledged' }
+        return route.fulfill({ json: { accepted: true, event_id: events[0].event_id, sequence: 1, delivery: events[0].delivery, dispatch_state: 'invoked', execution_started: false, result_attached: false, evidence_attached: false } })
       }
       return route.fulfill({ json: { target: { role: 'planner', binding_version: 1 }, events, csrf: 'synthetic-csrf', completion_authority: false } })
     })
@@ -36,11 +39,13 @@ try {
     const draft = page.getByLabel('Planner에게 메시지', { exact: true })
     await draft.fill('합성 수신 확인')
     await page.getByRole('button', { name: '메시지 보내기', exact: true }).click()
-    await page.getByRole('button', { name: '수동으로 다시 시도', exact: true }).waitFor()
+    if (confirmation !== 'direct') await page.getByRole('button', { name: '수동으로 다시 시도', exact: true }).waitFor()
+    else await page.locator('#planner-message-status').getByText('전송 대기', { exact: true }).waitFor()
     if (edited) await draft.fill('보존해야 할 새로운 초안')
     if (confirmation === 'answer') events.push({ event_id: 'event-0000000000000002', sequence: 2, observed_at: '2026-09-08T00:00:01.000Z', kind: 'assistant_message', state: 'completed', correlation_id: events[0].correlation_id, payload: { private_content: { text: '합성 답변 확인' } } })
-    else events[0].delivery = 'acknowledged'
-    await page.getByRole('button', { name: '새로고침', exact: true }).click()
+    else if (confirmation !== 'direct') events[0].delivery = 'acknowledged'
+    if (confirmation === 'direct') releasePost()
+    else await page.getByRole('button', { name: '새로고침', exact: true }).click()
     const confirmationText = confirmation === 'answer' ? 'Planner 답변 확인됨' : '목적지 접수 확인'
     await page.locator('.planner-conversation__messages').getByText(confirmationText, { exact: true }).waitFor()
     await page.getByRole('button', { name: '수동으로 다시 시도', exact: true }).waitFor({ state: 'detached' })

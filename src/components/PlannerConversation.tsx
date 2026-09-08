@@ -120,7 +120,7 @@ export function PlannerConversation({ events, plannerBound = false, onSend, fixt
       const result = await submitPrivatePlannerMessage('outcome', draft, csrf, key, token)
       if (generation !== authGeneration.current) return
       setDelivery(result.delivery); setRetryAvailable(['delivery_unknown', 'failed'].includes(result.delivery))
-      if (result.delivery === 'acknowledged') { setDraft(''); submission.current = null }
+      if (result.delivery === 'acknowledged') { setDraft(current => current === draft ? '' : current); submission.current = null }
       await refresh()
     }
     catch (error) { if (generation === authGeneration.current) { setDelivery(error instanceof Error && error.message === 'sensitive_content_rejected' ? 'rejected' : 'failed'); setRetryAvailable(!(error instanceof Error && error.message === 'sensitive_content_rejected')) } }
