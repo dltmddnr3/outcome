@@ -10,9 +10,28 @@ import {createDestinationConfirmationRepository} from './outcome-destination-con
 import {discoveryDomains} from '../src/lib/destination-question-policy.mjs'
 import {once} from 'node:events'
 import {createOutcomeServer} from './index.mjs'
+import {createDestinationSourceVerifier} from './outcome-destination-source-verifier.mjs'
 
 const scope={workspaceId:'workspace',accountRef:'owner',draftId:'00000000-0000-4000-8000-000000000001'}
 const requestId='00000000-0000-4000-8000-000000000010'
+test('content-verified assessment composes with confirmation SQL and source drift leaves no record',async()=>{
+ const f=await fixture();try{
+  const original='Synthetic checked technical contract';let content=original
+  const contentDigest=createHash('sha256').update(original).digest('hex')
+  const verifyReview=createDestinationSourceVerifier({
+   readAssessment:async({workspaceId,accountRef,reviewDigest})=>JSON.stringify({schemaVersion:1,workspaceId,accountRef,reviewDigest,verdict:'supported_for_owner_review',domains:discoveryDomains.map(domain=>({domain,state:'contract_ready',assessment:'supported',evidence:[{ref:'synthetic-contract',contentDigest,startLine:1,endLine:1,quote:original}]})),completionAuthority:false}),
+   readSource:async()=>content,
+  })
+  const repo=createDestinationConfirmationRepository({transact:f.transact,verifyReview})
+  const review=await repo.review(scope);assert.equal(await f.count(),0)
+  content+=' changed'
+  const input={...scope,requestId,reviewDigest:review.reviewDigest,confirmed:true}
+  await assert.rejects(()=>repo.confirm(input));assert.equal(await f.count(),0)
+  content=original
+  const saved=await repo.confirm(input);assert.equal(saved.state,'creation_requested');assert.equal(saved.executionAuthority,false)
+  assert.deepEqual(await repo.confirm(input),saved);assert.equal(await f.count(),1)
+ }finally{await f.db.close()}
+})
 test('owner HTTP confirmation composes real restricted SQL, CSRF, exact body and durable readback',async()=>{
  const f=await fixture()
  const runtime={allowedOrigin:'https://preview.invalid',csrfSecret:'synthetic-confirmation-csrf',confirmationRepository:createDestinationConfirmationRepository(f)}
