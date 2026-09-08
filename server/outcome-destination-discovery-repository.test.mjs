@@ -6,6 +6,43 @@ import {once} from 'node:events'
 import {createOutcomeServer} from './index.mjs'
 import {createDestinationDraftRepository} from './outcome-destination-postgres.mjs'
 import {createDiscoveryRepository,parseDiscoveryContext,discoveryContextDigest} from './outcome-destination-discovery-repository.mjs'
+import {createDiscoveryQuestionRepository} from './outcome-destination-question-repository.mjs'
+
+test('explicit intake version update preserves answered history and rejects erased decisions or stale writers',async()=>{
+ const db=await PGlite.create('memory://')
+ try{
+  await db.exec('create role anon nologin;create role authenticated nologin')
+  for(const file of ['20260908011009_outcome_destination_private_drafts.sql','20260908042838_outcome_destination_discovery_drafts.sql','20260908044800_outcome_discovery_question_receipts.sql'])await db.exec(await readFile(new URL(`../supabase/migrations/${file}`,import.meta.url),'utf8'))
+  const transact=work=>db.transaction(async tx=>{await tx.exec('set local role outcome_destination_backend');return work({query:(sql,args)=>tx.query(sql,args)})})
+  const scope={workspaceId:'workspace',accountRef:'owner',draftId:'00000000-0000-4000-8000-000000000001'}
+  const requestId=n=>`00000000-0000-4000-8000-${String(n).padStart(12,'0')}`
+  const drafts=createDestinationDraftRepository({transact}),repo=createDiscoveryRepository({transact}),questions=createDiscoveryQuestionRepository({transact})
+  const document={schemaVersion:1,mode:'guided_200q',source:'',answers:{problem:'original'},unknowns:['technical review pending']}
+  await drafts.save({...scope,requestId:requestId(1),expectedRevision:0,document:JSON.stringify(document)})
+  const initial={mode:document.mode,source:document.source,seedAnswers:document.answers,unknowns:document.unknowns,revision:1,answers:[],askedQuestionIds:[]}
+  const first=await repo.save({...scope,requestId:requestId(2),expectedRevision:0,intakeRevision:1,context:JSON.stringify(initial)})
+  const offered={id:'owner-q',gapId:'owner-gap',domain:'system_boundary',prompt:'누가 사용하나요?',choices:['나','팀'],recommendation:'나',reason:'사용자 확인',material:true}
+  await questions.record({...scope,contextDigest:first.contextDigest,bindingVersion:1,responseSourceDigest:'a'.repeat(64),receipt:JSON.stringify({schemaVersion:1,contextDigest:first.contextDigest,coverage:[],questions:[offered],completionAuthority:false})})
+  const answered={...initial,revision:2,answers:[{questionId:offered.id,gapId:offered.gapId,value:'팀'}],askedQuestionIds:[offered.id]}
+  const second=await repo.save({...scope,requestId:requestId(3),expectedRevision:1,intakeRevision:1,context:JSON.stringify(answered)})
+  const newer={...document,answers:{problem:'edited by owner'}}
+  await drafts.save({...scope,requestId:requestId(4),expectedRevision:1,document:JSON.stringify(newer)})
+  const updated={...answered,revision:3,seedAnswers:newer.answers}
+  await assert.rejects(()=>repo.save({...scope,requestId:requestId(5),expectedRevision:2,intakeRevision:2,context:JSON.stringify({...updated,answers:[]})}),/discovery_invalid/)
+  assert.deepEqual(await repo.load(scope),second)
+  const request={...scope,requestId:requestId(6),expectedRevision:2,intakeRevision:2,context:JSON.stringify(updated)}
+  const rebased=await repo.save(request)
+  assert.deepEqual(rebased.context.answers,answered.answers);assert.deepEqual(rebased.context.askedQuestionIds,answered.askedQuestionIds)
+  assert.deepEqual(rebased.context.unknowns,document.unknowns);assert.equal(rebased.intakeRevision,2);assert.equal(rebased.revision,3)
+  assert.notEqual(rebased.contextDigest,second.contextDigest);assert.equal(rebased.completionAuthority,false)
+  assert.deepEqual(await repo.save(request),rebased)
+  assert.deepEqual(await createDiscoveryRepository({transact}).load(scope),rebased)
+  await assert.rejects(()=>repo.save({...request,requestId:requestId(7)}),/discovery_revision_conflict/)
+  const history=(await db.query('select context_digest from outcome_destination_private.discovery_question_receipts')).rows
+  assert.deepEqual(history.map(row=>row.context_digest),[first.contextDigest])
+  assert.equal(await repo.load({...scope,accountRef:'other'}),null)
+ }finally{await db.close()}
+})
 
 test('server context digest matches the browser Unicode and ordering golden vector',()=>{
  const context={source:'운영 상태를 쉽게 확인하고 싶습니다.',mode:'guided_200q',seedAnswers:{outcome:'결과',problem:'문제'},unknowns:['검증 필요'],revision:1,answers:[{questionId:'q-2',gapId:'g-2',value:'나'},{questionId:'q-1',gapId:'g-1',value:'가'}],askedQuestionIds:['q-2','q-1']}
