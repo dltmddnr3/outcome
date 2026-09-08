@@ -242,7 +242,7 @@ export function createStableHostRequestHandler({ environment = process.env, runt
     }
     // Observation refresh must not initialize mutation runtimes or refresh
     // workspace/decision/Destination bindings. Missing producer stays unknown.
-    if (pathname.startsWith('/api/private/work-observation/')) {
+    if (pathname.startsWith('/api/private/work-observation/') || pathname.startsWith('/api/private/connections/')) {
       return handlePrivateAccessRequest({ method, pathname, token: privateSessionToken(headers), service: hosted.service })
     }
     const destinationPath = /^\/api\/private\/destination\/(drafts|analysis|discovery|questions|question-requests|review|confirmation-review|confirmations)\//.test(pathname)

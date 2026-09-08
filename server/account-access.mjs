@@ -143,6 +143,21 @@ export function createAccountAccessService({ authProvider, store, ownerSubject, 
         accountRef: authority.account_ref, workspaceId: authority.workspace_id, projectId: requestedProjectId, now })
       return { projectId: requestedProjectId, observation, completionAuthority: false }
     },
+    async readConnectionInventory({ token, requestedProjectId } = {}) {
+      const authority = await service.resolveBridgeAuthority({ token })
+      if (!authority.project_ids.includes(requestedProjectId)) throw new AccountAccessError('project_access_denied', 403)
+      const accessObservedAtMs = now()
+      const observation = await readScopedWorkObservation({ readSource: workObservationSource,
+        accountRef: authority.account_ref, workspaceId: authority.workspace_id, projectId: requestedProjectId, now })
+      // Access was checked in this request. This is not evidence of provider
+      // health, CLI availability, or permission to change a connection.
+      const sourceAvailable = observation && (observation.runtime.reason === null || observation.runtime.reason === 'observation_stale')
+      const observerState = !sourceAvailable ? 'not_observed' : now() - observation.observedAtMs > 15000 ? 'stale' : 'source_observed'
+      const entries = [{ id: 'workspace_api', state: 'access_verified', observedAtMs: accessObservedAtMs },
+        { id: 'execution_observer', state: observerState, observedAtMs: sourceAvailable ? observation.observedAtMs : null },
+        ...['mcp', 'provider_api', 'cli', 'environment', 'deployment'].map(id => ({ id, state: 'not_observed', observedAtMs: null }))]
+      return { schemaVersion: 1, projectId: requestedProjectId, entries, completionAuthority: false, executionAuthority: false }
+    },
     async endSession({ token } = {}) {
       const identity = await authenticate(token)
       if (!authProvider.signOut) throw new AccountAccessError('authentication_unavailable', 503)

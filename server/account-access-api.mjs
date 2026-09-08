@@ -84,6 +84,17 @@ export async function handlePrivateAccessRequest({ method = 'GET', pathname = '/
   }
   if (method !== 'GET') return response(405, { error: 'read_only' })
   if (pathname === '/api/private/config') return response(200, privateAccessPublicConfig(Boolean(service)))
+  const connectionPath = /^\/api\/private\/connections\/(outcome|cherry-note)$/.exec(pathname)
+  if (connectionPath) {
+    const headers = { 'cache-control': 'private, no-store', vary: 'Cookie, Authorization' }
+    if (!service) return response(401, { error: 'authentication_required' }, headers)
+    try {
+      return response(200, await service.readConnectionInventory({ token, requestedProjectId: connectionPath[1] }), headers)
+    } catch (error) {
+      if (error instanceof AccountAccessError) return response(error.status, { error: error.code }, headers)
+      return response(503, { error: 'connection_inventory_unavailable' }, headers)
+    }
+  }
   const observationPath = /^\/api\/private\/work-observation\/(outcome|cherry-note)$/.exec(pathname)
   if (observationPath) {
     const headers = { 'cache-control': 'private, no-store', vary: 'Cookie, Authorization' }
