@@ -59,6 +59,11 @@ export function createWorkJournal(db) {
     return action
   }
   return Object.freeze({
+    readTerminal(scopeJson,nowMs){return guarded(()=>{
+      const bound=normalize(scopeJson,nowMs),current=load(bound,nowMs),last=current.journal.events.at(-1)
+      if(!last||last.activity!=='terminal')fail()
+      return Object.freeze({sequence:current.sequence,...last})
+    })},
     read(scopeJson,nowMs){return guarded(()=>{
       const bound=normalize(scopeJson,nowMs),current=load(bound,nowMs)
       return Object.freeze({sequence:current.sequence,projection:projectSingleSessionWork(JSON.stringify(current.journal),bound.scopeJson,nowMs)})

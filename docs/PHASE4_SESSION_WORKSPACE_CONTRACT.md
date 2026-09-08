@@ -50,6 +50,11 @@ These are program responsibilities, not new agents, schedules or products. The c
 
 #### Candidate-bound stage receipt check · 2026-09-09
 
+- [x] Local integrated entrypoint composes owner authentication, durable grant/journal, current work policy and protected receipt reads before a bounded dispatch. Missing dependencies, mismatched terminal receipt or changed current policy stop the action. Default disabled; no daemon, environment change or implicit stage events.
+  CHECK: node --test server/outcome-work-local-runtime.test.mjs
+  EXPECT: fail 0
+  EVIDENCE: 2026-09-09 same-session integration/journal 5 PASS; full npm test exit 0 with server 874 PASS. Additional configuration/oversize/timeout test subsequently added and integrated suite 2 PASS; diff check PASS. Real temporary SQLite and mode-0400 receipts, existing account service with fixture identity provider, synthetic policy and transport; seven integration scenarios. Current live policy/token/dispatch adapters remain absent. No owner dogfood, initial queued-to-implementation bootstrap, executor-side atomic authorization or Phase completion claimed. Cherry approved local activation/testing in this turn; no additional activation approval request is needed within that exact boundary, but absent adapters must be implemented and verified first.
+
 - [x] Existing account authentication gates stored grant reads; revoked session and unauthorized project cannot read grants. Read-only adapter, not approval issuance or live activation.
   CHECK: node --test server/outcome-work-grant-store.test.mjs
   EXPECT: fail 0
