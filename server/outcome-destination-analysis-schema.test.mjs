@@ -6,6 +6,8 @@ import {createDestinationAnalysisRepository} from './outcome-destination-analysi
 import {createDestinationDraftRepository} from './outcome-destination-postgres.mjs'
 import {destinationDocumentDigest} from './outcome-destination-analysis-source.mjs'
 import {runDestinationAnalysisOnce} from './outcome-destination-analysis-worker.mjs'
+import {createOutcomeServer} from './index.mjs'
+import {once} from 'node:events'
 test('analysis SQL pins source, enforces one claim and terminal hold, and isolates owners',async()=>{
  const db=await PGlite.create('memory://')
  try{
@@ -60,5 +62,28 @@ test('analysis SQL pins source, enforces one claim and terminal hold, and isolat
   assert.equal((await runDestinationAnalysisOnce(worker)).state,'awaiting_result')
   assert.equal((await runDestinationAnalysisOnce({...worker,repository:createDestinationAnalysisRepository({transact})})).state,'not_claimed')
   assert.equal(dispatches,1);assert.equal((await repo.load(nextRequest)).state,'dispatch_started')
+  const http=createOutcomeServer({publicReadOnly:true,accountAccess:{authenticate:async token=>{if(token!=='owner'&&token!=='other')throw Error('invalid')},resolveBridgeAuthority:async({token})=>({workspace_id:'workspace',account_ref:token,project_ids:['outcome']})},destinationRuntime:{allowedOrigin:'https://preview.invalid',csrfSecret:'synthetic-analysis-csrf',analysisRepository:repo}})
+  http.listen(0,'127.0.0.1');await once(http,'listening')
+  try{
+   const submitted={...request,requestId:'00000000-0000-4000-8000-000000000030'}
+   const url=`http://127.0.0.1:${http.address().port}/api/private/destination/analysis/${submitted.requestId}`
+   const headers={cookie:'__session=owner','content-type':'application/json',origin:'https://preview.invalid','x-outcome-csrf':'synthetic-analysis-csrf'}
+   const payload=JSON.stringify({draftId:request.draftId,draftRevision:1,documentDigest:request.documentDigest})
+   const enqueue=()=>fetch(url,{method:'POST',headers,body:payload})
+   const first=await enqueue();assert.equal(first.status,202)
+   const receipt=await first.json();assert.equal(receipt.analysis.state,'queued')
+   assert.equal(JSON.stringify(receipt).includes('synthetic problem'),false)
+   assert.deepEqual(await (await enqueue()).json(),receipt)
+   assert.equal((await fetch(url)).status,401)
+   assert.deepEqual(await (await fetch(url,{headers:{cookie:'__session=other'}})).json(),{analysis:null,completionAuthority:false})
+   let actualDispatches=0
+   const execute={repository:validated,request:submitted,dispatch:async()=>{actualDispatches++;return {delivery:'acknowledged',result:'synthetic validated response'}}}
+   assert.equal((await runDestinationAnalysisOnce(execute)).state,'result_recorded')
+   assert.equal((await runDestinationAnalysisOnce(execute)).state,'not_claimed')
+   const readback=await (await fetch(url,{headers})).json()
+   assert.equal(readback.analysis.state,'completed');assert.equal(readback.completionAuthority,false)
+   assert.deepEqual(readback.analysis.result,{completionAuthority:false,proposals:[]});assert.equal(actualDispatches,1)
+   assert.equal((await fetch(url,{method:'POST',headers,body:'x'.repeat(4097)})).status,413)
+  }finally{http.closeAllConnections();await new Promise(resolve=>http.close(resolve))}
  }finally{await db.close()}
 })
