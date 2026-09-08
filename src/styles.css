@@ -471,6 +471,7 @@ body:has(.account-workspace){min-width:0}
 /* Split workbench: future session surface beside a three-level outcome map. */
 .oc-workspace-tabs{display:none}
 .oc-workbench{display:grid;grid-template-columns:minmax(0,1fr) 220px minmax(320px,.72fr);margin-bottom:24px;overflow:hidden;border:1px solid var(--oc-rule-strong);border-radius:var(--oc-radius-lg);background:var(--oc-surface);box-shadow:none}
+.oc-map-workspace>.oc-primary-workspace{display:block}
 .oc-approval-rail,.oc-conversation-panel{min-width:0;border-left:1px solid var(--oc-rule);background:var(--oc-surface)}
 .oc-approval-rail{padding:18px}.oc-approval-rail>header{display:grid;gap:3px;margin-bottom:14px}.oc-approval-rail>header span,.oc-approval-rail>header strong{color:var(--oc-muted);font-size:11px}.oc-approval-rail h2{margin:0}.oc-approval-empty{font-size:12px;line-height:1.5}
 .oc-approval-list{display:grid;gap:12px;margin:0;padding:0;list-style:none}

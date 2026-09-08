@@ -29,6 +29,8 @@ try{
  for(const viewport of [{width:1440,height:900},{width:430,height:932},{width:390,height:844},{width:375,height:812},{width:320,height:568}]){
   const page=await browser.newPage({viewport});const errors=[];page.on('pageerror',e=>errors.push(e.message))
   await page.goto(`http://127.0.0.1:${server.address().port}/cherry-note-dashboard`,{waitUntil:'networkidle'})
+  assert.equal(await page.locator('#oc-planner-conversation').evaluate(element=>element.closest('details.oc-v1-compatibility')===null),true,'primary composer must not be inside compatibility disclosure')
+  assert.equal(await page.locator('.oc-approval-rail').evaluate(element=>element.closest('details.oc-v1-compatibility')===null),true,'approval inbox must not be inside compatibility disclosure')
   const compatibility=page.locator('.oc-v1-compatibility > summary')
   if(await compatibility.count())await compatibility.click()
   const block=page.locator('[data-source-context="true"]');
@@ -47,6 +49,18 @@ try{
   }
   assert.equal(await block.getAttribute('data-source-conflict'),coherent?null:'Slice A A1-A4 OPEN|13/13 evidence closure')
   assert.equal(errors.length,0)
+  const panels=page.locator('.oc-workbench > [data-workspace-panel]')
+  assert.equal(await panels.count(),3)
+  if(viewport.width<1100){
+   for(const label of ['대화','승인','지도']){
+    await page.getByRole('navigation',{name:'모바일 작업공간'}).getByRole('button',{name:label,exact:true}).click()
+    for(const panel of ['지도','대화','승인'])assert.equal(await page.locator(`.oc-workbench > [data-workspace-panel="${panel}"]`).isVisible(),panel===label)
+   }
+  }else{
+   const boxes=await panels.evaluateAll(elements=>elements.map(element=>{const r=element.getBoundingClientRect();return{x:r.x,y:r.y,width:r.width,height:r.height,right:r.right}}))
+   assert.ok(boxes.every(box=>box.width>0&&box.height>0))
+   assert.ok(boxes[0].right<=boxes[1].x+1&&boxes[1].right<=boxes[2].x+1,'desktop map/inbox/chat must remain nonoverlapping peers')
+  }
   const overflow=await page.evaluate(()=>document.documentElement.scrollWidth-innerWidth)
   if(!baseline)assert.equal(overflow,0,'document must not overflow horizontally')
   if(overflow>0)console.log(JSON.stringify({overflowElements:await page.evaluate(()=>Array.from(document.querySelectorAll('body *')).map(e=>({tag:e.tagName,cls:e.className,rect:e.getBoundingClientRect()})).filter(x=>x.rect.right>innerWidth&&x.rect.width>0).slice(0,12).map(x=>({tag:x.tag,cls:x.cls,right:x.rect.right,width:x.rect.width})))}))
