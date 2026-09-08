@@ -50,6 +50,8 @@ These are program responsibilities, not new agents, schedules or products. The c
 
 #### Candidate-bound stage receipt check · 2026-09-09
 
+Live local transport canary · 2026-09-09 · current source 467d7a4. Cherry's local connection/limited verification approval was used for exactly one existing Planner queue submission, correlation message-4a67d7a49b092026. Protected registry resolved exactly one active Planner matching this thread; existing owner probe and cwd/registry checks passed. CLI adapter returned acknowledged. The message subsequently appeared in this conversation and received the requested final answer. Read-only existing response collector returned completed, exact correlation=true and exact answer=true; source digest 7df65c9d8f9c35f914e4559d2190af0c0c10ae05e4edbb2f6ccf941a0256d7b0. No resend, new session, hosted DB, environment change, deployment or stage execution occurred. This proves real transport and answer extraction only, not authenticated execution-grant issuance, stage controller dispatch or Phase 4/5 completion. The canary used the existing queue adapter directly; do not attribute it to the new integrated runtime.
+
 - [x] Local integrated entrypoint composes owner authentication, durable grant/journal, current work policy and protected receipt reads before a bounded dispatch. Missing dependencies, mismatched terminal receipt or changed current policy stop the action. Default disabled; no daemon, environment change or implicit stage events.
   CHECK: node --test server/outcome-work-local-runtime.test.mjs
   EXPECT: fail 0
