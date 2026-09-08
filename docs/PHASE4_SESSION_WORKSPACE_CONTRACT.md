@@ -50,6 +50,11 @@ These are program responsibilities, not new agents, schedules or products. The c
 
 #### Candidate-bound stage receipt check · 2026-09-09
 
+- [x] Local grant storage preserves immutable approval and monotonic revocation across restart, rejects wrong owner and changed bytes. Dedicated disposable SQLite tests only; no runtime database opened or migrated. Caller must authenticate owner before recording/revoking; no public API or implicit approval issuer.
+  CHECK: node --test server/outcome-work-grant-store.test.mjs
+  EXPECT: fail 0
+  EVIDENCE: 2026-09-09 same-session grant-store/controller/grant suites 16 PASS; diff check PASS. Disk close/reopen confirms durable approval and tombstone, repeat record cannot reactivate, wrong owner and changed content fail closed. This is storage code, not authenticated live grant issuance; no runtime caller configured. Stored active status still requires expiry/current-owner/dependency/evidence checks in the controller.
+
 - [x] Grant-controller composition checks fresh approval both before reservation and dispatch; missing resolver, revoked/expired/mismatched grant or failed evidence prevents sending.
   CHECK: node --test server/outcome-work-continuation.test.mjs
   EXPECT: fail 0
