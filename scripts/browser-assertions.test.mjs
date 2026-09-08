@@ -8,11 +8,19 @@ const passingMeasurement = () => ({
   pageHeading: true, sequentialHeadings: true, compactHero: true, roleGeometry: true, heroGeometry: true, mobileMapFirstFold: true, mobileDomOrder: true, mobileHierarchyTruth: true, workspaceSidebarTruth: true, workbenchTruth: true, wideCanvasTruth: true, gateDetailsTruth: true, refinedVisualSystemTruth: true, currentStageActionTruth: true, singleProgressRailTruth: true, phaseNavigationUniqueTruth: true, currentSelectionDistinctionTruth: true, folderHierarchyTruth: true, phaseCurrentMarkerTruth: true, phaseLabelsFull: true, phaseBandTruth: true, phaseOptionTitlesFull: true, desktopPhaseListFirstFold: true, liveSemantics: true, structureTruth: true, phaseCompletionTruth: true, stagePositionTruth: true, snapshotHeroTruth: true, oneMapSurface: true, roving: true, desktopColumns: true, mobileDrill: true, gateCountTruth: true, gaugeTruth: true, explorationTruth: true, groupTruth: true, singleStaleNowSignal: true, snapshotBadgeTextTruth: true, technicalCollapsed: true, technicalEvidence: true, noFabricatedProgress: true, firstFold: true,
 })
 
-const passingSourceContext = () => ({ count: 1, visibleCount: 1, role: 'region', accessibleName: '원본 맥락 · 비권한 참조', completionAuthority: 'false', primary: 'outcome-phase-5:13/13', compatibility: 'outcome-phase-3:38/43', historical: 'outcome-phase-2:5/6', conflict: 'Slice A A1-A4 OPEN|13/13 evidence closure', text: '원본 맥락 · 비권한 참조 현재 primary · Phase 5 13/13 compatibility · Phase 3 38/43 historical · Phase 2 5/6 원본 충돌 · Map · Slice A A1-A4 OPEN · Gate · 13/13 evidence closure 캡처 시각 2026-09-07T12:23:21.492Z 원본 갱신 2026-08-31 KST 근거 관측 2026-09-03T09:55:56.978Z completionAuthority=false · 이 원본 맥락은 프로젝트 완료나 Cherry 수용을 승인하지 않습니다.' })
+const passingSourceContext = () => ({ count: 1, visibleCount: 1, role: 'region', accessibleName: '원본 맥락 · 비권한 참조', completionAuthority: 'false', primary: 'outcome-phase-5:13/13', compatibility: 'outcome-phase-3:38/43', historical: 'outcome-phase-2:5/6', conflict: 'Slice A A1-A4 OPEN|13/13 evidence closure', text: '원본 맥락 · 비권한 참조 현재 primary · Phase 5 13/13 compatibility · Phase 3 38/43 historical · Phase 2 5/6 원본 충돌 · Map · Slice A A1-A4 OPEN · Gate · 13/13 evidence closure 캡처 시각 2026-09-07T12:23:21.492Z 원본 갱신 2026-08-31 KST 근거 원본 확인 2026-09-03T09:55:56.978Z completionAuthority=false · 이 원본 맥락은 프로젝트 완료나 Cherry 수용을 승인하지 않습니다.' })
 
 test('source context browser contract requires exact visible DOM and accessible source distinctions', () => {
   assert.doesNotThrow(() => assertSourceContextMeasurement('desktop/outcome', true, passingSourceContext()))
   assert.doesNotThrow(() => assertSourceContextMeasurement('desktop/cherry-note', false, { count: 0 }))
+})
+
+test('coherent browser context uses exact supplied observation times rather than a historical snapshot constant', () => {
+  const source = { captured_at: '2026-09-08T02:00:00.000Z', source_updated_at: '2026-08-31 KST', evidence_observed_at: '2026-09-08T01:00:00.000Z', conflicts: [] }
+  const context = { ...passingSourceContext(), conflict: null, text: passingSourceContext().text.replace('원본 충돌 · Map · Slice A A1-A4 OPEN · Gate · 13/13 evidence closure ', '').replace('2026-09-07T12:23:21.492Z', source.captured_at).replace('2026-09-03T09:55:56.978Z', source.evidence_observed_at) }
+  assert.doesNotThrow(() => assertSourceContextMeasurement('coherent', source, context))
+  assert.throws(() => assertSourceContextMeasurement('wrong-time', source, { ...context, text: context.text.replace(source.evidence_observed_at, '2026-09-07T00:00:00.000Z') }), /text-missing/)
+  assert.throws(() => assertSourceContextMeasurement('stale-conflict', source, { ...context, conflict: passingSourceContext().conflict }), /conflict=/)
 })
 
 test('source context browser contract fails closed for a missing or substituted decisive value', () => {

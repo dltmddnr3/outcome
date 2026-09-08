@@ -23,7 +23,7 @@ let browser
 try{
  browser=await chromium.launch({headless:true,executablePath:'/Applications/Google Chrome.app/Contents/MacOS/Google Chrome'})
  const context=snapshot.projects.find(project=>project.project.id==='outcome').resultView.source_projection
- const originalConflicts=structuredClone(context.conflicts)
+ const originalConflicts=[{code:'map_primary_narrative_stale',map_value:'Slice A A1-A4 OPEN',gate_value:'13/13 evidence closure'}]
  for(const coherent of [false,true]){
  context.conflicts=coherent?[]:structuredClone(originalConflicts)
  for(const viewport of [{width:1440,height:900},{width:430,height:932},{width:390,height:844},{width:375,height:812},{width:320,height:568}]){

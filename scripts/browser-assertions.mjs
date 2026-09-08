@@ -35,8 +35,9 @@ export function assertSourceContextMeasurement(name, expectedPresent, context) {
     return
   }
   const expected = { count: 1, visibleCount: 1, role: 'region', accessibleName: '원본 맥락 · 비권한 참조', completionAuthority: 'false', primary: 'outcome-phase-5:13/13', compatibility: 'outcome-phase-3:38/43', historical: 'outcome-phase-2:5/6', conflict: 'Slice A A1-A4 OPEN|13/13 evidence closure' }
+  if (typeof expectedPresent === 'object') expected.conflict = expectedPresent.conflicts.length ? `${expectedPresent.conflicts[0].map_value}|${expectedPresent.conflicts[0].gate_value}` : null
   const failures = Object.entries(expected).flatMap(([key, value]) => context[key] === value ? [] : [`${key}=${JSON.stringify(context[key])}`])
-  for (const text of ['현재 primary · Phase 5', '13/13', 'compatibility · Phase 3', '38/43', 'historical · Phase 2', '5/6', 'Map · Slice A A1-A4 OPEN', 'Gate · 13/13 evidence closure', '캡처 시각', '2026-09-07T12:23:21.492Z', '원본 갱신', '2026-08-31 KST', '근거 관측', '2026-09-03T09:55:56.978Z', 'completionAuthority=false', '프로젝트 완료나 Cherry 수용을 승인하지 않습니다.']) if (!context.text.includes(text)) failures.push(`text-missing=${text}`)
+  for (const text of sourceContextLiterals(typeof expectedPresent === 'object' ? expectedPresent : undefined)) if (!context.text.includes(text)) failures.push(`text-missing=${text}`)
   if (failures.length) throw new Error(`${name}: source context failed: ${failures.join(' | ')}`)
 }
 
@@ -50,7 +51,12 @@ export async function measureSourceContext(page) {
   })
 }
 
-export const sourceContextRawAxLiterals = ['현재 primary · Phase 5', '13/13', 'compatibility · Phase 3', '38/43', 'historical · Phase 2', '5/6', 'Map · Slice A A1-A4 OPEN', 'Gate · 13/13 evidence closure', '캡처 시각', '2026-09-07T12:23:21.492Z', '원본 갱신', '2026-08-31 KST', '근거 관측', '2026-09-03T09:55:56.978Z', 'completionAuthority=false', '프로젝트 완료나 Cherry 수용을 승인하지 않습니다.']
+export const sourceContextRawAxLiterals = ['현재 primary · Phase 5', '13/13', 'compatibility · Phase 3', '38/43', 'historical · Phase 2', '5/6', 'Map · Slice A A1-A4 OPEN', 'Gate · 13/13 evidence closure', '캡처 시각', '2026-09-07T12:23:21.492Z', '원본 갱신', '2026-08-31 KST', '근거 원본 확인', '2026-09-03T09:55:56.978Z', 'completionAuthority=false', '프로젝트 완료나 Cherry 수용을 승인하지 않습니다.']
+
+export function sourceContextLiterals(source) {
+  if (!source) return sourceContextRawAxLiterals
+  return ['현재 primary · Phase 5', '13/13', 'compatibility · Phase 3', '38/43', 'historical · Phase 2', '5/6', ...source.conflicts.flatMap(conflict => [`Map · ${conflict.map_value}`, `Gate · ${conflict.gate_value}`]), '캡처 시각', source.captured_at, '원본 갱신', source.source_updated_at, '근거 원본 확인', source.evidence_observed_at, 'completionAuthority=false', '프로젝트 완료나 Cherry 수용을 승인하지 않습니다.']
+}
 
 export async function measureRawAccessibilityLiterals(page, literals = sourceContextRawAxLiterals) {
   const session = await page.context().newCDPSession(page)
@@ -252,7 +258,7 @@ async function assertSplitWorkbenchContract(page, name) {
 }
 
 export async function verifyAllDashboardStates(page, viewportName) {
-  await page.getByRole('heading', { name: '프로젝트 여정', exact: true }).waitFor(); const initialSourceContext = await measureSourceContext(page); if (initialSourceContext.count) { assertSourceContextMeasurement(viewportName, true, initialSourceContext); assertRawAccessibilityLiterals(viewportName, await measureRawAccessibilityLiterals(page)) }; await assertWorkspaceSidebarContract(page, viewportName); await assertSplitWorkbenchContract(page, viewportName); const projectButtons = page.locator('.oc-project-select')
+  await page.getByRole('heading', { name: '프로젝트 여정', exact: true }).waitFor(); await assertWorkspaceSidebarContract(page, viewportName); await assertSplitWorkbenchContract(page, viewportName); const projectButtons = page.locator('.oc-project-select')
   const payload = await page.evaluate(async () => { const response = await fetch('/api/dashboard', { headers: { accept: 'application/json' } }); if (!response.ok) throw new Error(`dashboard payload ${response.status}`); return (await response.json()).dashboard })
   const projectCount = payload.projects?.length ?? 0; if (projectCount < 1 || await projectButtons.count() !== projectCount || await page.locator('.oc-project-menu').count() !== projectCount) throw new Error(`${viewportName}: project switch/menu count does not match payload (${await projectButtons.count()}/${await page.locator('.oc-project-menu').count()}/${projectCount})`)
   await ensureGlobalNavigationOpen(page); const search = page.locator('.oc-project-search input'); const secondName = payload.projects[Math.min(1, projectCount - 1)].project.name; await search.fill(secondName); if (await projectButtons.count() !== 1 || (await projectButtons.first().textContent())?.includes(secondName) !== true) throw new Error(`${viewportName}: project search did not filter loaded projects`); await search.fill('__no_matching_project__'); if (!await page.getByText('일치하는 프로젝트가 없습니다.', { exact: true }).isVisible()) throw new Error(`${viewportName}: project search empty state missing`); await search.fill(''); if (await projectButtons.count() !== projectCount) throw new Error(`${viewportName}: clearing project search did not restore payload projects`)
@@ -281,7 +287,11 @@ export async function verifyAllDashboardStates(page, viewportName) {
         }
       }
     }
-    try { assertSourceContextMeasurement(`${viewportName}/${projectId}`, Boolean(payload.projects[projectIndex].resultView?.source_projection), await measureSourceContext(page)) } catch (error) { failures.push(String(error.message)) }
+    try {
+      const source = payload.projects[projectIndex].resultView?.source_projection
+      assertSourceContextMeasurement(`${viewportName}/${projectId}`, source, await measureSourceContext(page))
+      if (source) { const literals = sourceContextLiterals(source); assertRawAccessibilityLiterals(`${viewportName}/${projectId}`, await measureRawAccessibilityLiterals(page, literals), literals) }
+    } catch (error) { failures.push(String(error.message)) }
     await page.locator('.oc-show-current-button').click()
     try {
       await page.waitForFunction(() => { const root = document.querySelector('.oc-dashboard'); return root?.dataset.selectedStageId === root?.dataset.currentStageId && root?.dataset.mobileLevel === '2' })

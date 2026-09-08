@@ -36,10 +36,14 @@ describe('OUTCOME Package dashboard', () => {
     expect(markup).toContain('완료 조건 미연결 · 전체 완료율 아님')
     expect(markup).not.toContain('<b>0/0</b><small>근거 닫힘</small>')
   })
-  it('opens the sealed Phase 5 primary while keeping compatibility and historical evidence non-authoritative', () => {
+  it('preserves historical conflicting source context while keeping compatibility evidence non-authoritative', () => {
     const source = JSON.parse(readFileSync(new URL('../../snapshot/outcome-package-source.json', import.meta.url), 'utf8'))
     const sealed = { ...source, build: { repository: 'OUTCOME', ref: 'candidate', commit: null, tree: null, asset: null, runtimeNowPinned: false as const } } as OutcomeDashboardData
     const outcome = sealed.projects.find((item) => item.project.id === 'outcome')!
+    outcome.resultView!.source_projection!.conflicts = [{ code: 'map_primary_narrative_stale', map_value: 'Slice A A1-A4 OPEN', gate_value: '13/13 evidence closure' }]
+    outcome.resultView!.source_projection!.captured_at = '2026-09-07T12:23:21.492Z'
+    outcome.resultView!.source_projection!.source_updated_at = '2026-08-31 KST'
+    outcome.resultView!.source_projection!.evidence_observed_at = '2026-09-03T09:55:56.978Z'
     expect(defaultHierarchySelection(outcome)).toEqual({ phaseId: 'outcome-phase-5', scopeId: 'outcome-phase-5-composition', stageId: 'outcome-milestone-model-v2-local-default-projection' })
     const markup = renderToStaticMarkup(createElement(OutcomeDashboard, { onUnauthorized: () => undefined, initialData: sealed }))
     expect(markup).toContain('data-current-phase-id="outcome-phase-5"')
@@ -51,7 +55,7 @@ describe('OUTCOME Package dashboard', () => {
     expect(markup).toContain('data-completion-authority="false"')
     expect(markup.match(/data-source-context="true"/g) ?? []).toHaveLength(1)
     expect(markup).toContain('aria-labelledby="oc-source-context-title"')
-    for (const text of ['현재 primary · Phase 5', '13/13', 'compatibility · Phase 3', '38/43', 'historical · Phase 2', '5/6', 'Map · Slice A A1-A4 OPEN', 'Gate · 13/13 evidence closure', '캡처 시각', '2026-09-07T12:23:21.492Z', '원본 갱신', '2026-08-31 KST', '근거 관측', '2026-09-03T09:55:56.978Z', 'completionAuthority=false', '프로젝트 완료나 Cherry 수용을 승인하지 않습니다.']) expect(markup).toContain(text)
+    for (const text of ['현재 primary · Phase 5', '13/13', 'compatibility · Phase 3', '38/43', 'historical · Phase 2', '5/6', 'Map · Slice A A1-A4 OPEN', 'Gate · 13/13 evidence closure', '캡처 시각', '2026-09-07T12:23:21.492Z', '원본 갱신', '2026-08-31 KST', '근거 원본 확인', '2026-09-03T09:55:56.978Z', 'completionAuthority=false', '프로젝트 완료나 Cherry 수용을 승인하지 않습니다.']) expect(markup).toContain(text)
     expect(markup).toContain('data-source-primary="outcome-phase-5:13/13"')
     expect(markup).toContain('data-source-compatibility="outcome-phase-3:38/43"')
     expect(markup).toContain('data-source-historical="outcome-phase-2:5/6"')

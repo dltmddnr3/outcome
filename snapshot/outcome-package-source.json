@@ -1,6 +1,6 @@
 {
   "schemaVersion": 2,
-  "observedAt": "2026-09-07T12:23:21.492Z",
+  "observedAt": "2026-09-08T02:06:19.209Z",
   "projects": [
     {
       "status": "conflict",
@@ -1694,14 +1694,8 @@
       }
     },
     {
-      "status": "conflict",
-      "errors": [
-        "sessions_registry_conflict:planner",
-        "sessions_registry_conflict:builder",
-        "sessions_registry_conflict:ux_product_qa",
-        "sessions_registry_conflict:release_audit",
-        "source_projection_conflict:map_primary_narrative_stale"
-      ],
+      "status": "valid",
+      "errors": [],
       "observedAt": "2026-09-07T12:04:48.533Z",
       "sourceFreshness": {
         "state": "observed",
@@ -5322,7 +5316,7 @@
                     "closed": 13,
                     "available": true,
                     "sourceRef": "GATES_OUTCOME_MODEL_V2_LOCAL_DEFAULT_AND_SERVICE_PROJECTION.md",
-                    "observedAt": "2026-09-03T09:55:56.978Z"
+                    "observedAt": "2026-09-08T01:53:42.429Z"
                   },
                   "sourceState": "present",
                   "state": "complete",
@@ -5379,74 +5373,115 @@
       "bindings": [
         {
           "role": "planner",
-          "status": "registry_conflict",
+          "status": "stale",
           "activity": null,
-          "boundAt": null,
-          "observedAt": null,
-          "freshness": "unknown",
-          "bindingVersion": 0,
-          "historyCount": 0,
+          "boundAt": "2026-08-31T23:54:05.044Z",
+          "observedAt": "2026-09-08T00:15:56.321Z",
+          "freshness": "stale",
+          "bindingVersion": 3,
+          "historyCount": 3,
           "phaseId": null,
           "scopeId": null,
           "stageId": null,
           "rotating": false,
-          "hasPredecessor": false,
-          "history": []
-        },
-        {
-          "role": "builder",
-          "status": "registry_conflict",
-          "activity": null,
-          "boundAt": null,
-          "observedAt": null,
-          "freshness": "unknown",
-          "bindingVersion": 0,
-          "historyCount": 0,
-          "phaseId": null,
-          "scopeId": null,
-          "stageId": null,
-          "rotating": false,
-          "hasPredecessor": false,
-          "history": []
-        },
-        {
-          "role": "ux_product_qa",
-          "status": "registry_conflict",
-          "activity": null,
-          "boundAt": null,
-          "observedAt": null,
-          "freshness": "unknown",
-          "bindingVersion": 0,
-          "historyCount": 0,
-          "phaseId": null,
-          "scopeId": null,
-          "stageId": null,
-          "rotating": false,
-          "hasPredecessor": false,
-          "history": []
-        },
-        {
-          "role": "release_audit",
-          "status": "registry_conflict",
-          "activity": null,
-          "boundAt": null,
-          "observedAt": null,
-          "freshness": "unknown",
-          "bindingVersion": 0,
-          "historyCount": 0,
-          "phaseId": null,
-          "scopeId": null,
-          "stageId": null,
-          "rotating": false,
-          "hasPredecessor": false,
-          "history": []
+          "hasPredecessor": true,
+          "history": [
+            {
+              "action": "assign",
+              "before_version": 0,
+              "after_version": 1,
+              "occurred_at": "2026-08-27T05:28:47.984Z",
+              "reason_class": "legacy_stale_migration",
+              "stage_id": "outcome-stage-6"
+            },
+            {
+              "action": "observe",
+              "before_version": 1,
+              "after_version": 1,
+              "occurred_at": "2026-08-27T05:28:47.984Z",
+              "reason_class": "legacy_stale_migration",
+              "stage_id": "outcome-stage-6"
+            },
+            {
+              "action": "revoke",
+              "before_version": 1,
+              "after_version": 1,
+              "occurred_at": "2026-08-27T05:28:47.984Z",
+              "reason_class": "legacy_manifest_unbound_reconciliation",
+              "stage_id": null
+            },
+            {
+              "action": "assign",
+              "before_version": 1,
+              "after_version": 2,
+              "occurred_at": "2026-08-28T03:24:46.235Z",
+              "reason_class": "cherry_confirmed_remote_planner",
+              "stage_id": null
+            },
+            {
+              "action": "observe",
+              "before_version": 2,
+              "after_version": 2,
+              "occurred_at": "2026-08-28T03:24:46.267Z",
+              "reason_class": "adapter_unreachable",
+              "stage_id": null
+            },
+            {
+              "action": "observe",
+              "before_version": 2,
+              "after_version": 2,
+              "occurred_at": "2026-08-28T06:08:49.562Z",
+              "reason_class": "session_environment_activation",
+              "stage_id": null
+            },
+            {
+              "action": "replace",
+              "before_version": 2,
+              "after_version": 3,
+              "occurred_at": "2026-08-31T23:54:05.044Z",
+              "reason_class": "model_v2_compact_rotation",
+              "stage_id": null
+            },
+            {
+              "action": "observe",
+              "before_version": 3,
+              "after_version": 3,
+              "occurred_at": "2026-09-03T02:46:43.332Z",
+              "reason_class": "chat_ch2_live_queue_proof",
+              "stage_id": null
+            },
+            {
+              "action": "observe",
+              "before_version": 3,
+              "after_version": 3,
+              "occurred_at": "2026-09-07T23:36:56.817Z",
+              "reason_class": "app_readback_verified",
+              "stage_id": null
+            },
+            {
+              "action": "observe",
+              "before_version": 3,
+              "after_version": 3,
+              "occurred_at": "2026-09-08T00:01:08.659Z",
+              "reason_class": "app_readback_verified",
+              "stage_id": null
+            },
+            {
+              "action": "observe",
+              "before_version": 3,
+              "after_version": 3,
+              "occurred_at": "2026-09-08T00:15:56.321Z",
+              "reason_class": "app_readback_verified",
+              "stage_id": null
+            }
+          ]
         }
       ],
       "now": {
-        "status": "registry_conflict",
+        "status": "stale",
         "activity": null,
-        "observedAt": null,
-        "source": "runtime_registry"
+        "observedAt": "2026-09-08T00:15:56.321Z",
+        "source": "owner_binding"
       },
       "progress": {
         "available": false,
@@ -10309,9 +10344,9 @@
           }
         },
         "source_projection": {
-          "captured_at": "2026-09-07T12:23:21.492Z",
-          "source_updated_at": "2026-08-31 KST",
-          "evidence_observed_at": "2026-09-03T09:55:56.978Z",
+          "captured_at": "2026-09-08T02:06:19.209Z",
+          "source_updated_at": "2026-09-08 KST",
+          "evidence_observed_at": "2026-09-08T01:53:42.429Z",
           "primary": {
             "destination_id": "outcome-phase-5",
             "compatibility_workstream_id": "outcome-phase-5-composition",
@@ -10356,18 +10391,12 @@
               "label": "historical"
             }
           ],
-          "conflicts": [
-            {
-              "code": "map_primary_narrative_stale",
-              "map_value": "Slice A A1-A4 OPEN",
-              "gate_value": "13/13 evidence closure"
-            }
-          ],
+          "conflicts": [],
           "completion_authority": false
         },
         "completion_authority": false
       },
-      "conflict": true
+      "conflict": false
     }
   ],
   "modelV2": {
@@ -10389,7 +10418,7 @@
         "projection": {
           "schema_version": 2,
           "source_revision": "[immutable artifact]",
-          "observed_at": "2026-09-07T12:23:21.492Z",
+          "observed_at": "2026-09-08T02:06:19.209Z",
           "primary_destination": null,
           "ready_frontier": [],
           "progress": {
@@ -12762,7 +12791,7 @@
         "projection": {
           "schema_version": 2,
           "source_revision": "[immutable artifact]",
-          "observed_at": "2026-09-07T12:23:21.492Z",
+          "observed_at": "2026-09-08T02:06:19.209Z",
           "primary_destination": "outcome-phase-2",
           "ready_frontier": [
             "outcome-stage-account-access-hosted-identity-preview",
@@ -12793,7 +12822,7 @@
   },
   "snapshot": {
     "boundary": "deployment_snapshot",
-    "capturedAt": "2026-09-07T12:23:21.492Z",
+    "capturedAt": "2026-09-08T02:06:19.209Z",
     "source": "sanitized_public_projection",
     "liveSessionRelay": false,
     "refreshBehavior": "new_deployment_required"

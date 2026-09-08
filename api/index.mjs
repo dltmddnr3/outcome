@@ -204,8 +204,10 @@ export function createStableHostRequestHandler({ environment = process.env, runt
     const hosted = await selectedRuntime()
     if (pathname.startsWith('/api/private/chat/')) {
       if (!hosted || typeof selectedChatRuntimeFactory !== 'function') return result(503, { error: 'chat_unavailable' })
+      const token = privateSessionToken(headers)
+      if (!token) return result(401, { error: 'authentication_required' })
       try {
-        const authority = await hosted.service.resolveBridgeAuthority({ token: privateSessionToken(headers) })
+        const authority = await hosted.service.resolveBridgeAuthority({ token })
         if (!authority || !Array.isArray(authority.project_ids) || !authority.project_ids.includes('outcome')) return result(403, { error: 'project_access_denied' })
         chatRuntimePromise ??= Promise.resolve().then(() => selectedChatRuntimeFactory({ accountRuntime: hosted, allowedOrigin: configuredOrigin })).catch(() => null)
         const chat = await chatRuntimePromise

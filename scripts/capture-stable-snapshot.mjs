@@ -1,5 +1,6 @@
 import { mkdirSync, readFileSync, writeFileSync } from 'node:fs'
 import { createHash } from 'node:crypto'
+import { execFileSync } from 'node:child_process'
 import { dirname, resolve } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { buildPackageModel, collectOutcomePackages, loadBindingRegistry, parseOutcomeMap, projectPublicPackages } from '../server/outcome-package.mjs'
@@ -27,7 +28,7 @@ export function refreshSourceBindings(sourceProject, canonicalProject) {
   return { ...sourceProject, errors, bindings: structuredClone(canonicalProject.bindings), now: structuredClone(canonicalProject.now), ...(clearedOnlySessionConflict ? { status: 'valid', conflict: false } : {}) }
 }
 
-export function applyCurrentOutcomeSource({ currentProjection, sourceRoot, capturedAt, bindingRegistry, observationReceipt }) {
+export function applyCurrentOutcomeSource({ currentProjection, sourceRoot, capturedAt, bindingRegistry, observationReceipt, historicalProjection = currentProjection }) {
   if (typeof sourceRoot !== 'string' || !sourceRoot.startsWith('/')) throw new Error('current_source_root_required')
   const canonicalRoot = resolve(sourceRoot)
   const mapPath = resolve(canonicalRoot, 'docs/OUTCOME_MAP.md')
@@ -48,11 +49,15 @@ export function applyCurrentOutcomeSource({ currentProjection, sourceRoot, captu
     now: new Date(capturedAt),
   })
   if (!Array.isArray(currentProjection?.projects) || currentProjection.projects.filter((project) => project?.project?.id === 'outcome').length !== 1) throw new Error('current_source_project_ambiguous')
-  const sourceProject = refreshSourceBindings(structuredClone(currentProjection.projects.find((project) => project?.project?.id === 'outcome')), canonicalProject)
+  const historical = historicalProjection?.projects?.filter(project => project?.project?.id === 'outcome')
+  if (!Array.isArray(historical) || historical.length !== 1) throw new Error('current_source_history_ambiguous')
+  const sourceProject = refreshSourceBindings(structuredClone(historical[0]), canonicalProject)
   const canonicalMilestones = canonicalProject.phases.filter((phase) => phase.id === 'outcome-phase-5').flatMap((phase) => phase.scopes).filter((scope) => scope.id === 'outcome-phase-5-composition').flatMap((scope) => scope.stages).filter((stage) => ['outcome-milestone-model-v2-pilot', 'outcome-milestone-model-v2-local-default-projection'].includes(stage.id))
   const targetScopes = sourceProject.phases.filter((phase) => phase.id === 'outcome-phase-5').flatMap((phase) => phase.scopes).filter((scope) => scope.id === 'outcome-phase-5-composition')
   if (canonicalMilestones.length !== 2 || targetScopes.length !== 1) throw new Error('current_source_primary_ambiguous')
-  targetScopes[0].stages = canonicalMilestones.map((stage) => ({ ...stage, gate: { ...stage.gate, gates: stage.gate.gates.map((gate) => ({ ...gate, title: `${gate.id} · canonical Gate evidence` })) } }))
+  const historicalPilot = targetScopes[0].stages.find(stage => stage.id === 'outcome-milestone-model-v2-pilot')
+  if (!historicalPilot) throw new Error('current_source_history_ambiguous')
+  targetScopes[0].stages = canonicalMilestones.map((stage) => stage.id === historicalPilot.id ? historicalPilot : ({ ...stage, gate: { ...stage.gate, gates: stage.gate.gates.map((gate) => ({ ...gate, title: `${gate.id} · canonical Gate evidence` })) } }))
   const tracking = JSON.parse(readFileSync(trackingPath, 'utf8'))
   const updated = mapText.match(/^Updated:\s*(.+)$/m)?.[1]?.trim()
   const corrected = projectOutcomeCurrentSource(sourceProject, tracking, { observedAtCutoff: capturedAt }, entry.work_tracking_source_refs, {
@@ -103,7 +108,10 @@ export function captureStableSnapshot() {
   const bindingRegistry = loadBindingRegistry()
   const collected = collectOutcomePackages({ bindingRegistry, now: new Date(capturedAt) })
   const observationReceipt = JSON.parse(readFileSync(resolve(root, 'config/outcome-source-observation.json'), 'utf8'))
-  const currentProjection = projectPublicPackages(applyCurrentOutcomeSource({ currentProjection: collected, sourceRoot: process.env.OUTCOME_CURRENT_SOURCE_ROOT, capturedAt, bindingRegistry, observationReceipt }))
+  // The committed snapshot is immutable history. A local recapture or checkout
+  // must not re-date historical Gate observations using filesystem mtimes.
+  const historicalProjection = JSON.parse(execFileSync('git', ['show', 'HEAD:snapshot/outcome-package-source.json'], { cwd: root, encoding: 'utf8', maxBuffer: 2 * 1024 * 1024 }))
+  const currentProjection = projectPublicPackages(applyCurrentOutcomeSource({ currentProjection: collected, sourceRoot: process.env.OUTCOME_CURRENT_SOURCE_ROOT, capturedAt, bindingRegistry, observationReceipt, historicalProjection }))
   const snapshot = buildStableSnapshot({ currentProjection, priorSnapshot: readPriorSnapshot(), capturedAt })
   mkdirSync(dirname(output), { recursive: true })
   writeFileSync(output, `${JSON.stringify(snapshot, null, 2)}\n`, 'utf8')

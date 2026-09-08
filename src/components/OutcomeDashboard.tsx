@@ -120,7 +120,8 @@ function ResultSourceContext({ source, hierarchy }: { source: ResultSourceProjec
       <dl className="oc-result-work"><div><dt>현재 primary · Phase 5</dt><dd>{`${source.primary.acceptance.closed}/${source.primary.acceptance.total}`}</dd></div><div><dt>{source.compatibility.label} · Phase 3</dt><dd>{`${source.compatibility.closed}/${source.compatibility.total}`}</dd></div><div><dt>{historical.label} · Phase 2</dt><dd>{`${historical.closed}/${historical.total}`}</dd></div></dl>
       {conflict && <p className="oc-result-message" role="status">원본 충돌 · <span>{`Map · ${conflict.map_value}`}</span> · <span>{`Gate · ${conflict.gate_value}`}</span></p>}
       {differs && <p className="oc-result-message" role="status">{`Phase 3 집계 차이 · Map 문서 기록 ${source.compatibility.closed}/${source.compatibility.total} · 현재 후보의 연결 Gate 집계 ${current.closed}/${current.total}. 문서 기록을 현재 후보의 검증 완료율로 사용하지 않습니다.`}</p>}
-      <dl className="oc-result-delta"><div><dt>캡처 시각</dt><dd>{source.captured_at}</dd></div><div><dt>원본 갱신</dt><dd>{source.source_updated_at}</dd></div><div><dt>근거 관측</dt><dd>{source.evidence_observed_at}</dd></div></dl>
+      <dl className="oc-result-delta"><div><dt>캡처 시각</dt><dd>{source.captured_at}</dd></div><div><dt>원본 갱신</dt><dd>{source.source_updated_at}</dd></div><div><dt>근거 원본 확인</dt><dd>{source.evidence_observed_at}</dd></div></dl>
+      <p>근거 원본 확인 시각은 문서 내용을 확인한 시각이며, 테스트 재통과나 작업 완료 시각이 아닙니다.</p>
       <p><span>{`completionAuthority=${String(source.completion_authority)}`}</span> · 이 원본 맥락은 프로젝트 완료나 Cherry 수용을 승인하지 않습니다.</p>
     </div>
   </section>

@@ -103,6 +103,17 @@ test('production chat ingress reads streamed UTF-8 bodies and caps bytes before 
   assert.equal(await rawBridgeBody(request, '/api/private/chat/unknown'), undefined)
 })
 
+test('anonymous chat requires authentication without resolving authority or constructing database runtime', async () => {
+  let authorityCalls = 0, databaseCalls = 0
+  const handler = createStableHostRequestHandler({ environment: identityEnvironment,
+    runtimeFactory: async () => ({ allowedOrigin: 'https://preview.invalid', publishableKey: 'pk_test_boundary', service: { readWorkspace() {}, authenticate() {}, resolveBridgeAuthority: async () => { authorityCalls++; throw new Error('unexpected') } } }),
+    chatRuntimeFactory: async () => { databaseCalls++; throw new Error('unexpected') },
+  })
+  for (const [method, pathname] of [['GET', '/api/private/chat/timeline'], ['POST', '/api/private/chat/messages']]) assert.deepEqual(await handler({ method, pathname }), { status: 401, body: { error: 'authentication_required' } })
+  assert.equal(authorityCalls, 0)
+  assert.equal(databaseCalls, 0)
+})
+
 test('chat route contains hostile thrown values without reading status or exposing details', async () => {
   let reads = 0
   const hostile = Object.defineProperty({}, 'status', { get() { reads++; throw new Error('private failure') } })
@@ -112,7 +123,7 @@ test('chat route contains hostile thrown values without reading status or exposi
       runtimeFactory: async () => ({ allowedOrigin: 'https://preview.invalid', publishableKey: 'pk_test_boundary', service: { readWorkspace() {}, authenticate() {}, resolveBridgeAuthority: async () => { throw failure } } }),
       chatRuntimeFactory: async () => { throw new Error('must not construct') },
     })
-    assert.deepEqual(await handler({ method: 'GET', pathname: '/api/private/chat/timeline' }), { status: 503, body: { error: 'chat_unavailable' } })
+    assert.deepEqual(await handler({ method: 'GET', pathname: '/api/private/chat/timeline', headers: { authorization: 'Bearer synthetic-test-token' } }), { status: 503, body: { error: 'chat_unavailable' } })
   }
   assert.equal(reads, 0)
 })
@@ -124,7 +135,7 @@ test('chat POST accepts exact trusted Preview origin but rejects lookalikes and 
   const handler=createStableHostRequestHandler({environment:{...identityEnvironment,VERCEL_ENV:mode,VERCEL_URL:'outcome-test.vercel.app'},
    runtimeFactory:async()=>({allowedOrigin:configured,publishableKey:'pk_test_boundary',service:{readWorkspace(){},authenticate(){},resolveBridgeAuthority:async()=>({account_ref:'account-test',workspace_id:'workspace-test',project_ids:['outcome']})}}),
    chatRuntimeFactory:async()=>({allowedOrigin:configured,csrfSecret:csrf,sendEnabled:true,rateLimit:()=>({allowed:true}),createService:()=>({submitPlannerMessage:async()=>{calls++;return {accepted:true,sequence:1,event_id:'event-0000000000000001',dispatch_state:'not_invoked',delivery:'delivery_unknown',execution_started:false,result_attached:false,evidence_attached:false}}})})});
-  const r=await handler({method:'POST',pathname:'/api/private/chat/messages',headers:{origin:requestOrigin,'content-type':'application/json','x-outcome-csrf':csrf,'idempotency-key':'message-0000000000000001'},body:JSON.stringify({project_id:'outcome',message:'hello'})});
+  const r=await handler({method:'POST',pathname:'/api/private/chat/messages',headers:{authorization:'Bearer synthetic-test-token',origin:requestOrigin,'content-type':'application/json','x-outcome-csrf':csrf,'idempotency-key':'message-0000000000000001'},body:JSON.stringify({project_id:'outcome',message:'hello'})});
   assert.equal(r.status,status);assert.equal(calls,status===202?1:0);
  }
 })
