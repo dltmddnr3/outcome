@@ -2,7 +2,7 @@ import { useEffect, useRef, useState } from 'react'
 import { fetchPrivateDecisionHistory, privateDecisionRecordingAvailable, recordPrivateDecision, type PrivateDecisionReason, type PrivateDecisionReceipt } from '../lib/api'
 
 const reasons: Array<[PrivateDecisionReason,string]> = [['evidence_insufficient','근거 보완 필요'],['scope_not_authorized','승인 범위 밖'],['superseded_by_newer_observation','새 관측으로 대체'],['defer_pending_external_input','외부 입력 대기']]
-export function DecisionControls({projectId,eventId,sequence}: {projectId:string;eventId:string;sequence:number}) {
+export function DecisionControls({projectId,eventId,sequence,onRecorded}: {projectId:string;eventId:string;sequence:number;onRecorded?:()=>void}) {
   const [choice,setChoice]=useState<'approved'|'rejected'|null>(null)
   const [reason,setReason]=useState<PrivateDecisionReason>('evidence_insufficient')
   const [receipt,setReceipt]=useState<PrivateDecisionReceipt|null>(null)
@@ -34,7 +34,7 @@ export function DecisionControls({projectId,eventId,sequence}: {projectId:string
     try {
       const result=await recordPrivateDecision({projectId,eventId,sequence,decision:choice,rejectionReason:choice==='rejected'?reason:null})
       if(result.decisionState!=='recorded'||result.completionAuthority!==false||result.decision!==choice||!result.decisionId)throw Error('invalid_receipt')
-      setReceipt(result);setChoice(null)
+      setReceipt(result);setChoice(null);onRecorded?.()
     } catch {setFailure(true);setChoice(null)}
     finally {busy.current=false;setPending(false)}
   }

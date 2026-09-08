@@ -4,6 +4,7 @@ import { fetchOutcomeDashboard, type PrivateModelV2Event, type PrivateModelV2Pro
 import { CurrentProjection } from './CurrentProjection'
 import { DestinationStudio } from './DestinationStudio'
 import { DecisionControls } from './DecisionControls'
+import { DecisionHistory } from './DecisionHistory'
 import { PlannerConversation, type RoleChatFilter, type RoleChatFixtureState } from './PlannerConversation'
 import { activityLabelKo, axisLabelKo, freshnessLabelKo, gatePresentation, groupPresentation, phasePresentation, projectOutcomePresentation, roleLabel, scopePresentation, sourceLabelKo, sourceStateLabelKo, stagePresentation, stateLabelKo } from './outcomeKorean'
 
@@ -149,13 +150,15 @@ export function approvalInboxProjection(projection: PrivateModelV2Projection | u
 }
 export function ApprovalInbox({ projection, active = false, className = 'oc-approval-rail' }: { projection?: PrivateModelV2Projection; active?: boolean; className?: string }) {
   const items = approvalInboxProjection(projection)
+  const [historyVersion,setHistoryVersion]=useState(0)
   return <aside className={className} data-workspace-panel="승인" data-workspace-active={active ? 'true' : 'false'} data-completion-authority="false" aria-labelledby="oc-approval-title">
     <header><span>Model v2 · 읽기 전용</span><h2 id="oc-approval-title">승인</h2><strong>승인 권한 위임 없음</strong></header>
     {items.length === 0 ? <p className="oc-approval-empty" role="status">Cherry의 명시적 행동 또는 확인 가능한 차단 근거가 없습니다.</p> : <ol className="oc-approval-list">{items.map((item, index) => { const reasonId = `oc-approval-reason-${index}`; return <li className="oc-approval-item" key={`${item.kind}-${index}`} data-approval-kind={item.kind}>
       <div className="oc-approval-request"><small>{item.requestClass}</small><h3>{item.request}</h3></div>
       <dl><div><dt>요청</dt><dd>{item.request}</dd></div><div><dt>요청자 → 권한</dt><dd>{item.requester} → {item.authorityTarget}</dd></div><div><dt>차단 대상</dt><dd>{item.blockedTarget}</dd></div><div><dt>공개 pin</dt><dd>{item.publicPin}</dd></div><div><dt>공개 근거</dt><dd>{item.evidence}</dd></div><div><dt>만료</dt><dd>{item.expiry}</dd></div><div><dt>신선도</dt><dd>{item.freshness}</dd></div><div><dt>계보 / 교체</dt><dd>{item.lineage}</dd></div><div><dt>불변 이력</dt><dd>{item.immutableHistory}</dd></div></dl>
-      {item.kind === 'evidence_blocker' && projection ? (() => { const event = projection.events.find(event => `${event.id} · sequence ${event.sequence}` === item.immutableHistory); return event ? <DecisionControls key={`${projection.project.id}:${event.id}:${event.sequence}:${event.observedAt}`} projectId={projection.project.id} eventId={event.id} sequence={event.sequence} /> : null })() : <p className="oc-approval-reason" id={reasonId}>고정된 대상 식별자가 없어 결정을 기록할 수 없습니다.</p>}
+      {item.kind === 'evidence_blocker' && projection ? (() => { const event = projection.events.find(event => `${event.id} · sequence ${event.sequence}` === item.immutableHistory); return event ? <DecisionControls key={`${projection.project.id}:${event.id}:${event.sequence}:${event.observedAt}`} projectId={projection.project.id} eventId={event.id} sequence={event.sequence} onRecorded={()=>setHistoryVersion(value=>value+1)} /> : null })() : <p className="oc-approval-reason" id={reasonId}>고정된 대상 식별자가 없어 결정을 기록할 수 없습니다.</p>}
     </li> })}</ol>}
+    {projection&&<DecisionHistory key={projection.project.id} projectId={projection.project.id} version={historyVersion} />}
   </aside>
 }
 

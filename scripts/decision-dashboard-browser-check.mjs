@@ -11,7 +11,7 @@ try{for(const width of [390,1440]){
  const dashboard=JSON.parse(readFileSync('snapshot/outcome-package-source.json','utf8'))
  dashboard.build={repository:'synthetic/outcome',ref:'test',commit:null,tree:null,asset:null,runtimeNowPinned:false}
  const modelV2=createAccountModelV2Projection({project:{id:'outcome',name:'OUTCOME',outcome:'safe result'},blocked:true,events:[{id:'event-blocked',sequence:1,role:'planner',type:'result_observed',summary:'승인 기록 브라우저 검증',observedAt:'2026-09-08T00:00:00.000Z',status:'safe_hold'}]},{observedAt:'2026-09-08T00:00:00.000Z'})
- const projects=dashboard.projects.map(project=>({...project,modelV2:project.project.id==='outcome'?modelV2:createAccountModelV2Projection(project,{observedAt:'2026-09-08T00:00:00.000Z'})}))
+ let projects=dashboard.projects.map(project=>({...project,modelV2:project.project.id==='outcome'?modelV2:createAccountModelV2Projection(project,{observedAt:'2026-09-08T00:00:00.000Z'})}))
  const store=createInMemoryDecisionRecordStore()
  const runtime={allowedOrigin:'pending',csrfSecret:'synthetic-csrf-token',service:createDecisionRecordService({store})}
  const identity={authenticate:async(token)=>{assert.equal(token,'valid');return {subject:'owner'}},readWorkspace:async()=>({viewState:'ready',workspace:{id:'workspace'},projects,dashboard,completionAuthority:false})}
@@ -40,6 +40,14 @@ try{for(const width of [390,1440]){
   if(width<1100)await page.locator('.oc-workspace-tabs').getByRole('button',{name:'승인',exact:true}).click()
   await page.getByText('결정 기록됨 · 실행·완료·배포 승인이 아닙니다.',{exact:true}).waitFor()
   assert.equal(store.snapshot().decisions.length,1);assert.deepEqual(errors,[])
+  const history=page.getByRole('region',{name:'결정 기록 이력'})
+  await history.getByText('event-blocked · sequence 1',{exact:true}).waitFor()
+  projects=projects.map(project=>project.project.id==='outcome'?{...project,modelV2:createAccountModelV2Projection({project:{id:'outcome',name:'OUTCOME',outcome:'safe result'},events:[]},{observedAt:'2026-09-08T00:01:00.000Z'})}:project)
+  await page.reload()
+  if(width<1100)await page.locator('.oc-workspace-tabs').getByRole('button',{name:'승인',exact:true}).click()
+  await history.getByText('event-blocked · sequence 1',{exact:true}).waitFor()
+  assert.equal(await page.getByRole('button',{name:'승인 기록',exact:true}).count(),0)
+  assert.equal(store.snapshot().decisions.length,1)
   console.log(`PASS built dashboard ${width}: review AX, zero-before-confirm, one record, reload`)
  }finally{await page.close();server.close();await once(server,'close')}
 }}finally{await browser.close()}
