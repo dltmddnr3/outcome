@@ -7,6 +7,20 @@ Capacity assumption: Codex Pro 20x + Claude Max 20x, with quota treated as burst
 Acceptance authority: Cherry
 Fixed allocation: `docs/MVP_14_DAY_RESOURCE_MODEL_ALLOCATION.md`
 
+## Current operating amendment — 2026-09-08
+
+Cherry's later single-session instruction supersedes the operating topology and model allocation in the historical plan below. This amendment changes HOW the existing Phase 1–5 scope is delivered, not its deadline, acceptance outcomes or external authority.
+
+- One existing Codex session owns planning → isolated implementation → QA verification → Release verification. No new role session, Observer chat or automatic schedule is created. The Planner remains Cherry's single communication channel.
+- Codex preference is Astra low; Claude is used only for design with Opus high while Fable is unavailable. These are requested settings, not a claim that the running model or provider quota has been verified.
+- QA and Release checks in that session are recorded as `same-session verification`. Historical independent receipts are not transferred to new candidates. Any existing Predicate that explicitly requires independent evidence remains unmet unless Cherry separately amends or satisfies it.
+- New project composition uses one result-owned execution session and stages, not automatic four-role creation. Existing bindings and role-separated receipts remain compatibility history. This does not authorize creation of an actual session or project without its required confirmation/boundary.
+- The Observer and continuation controller are product code, not an additional agent or a target number of occupied sessions. The authoritative work/stage/freshness/continuation rules are in `PHASE4_SESSION_WORKSPACE_CONTRACT.md`, “Single-session Observer amendment”. Supported live-source integration and real interruption/recovery use remain required; synthetic tests or a listening process do not prove 24-hour operation.
+- Sections 3–6 below retain the original multi-role pipeline, percentages and day-by-day delivery baseline for comparison. They must not trigger obsolete role dispatches, Fable work, quota allocations or independent-verification claims. Unchanged safety, scope, source freeze, real desktop/mobile checks and Cherry final acceptance requirements still apply.
+- GitHub/unique non-Production Preview work stays within existing bounded approval. Specific migration, credential or provider restrictions are not overridden by this plan. Production, stable/custom domain, paid changes and external release remain excluded.
+
+Current progress is derived from the existing Gate evidence, not from this amendment. The change does not close any Phase or set Destination coverage to `contract_ready`.
+
 ## 1. Outcome and finish line
 
 The 14-day objective is not “many tasks completed.” It is:

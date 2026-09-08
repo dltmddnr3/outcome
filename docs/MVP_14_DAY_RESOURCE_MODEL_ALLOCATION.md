@@ -6,6 +6,23 @@ Applies to: Phase 1-5 compressed MVP execution in `docs/MVP_14_DAY_EXECUTION_PLA
 
 This allocation is a routing and throttling contract, not a token guarantee or progress metric. Provider reset-window percentages are ceilings to protect the critical path and reserves. Only immutable Gate evidence changes canonical progress.
 
+## Current allocation override — 2026-09-08
+
+Cherry's later instructions and the current operating amendment in `MVP_14_DAY_EXECUTION_PLAN.md` supersede the historical role/model tables below for this MVP run.
+
+| Current work | Requested model / effort | Execution boundary |
+| --- | --- | --- |
+| Planning, isolated implementation, QA verification and Release verification | Codex Astra low | One existing session, sequential stages; label checks `same-session verification` |
+| Design only, when a design change is needed | Claude Opus high | Design artifact only; no Fable work while unavailable and no Claude implementation/QA/deployment dispatch |
+
+- Do not allocate work to obsolete Builder/QA/Audit sessions or fill four active slots. No Observer conversation or automatic schedule is part of this allocation.
+- Do not report the requested model, actual effort or available quota as verified without observing those settings. No new numerical provider budget is inferred here.
+- Historical percentage allocations in sections 2–5 are retained only as the previous-method comparison baseline, not active per-role spending instructions. Preserve quota headroom and stop at a safe checkpoint when actual limits require it; never hide failures or skip required verification to fit a budget.
+- Model or topology changes do not grant provider/database/credential authority, waive explicit independent-evidence Predicates, or replace Cherry's actual-use acceptance. Preserve one canonical implementation target and isolated task-owned changes.
+- The anti-loop rule and existing bounded GitHub/Preview permissions remain in force. References below to the “exact Builder” describe the historical topology; the current session performs that stage under its approved single-session boundary, not under a newly created role identity.
+
+The original allocation below is preserved as historical context; it must not restart Fable or role-separated dispatches. The current Observer contract is `PHASE4_SESSION_WORKSPACE_CONTRACT.md`, “Single-session Observer amendment”.
+
 ## 1. Fixed authority boundary
 
 - Codex retains official Planner, Builder, UX & Product QA and Release Audit authority in their exact registered OUTCOME role sessions.
