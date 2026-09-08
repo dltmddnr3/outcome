@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict'
 import { EventEmitter } from 'node:events'
-import { chmodSync, mkdtempSync } from 'node:fs'
+import { chmodSync, mkdtempSync, readFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import test from 'node:test'
@@ -9,6 +9,45 @@ import { plannerRequestEnvelope } from './outcome-chat-result-source.mjs'
 import { createEmptyRegistry, mutateRegistry } from './outcome-session-registry-persistence.mjs'
 
 const now = '2026-09-03T01:00:00.000Z'
+
+test('live ownership and metadata refresh binding proof without rewriting registry', async () => {
+  const path = registry(), before = readFileSync(path), cwd = '/synthetic/project'; let probes = 0
+  const adapter = createCodexQueueAdapter({ enabled: true, registryPath: path, now: () => '2026-09-04T01:00:00.000Z', expectedCwd: cwd,
+    ownerProbe: async () => { probes++; return true }, readThread: async (id, options) => {
+      assert.deepEqual(options, { includeTurns: false }); return JSON.stringify({ thread: { id, cwd, status: { type: 'notLoaded' } } })
+    },
+  })
+  const binding = await adapter.bindingResolver({ project_id: 'outcome', role: 'planner' })
+  assert.equal(binding.freshness, 'fresh'); assert.equal(probes, 2)
+  assert.equal(Object.hasOwn(binding, 'execution_started'), false)
+  assert.deepEqual(readFileSync(path), before)
+})
+
+test('live proof fails on missing owner, metadata mismatch or binding drift', async () => {
+  for (const mode of ['owner', 'cwd', 'id', 'drift', 'late-owner']) {
+    const path = registry(); let calls = 0, probes = 0
+    const adapter = createCodexQueueAdapter({ enabled: true, registryPath: path, now: () => now, expectedCwd: '/synthetic/project',
+      spawnProcess: () => { calls++ }, ownerProbe: async () => { probes++; return mode !== 'owner' && !(mode === 'late-owner' && probes === 2) },
+      readThread: async id => {
+        if (mode === 'drift') mutateRegistry(path, { action: 'observe', projectId: 'outcome', role: 'planner', expectedVersion: 1, actorClass: 'observer', reasonClass: 'test_stale', occurredAt: now, observedAt: now, status: 'stale' })
+        return JSON.stringify({ thread: { id: mode === 'id' ? 'other' : id, cwd: mode === 'cwd' ? '/other' : '/synthetic/project' } })
+      },
+    })
+    await assert.rejects(adapter.bindingResolver({ project_id: 'outcome', role: 'planner' }), /binding_unavailable/)
+    assert.equal(calls, 0)
+  }
+})
+
+test('loss of live owner after resolution prevents the queue invocation', async () => {
+  let available = true, calls = 0
+  const adapter = createCodexQueueAdapter({ enabled: true, registryPath: registry(), now: () => now, expectedCwd: '/synthetic/project',
+    ownerProbe: async () => available, readThread: async id => JSON.stringify({ thread: { id, cwd: '/synthetic/project' } }),
+    spawnProcess: () => { calls++ },
+  })
+  const binding = await adapter.bindingResolver({ project_id: 'outcome', role: 'planner' }); available = false
+  assert.deepEqual(await adapter.transport({ destination: binding.destination, message: 'ordinary', correlation_id: 'message-0123456789abcdef' }), { delivery: 'delivery_unknown' })
+  assert.equal(calls, 0)
+})
 function registry() {
   const path = join(mkdtempSync(join(tmpdir(), 'chat-queue-')), 'bindings.json')
   createEmptyRegistry(path, ['outcome']); chmodSync(path, 0o600)

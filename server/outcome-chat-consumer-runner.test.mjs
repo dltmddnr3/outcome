@@ -68,6 +68,18 @@ test('valid idle acknowledged and ambiguous outcomes are fixed finite terminals'
   for (const [outcome,code,text] of [['idle',0,'OUTCOME_CHAT_CONSUMER_IDLE\n'],['acknowledged',0,'OUTCOME_CHAT_CONSUMER_ACKNOWLEDGED\n'],['delivery_unknown',2,'OUTCOME_CHAT_CONSUMER_DELIVERY_UNKNOWN\n']]) { const {result,calls}=await execute(outcome); assert.equal(result,code); assert.deepEqual(calls.write,[text]); assert.equal(calls.run,1); assert.equal(calls.end,1) }
 })
 
+test('canonical registry runner wires live owner proof to exact project root', async () => {
+  let observed
+  const { result } = await execute('idle', {
+    environment: environment({ [OUTCOME_CHAT_CONSUMER_ENV.registryPath]: '/synthetic/outcome/.outcome-runtime/bindings.json' }),
+    pathStat: () => ({ isFile: () => true, mode: 0o600 }),
+    queueAdapterFactory: options => { observed = options; return {} },
+  })
+  assert.equal(result, 0)
+  assert.equal(typeof observed.ownerProbe, 'function')
+  assert.equal(observed.expectedCwd, '/synthetic/outcome')
+})
+
 test('rejected and failed outcomes preserve truth with deterministic exit codes', async () => {
   for (const [outcome,code] of [['rejected',3],['failed',4]]) { const {result,calls}=await execute(outcome); assert.equal(result,code); assert.equal(calls.run,1); assert.equal(calls.end,1) }
 })

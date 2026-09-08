@@ -1,5 +1,6 @@
 import { lstatSync } from 'node:fs'
-import { isAbsolute } from 'node:path'
+import { isAbsolute, basename, dirname, join } from 'node:path'
+import { homedir } from 'node:os'
 import { pathToFileURL } from 'node:url'
 import { types } from 'node:util'
 import { createCodexQueueAdapter } from './outcome-chat-codex-queue.mjs'
@@ -7,6 +8,7 @@ import { createOutcomeChatPostgresRepository, createOutcomeChatTransactionPort }
 import { createOutcomeChatConsumerRuntime } from './outcome-chat-runtime.mjs'
 import { readOutcomeChatPoolerUrl } from './outcome-chat-database-url.mjs'
 import { createPlannerResponseConsumer } from './outcome-chat-response-consumer.mjs'
+import { createPlannerOwnerProbe } from './outcome-chat-owner-probe.mjs'
 
 export const OUTCOME_CHAT_CONSUMER_ENV = Object.freeze({
   enabled: 'OUTCOME_CHAT_CONSUMER_ENABLED',
@@ -94,7 +96,10 @@ export async function runOutcomeChatConsumerOnce({
     connectionUrl.search = ''
     pool = new driver.Pool({ connectionString: connectionUrl.toString(), ssl: { ca: configuration.databaseCaPem, rejectUnauthorized: true }, max: 1, allowExitOnIdle: true, connectionTimeoutMillis: configuration.timeoutMs })
     const repository = repositoryFactory({ transact: transactionFactory({ pool }) })
-    const queueAdapter = queueAdapterFactory({ enabled: true, registryPath: configuration.registryPath, timeoutMs: configuration.timeoutMs, codexExecutable:configuration.executable })
+    const canonicalRegistry = basename(configuration.registryPath) === 'bindings.json' && basename(dirname(configuration.registryPath)) === '.outcome-runtime'
+    const ownerProbe = canonicalRegistry ? createPlannerOwnerProbe({ socketPath: join(homedir(), '.codex', 'ipc', 'ipc.sock') }) : null
+    const queueAdapter = queueAdapterFactory({ enabled: true, registryPath: configuration.registryPath, timeoutMs: configuration.timeoutMs, codexExecutable:configuration.executable,
+      ownerProbe, expectedCwd: canonicalRegistry ? dirname(dirname(configuration.registryPath)) : null })
     const runtime = collectResponses
       ? responseRuntimeFactory({repository,queueAdapter,diagnostic,scope:{workspace_id:configuration.workspaceId,project_id:'outcome',binding_version:configuration.bindingVersion}})
       : runtimeFactory({ consumerEnabled: true, repository, queueAdapter, consumerId: configuration.consumerId, leaseMs: configuration.leaseMs })
