@@ -1,6 +1,6 @@
 import {expect,it} from 'vitest'
 import {discoveryContextDigest,validateDiscoveryQuestionReceipt,type DiscoveryContext} from './destination-question-receipt'
-const context:DiscoveryContext={source:'운영 상태를 쉽게 확인하고 싶습니다.',answers:[],askedQuestionIds:[],revision:1}
+const context:DiscoveryContext={source:'운영 상태를 쉽게 확인하고 싶습니다.',mode:'guided_200q',seedAnswers:{},unknowns:['검증 필요'],answers:[],askedQuestionIds:[],revision:1}
 const question={id:'q-1',gapId:'ownership',domain:'system_boundary',prompt:'누가 결과를 확인하나요?',choices:['소유자','내부 팀'],recommendation:'소유자',reason:'첫 사용자의 범위를 고정합니다.',material:true}
 const receipt=async()=>JSON.stringify({schemaVersion:1,contextDigest:await discoveryContextDigest(context),coverage:[],questions:[question],completionAuthority:false})
 it('routes a current Planner question through bounded planning without claiming evidence verification',async()=>{
@@ -14,4 +14,9 @@ it('rejects late questions after source, revision or issued-question history cha
 it('rejects forged authority, extra fields and malformed question records',async()=>{
  const value=JSON.parse(await receipt())
  for(const modified of [{...value,completionAuthority:true},{...value,execute:true},{...value,questions:[{...question,callback:'execute'}]},{...value,questions:[{...question,recommendation:'outside choices'}]}])await expect(validateDiscoveryQuestionReceipt(context,JSON.stringify(modified))).rejects.toThrow('discovery_receipt_invalid')
+})
+it('binds mode, initial intake answers and unresolved questions as well as follow-up answers',async()=>{
+ const initial={...context,mode:'guided_200q' as const,seedAnswers:{problem:'원래 문제'},unknowns:['검증 필요']}
+ const digest=await discoveryContextDigest(initial)
+ for(const changed of [{...initial,mode:'brief_gap' as const},{...initial,seedAnswers:{problem:'다른 문제'}},{...initial,unknowns:['다른 미상']}])expect(await discoveryContextDigest(changed)).not.toBe(digest)
 })

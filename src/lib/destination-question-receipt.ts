@@ -1,7 +1,8 @@
 import {destinationSourceSha256} from './destination-analysis'
+import {destinationQuestions,type DestinationAnswers,type DestinationMode} from './destination-discovery'
 import {planDestinationQuestions,type DiscoveryCoverage,type DiscoveryQuestion,type DiscoveryAnswer} from './destination-question-plan'
 
-export type DiscoveryContext={source:string;answers:DiscoveryAnswer[];askedQuestionIds:string[];revision:number}
+export type DiscoveryContext={source:string;mode:DestinationMode;seedAnswers:DestinationAnswers;unknowns:string[];answers:DiscoveryAnswer[];askedQuestionIds:string[];revision:number}
 const fail=():never=>{throw Error('discovery_receipt_invalid')}
 const exact=(value:unknown,keys:string[]):Record<string,unknown>=>{
  if(!value||typeof value!=='object'||Array.isArray(value)||Object.keys(value).sort().join(',')!==[...keys].sort().join(','))return fail()
@@ -9,9 +10,13 @@ const exact=(value:unknown,keys:string[]):Record<string,unknown>=>{
 }
 export async function discoveryContextDigest(context:DiscoveryContext) {
  if(typeof context.source!=='string'||!Number.isSafeInteger(context.revision)||context.revision<0||!Array.isArray(context.answers)||!Array.isArray(context.askedQuestionIds))return fail()
+ if(!['guided_200q','brief_gap'].includes(context.mode)||!context.seedAnswers||typeof context.seedAnswers!=='object'||Array.isArray(context.seedAnswers)||!Array.isArray(context.unknowns)||context.unknowns.length>200||context.unknowns.some(v=>typeof v!=='string'||!v.trim()||v.length>2000))return fail()
+ const fields=new Set<string>(destinationQuestions.map(q=>q.id))
+ const seeds=Object.entries(context.seedAnswers)
+ if(seeds.some(([key,value])=>!fields.has(key)||typeof value!=='string'||!value.trim()||new TextEncoder().encode(value).length>16000))return fail()
  planDestinationQuestions({coverage:[],questions:[],answers:context.answers,askedQuestionIds:context.askedQuestionIds})
  const sourceDigest=await destinationSourceSha256(context.source)
- return destinationSourceSha256(JSON.stringify([sourceDigest,context.revision,context.answers.map(a=>[a.questionId,a.gapId,a.value]).sort(([a],[b])=>a.localeCompare(b)),[...context.askedQuestionIds].sort()]))
+ return destinationSourceSha256(JSON.stringify([sourceDigest,context.mode,seeds.sort(([a],[b])=>a.localeCompare(b)),context.unknowns,context.revision,context.answers.map(a=>[a.questionId,a.gapId,a.value]).sort(([a],[b])=>a.localeCompare(b)),[...context.askedQuestionIds].sort()]))
 }
 
 // This validates linkage and shape, never the truth of Planner-provided evidence.
