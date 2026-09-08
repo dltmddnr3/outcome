@@ -38,3 +38,10 @@ test('missing transport and lost claim never invoke external work',async()=>{
  await assert.rejects(()=>run({repository:{...f.repository,claim:async()=>{throw Error('claim unknown')}},dispatch:async()=>{dispatches++}}))
  assert.equal(dispatches,0)
 })
+
+test('acknowledged async analysis retains private collection identity without another dispatch',async()=>{
+ const f=fixture(),readReceipt={bindingVersion:1,message:'synthetic',destination:'private-synthetic'}
+ const result=await run({repository:f.repository,request:{requestId:'synthetic-request'},dispatchToken:'original-token',dispatch:()=>f.dispatch({delivery:'acknowledged',readReceipt})})
+ assert.deepEqual(result.collection,{request:{requestId:'synthetic-request',dispatchToken:'original-token'},readReceipt})
+ assert.equal(result.state,'awaiting_result');assert.equal(f.count(),1)
+})

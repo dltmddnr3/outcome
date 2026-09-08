@@ -8,7 +8,7 @@ export function createDestinationPlannerDispatch({queueAdapter,publishInput}={})
   if(input?.purpose!=='destination_analysis_only'||input.executionAuthority!==false||typeof input.requestId!=='string'||!/^[a-f0-9]{8}(?:-[a-f0-9]{4}){3}-[a-f0-9]{12}$/.test(input.requestId)||typeof input.documentDigest!=='string'||!/^[a-f0-9]{64}$/.test(input.documentDigest)||!Number.isSafeInteger(input.draftRevision)||input.draftRevision<1)return unknown
   try{
    const binding=await queueAdapter.bindingResolver({project_id:'outcome',role:'planner'})
-   if(binding?.project_id!=='outcome'||binding.role!=='planner'||binding.status!=='active'||binding.freshness!=='fresh'||!binding.destination)return unknown
+   if(binding?.project_id!=='outcome'||binding.role!=='planner'||binding.status!=='active'||binding.freshness!=='fresh'||!binding.destination||!Number.isSafeInteger(binding.binding_version)||binding.binding_version<1)return unknown
    const publication=await publishInput(input)
    if(publication?.requestId!==input.requestId||publication.documentDigest!==input.documentDigest||publication.draftRevision!==input.draftRevision||publication.state!=='ready'||typeof publication.reference!=='string'||!/^analysis-[a-f0-9]{64}$/.test(publication.reference))return unknown
    const correlation_id=`message-${createHash('sha256').update(JSON.stringify(['destination-analysis',input.requestId,input.documentDigest])).digest('hex').slice(0,16)}`
@@ -21,7 +21,7 @@ export function createDestinationPlannerDispatch({queueAdapter,publishInput}={})
     '응답은 코드펜스 없는 JSON만 사용하세요: schemaVersion=1, documentDigest와 draftRevision은 위 값, completionAuthority=false, proposals 배열. 각 proposal은 field,value,startLine,endLine,quote만 포함합니다. field는 problem,targetUser,outcome,scope,nonGoals,constraints,acceptance,failureRecovery 중 하나입니다. 인용은 해당 원문 행 전체와 정확히 일치해야 하며 최대8개 제안만 반환하세요. 근거가 없으면 제안을 만들지 마세요.',
    ].join('\n')
    const response=await queueAdapter.transport({destination:binding.destination,message,correlation_id})
-   return response?.delivery==='acknowledged'?{delivery:'acknowledged'}:unknown
+   return response?.delivery==='acknowledged'?{delivery:'acknowledged',readReceipt:{requestId:input.requestId,documentDigest:input.documentDigest,bindingVersion:binding.binding_version,destination:binding.destination,correlation_id,message}}:unknown
   }catch{return unknown}
  }
 }

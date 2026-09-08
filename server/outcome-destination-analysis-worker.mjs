@@ -15,7 +15,9 @@ export async function runDestinationAnalysisOnce({repository,dispatch,request,di
   await repository.finish({...identity,state:'delivery_unknown'})
   return {state:'delivery_unknown',dispatched:true,completionAuthority:false}
  }
- if(response?.delivery==='acknowledged'&&response.result===undefined)return {state:'awaiting_result',dispatched:true,completionAuthority:false}
+ // Private coordinator handoff only: never expose destination/message/token
+ // through the public analysis HTTP projection.
+ if(response?.delivery==='acknowledged'&&response.result===undefined)return {state:'awaiting_result',dispatched:true,completionAuthority:false,...(response.readReceipt?{collection:{request:identity,readReceipt:response.readReceipt}}:{})}
  if(response?.delivery!=='acknowledged') {
   await repository.finish({...identity,state:'delivery_unknown'})
   return {state:'delivery_unknown',dispatched:true,completionAuthority:false}
