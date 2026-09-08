@@ -50,6 +50,11 @@ These are program responsibilities, not new agents, schedules or products. The c
 
 #### Candidate-bound stage receipt check · 2026-09-09
 
+- [x] Existing account authentication gates stored grant reads; revoked session and unauthorized project cannot read grants. Read-only adapter, not approval issuance or live activation.
+  CHECK: node --test server/outcome-work-grant-store.test.mjs
+  EXPECT: fail 0
+  EVIDENCE: 2026-09-09 same-session store/controller suites 15 PASS; diff check PASS. Existing account service, fixture identity provider and SQLite store verify allowed project read, revoked session, wrong project and aborted read. Runtime token supplier and live route remain unconfigured; no live owner login or execution claim.
+
 - [x] Re-read durable approval after asynchronous eligibility work; revocation during evidence verification must produce zero sends.
   CHECK: node --test --test-name-pattern='durable revocation during' server/outcome-work-continuation.test.mjs
   EXPECT: fail 0

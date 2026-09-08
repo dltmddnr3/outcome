@@ -5,6 +5,21 @@ const digest=s=>createHash('sha256').update(s).digest('hex')
 const sha=s=>typeof s==='string'&&/^[a-f0-9]{64}$/.test(s)
 const fail=()=>{throw new Error('execution_grant_unavailable')}
 
+// Trusted local composition: token supplier stays private, never saved in grants.
+// Authentication establishes identity only; an explicit stored grant is required.
+export function createAuthenticatedWorkGrantResolver({accountService,readToken,store}={}){
+  return async(input,{signal}={})=>{
+    try{
+      if(signal?.aborted||typeof readToken!=='function'||typeof accountService?.resolveBridgeAuthority!=='function'||typeof store?.read!=='function')fail()
+      if(typeof input?.scopeJson!=='string'||Buffer.byteLength(input.scopeJson)>2048||!sha(input.authorityRef))fail()
+      const scope=JSON.parse(input.scopeJson)
+      const authority=await accountService.resolveBridgeAuthority({token:await readToken()})
+      if(signal?.aborted||!Array.isArray(authority.project_ids)||!authority.project_ids.includes(scope.projectId)||!sha(authority.account_ref))fail()
+      return store.read(input.authorityRef,authority.account_ref)
+    }catch{fail()}
+  }
+}
+
 // Explicit local storage port. A trusted caller owns a protected connection,
 // authenticates ownerRef and obtains explicit approval before record/revoke.
 // Storage alone is not authorization, dependencies, or execution activation.
