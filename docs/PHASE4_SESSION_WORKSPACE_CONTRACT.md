@@ -50,6 +50,11 @@ These are program responsibilities, not new agents, schedules or products. The c
 
 #### Candidate-bound stage receipt check · 2026-09-09
 
+- [x] V2 grant binds explicit checkout reference, per-stage argv/timeouts and exact relative write paths to approval bytes. V1 remains transport/reservation compatibility only; no automatic conversion to command permission. Contract parsing is not an OS sandbox or executable trust proof.
+  CHECK: node --test server/outcome-work-execution-grant.test.mjs server/outcome-work-grant-store.test.mjs
+  EXPECT: fail 0
+  EVIDENCE: 2026-09-09 same-session grant/store/controller suites 20 PASS, then dedicated V2 persistence/revocation test added. Commands and paths are covered by the immutable authorityRef; changed argv/path/checkout fails against original approval. Traversal/glob/duplicate paths, shell program, invalid timeout and incomplete stage coverage rejected. Program allowlist is syntactic only: node/npm/git can run arbitrary code, so an isolated executor with separately enforced scope/network boundaries is still required. No commands or live grants were issued.
+
 - [x] Receiver entrypoint revalidates authenticated grant, current policy and protected evidence, then consumes the exact reservation once without sending any new message.
   CHECK: node --test server/outcome-work-local-runtime.test.mjs server/outcome-work-continuation.test.mjs
   EXPECT: fail 0

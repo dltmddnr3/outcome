@@ -9,6 +9,16 @@ import {createAuthenticatedWorkGrantResolver} from './outcome-work-grant-store.m
 import {createAccountAccessService,createInMemoryAccountStore} from './account-access.mjs'
 import fixture from '../test/fixtures/account-access.json' with {type:'json'}
 const owner='a'.repeat(64),grant=JSON.stringify({schemaVersion:1,projectId:'outcome',workId:'w',runId:'r',sessionRef:'s',bindingVersion:1,ownerRef:owner,candidateCommit:'b'.repeat(40),candidateTree:'c'.repeat(40),allowedStages:['qa_verifying'],issuedAt:100,expiresAt:300})
+test('v2 execution contract persists unchanged and remains revocable',()=>{
+  const db=new DatabaseSync(':memory:'),store=create(db)
+  try{
+    const raw=JSON.stringify({...JSON.parse(grant),schemaVersion:2,execution:{checkoutRef:'d'.repeat(64),writePaths:[],commands:[{id:'check',stage:'qa_verifying',program:'node',args:['--check','server/index.mjs'],timeoutMs:1000}]}})
+    const {authorityRef}=store.record(raw,owner,150)
+    assert.equal(JSON.parse(store.read(authorityRef,owner)).grantJson,raw)
+    store.revoke(authorityRef,owner,160)
+    assert.equal(store.record(raw,owner,170).status,'revoked')
+  }finally{db.close()}
+})
 test('real account service gates local grant reads and observes revoked sessions',async()=>{
   const db=new DatabaseSync(':memory:'),store=create(db);let revoked=false,reads=0
   const accountService=createAccountAccessService({ownerSubject:'synthetic-owner',now:()=>150,store:createInMemoryAccountStore(fixture),authProvider:{verify:async token=>token==='test-token'?{subject:'synthetic-owner',issuedAt:100,expiresAt:300,revoked}:null}})

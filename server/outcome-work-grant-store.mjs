@@ -45,7 +45,7 @@ export function createWorkGrantStore(db){
     record(grantJson,ownerRef,now){return transaction(()=>{
       if(typeof grantJson!=='string'||Buffer.byteLength(grantJson)>8192||!sha(ownerRef))fail()
       const g=JSON.parse(grantJson),ref=digest(grantJson)
-      const {schemaVersion,allowedStages,issuedAt,expiresAt,...identity}=g??{}
+      const {schemaVersion,allowedStages,issuedAt,expiresAt,execution,...identity}=g??{}
       const expected=JSON.stringify({...identity,ownerRef,authorityRef:ref,action:allowedStages?.[0],status:'active'})
       if(!verifyWorkExecutionGrant(grantJson,expected,now).matches)fail()
       db.prepare('INSERT OR IGNORE INTO outcome_execution_grants VALUES (?,?,?,NULL)').run(ref,grantJson,ownerRef)
