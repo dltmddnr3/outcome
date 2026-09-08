@@ -28,9 +28,11 @@ test('hosted factory composes explicit source readers with restricted confirmati
   }
   // Driver identity is synthetic; all domain queries use real restricted PGlite
   // SQL. This verifies factory composition, not hosted TLS or actual owner use.
-  class Pool{on(){}async connect(){return{query:async(sql,args)=>sql==='select session_user, current_user'?{rows:[{session_user:'outcome_destination_runtime',current_user:'outcome_destination_backend'}]}:f.db.query(sql,args),release(){}}}}
+  let connections=0
+  class Pool{on(){}async connect(){connections++;return{query:async(sql,args)=>sql==='select session_user, current_user'?{rows:[{session_user:'outcome_destination_runtime',current_user:'outcome_destination_backend'}]}:f.db.query(sql,args),release(){}}}}
   const environment={VERCEL_ENV:'preview',VERCEL_URL:'outcome-synthetic-unique.vercel.app',OUTCOME_DESTINATION_DURABLE_ENABLED:'1',OUTCOME_DESTINATION_DATABASE_URL:'postgresql://outcome_destination_runtime.abcdefghijklmnopqrst:synthetic@aws-0-us-east-1.pooler.supabase.com:6543/postgres?sslmode=verify-full',OUTCOME_DESTINATION_DATABASE_CA_PEM:'-----BEGIN CERTIFICATE-----\nQUJD\n-----END CERTIFICATE-----',OUTCOME_DESTINATION_CSRF_SECRET:'synthetic-csrf-destination-123456789',OUTCOME_SUPABASE_URL:'https://abcdefghijklmnopqrst.supabase.co'}
   const host={allowedOrigin:`https://${environment.VERCEL_URL}`,accountRuntime:{service:{resolveBridgeAuthority(){}}}}
+  const originalAssessmentReader=sourceReaders.readAssessment
   const factory=createDestinationHostedRuntimeFactory({environment,sourceReaders,driverLoader:async()=>({Pool})})
   sourceReaders.readAssessment=async()=>{throw Error('changed capability must not be used')}
   const runtime=await factory(host);assert.ok(runtime)
@@ -46,6 +48,17 @@ test('hosted factory composes explicit source readers with restricted confirmati
   const unavailable=await createDestinationHostedRuntimeFactory({environment,driverLoader:async()=>({Pool})})(host)
   await assert.rejects(()=>unavailable.confirmationRepository.review(scope),/destination_unavailable/)
   assert.deepEqual(await unavailable.confirmationRepository.load(scope),saved)
+  assert.equal(await f.count(),1)
+  // Trusted fixture publication is outside the read-only web runtime.
+  await f.db.exec(await readFile(new URL('../supabase/migrations/20260908075808_outcome_destination_verification_evidence.sql',import.meta.url),'utf8'))
+  const assessment=await originalAssessmentReader({...scope,reviewDigest:review.reviewDigest})
+  await f.db.query('insert into outcome_destination_private.verification_evidence values($1,$2,$3,$4,$5)',[scope.workspaceId,scope.accountRef,review.reviewDigest,assessment,JSON.stringify({'synthetic-contract':original})])
+  const priorConnections=connections
+  assert.deepEqual(await unavailable.confirmationRepository.review(scope),review)
+  assert.equal(connections,priorConnections+1)
+  assert.deepEqual(await unavailable.confirmationRepository.confirm(input),saved)
+  await f.db.query('update outcome_destination_private.verification_evidence set sources=$1',[JSON.stringify({'synthetic-contract':'changed source'})])
+  await assert.rejects(()=>unavailable.confirmationRepository.review(scope),/destination_unavailable/)
   assert.equal(await f.count(),1)
  }finally{await f.db.close()}
 })

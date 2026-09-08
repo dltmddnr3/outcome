@@ -41,7 +41,7 @@ export function createDestinationConfirmationRepository({transact,verifyReview}=
   if(checked.plan.state!=='coverage_ready_for_review'||checked.plan.unresolvedDomains.length||checked.plan.batch.length)fail()
   const snapshot={schemaVersion:1,draftId:scope[2],intakeRevision:intake.revision,contextRevision:discovery.revision,contextDigest:discovery.context_digest,document,context,questionReceipt:checked.receipt,responseSourceDigest:row.response_source_digest,completionAuthority:false,executionAuthority:false}
   const serialized=canonical(snapshot),reviewDigest=hash(serialized)
-  const raw=await verifyReview({workspaceId:scope[0],accountRef:scope[1],reviewDigest,serializedSnapshot:serialized})
+  const raw=await verifyReview({workspaceId:scope[0],accountRef:scope[1],reviewDigest,serializedSnapshot:serialized,query})
   if(typeof raw!=='string'||Buffer.byteLength(raw)>2048)fail()
   let proof;try{proof=JSON.parse(raw)}catch{fail()}
   if(!proof||Object.keys(proof).sort().join(',')!=='completionAuthority,evidenceDigest,reviewDigest,verified'||proof.verified!==true||proof.completionAuthority!==false||proof.reviewDigest!==reviewDigest||!digest(proof.evidenceDigest))fail()

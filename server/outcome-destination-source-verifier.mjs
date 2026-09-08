@@ -47,7 +47,7 @@ export function createDestinationSourceVerifier({readAssessment,readSource,timeo
        if(controller.signal.aborted)fail()
        if(!sources.has(evidence.ref)){
         if(sources.size>=64)fail()
-        const content=await readSource({workspaceId,accountRef,ref:evidence.ref,signal:controller.signal})
+        const content=await readSource({workspaceId,accountRef,reviewDigest,ref:evidence.ref,signal:controller.signal})
         if(controller.signal.aborted||typeof content!=='string'||Buffer.byteLength(content)>524288)fail()
         totalBytes+=Buffer.byteLength(content);if(totalBytes>2097152)fail()
         sources.set(evidence.ref,{digest:hash(content),lines:content.split(/\r?\n/)})
