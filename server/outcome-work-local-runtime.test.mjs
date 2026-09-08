@@ -65,7 +65,17 @@ test('integrated local runtime checks account, durable grant, exact terminal rec
       const passes=['valid','queue'].includes(mode)
       assert.equal(result.outcome==='acknowledged',passes,mode)
       assert.equal(sends,passes?1:0,mode)
-      if(passes){assert.equal((await createLocalWorkRuntime(options).runOnce()).outcome,'acknowledged');assert.equal(sends,1)}
+      if(passes){
+        assert.equal((await createLocalWorkRuntime(options).runOnce()).outcome,'acknowledged');assert.equal(sends,1)
+        const reservation=db.prepare('SELECT reservation_digest FROM outcome_work_reservations').get().reservation_digest
+        assert.equal((await createLocalWorkRuntime(options).receiveOnce('f'.repeat(64))).outcome,'configuration_hold')
+        assert.equal((await createLocalWorkRuntime(options).receiveOnce(reservation)).outcome,'claimed')
+        assert.equal((await createLocalWorkRuntime(options).receiveOnce(reservation)).outcome,'already_claimed')
+        grantStore.revoke(authorityRef,ownerRef,time)
+        assert.equal((await createLocalWorkRuntime(options).receiveOnce(reservation)).outcome,'configuration_hold')
+        assert.equal(sends,1)
+        assert.equal(db.prepare('SELECT count(*) AS n FROM outcome_work_execution_claims').get().n,1)
+      }
       assert.equal(result.completionAuthority,false)
     }finally{db.close();rmSync(directory,{recursive:true,force:true})}
   }

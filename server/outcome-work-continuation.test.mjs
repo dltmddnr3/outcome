@@ -75,10 +75,10 @@ test('receiver claim checks atomic durable approval and cannot be reused',()=>{
       if(mode==='unknown')s.journal.recordContinuationResult(scopeJson,reservationDigest,'delivery_unknown',null,time)
       if(mode==='revoked')store.revoke(authorityRef,ownerRef,time)
       if(mode==='missing-grant')s.db.prepare('DELETE FROM outcome_execution_grants').run()
-      const claim=()=>s.journal.claimContinuationExecution(scopeJson,mode==='wrong-sequence'?2:3,reservationDigest,mode==='wrong-owner'?'f'.repeat(64):ownerRef,mode==='expired'?time+1:time)
+      const claim=()=>s.journal.claimContinuationExecution(scopeJson,mode==='wrong-sequence'?2:3,reservationDigest,mode==='wrong-owner'?'f'.repeat(64):ownerRef,mode==='expired'?time+1:time,authorityRef)
       if(mode==='valid'){
         assert.equal(claim().outcome,'claimed')
-        assert.equal(createWorkJournal(s.db).claimContinuationExecution(scopeJson,3,reservationDigest,ownerRef,time).outcome,'already_claimed')
+        assert.equal(createWorkJournal(s.db).claimContinuationExecution(scopeJson,3,reservationDigest,ownerRef,time,authorityRef).outcome,'already_claimed')
         assert.equal(s.db.prepare('SELECT count(*) AS n FROM outcome_work_execution_claims').get().n,1)
         store.revoke(authorityRef,ownerRef,time);assert.throws(claim,/work_journal_unavailable/)
       }else{

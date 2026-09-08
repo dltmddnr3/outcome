@@ -67,9 +67,10 @@ export function createWorkJournal(db) {
     // Caller authenticates current owner and verifies current binding/dependencies/
     // receipt coverage first. Claim is not start evidence or a mutation capability.
     // Grant store MUST share this database; no cross-database fallback is allowed.
-    claimContinuationExecution(scopeJson,expectedSequence,reservationDigest,ownerRef,nowMs){return transact(()=>{
+    claimContinuationExecution(scopeJson,expectedSequence,reservationDigest,ownerRef,nowMs,expectedAuthorityRef){return transact(()=>{
       if(!sha(ownerRef,64)||!Number.isSafeInteger(nowMs)||nowMs<0)fail()
       const bound=normalize(scopeJson,nowMs),current=load(bound,nowMs),last=current.journal.events.at(-1),action=reservation(bound,reservationDigest)
+      if(!sha(expectedAuthorityRef,64)||action[6]!==expectedAuthorityRef)fail()
       const projection=projectSingleSessionWork(JSON.stringify(current.journal),bound.scopeJson,nowMs)
       if(current.sequence!==expectedSequence||last?.activity!=='terminal'||!sha(last.evidenceRef,64)
         ||projection.continuation!=='next_action_recorded'

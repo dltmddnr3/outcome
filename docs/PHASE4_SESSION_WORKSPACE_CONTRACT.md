@@ -50,6 +50,11 @@ These are program responsibilities, not new agents, schedules or products. The c
 
 #### Candidate-bound stage receipt check · 2026-09-09
 
+- [x] Receiver entrypoint revalidates authenticated grant, current policy and protected evidence, then consumes the exact reservation once without sending any new message.
+  CHECK: node --test server/outcome-work-local-runtime.test.mjs server/outcome-work-continuation.test.mjs
+  EXPECT: fail 0
+  EVIDENCE: 2026-09-09 same-session local-runtime/controller suites 15 PASS, diff check PASS. Integration follows send/ack through wrong-reservation rejection, first claim, reconstructed duplicate claim, revoked-grant rejection, one total send and one stored claim. Receiver pins reservation authority to current policy authority. No live receiver activation, start event, stage command or completion publication; no claim that external account revocation is atomic with the local database transaction.
+
 - [x] Receiver claim atomically checks the same local grant store and exact journal reservation; expired/revoked/missing grant, wrong owner and unsent/unknown delivery cannot claim. Repeated claim never grants a second execution.
   CHECK: node --test --test-name-pattern='receiver claim' server/outcome-work-continuation.test.mjs
   EXPECT: fail 0
