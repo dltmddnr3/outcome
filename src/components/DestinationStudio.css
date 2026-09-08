@@ -1,0 +1,12 @@
+.destination-studio__backdrop{position:fixed;inset:0;z-index:1000;display:grid;place-items:center;padding:16px;background:#000a}
+.destination-studio{width:min(720px,100%);max-height:calc(100dvh - 32px);overflow:auto;padding:24px;border:1px solid var(--oc-rule-strong);border-radius:var(--oc-radius-lg);background:#181818;color:var(--oc-text);overflow-wrap:anywhere}
+.destination-studio__header,.destination-studio__actions{display:flex;align-items:center;justify-content:space-between;gap:12px}
+.destination-studio h2,.destination-studio h3{line-height:1.4}.destination-studio p{line-height:1.6;color:var(--oc-muted)}
+.destination-studio button,.destination-studio input,.destination-studio textarea{font:inherit;color:inherit;max-width:100%}
+.destination-studio button{min-height:44px;padding:10px 14px;border:1px solid var(--oc-rule-strong);border-radius:var(--oc-radius-md);background:#292929}
+.destination-studio button:disabled{opacity:.55;cursor:not-allowed}.destination-studio :focus-visible{outline:2px solid var(--oc-accent);outline-offset:3px}
+.destination-studio__entry-grid{display:grid;gap:12px}.destination-studio__entry-grid button{display:flex;gap:12px;text-align:left}.destination-studio small{display:block;margin-top:5px;color:var(--oc-muted)}
+.destination-studio textarea{display:block;width:100%;margin:8px 0 16px;padding:12px;resize:vertical;border:1px solid var(--oc-rule-strong);border-radius:var(--oc-radius-md);background:#111;line-height:1.5}
+.destination-studio fieldset{display:grid;gap:10px;margin:16px 0;padding:12px;border:1px solid var(--oc-rule-strong);min-width:0}.destination-studio fieldset label{display:flex;gap:12px;padding:10px;align-items:center;min-height:44px}.destination-studio fieldset label[data-selected]{outline:1px solid var(--oc-accent)}
+.destination-studio dl>div{padding:12px 0;border-bottom:1px solid var(--oc-rule)}.destination-studio dd{margin:8px 0;white-space:pre-wrap}.destination-studio__boundary,.destination-studio__unknowns{margin:16px 0}.destination-studio [role=alert]{color:#ff9d8e}.destination-studio__file{display:grid;gap:8px;margin:16px 0}
+@media(max-width:480px){.destination-studio{padding:16px}.destination-studio__actions{align-items:stretch;flex-direction:column}}
