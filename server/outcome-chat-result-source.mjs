@@ -17,6 +17,9 @@ export function projectCompletedPlannerResponse({ json, threadId, message, corre
     if (!thread || thread.id !== threadId || !Array.isArray(thread.turns)) return hold()
     const expected = plannerRequestEnvelope(message, correlationId)
     const matches = thread.turns.filter(turn => Array.isArray(turn.items) && turn.items.some(item => item.type === 'userMessage' && Array.isArray(item.content) && item.content.length === 1 && item.content[0].type === 'text' && item.content[0].text === expected))
+    // Queued input may not have become a turn yet, especially while Planner is busy.
+    // Absence proves neither delivery failure nor completion; never resend here.
+    if (matches.length === 0) return { outcome:'pending' }
     if (matches.length !== 1) return hold()
     const turn = matches[0]
     if (turn.status === 'inProgress') return { outcome:'pending' }

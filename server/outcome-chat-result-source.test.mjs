@@ -29,6 +29,13 @@ test('incomplete turns never become answers and failed turns are not pending', (
   }
 })
 
+test('queued request absent from the readable turn window remains pending without inventing an answer', () => {
+  const data=fixture(); data.thread.turns=[]
+  assert.deepEqual(project(data),{outcome:'pending'})
+  const unrelated=fixture(); unrelated.thread.turns[0].items[0].content[0].text='unrelated owner request'
+  assert.deepEqual(project(unrelated),{outcome:'pending'})
+})
+
 test('ambiguous, mismatched and partially loaded source evidence fails closed', () => {
   for (const mutate of [
     d => { d.thread.id='different' },
@@ -36,7 +43,6 @@ test('ambiguous, mismatched and partially loaded source evidence fails closed', 
     d => { d.thread.turns[0].itemsView='summary' },
     d => { d.thread.turns[0].error={message:'failure'} },
     d => { d.thread.turns[0].completedAt=null },
-    d => { d.thread.turns[0].items[0].content[0].text=request.message },
     d => { d.thread.turns[0].items.push(structuredClone(d.thread.turns[0].items[2])) },
     d => { d.thread.turns[0].items[2].phase=null },
     d => { d.thread.turns[0].items.push({type:'userMessage',content:[]}) },

@@ -1,6 +1,7 @@
 import test from 'node:test'
 import assert from 'node:assert/strict'
 import { runOutcomeChatService } from './outcome-chat-service.mjs'
+import { plannerRequestEnvelope, projectCompletedPlannerResponse } from './outcome-chat-result-source.mjs'
 
 test('default off and invalid intervals never invoke the runner', async () => {
   for (const options of [{}, { enabled: true, intervalMs: 0 }, { enabled: true, intervalMs: 60001 }]) {
@@ -49,4 +50,24 @@ test('abort during a pass or sleep does not begin another pass', async () => {
     }), 0)
     assert.equal(calls, boundary === 'dispatch' ? 1 : 2)
   }
+})
+
+test('delayed queued turn progresses through pending to exact answer with one dispatch', async () => {
+  const controller=new AbortController(), outcomes=[]; let sends=0, reads=0
+  const request={threadId:'synthetic-thread',message:'confirm receipt',correlationId:'message-0123456789abcdef'}
+  const turn={id:'turn-1',status:'completed',completedAt:1,error:null,itemsView:'full',items:[
+    {type:'userMessage',content:[{type:'text',text:plannerRequestEnvelope(request.message,request.correlationId)}]},
+    {type:'agentMessage',id:'reply-1',phase:'final_answer',text:'confirmed'},
+  ]}
+  assert.equal(await runOutcomeChatService({enabled:true,signal:controller.signal,write(){},wait:async()=>{},
+    runOnce:async({argv})=>{
+      if(!argv.length){sends++;return 2}
+      reads++
+      const result=projectCompletedPlannerResponse({...request,observedAt:'2030-01-01T00:00:00.000Z',json:JSON.stringify({thread:{id:request.threadId,turns:reads<3?[]:[turn]}})})
+      outcomes.push(result.outcome)
+      if(result.outcome==='completed'){assert.equal(result.response.message,'confirmed');controller.abort()}
+      return ['pending','completed'].includes(result.outcome)?0:70
+    },
+  }),0)
+  assert.equal(sends,1);assert.deepEqual(outcomes,['pending','pending','completed'])
 })
