@@ -44,5 +44,8 @@ export function projectObservedSingleSessionWork(journalJson, scopeJson, runtime
   const executionState=runtime.state==='active'
     ? work.freshness==='fresh' && work.activity==='running'?'running':'stage_unconfirmed'
     : runtime.state==='idle'?'idle':runtime.state
-  return Object.freeze({work,runtime,executionState,completionAuthority:false,executionAuthority:false})
+  // Browser expiry retains the older of the stage and runtime observations.
+  // A fresh HTTP response must never make an older source look freshly observed.
+  const sourceObservedAtMs=work.observationAgeMs===null ? observedAtMs : Math.min(observedAtMs,nowMs-work.observationAgeMs)
+  return Object.freeze({schemaVersion:1,observedAtMs:sourceObservedAtMs,work,runtime,executionState,completionAuthority:false,executionAuthority:false})
 }

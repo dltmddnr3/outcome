@@ -39,8 +39,10 @@ test('composition requires both observed work stage and actual source; neither a
   for(const [status,state] of [[{type:'active',activeFlags:[]},'running'],[{type:'idle'},'idle'],[{type:'notLoaded'},'unknown'],[{type:'active',activeFlags:['waitingOnApproval']},'waiting_approval']]){
     const result=compose(journal([first,second]),scopeJson,read(status),now,now)
     assert.equal(result.executionState,state);assert.equal(result.work.stage,'implementing')
+    assert.equal(result.schemaVersion,1);assert.equal(result.observedAtMs,now)
     assert.equal(result.completionAuthority,false);assert.equal(result.executionAuthority,false);assert(Object.isFrozen(result))
   }
   assert.equal(compose(journal([first]),scopeJson,read({type:'active',activeFlags:[]}),now,now).executionState,'stage_unconfirmed')
   assert.equal(compose(journal([first,second]),scopeJson,read({type:'active',activeFlags:[]}),now+20000,now+20000).executionState,'stage_unconfirmed')
+  assert.equal(compose(journal([first,second]),scopeJson,read({type:'active',activeFlags:[]}),now+20000,now+20000).observedAtMs,now)
 })

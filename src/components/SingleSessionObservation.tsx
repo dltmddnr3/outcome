@@ -1,0 +1,54 @@
+import { useEffect, useState } from 'react'
+
+const stages = { queued: '작업 대기', implementing: '구현', qa_verifying: 'QA 검증', release_verifying: '릴리즈 검증', awaiting_owner: 'Cherry 확인 대기' }
+const runtimes = { active: '실행 관측됨', idle: '현재 실행 없음', waiting_approval: '권한 승인 대기', waiting_user: '답변 대기', waiting_approval_and_user: '권한 승인·답변 대기', unknown: '실행 상태 확인 불가' }
+const nextStates = { unobserved: '연결 확인 전', observation_stale: '새 관측 필요', observing: '관측 중', next_action_recorded: '다음 단계 기록됨 · 실행과 별개', next_action_missing: '완료 후 다음 단계 누락', needs_owner: 'Cherry 확인 필요', dependency_blocked: '선행 작업 대기', authority_missing: '실행 권한 확인 필요', evidence_missing: '검증 근거 필요', delivery_unknown: '전달 확인 필요 · 자동 재전송 안 함' }
+type Snapshot = {
+  observedAtMs: number
+  work: { stage: keyof typeof stages | null; activity: 'running' | 'waiting' | 'terminal' | 'unknown'; freshness: 'fresh' | 'stale' | 'unobserved'; evidenceStatus: 'missing' | 'reference_only_unverified'; continuation: keyof typeof nextStates }
+  runtime: { state: keyof typeof runtimes }
+}
+const member = (map: object, key: unknown): boolean => typeof key === 'string' && Object.hasOwn(map, key)
+function parse(value: unknown): Snapshot | null {
+  try {
+    if (!value || typeof value !== 'object') return null
+    const raw = value as Snapshot & { schemaVersion: number; completionAuthority: boolean; executionAuthority: boolean }
+    if (raw.schemaVersion !== 1 || raw.completionAuthority !== false || raw.executionAuthority !== false
+      || !Number.isSafeInteger(raw.observedAtMs) || raw.observedAtMs < 0 || !raw.work || !raw.runtime
+      || !(raw.work.stage === null || member(stages, raw.work.stage))
+      || !['running', 'waiting', 'terminal', 'unknown'].includes(raw.work.activity)
+      || !['fresh', 'stale', 'unobserved'].includes(raw.work.freshness)
+      || !['missing', 'reference_only_unverified'].includes(raw.work.evidenceStatus)
+      || !member(nextStates, raw.work.continuation) || !member(runtimes, raw.runtime.state)) return null
+    return { observedAtMs: raw.observedAtMs,
+      work: { stage: raw.work.stage, activity: raw.work.activity, freshness: raw.work.freshness, evidenceStatus: raw.work.evidenceStatus, continuation: raw.work.continuation },
+      runtime: { state: raw.runtime.state } }
+  } catch { return null }
+}
+
+// The server supplies the ORIGINAL observation time. Rendering/polling must not
+// replace it with Date.now(). This card never treats an evidence reference as PASS.
+export function SingleSessionObservation({ observation }: { observation?: unknown }) {
+  const [now, setNow] = useState(Date.now)
+  useEffect(() => {
+    if (!parse(observation)) return
+    const timer = setInterval(() => setNow(Date.now()), 1000)
+    return () => clearInterval(timer)
+  }, [observation])
+  const snapshot = parse(observation)
+  const age = snapshot ? now - snapshot.observedAtMs : null
+  const fresh = age !== null && age >= 0 && age <= 15000 && snapshot?.work.freshness === 'fresh'
+  const status = !snapshot ? '연결 확인 전' : !fresh ? '새 관측 필요' : runtimes[snapshot.runtime.state]
+  return <article data-projection-field="single-session-observation" data-completion-authority="false" data-execution-authority="false">
+    <small>한 세션 · 작업 관측</small>
+    <h3>{status}</h3>
+    <dl>
+      <dt>마지막 작업 단계</dt><dd>{snapshot?.work.stage ? stages[snapshot.work.stage] : '단계 확인 전'}</dd>
+      <dt>현재 실행</dt><dd>{fresh && snapshot ? snapshot.runtime.state === 'active' && snapshot.work.activity !== 'running' ? '실행 관측됨 · 작업 단계 확인 필요' : runtimes[snapshot.runtime.state] : '실행 상태 확인 불가'}</dd>
+      <dt>후속 작업</dt><dd>{snapshot ? fresh ? nextStates[snapshot.work.continuation] : '새 관측 필요' : '연결 확인 전'}</dd>
+      <dt>검증 근거</dt><dd>{snapshot?.work.evidenceStatus === 'reference_only_unverified' ? '근거 참조 있음 · 내용 검증과 별개' : '근거 확인 전'}</dd>
+    </dl>
+    <p>구현 → QA 검증 → 릴리즈 검증 → Cherry 확인</p>
+    <p>동일 세션 검증이며 독립 QA·감사와 구분합니다. 세션 활동은 진행률이나 완료를 뜻하지 않습니다.</p>
+  </article>
+}
