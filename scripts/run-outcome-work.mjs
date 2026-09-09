@@ -7,6 +7,7 @@ import {DatabaseSync} from 'node:sqlite'
 import {createHash} from 'node:crypto'
 import {executeClaimedWorkCommand} from '../server/outcome-work-command-execution.mjs'
 import {createPreviewWorkIdentity} from '../server/outcome-preview-work-identity.mjs'
+import {createLocalSessionReceiver} from '../server/outcome-local-session-receiver.mjs'
 import {verifyWorkExecutionGrant} from '../server/outcome-work-execution-grant.mjs'
 import {workQueueEnvelope} from '../server/outcome-work-queue.mjs'
 import {verifyWorkOutputCandidate} from '../server/outcome-work-output-candidate.mjs'
@@ -113,6 +114,9 @@ export async function runOutcomeWorkOnce({argv=process.argv.slice(2),write=text=
       if(queueAdapter.matchesWorkScope(binding?.destination,request.scopeJson)!==true)fail()
       return latest
     }
+    // Interactive pairing has its own finite expiry. Complete it before the
+    // short execution/approval inspection timeout; then recheck normal state.
+    if(config.schemaVersion>=4){await readCurrentPolicy();await readToken()}
     const runtime=createLocalWorkRuntime({enabled:true,accountService:identity.service,readToken,grantStore,journal,
       receiptDirectory:config.receiptDirectory,queueAdapter,now,readCurrentPolicy})
     if(argv[0]==='--execute'){
@@ -229,9 +233,24 @@ export async function runOutcomeWorkOnce({argv=process.argv.slice(2),write=text=
   finally{if(db)try{db.close()}catch{}}
 }
 if(typeof process.argv[1]==='string'&&pathToFileURL(process.argv[1]).href===import.meta.url){
-  const argv=process.argv.slice(2),useInput=argv[0]==='--session-stdin'
-  let token
-  process.exitCode=await runOutcomeWorkOnce({argv:useInput?argv.slice(1):argv,
-    sessionTokenReader:useInput?()=>token??=readWorkSessionInput(process.stdin):undefined})
-  token=undefined
+  const argv=process.argv.slice(2),useInput=argv[0]==='--session-stdin',useBrowser=argv[0]==='--session-browser'
+  let token,receiver
+  const browserToken=async()=>{
+    if(!receiver){
+      const config=JSON.parse((await readDestinationProtectedBytes(argv[2])).toString('utf8'))
+      if(config.schemaVersion!==5)fail()
+      const identity=createPreviewWorkIdentity({previewOrigin:config.previewOrigin,accountRef:config.accountRef,workspaceId:config.workspaceId,projectId:'outcome'})
+      receiver=await createLocalSessionReceiver({previewOrigin:config.previewOrigin,verifySession:async session=>{
+        await identity.service.resolveBridgeAuthority({token:session});return true
+      }})
+      const fragment=Buffer.from(JSON.stringify(receiver.invitation)).toString('base64url')
+      process.stdout.write(JSON.stringify({outcome:'session_connection_required',url:`${config.previewOrigin}/workspace#local-work-session=${fragment}`,executionAuthority:false,completionAuthority:false})+'\n')
+      if((await receiver.ready).outcome!=='session_connected')fail()
+    }
+    return receiver.readToken()
+  }
+  try{
+    process.exitCode=await runOutcomeWorkOnce({argv:useInput||useBrowser?argv.slice(1):argv,
+      sessionTokenReader:useInput?()=>token??=readWorkSessionInput(process.stdin):useBrowser?()=>token??=browserToken():undefined})
+  }finally{receiver?.dispose();token=undefined}
 }

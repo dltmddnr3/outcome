@@ -52,6 +52,11 @@ These are program responsibilities, not new agents, schedules or products. The c
 
 ### Existing Phase 4 acceptance additions
 
+- [ ] Explicit local session receiver accepts only exact Preview origin/loopback host and one unexpired random invitation, validates owner before exposing an in-memory token to the trusted caller, and never grants or executes work.
+  CHECK: node --test server/outcome-local-session-receiver.test.mjs
+  EXPECT: fail 0
+  EVIDENCE: pending. Default-off factory only; browser consent UI, verified Preview configuration and operational wiring remain open. No production listener or credential file.
+
 - [ ] Execution CLI accepts explicit protected Preview identity configuration with in-memory session input; remote authenticated workspace proves identity only and never substitutes for current local grant, binding or evidence.
   CHECK: node --test server/outcome-work-runner.test.mjs server/outcome-preview-work-identity.test.mjs
   EXPECT: fail 0

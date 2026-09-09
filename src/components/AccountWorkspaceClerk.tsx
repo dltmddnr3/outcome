@@ -3,6 +3,7 @@ import { type FormEvent, useEffect, useRef, useState } from 'react'
 import { clearPrivateSessionBindings, fetchPrivateOwnerSession, fetchPrivateWorkspace, subscribePrivateAccessFailure, type PrivateWorkspaceView } from '../lib/api'
 import { AccountWorkspace, type AccountWorkspaceState } from './AccountWorkspace'
 import { PlannerConversationSession } from './PlannerConversation'
+import { LocalWorkSessionConnection } from './LocalWorkSessionConnection'
 
 const callbackPaths = new Set(['/workspace/sso-callback', '/workspace/apple-callback'])
 export const hostedGoogleSsoParameters = Object.freeze({ strategy: 'oauth_google' as const, redirectCallbackUrl: '/workspace/sso-callback', redirectUrl: '/workspace' })
@@ -213,7 +214,7 @@ function HostedWorkspaceSession() {
     <span className="account-workspace__apple-note">애플 계정은 소유자 로그인 확인 후 연결</span>
     <p className="account-workspace__adapter-note">접근이 허용된 기존 계정만 사용할 수 있습니다.</p>
   </div>
-  return <PlannerConversationSession.Provider value={{ getSessionCredential: getToken }}><AccountWorkspace state={state} workspace={workspace} ownerVerified={ownerVerified} sessionPresent={Boolean(isSignedIn)} loginContent={loginContent} onLogout={isSignedIn || ownerWasReady ? returnToLogin : undefined} onAppleLink={ownerVerified ? linkApple : undefined} transitionError={error} /></PlannerConversationSession.Provider>
+  return <PlannerConversationSession.Provider value={{ getSessionCredential: getToken }}>{ownerVerified && <LocalWorkSessionConnection getToken={getToken} />}<AccountWorkspace state={state} workspace={workspace} ownerVerified={ownerVerified} sessionPresent={Boolean(isSignedIn)} loginContent={loginContent} onLogout={isSignedIn || ownerWasReady ? returnToLogin : undefined} onAppleLink={ownerVerified ? linkApple : undefined} transitionError={error} /></PlannerConversationSession.Provider>
 }
 
 export function HostedClerkWorkspace({ publishableKey, pathname = window.location.pathname }: { publishableKey: string; pathname?: string }) {
