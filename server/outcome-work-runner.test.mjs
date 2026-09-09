@@ -122,6 +122,11 @@ test('configured CLI starts once only after correlated running observation, neve
     chmodSync(receiptPath,0o600)
     assert.equal(await runOutcomeWorkOnce({...options,argv:['--finalize',path,digest]}),70)
     chmodSync(receiptPath,0o400)
+    const commandResult=db.prepare('SELECT * FROM outcome_work_command_results WHERE reservation_digest=?').get(digest)
+    db.prepare('DELETE FROM outcome_work_command_results WHERE reservation_digest=?').run(digest)
+    assert.equal(await runOutcomeWorkOnce({...options,argv:['--finalize',path,digest]}),70) // Passing receipt cannot replace missing execution evidence.
+    assert.equal(journal.read(scopeJson,now).sequence,2)
+    db.prepare('INSERT INTO outcome_work_command_results VALUES(?,?,?)').run(commandResult.reservation_digest,commandResult.command_id,commandResult.result_json)
     assert.equal(await runOutcomeWorkOnce({...options,argv:['--finalize',path,digest]}),0,output)
     assert.equal(JSON.parse(output).outcome,'terminal_recorded')
     assert.equal(journal.read(scopeJson,now).projection.nextAction,'qa_verifying')
