@@ -1,6 +1,7 @@
 import {createHash} from 'node:crypto'
 import {projectSingleSessionWork} from './outcome-work-observer.mjs'
 import {verifyWorkExecutionGrant} from './outcome-work-execution-grant.mjs'
+import {verifyStoredWorkStageReceipt} from './outcome-work-stage-receipt.mjs'
 
 const digest = text => createHash('sha256').update(text).digest('hex')
 const fail = () => {throw new Error('work_journal_unavailable')}
@@ -73,6 +74,36 @@ export function createWorkJournal(db) {
     return action
   }
   return Object.freeze({
+    recordVerifiedTerminal(scopeJson,reservationDigest,ownerRef,receiptDirectory,expectedJson,nowMs){return transact(()=>{
+      const bound=normalize(scopeJson,nowMs),current=load(bound,nowMs),action=reservation(bound,reservationDigest)
+      const claim=db.prepare('SELECT owner_ref FROM outcome_work_execution_claims WHERE reservation_digest=?').get(reservationDigest)
+      const start=db.prepare('SELECT sequence FROM outcome_work_starts WHERE reservation_digest=?').get(reservationDigest)
+      if(!sha(ownerRef,64)||claim?.owner_ref!==ownerRef||!start||!verifyStoredWorkStageReceipt(receiptDirectory,expectedJson).matches)fail()
+      const expected=JSON.parse(expectedJson),first=current.journal.events[start.sequence-1],last=current.journal.events.at(-1)
+      if(expected.projectId!==bound.scope.projectId||expected.workId!==bound.scope.workId||expected.runId!==bound.scope.runId
+        ||expected.stage!==action[3]||expected.verificationMode!=='same-session verification'||!first||first.stage!==action[3]
+        ||last.stage!==first.stage||last.attempt!==first.attempt)fail()
+      if(action[3]!=='implementing'&&(expected.candidateCommit!==action[4]||expected.candidateTree!==action[5]))fail()
+      const grant=db.prepare('SELECT grant_json,owner_ref,revoked_at FROM outcome_execution_grants WHERE digest=?').get(action[6])
+      const grantExpected=JSON.stringify({...bound.scope,ownerRef,candidateCommit:action[4],candidateTree:action[5],authorityRef:action[6],action:action[3],status:'active'})
+      if(!grant||grant.owner_ref!==ownerRef||grant.revoked_at!==null||!verifyWorkExecutionGrant(grant.grant_json,grantExpected,nowMs).matches)fail()
+      const nextAction={implementing:'qa_verifying',qa_verifying:'release_verifying',release_verifying:'awaiting_owner'}[action[3]]
+      if(last.activity==='terminal'){
+        if(last.evidenceRef!==expected.digest||last.candidateCommit!==expected.candidateCommit||last.candidateTree!==expected.candidateTree||last.nextAction!==nextAction)fail()
+        return Object.freeze({outcome:'terminal_already_recorded',executionAuthority:false,completionAuthority:false})
+      }
+      const row=db.prepare('SELECT observation_json FROM outcome_work_activity WHERE reservation_digest=?').get(reservationDigest)
+      if(!row)fail()
+      const observation=JSON.parse(row.observation_json)
+      if(observation.activity!=='terminal'||observation.providerStatus!=='completed'||last.activity!=='running')fail()
+      const event={sequence:current.sequence+1,observedAt:new Date(nowMs).toISOString(),stage:last.stage,attempt:last.attempt,activity:'terminal',
+        candidateCommit:expected.candidateCommit,candidateTree:expected.candidateTree,evidenceRef:expected.digest,nextAction,blocker:null}
+      const next={...current.journal,events:[...current.journal.events,event]}
+      projectSingleSessionWork(JSON.stringify(next),bound.scopeJson,nowMs)
+      if(db.prepare('UPDATE outcome_work_journals SET sequence=?,journal_json=? WHERE project_id=? AND work_id=? AND sequence=?')
+        .run(event.sequence,JSON.stringify(next),bound.scope.projectId,bound.scope.workId,current.sequence).changes!==1)fail()
+      return Object.freeze({outcome:'terminal_recorded',executionAuthority:false,completionAuthority:false})
+    })},
     recordObservedStart(scopeJson,reservationDigest,ownerRef,nowMs){return transact(()=>{
       const bound=normalize(scopeJson,nowMs),current=load(bound,nowMs),action=reservation(bound,reservationDigest)
       const claim=db.prepare('SELECT owner_ref FROM outcome_work_execution_claims WHERE reservation_digest=?').get(reservationDigest)

@@ -30,13 +30,13 @@ export async function runOutcomeWorkOnce({argv=process.argv.slice(2),write=text=
   identityFactory=createHostedIdentityRuntime,queueFactory=createCodexQueueAdapter,now=Date.now}={}){
   let db
   try{
-    if(!Array.isArray(argv)||!['--dispatch','--receive','--approve','--observe'].includes(argv[0])||argv.length!==(argv[0]==='--dispatch'?2:3)
+    if(!Array.isArray(argv)||!['--dispatch','--receive','--approve','--observe','--finalize'].includes(argv[0])||argv.length!==(argv[0]==='--dispatch'?2:3)
       ||argv[0]!=='--dispatch'&&!hash(argv[2],64))fail()
     const read=async path=>(await readDestinationProtectedBytes(path)).toString('utf8')
     const config=JSON.parse(await read(argv[1]))
-    const configKeys=config?.schemaVersion===2?[...keys,'approvalPath']:keys
+    const configKeys=config?.schemaVersion===3?[...keys,'approvalPath','terminalPath']:config?.schemaVersion===2?[...keys,'approvalPath']:keys
     if(!config||Array.isArray(config)||Object.keys(config).length!==configKeys.length||!configKeys.every(key=>Object.hasOwn(config,key))
-      ||![1,2].includes(config.schemaVersion)||!hash(config.candidatePin,40)||argv[0]==='--approve'&&config.schemaVersion!==2)fail()
+      ||![1,2,3].includes(config.schemaVersion)||!hash(config.candidatePin,40)||argv[0]==='--approve'&&config.schemaVersion<2||argv[0]==='--finalize'&&config.schemaVersion!==3)fail()
     const checkout=await realpath(fileURLToPath(new URL('..',import.meta.url)))
     const head=execFileSync('git',['rev-parse','HEAD'],{cwd:checkout,encoding:'utf8',timeout:5000,stdio:['ignore','pipe','ignore']}).trim()
     if(head!==config.candidatePin)fail()
@@ -79,6 +79,37 @@ export async function runOutcomeWorkOnce({argv=process.argv.slice(2),write=text=
     }
     const runtime=createLocalWorkRuntime({enabled:true,accountService:identity.service,readToken:()=>read(config.tokenPath),grantStore,journal,
       receiptDirectory:config.receiptDirectory,queueAdapter,now,readCurrentPolicy})
+    if(argv[0]==='--finalize'){
+      let timer
+      const inspect=async()=>{
+        const {request}=JSON.parse(await readCurrentPolicy()),scope=JSON.parse(request.scopeJson)
+        const owner=await identity.service.resolveBridgeAuthority({token:await read(config.tokenPath)})
+        if(!owner?.project_ids?.includes(scope.projectId))fail()
+        const reserved=journal.readObservationRequest(request.scopeJson,argv[2],owner.account_ref,now())
+        if(['candidateCommit','candidateTree','authorityRef','action'].some(key=>request[key]!==reserved[key]))fail()
+        const expectedJson=await read(config.terminalPath),expected=JSON.parse(expectedJson)
+        if(!hash(expected.candidateCommit,40)||!hash(expected.candidateTree,40))fail()
+        const git=args=>execFileSync('git',args,{cwd:checkout,encoding:'utf8',timeout:5000,maxBuffer:1024*1024,stdio:['ignore','pipe','ignore']}).trim()
+        if(git(['rev-parse',`${expected.candidateCommit}^{tree}`])!==expected.candidateTree)fail()
+        if(expected.candidateCommit!==request.candidateCommit){
+          if(request.action!=='implementing')fail()
+          const saved=JSON.parse(grantStore.read(request.authorityRef,owner.account_ref)),grant=JSON.parse(saved.grantJson)
+          if(saved.status!=='active'||grant.schemaVersion!==2)fail()
+          git(['merge-base','--is-ancestor',request.candidateCommit,expected.candidateCommit])
+          const paths=git(['log','--format=','--name-only',`${request.candidateCommit}..${expected.candidateCommit}`]).split('\n').filter(Boolean)
+          if(paths.some(path=>!grant.execution.writePaths.includes(path)))fail()
+        }
+        await readCurrentPolicy()
+        if(await read(config.terminalPath)!==expectedJson)fail()
+        const fresh=await identity.service.resolveBridgeAuthority({token:await read(config.tokenPath)})
+        if(fresh?.account_ref!==owner.account_ref||!fresh.project_ids?.includes(scope.projectId))fail()
+        return {request,ownerRef:owner.account_ref,expectedJson}
+      }
+      let found
+      try{found=await Promise.race([inspect(),new Promise((_,reject)=>{timer=setTimeout(()=>reject(Error('finalize_timeout')),5000)})])}finally{clearTimeout(timer)}
+      const result=journal.recordVerifiedTerminal(found.request.scopeJson,argv[2],found.ownerRef,config.receiptDirectory,found.expectedJson,now())
+      write(JSON.stringify(result)+'\n');return 0
+    }
     if(argv[0]==='--observe'){
       let timer
       const inspect=async()=>{

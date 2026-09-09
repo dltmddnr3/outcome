@@ -54,6 +54,11 @@ These are program responsibilities, not new agents, schedules or products. The c
 
 #### Candidate-bound stage receipt check · 2026-09-09
 
+- [ ] Stage terminal publication requires a recorded start, completed correlated provider observation, current unrevoked grant and protected passing receipt for the same work; publication records one next action but never dispatches or accepts automatically.
+  CHECK: node --test server/outcome-work-runner.test.mjs
+  EXPECT: fail 0
+  EVIDENCE: pending. Scope journal/one-shot runner/tests; implementing output must be the source or its allowed-path descendant, QA/Release remain exact-candidate. No live publication or release.
+
 - [x] A running observation for an exact claimed reservation records the stage start once; terminal-only observation cannot synthesize a missed start or stage acceptance. Tested integration, not live owner use.
   CHECK: node --test server/outcome-work-runner.test.mjs server/outcome-work-journal.test.mjs
   EXPECT: fail 0

@@ -32,7 +32,12 @@ test('configured CLI starts once only after correlated running observation, neve
   journal.append(scopeJson,JSON.stringify({sequence:1,observedAt:new Date(now).toISOString(),stage:'queued',attempt:1,activity:'waiting',candidateCommit:null,candidateTree:null,evidenceRef:null,nextAction:null,blocker:null}),0,now)
   const save=(name,value)=>{const path=join(root,name);writeFileSync(path,value,{mode:0o600});return path}
   const policyPath=save('policy.json',JSON.stringify({request:{scopeJson,expectedSequence:1,candidateCommit,candidateTree,authorityRef,action:'implementing'},priorReceipt:null,dependencyReceipts:[]}))
-  const config={schemaVersion:2,approvalPath:save('approval.json',grantJson),candidatePin:execFileSync('git',['rev-parse','HEAD'],{encoding:'utf8'}).trim(),databasePath,receiptDirectory:root,policyPath,
+  const receipt={schemaVersion:1,projectId:scope.projectId,workId:scope.workId,runId:scope.runId,candidateCommit,candidateTree,stage:'implementing',verificationMode:'same-session verification',checks:[{id:'check',outcome:'pass',evidenceDigest:'a'.repeat(64)}]}
+  const receiptJson=JSON.stringify(receipt),receiptDigest=createHash('sha256').update(receiptJson).digest('hex')
+  const receiptPath=save(`${receiptDigest}.json`,receiptJson);chmodSync(receiptPath,0o400)
+  const {schemaVersion,checks,...receiptFields}=receipt
+  const terminalPath=save('terminal.json',JSON.stringify({...receiptFields,digest:receiptDigest,requiredChecks:['check']}))
+  const config={schemaVersion:3,terminalPath,approvalPath:save('approval.json',grantJson),candidatePin:execFileSync('git',['rev-parse','HEAD'],{encoding:'utf8'}).trim(),databasePath,receiptDirectory:root,policyPath,
     tokenPath:save('token','test-private-token'),identityPath:save('identity.json','{}'),snapshotPath:save('snapshot.json','{}'),registryPath:join(root,'.outcome-runtime','bindings.json'),ownerCwd:root,codexExecutable:process.execPath}
   const path=save('config.json',JSON.stringify(config));let sends=0,output='',bindingValid=true
   let observation={outcome:'observed',activity:'running',providerStatus:'inProgress',observedAt:new Date(now).toISOString(),terminalAt:null,sourceDigest:'8'.repeat(64),turnRef:'9'.repeat(64),executionAuthority:false,completionAuthority:false}
@@ -70,6 +75,7 @@ test('configured CLI starts once only after correlated running observation, neve
     assert.equal(await runOutcomeWorkOnce({...options,argv:['--observe',path,digest]}),0,output)
     assert.equal(JSON.parse(output).outcome,'start_recorded')
     assert.equal(journal.read(scopeJson,now).projection.stage,'implementing')
+    assert.equal(await runOutcomeWorkOnce({...options,argv:['--finalize',path,digest]}),70) // Running is not completed.
     assert.equal(await runOutcomeWorkOnce({...options,argv:['--observe',path,digest]}),0,output)
     assert.equal(JSON.parse(output).outcome,'start_already_recorded')
     assert.equal(db.prepare('SELECT count(*) AS n FROM outcome_work_starts').get().n,1)
@@ -86,6 +92,16 @@ test('configured CLI starts once only after correlated running observation, neve
     assert.equal(JSON.parse(db.prepare('SELECT observation_json FROM outcome_work_activity').get().observation_json).activity,'terminal')
     assert.equal(journal.read(scopeJson,now).sequence,2) // Terminal activity is not stage acceptance.
     assert.equal(journal.read(scopeJson,now).projection.nextAction,null)
+    chmodSync(receiptPath,0o600)
+    assert.equal(await runOutcomeWorkOnce({...options,argv:['--finalize',path,digest]}),70)
+    chmodSync(receiptPath,0o400)
+    assert.equal(await runOutcomeWorkOnce({...options,argv:['--finalize',path,digest]}),0,output)
+    assert.equal(JSON.parse(output).outcome,'terminal_recorded')
+    assert.equal(journal.read(scopeJson,now).projection.nextAction,'qa_verifying')
+    assert.equal(await runOutcomeWorkOnce({...options,argv:['--finalize',path,digest]}),0,output)
+    assert.equal(JSON.parse(output).outcome,'terminal_already_recorded')
+    assert.equal(journal.read(scopeJson,now).sequence,3)
+    assert.equal(sends,1) // Recording a next action never automatically dispatches it.
     writeFileSync(path,JSON.stringify({...config,candidatePin:'0'.repeat(40)}))
     assert.equal(await runOutcomeWorkOnce({...options,argv:['--dispatch',path]}),70)
     writeFileSync(path,JSON.stringify(config));chmodSync(path,0o644)
