@@ -11,6 +11,7 @@ import {runOutcomeWorkOnce,readWorkSessionInput} from '../scripts/run-outcome-wo
 import {createWorkJournal} from './outcome-work-journal.mjs'
 import {createWorkGrantStore} from './outcome-work-grant-store.mjs'
 import {createPreviewWorkIdentity} from './outcome-preview-work-identity.mjs'
+import {createLocalSessionReceiver} from './outcome-local-session-receiver.mjs'
 
 test('session input is bounded, one-shot and never exposes rejected bytes',async()=>{
   const stream=new PassThrough(),ready=readWorkSessionInput(stream);stream.end('fixture-token\n')
@@ -70,7 +71,18 @@ test('configured CLI starts once only after correlated running observation, neve
     assert.equal(await runOutcomeWorkOnce({...options,argv:['--approve',path,authorityRef]}),70)
     assert.equal(db.prepare('SELECT count(*) AS n FROM outcome_execution_grants').get().n,0)
     bindingValid=true
-    assert.equal(await runOutcomeWorkOnce({...options,argv:['--approve',path,authorityRef]}),0,output)
+    const previewOrigin='https://outcome-fixture-white-castle.vercel.app'
+    const receiver=await createLocalSessionReceiver({previewOrigin,approval:{grantJson,digest:authorityRef},verifySession:async token=>token==='test-private-token'})
+    try{
+      const pending=runOutcomeWorkOnce({...options,sessionTokenReader:async()=>{await receiver.ready;return receiver.readToken()},argv:['--approve',path,authorityRef]})
+      const send=body=>fetch(receiver.invitation.endpoint,{method:'POST',headers:{origin:previewOrigin,'content-type':'application/json'},body:JSON.stringify({challenge:receiver.invitation.challenge,token:'test-private-token',...body})})
+      assert.equal((await send({action:'review'})).status,200)
+      assert.equal(db.prepare('SELECT count(*) AS n FROM outcome_execution_grants').get().n,0)
+      assert.equal(sends,0)
+      assert.equal((await send({approvalDigest:authorityRef})).status,200)
+      assert.equal(await pending,0,output)
+      assert.equal(db.prepare('SELECT count(*) AS n FROM outcome_execution_grants').get().n,1)
+    }finally{receiver.dispose()}
     assert.equal(JSON.parse(output).outcome,'approval_recorded')
     assert.equal(sends,0)
     assert.equal(await runOutcomeWorkOnce({...options,argv:['--dispatch',path]}),0,output)

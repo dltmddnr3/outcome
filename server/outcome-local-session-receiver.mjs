@@ -17,7 +17,7 @@ export async function createLocalSessionReceiver({previewOrigin,verifySession,ti
     if(/(?:\/(?:Users|home|private\/tmp|tmp)\/|-----BEGIN .*PRIVATE KEY-----|\b(?:bearer|basic)\s+\S+|\b(?:password|secret|token|api[_ -]?key)\s*[:=]\s*\S+)/i.test(approval.grantJson.normalize('NFKC')))throw Error('session_receiver_unavailable')
     approval=Object.freeze({...approval})
   }
-  const challenge=randomBytes(32).toString('hex'),expiresAt=Date.now()+timeoutMs
+  const challenge=randomBytes(32).toString('hex'),expiresAt=Math.min(Date.now()+timeoutMs,approval===null?Infinity:JSON.parse(approval.grantJson).expiresAt)
   let token=null,used=false,done=false,port,timer,resolveReady,reviewed=false
   const ready=new Promise(resolve=>{resolveReady=resolve})
   const controller=new AbortController()
@@ -74,7 +74,7 @@ export async function createLocalSessionReceiver({previewOrigin,verifySession,ti
   server.headersTimeout=Math.min(timeoutMs,10000)
   await new Promise((resolve,reject)=>{server.once('error',reject);server.listen(0,'127.0.0.1',resolve)})
   port=server.address().port
-  timer=setTimeout(()=>finish('session_expired'),timeoutMs)
+  timer=setTimeout(()=>finish('session_expired'),Math.max(0,expiresAt-Date.now()))
   return Object.freeze({
     invitation:Object.freeze({schemaVersion:approval===null?1:2,endpoint:`http://127.0.0.1:${port}/outcome-session`,previewOrigin,challenge,expiresAt,...(approval===null?{}:{approvalDigest:approval.digest})}),
     ready,
