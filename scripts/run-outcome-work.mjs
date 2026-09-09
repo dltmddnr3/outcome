@@ -166,10 +166,10 @@ export async function runOutcomeWorkOnce({argv=process.argv.slice(2),write=text=
       return 0
     }
     const result=argv[0]==='--dispatch'?await runtime.runOnce():await runtime.receiveOnce(argv[2])
-    const permitted=['acknowledged','claimed','already_claimed','delivery_unknown','reconciliation_required']
+    const permitted=['acknowledged','claimed','already_claimed','delivery_unknown','reconciliation_required','needs_owner']
     const outcome=permitted.includes(result.outcome)?result.outcome:'configuration_hold'
     write(JSON.stringify({outcome,executionAuthority:false,completionAuthority:false})+'\n')
-    return ['acknowledged','claimed','already_claimed'].includes(outcome)?0:70
+    return ['acknowledged','claimed','already_claimed','needs_owner'].includes(outcome)?0:70
   }catch{try{write('{"outcome":"configuration_hold","executionAuthority":false,"completionAuthority":false}\n')}catch{};return 70}
   finally{if(db)try{db.close()}catch{}}
 }
