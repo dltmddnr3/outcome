@@ -63,8 +63,15 @@ export async function runOutcomeWorkOnce({argv=process.argv.slice(2),write=text=
     const journal=createWorkJournal(db),grantStore=createWorkGrantStore(db)
     const queueAdapter=queueFactory({enabled:true,registryPath:config.registryPath,codexExecutable:config.codexExecutable,expectedCwd:config.ownerCwd,
       ownerProbe:createPlannerOwnerProbe({socketPath:join(homedir(),'.codex','ipc','ipc.sock')})})
+    const readCurrentPolicy=async()=>{
+      const latest=await read(config.policyPath);if(latest!==policy)fail()
+      const {request}=JSON.parse(latest),scope=JSON.parse(request.scopeJson)
+      const binding=await queueAdapter.bindingResolver({project_id:scope.projectId,role:'planner'})
+      if(queueAdapter.matchesWorkScope(binding?.destination,request.scopeJson)!==true)fail()
+      return latest
+    }
     const runtime=createLocalWorkRuntime({enabled:true,accountService:identity.service,readToken:()=>read(config.tokenPath),grantStore,journal,
-      receiptDirectory:config.receiptDirectory,queueAdapter,now,readCurrentPolicy:async()=>{const latest=await read(config.policyPath);if(latest!==policy)fail();return latest}})
+      receiptDirectory:config.receiptDirectory,queueAdapter,now,readCurrentPolicy})
     const result=argv[0]==='--dispatch'?await runtime.runOnce():await runtime.receiveOnce(argv[2])
     const permitted=['acknowledged','claimed','already_claimed','delivery_unknown','reconciliation_required']
     const outcome=permitted.includes(result.outcome)?result.outcome:'configuration_hold'

@@ -32,19 +32,28 @@ test('configured CLI composes existing initial journal, grant and queue once wit
   const policyPath=save('policy.json',JSON.stringify({request:{scopeJson,expectedSequence:1,candidateCommit,candidateTree,authorityRef,action:'implementing'},priorReceipt:null,dependencyReceipts:[]}))
   const config={schemaVersion:1,candidatePin:execFileSync('git',['rev-parse','HEAD'],{encoding:'utf8'}).trim(),databasePath,receiptDirectory:root,policyPath,
     tokenPath:save('token','test-private-token'),identityPath:save('identity.json','{}'),snapshotPath:save('snapshot.json','{}'),registryPath:join(root,'.outcome-runtime','bindings.json'),ownerCwd:root,codexExecutable:process.execPath}
-  const path=save('config.json',JSON.stringify(config));let sends=0,output=''
+  const path=save('config.json',JSON.stringify(config));let sends=0,output='',bindingValid=true
   const options={now:()=>now,write:text=>output=text,identityFactory:()=>({service:{resolveBridgeAuthority:async({token})=>{assert.equal(token,'test-private-token');return {account_ref:ownerRef,project_ids:['outcome']}}}}),
-    queueFactory:()=>({bindingResolver:async()=>({status:'active',freshness:'fresh',project_id:'outcome',role:'planner',destination:{}}),matchesWorkScope:()=>true,transport:async()=>{sends++;return {delivery:'acknowledged'}}})}
+    queueFactory:()=>({bindingResolver:async()=>({status:'active',freshness:'fresh',project_id:'outcome',role:'planner',destination:{}}),matchesWorkScope:()=>bindingValid,transport:async()=>{sends++;return {delivery:'acknowledged'}}})}
   try{
     assert.equal(await runOutcomeWorkOnce({...options,argv:['--dispatch',path]}),0,output)
     assert.equal(await runOutcomeWorkOnce({...options,argv:['--dispatch',path]}),0,output)
     assert.equal(sends,1)
     assert.equal(journal.read(scopeJson,now).projection.stage,'queued')
     const digest=db.prepare('SELECT reservation_digest FROM outcome_work_reservations').get().reservation_digest
+    bindingValid=false
+    assert.equal(await runOutcomeWorkOnce({...options,argv:['--receive',path,digest]}),70)
+    assert.equal(db.prepare('SELECT count(*) AS n FROM outcome_work_execution_claims').get().n,0)
+    bindingValid=true
     assert.equal(await runOutcomeWorkOnce({...options,argv:['--receive',path,digest]}),0,output)
     assert.equal(JSON.parse(output).outcome,'claimed')
     assert.equal(await runOutcomeWorkOnce({...options,argv:['--receive',path,digest]}),0,output)
     assert.equal(JSON.parse(output).outcome,'already_claimed')
+    writeFileSync(path,JSON.stringify({...config,candidatePin:'0'.repeat(40)}))
+    assert.equal(await runOutcomeWorkOnce({...options,argv:['--dispatch',path]}),70)
+    writeFileSync(path,JSON.stringify(config));chmodSync(path,0o644)
+    assert.equal(await runOutcomeWorkOnce({...options,argv:['--dispatch',path]}),70)
+    chmodSync(path,0o600)
     store.revoke(authorityRef,ownerRef,now)
     assert.equal(await runOutcomeWorkOnce({...options,argv:['--dispatch',path]}),70)
     assert.equal(sends,1)
