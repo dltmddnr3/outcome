@@ -10,9 +10,9 @@ import {realpathSync} from 'node:fs'
 const now=20000, owner='a'.repeat(64), cwd=realpathSync(process.cwd()),checkout=createHash('sha256').update('outcome-work-checkout-v1\0').update(cwd).digest('hex')
 const scope={projectId:'outcome',workId:'work-a',runId:'run-a',sessionRef:'session-a',bindingVersion:1}
 const raw=JSON.stringify(scope)
-function setup({start=true,multiple=false}={}){
+function setup({start=true,multiple=false,args=['--version']}={}){
   const db=new DatabaseSync(':memory:'), journal=createWorkJournal(db), grants=createWorkGrantStore(db)
-  const command={id:'check',stage:'implementing',program:'node',args:['--version'],timeoutMs:1000}
+  const command={id:'check',stage:'implementing',program:'node',args,timeoutMs:1000}
   const grant=JSON.stringify({schemaVersion:2,...scope,ownerRef:owner,candidateCommit:'c'.repeat(40),candidateTree:'d'.repeat(40),allowedStages:['implementing'],issuedAt:now-1,expiresAt:now+1000,execution:{checkoutRef:checkout,writePaths:[],commands:multiple?[command,{...command,id:'second'}]:[command]}})
   const {authorityRef}=grants.record(grant,owner,now)
   journal.append(raw,JSON.stringify({sequence:1,observedAt:new Date(now).toISOString(),stage:'queued',attempt:1,activity:'waiting',candidateCommit:null,candidateTree:null,evidenceRef:null,nextAction:null,blocker:null}),0,now)
@@ -51,6 +51,17 @@ test('real bounded process result persists and replay cannot launch again',async
     assert.throws(()=>s.journal.recordCommandResult(s.reservationDigest,'check',owner,{...result,exitCode:1}),/work_journal_unavailable/)
     assert.equal(s.journal.read(raw,now).sequence,2)
   }finally{s.db.close()}
+})
+test('grant revocation during execution cancels process and preserves non-success result',async()=>{
+  const s=setup({args:['--eval','setInterval(()=>{},1000)']})
+  let timer
+  try{
+    timer=setTimeout(()=>s.grants.revoke(s.authorityRef,owner,now),40)
+    const result=await executeClaimedWorkCommand({journal:s.journal,scopeJson:raw,reservationDigest:s.reservationDigest,ownerRef:owner,commandId:'check',cwd,readPaths:[],now:()=>now})
+    assert.equal(result.outcome,'command_cancelled')
+    assert.equal(JSON.parse(s.db.prepare('SELECT result_json FROM outcome_work_command_results').get().result_json).outcome,'command_cancelled')
+    assert.equal(s.journal.read(raw,now).sequence,2)
+  }finally{clearTimeout(timer);s.db.close()}
 })
 test('missing start, wrong owner/checkout, expiry, revocation and multi-command fail closed',()=>{
   for(const variant of ['start','owner','checkout','expiry','revoked','multiple']){

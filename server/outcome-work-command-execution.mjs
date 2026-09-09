@@ -15,7 +15,18 @@ export async function executeClaimedWorkCommand({journal,scopeJson,reservationDi
     if(!absolute.startsWith(cwd+sep)||realpathSync(absolute)!==absolute)throw Error('command_path_unavailable')
     return absolute
   })
-  const result=await runBoundedWorkCommand({...claim.command,cwd,readPaths,writePaths,signal})
-  journal.recordCommandResult(reservationDigest,commandId,ownerRef,result)
-  return result
+  const controller=new AbortController(),cancel=()=>controller.abort()
+  signal?.addEventListener('abort',cancel,{once:true})
+  if(signal?.aborted)cancel()
+  // Re-check local revocation/expiry and running-stage ownership during the
+  // process lifetime. No re-claim can launch a process; it only validates state.
+  const monitor=setInterval(()=>{
+    try{journal.claimCommandExecution(scopeJson,reservationDigest,ownerRef,commandId,checkoutRef,now())}
+    catch{cancel()}
+  },100)
+  try{
+    const result=await runBoundedWorkCommand({...claim.command,cwd,readPaths,writePaths,signal:controller.signal})
+    journal.recordCommandResult(reservationDigest,commandId,ownerRef,result)
+    return result
+  }finally{clearInterval(monitor);signal?.removeEventListener('abort',cancel)}
 }
