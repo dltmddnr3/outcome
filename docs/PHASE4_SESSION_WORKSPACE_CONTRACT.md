@@ -54,10 +54,10 @@ These are program responsibilities, not new agents, schedules or products. The c
 
 #### Candidate-bound stage receipt check · 2026-09-09
 
-- [ ] One-shot CLI issues only an explicit digest-confirmed V2 execution plan for the authenticated current owner and exact policy/binding/candidate; rejected or mismatched requests do not create approval.
+- [x] One-shot CLI issues only an explicit digest-confirmed V2 execution plan for the authenticated current owner and exact policy/binding/candidate; rejected or mismatched requests do not create approval. This is tested issuance, not a live owner grant.
   CHECK: node --test server/outcome-work-runner.test.mjs
   EXPECT: fail 0
-  EVIDENCE: pending. --approve is a new explicit owner action, never inferred from ordinary decision cards. No live grant issuance is part of this implementation test. Scope runner and tests; rollback task-owned candidate only.
+  EVIDENCE: f339633 full npm test 886 PASS, 0 FAIL/skip/TODO. Protected schema-v2 configuration adds approvalPath; --approve requires the exact plan SHA argument, current owner authentication twice, exact current binding/policy/candidate, V2 grant verification, durable record and readback. Fixture integration proves no preapproval dispatch, no record for wrong digest/owner/binding, one approved dispatch, repeated claim safety and no resurrection after revocation. Preflight has a five-second timeout; timed-out inspection cannot later write. --approve is an explicit owner action, never inferred from ordinary decision cards. No live grant or credential was created, no stage command executed and no new schedule or deployment. Scope runner and tests; rollback task-owned candidate only. Actual owner approval UX, execution-start/terminal collection and continuous stage advancement remain unmet.
 
 - [x] Existing local runtime has a one-shot CLI composition with explicit protected configuration, existing database, current identity and canonical binding; no implicit initialization, grants or scheduler. This proves entrypoint composition only, not actual stage execution.
   CHECK: node --test server/outcome-work-runner.test.mjs
