@@ -52,6 +52,11 @@ These are program responsibilities, not new agents, schedules or products. The c
 
 ### Existing Phase 4 acceptance additions
 
+- [ ] Operational one-shot observation entry point wires protected scope/current registry, read-only existing DB, desktop reader and authenticated account projection without token persistence or writes.
+  CHECK: node --test server/outcome-work-observation-cli.test.mjs
+  EXPECT: fail 0
+  EVIDENCE: pending. Requires explicit non-secret configuration and inherited existing identity environment; does not activate hosted transport or execute a stage.
+
 Operational integration audit after c936357: canonical runtime JSON files <=64 KiB inspected recursively to depth 4: 65; matching work-runner configurations: 0. Isolated runtime: 0. No values were emitted or changed. More importantly, non-test call-site search finds createLocalWorkObservationSource only in the browser verification script, not an operational entry point. api/index.mjs default hostedRequest supplies no workObservationSource. Consequently the remaining gap is missing operational composition/transport, not merely finding a configuration. Next implementation must wire an authenticated local source into an actual serving/transport entry point with no credential copies and preserve original source times; adding another detached projector/test is not sufficient. Hosted provider/DB/env activation remains separately bounded. Actual execution stages, owner use and Phase 5 completion remain OPEN.
 
 - [x] SQLite observation reaches the real account HTTP handler and Chrome component at mobile/desktop widths, without mocked observation responses; revoked source removes running state.
