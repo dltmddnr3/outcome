@@ -22,7 +22,7 @@ test('configured CLI composes existing initial journal, grant and queue once wit
   const root=realpathSync(mkdtempSync(join(tmpdir(),'outcome-work-cli-')))
   const databasePath=join(root,'work.sqlite'),db=new DatabaseSync(databasePath)
   chmodSync(databasePath,0o600)
-  const now=Date.now(),ownerRef='a'.repeat(64),candidateCommit='b'.repeat(40),candidateTree='c'.repeat(40)
+  const now=Date.now(),ownerRef='a'.repeat(64),candidateCommit=execFileSync('git',['rev-parse','HEAD'],{encoding:'utf8'}).trim(),candidateTree=execFileSync('git',['rev-parse','HEAD^{tree}'],{encoding:'utf8'}).trim()
   const scope={projectId:'outcome',workId:'cli-work',runId:'cli-run',sessionRef:'d'.repeat(64),bindingVersion:1}
   const scopeJson=JSON.stringify(scope),journal=createWorkJournal(db),store=createWorkGrantStore(db)
   const grantJson=JSON.stringify({schemaVersion:1,...scope,ownerRef,candidateCommit,candidateTree,allowedStages:['implementing'],issuedAt:now-1,expiresAt:now+60000})

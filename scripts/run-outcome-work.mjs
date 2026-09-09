@@ -66,6 +66,9 @@ export async function runOutcomeWorkOnce({argv=process.argv.slice(2),write=text=
     const readCurrentPolicy=async()=>{
       const latest=await read(config.policyPath);if(latest!==policy)fail()
       const {request}=JSON.parse(latest),scope=JSON.parse(request.scopeJson)
+      if(!hash(request.candidateCommit,40)||!hash(request.candidateTree,40))fail()
+      const candidateTree=execFileSync('git',['rev-parse',`${request.candidateCommit}^{tree}`],{cwd:checkout,encoding:'utf8',timeout:5000,stdio:['ignore','pipe','ignore']}).trim()
+      if(candidateTree!==request.candidateTree)fail()
       const binding=await queueAdapter.bindingResolver({project_id:scope.projectId,role:'planner'})
       if(queueAdapter.matchesWorkScope(binding?.destination,request.scopeJson)!==true)fail()
       return latest
