@@ -54,7 +54,8 @@ export function createWorkContinuationController({enabled=false,journal,verifyEl
           ||!['implementing','qa_verifying','release_verifying','awaiting_owner'].includes(input.action)) return result('input_invalid')
         Object.freeze(input)
         const current=journal.read(input.scopeJson,now())
-        if(current.sequence!==input.expectedSequence||current.projection.continuation!=='next_action_recorded'||current.projection.nextAction!==input.action) return result('source_hold')
+        const initial=current.projection.stage==='queued'&&current.projection.activity==='waiting'&&current.projection.continuation==='observing'&&input.action==='implementing'
+        if(current.sequence!==input.expectedSequence||!initial&&(current.projection.continuation!=='next_action_recorded'||current.projection.nextAction!==input.action)) return result('source_hold')
         if(input.action==='awaiting_owner') return result('needs_owner')
         if(await invoke(verifyEligibility,input)!==true) return result('authority_hold')
         const reserved=journal.reserveContinuation(input.scopeJson,input.expectedSequence,input.candidateCommit,input.candidateTree,input.authorityRef,now())

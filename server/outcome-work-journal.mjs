@@ -7,6 +7,9 @@ const fail = () => {throw new Error('work_journal_unavailable')}
 const sha = (value,length) => typeof value==='string' && new RegExp(`^[a-f0-9]{${length}}$`).test(value)
 const scopeKeys=['projectId','workId','runId','sessionRef','bindingVersion']
 const eventKeys=['sequence','observedAt','stage','attempt','activity','candidateCommit','candidateTree','evidenceRef','nextAction','blocker']
+const initialEvent=last=>last?.stage==='queued'&&last.activity==='waiting'&&last.blocker===null&&last.nextAction===null
+const actionFor=(scopeJson,last,commit,tree,authority)=>[scopeJson,last.stage,last.attempt,initialEvent(last)?'implementing':last.nextAction,initialEvent(last)?commit:last.candidateCommit,initialEvent(last)?tree:last.candidateTree,authority]
+const dispatchable=(last,projection)=>initialEvent(last)?projection.freshness==='fresh':last?.activity==='terminal'&&projection.continuation==='next_action_recorded'
 
 // Explicit local companion composition only. The caller owns a dedicated,
 // protected SQLite connection and its lifetime; no path, daemon or network default.
@@ -72,9 +75,8 @@ export function createWorkJournal(db) {
       const bound=normalize(scopeJson,nowMs),current=load(bound,nowMs),last=current.journal.events.at(-1),action=reservation(bound,reservationDigest)
       if(!sha(expectedAuthorityRef,64)||action[6]!==expectedAuthorityRef)fail()
       const projection=projectSingleSessionWork(JSON.stringify(current.journal),bound.scopeJson,nowMs)
-      if(current.sequence!==expectedSequence||last?.activity!=='terminal'||!sha(last.evidenceRef,64)
-        ||projection.continuation!=='next_action_recorded'
-        ||JSON.stringify([bound.scopeJson,last.stage,last.attempt,last.nextAction,last.candidateCommit,last.candidateTree,action[6]])!==JSON.stringify(action))fail()
+      if(current.sequence!==expectedSequence||!dispatchable(last,projection)||(!initialEvent(last)&&!sha(last.evidenceRef,64))
+        ||JSON.stringify(actionFor(bound.scopeJson,last,action[4],action[5],action[6]))!==JSON.stringify(action))fail()
       const delivery=db.prepare('SELECT state FROM outcome_work_dispatches WHERE reservation_digest=?').get(reservationDigest)
       if(!delivery||!['dispatch_started','acknowledged'].includes(delivery.state))fail()
       const grant=db.prepare('SELECT grant_json,owner_ref,revoked_at FROM outcome_execution_grants WHERE digest=?').get(action[6])
@@ -90,6 +92,12 @@ export function createWorkJournal(db) {
       const bound=normalize(scopeJson,nowMs),current=load(bound,nowMs),last=current.journal.events.at(-1)
       if(!last||last.activity!=='terminal')fail()
       return Object.freeze({sequence:current.sequence,...last})
+    })},
+    readDispatchSource(scopeJson,nowMs){return guarded(()=>{
+      const bound=normalize(scopeJson,nowMs),current=load(bound,nowMs),last=current.journal.events.at(-1)
+      const projection=projectSingleSessionWork(JSON.stringify(current.journal),bound.scopeJson,nowMs)
+      if(!dispatchable(last,projection))fail()
+      return Object.freeze({sequence:current.sequence,...last,initial:initialEvent(last)})
     })},
     read(scopeJson,nowMs){return guarded(()=>{
       const bound=normalize(scopeJson,nowMs),current=load(bound,nowMs)
@@ -115,10 +123,10 @@ export function createWorkJournal(db) {
       if(!Number.isSafeInteger(expectedSequence)||expectedSequence<1 || !sha(candidateCommit,40)||!sha(candidateTree,40)||!sha(authorityRef,64)) fail()
       const bound=normalize(scopeJson,nowMs),current=load(bound,nowMs),last=current.journal.events.at(-1)
       const projection=projectSingleSessionWork(JSON.stringify(current.journal),bound.scopeJson,nowMs)
-      if(current.sequence!==expectedSequence || projection.continuation!=='next_action_recorded'
-        || last?.activity!=='terminal' || last.candidateCommit!==candidateCommit || last.candidateTree!==candidateTree) fail()
+      if(current.sequence!==expectedSequence || !dispatchable(last,projection)
+        || !initialEvent(last)&&(last.candidateCommit!==candidateCommit || last.candidateTree!==candidateTree)) fail()
       if(['qa_verifying','release_verifying'].includes(last.nextAction) && !sha(last.evidenceRef,64)) fail()
-      const actionJson=JSON.stringify([bound.scopeJson,last.stage,last.attempt,last.nextAction,candidateCommit,candidateTree,authorityRef])
+      const actionJson=JSON.stringify(actionFor(bound.scopeJson,last,candidateCommit,candidateTree,authorityRef))
       const reservationDigest=digest(actionJson)
       const existing=db.prepare('SELECT reservation_digest,action_json FROM outcome_work_reservations WHERE project_id=? AND work_id=? AND stage=? AND attempt=?')
         .get(bound.scope.projectId,bound.scope.workId,last.stage,last.attempt)
@@ -129,8 +137,8 @@ export function createWorkJournal(db) {
     beginContinuationDispatch(scopeJson,expectedSequence,reservationDigest,nowMs){return transact(()=>{
       const bound=normalize(scopeJson,nowMs),current=load(bound,nowMs),action=reservation(bound,reservationDigest),last=current.journal.events.at(-1)
       const projection=projectSingleSessionWork(JSON.stringify(current.journal),bound.scopeJson,nowMs)
-      if(current.sequence!==expectedSequence || projection.continuation!=='next_action_recorded' || last.nextAction==='awaiting_owner'
-        || JSON.stringify([bound.scopeJson,last.stage,last.attempt,last.nextAction,last.candidateCommit,last.candidateTree,action[6]])!==JSON.stringify(action)) fail()
+      if(current.sequence!==expectedSequence || !dispatchable(last,projection) || last.nextAction==='awaiting_owner'
+        || JSON.stringify(actionFor(bound.scopeJson,last,action[4],action[5],action[6]))!==JSON.stringify(action)) fail()
       if(['qa_verifying','release_verifying'].includes(last.nextAction) && !sha(last.evidenceRef,64)) fail()
       const existing=db.prepare('SELECT state FROM outcome_work_dispatches WHERE reservation_digest=?').get(reservationDigest)
       if(existing) return Object.freeze({outcome:'already_started'})

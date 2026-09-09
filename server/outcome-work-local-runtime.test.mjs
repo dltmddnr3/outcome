@@ -26,13 +26,14 @@ test('unconfigured, oversized or stalled current policy never invokes transport'
   assert.equal(sends,0)
 })
 test('integrated local runtime checks account, durable grant, exact terminal receipt and dependencies',async()=>{
-  for(const mode of ['valid','queue','revoked-session','revoked-grant','missing-dependency','wrong-receipt','changed-policy','disabled']){
+  for(const mode of ['valid','queue','initial','initial-unknown','initial-fake-receipt','initial-revoked','initial-dependency','initial-blocked','initial-stale','revoked-session','revoked-grant','missing-dependency','wrong-receipt','changed-policy','disabled']){
+    const initial=mode.startsWith('initial'),action=initial?'implementing':'qa_verifying'
     const directory=realpathSync(mkdtempSync(join(tmpdir(),'outcome-local-runtime-'))),db=new DatabaseSync(join(directory,'journal.sqlite'))
     const journal=createWorkJournal(db),grantStore=createWorkGrantStore(db);let sends=0,reads=0,revoked=false
     const accountService=createAccountAccessService({ownerSubject:'synthetic-owner',now:()=>time,store:createInMemoryAccountStore(fixture),authProvider:{verify:async()=>({subject:'synthetic-owner',issuedAt:time-1,expiresAt:time+1000,revoked})}})
     try{
       const {account_ref:ownerRef}=await accountService.resolveBridgeAuthority({token:'fixture-only'})
-      const grant=JSON.stringify({schemaVersion:1,...scope,ownerRef,candidateCommit:commit,candidateTree:tree,allowedStages:['qa_verifying'],issuedAt:time-1,expiresAt:time+1000})
+      const grant=JSON.stringify({schemaVersion:1,...scope,ownerRef,candidateCommit:commit,candidateTree:tree,allowedStages:[action],issuedAt:time-1,expiresAt:time+1000})
       const {authorityRef}=grantStore.record(grant,ownerRef,time)
       const receipt={schemaVersion:1,projectId:scope.projectId,workId:scope.workId,runId:scope.runId,candidateCommit:commit,candidateTree:tree,stage:'implementing',verificationMode:'same-session verification',checks:[{id:'regression',outcome:'pass',evidenceDigest:'c'.repeat(64)}]}
       const bytes=JSON.stringify(receipt),digest=createHash('sha256').update(bytes).digest('hex')
@@ -41,13 +42,15 @@ test('integrated local runtime checks account, durable grant, exact terminal rec
       const priorReceipt={...fields,digest,requiredChecks:['regression']}
       const first={sequence:1,observedAt:new Date(time).toISOString(),stage:'queued',attempt:1,activity:'waiting',candidateCommit:null,candidateTree:null,evidenceRef:null,nextAction:null,blocker:null}
       const scopeJson=JSON.stringify(scope)
-      journal.append(scopeJson,JSON.stringify(first),0,time)
+      journal.append(scopeJson,JSON.stringify({...first,...(mode==='initial-blocked'?{blocker:'needs_owner'}:{}),...(mode==='initial-stale'?{observedAt:new Date(time-3600000).toISOString()}:{})}),0,time)
+      if(!initial){
       journal.append(scopeJson,JSON.stringify({...first,sequence:2,stage:'implementing',activity:'running'}),1,time)
       journal.append(scopeJson,JSON.stringify({...first,sequence:3,stage:'implementing',activity:'terminal',candidateCommit:commit,candidateTree:tree,evidenceRef:digest,nextAction:'qa_verifying'}),2,time)
+      }
       if(mode==='revoked-session')revoked=true
-      if(mode==='revoked-grant')grantStore.revoke(authorityRef,ownerRef,time)
-      const policy=JSON.stringify({request:{scopeJson,expectedSequence:3,candidateCommit:commit,candidateTree:tree,authorityRef,action:'qa_verifying'},priorReceipt:mode==='wrong-receipt'?{...priorReceipt,digest:'d'.repeat(64)}:priorReceipt,dependencyReceipts:mode==='missing-dependency'?[{...priorReceipt,digest:'e'.repeat(64)}]:[]})
-      const options={enabled:mode!=='disabled',accountService,readToken:async()=>'fixture-only',grantStore,journal,receiptDirectory:directory,readCurrentPolicy:async()=>++reads>1&&mode==='changed-policy'?'{}':policy,now:()=>time,dispatch:async()=>{sends++;return JSON.stringify({delivery:'acknowledged',sourceDigest:'f'.repeat(64)})}}
+      if(['revoked-grant','initial-revoked'].includes(mode))grantStore.revoke(authorityRef,ownerRef,time)
+      const policy=JSON.stringify({request:{scopeJson,expectedSequence:initial?1:3,candidateCommit:commit,candidateTree:tree,authorityRef,action},priorReceipt:initial&&mode!=='initial-fake-receipt'?null:mode==='wrong-receipt'?{...priorReceipt,digest:'d'.repeat(64)}:priorReceipt,dependencyReceipts:['missing-dependency','initial-dependency'].includes(mode)?[{...priorReceipt,digest:'e'.repeat(64)}]:[]})
+      const options={enabled:mode!=='disabled',accountService,readToken:async()=>'fixture-only',grantStore,journal,receiptDirectory:directory,readCurrentPolicy:async()=>++reads>1&&mode==='changed-policy'?'{}':policy,now:()=>time,dispatch:async()=>{sends++;return mode==='initial-unknown'?'unknown':JSON.stringify({delivery:'acknowledged',sourceDigest:'f'.repeat(64)})}}
       if(mode==='queue'){
         const registryPath=join(directory,'bindings.json'),occurredAt=new Date(time).toISOString()
         createEmptyRegistry(registryPath,['outcome'])
@@ -62,9 +65,16 @@ test('integrated local runtime checks account, durable grant, exact terminal rec
         }})
       }
       const result=await createLocalWorkRuntime(options).runOnce()
-      const passes=['valid','queue'].includes(mode)
+      const passes=['valid','queue','initial'].includes(mode)
       assert.equal(result.outcome==='acknowledged',passes,mode)
-      assert.equal(sends,passes?1:0,mode)
+      assert.equal(sends,passes||mode==='initial-unknown'?1:0,mode)
+      if(mode==='initial-unknown'){
+        assert.equal(result.outcome,'delivery_unknown')
+        assert.equal((await createLocalWorkRuntime(options).runOnce()).outcome,'delivery_unknown')
+        const reservation=db.prepare('SELECT reservation_digest FROM outcome_work_reservations').get().reservation_digest
+        assert.equal((await createLocalWorkRuntime(options).receiveOnce(reservation)).outcome,'configuration_hold')
+        assert.equal(sends,1)
+      }
       if(passes){
         assert.equal((await createLocalWorkRuntime(options).runOnce()).outcome,'acknowledged');assert.equal(sends,1)
         const reservation=db.prepare('SELECT reservation_digest FROM outcome_work_reservations').get().reservation_digest
@@ -75,6 +85,10 @@ test('integrated local runtime checks account, durable grant, exact terminal rec
         assert.equal((await createLocalWorkRuntime(options).receiveOnce(reservation)).outcome,'configuration_hold')
         assert.equal(sends,1)
         assert.equal(db.prepare('SELECT count(*) AS n FROM outcome_work_execution_claims').get().n,1)
+        if(initial){
+          const current=journal.read(scopeJson,time)
+          assert.equal(current.sequence,1);assert.equal(current.projection.stage,'queued');assert.equal(current.projection.activity,'waiting')
+        }
       }
       assert.equal(result.completionAuthority,false)
     }finally{db.close();rmSync(directory,{recursive:true,force:true})}

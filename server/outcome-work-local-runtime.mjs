@@ -26,13 +26,18 @@ export function createLocalWorkRuntime({enabled=false,accountService,readToken,g
       const verifyEligibility=async(request,{signal})=>{
           const latest=await readCurrentPolicy({signal})
           if(signal.aborted||latest!==raw)return false
-          const scope=JSON.parse(request.scopeJson),terminal=journal.readTerminal(request.scopeJson,now())
-          if(terminal.sequence!==request.expectedSequence||terminal.nextAction!==request.action||terminal.candidateCommit!==request.candidateCommit||terminal.candidateTree!==request.candidateTree)return false
+          const scope=JSON.parse(request.scopeJson),terminal=journal.readDispatchSource(request.scopeJson,now())
+          if(terminal.sequence!==request.expectedSequence)return false
           const expected=policy.priorReceipt
-          if(!expected||expected.projectId!==scope.projectId||expected.workId!==scope.workId||expected.runId!==scope.runId
-            ||expected.candidateCommit!==request.candidateCommit||expected.candidateTree!==request.candidateTree
-            ||expected.stage!==terminal.stage||expected.digest!==terminal.evidenceRef)return false
-          for(const receipt of [expected,...policy.dependencyReceipts]){
+          if(terminal.initial){
+            if(request.action!=='implementing'||expected!==null)return false
+          }else{
+            if(terminal.nextAction!==request.action||terminal.candidateCommit!==request.candidateCommit||terminal.candidateTree!==request.candidateTree)return false
+            if(!expected||expected.projectId!==scope.projectId||expected.workId!==scope.workId||expected.runId!==scope.runId
+              ||expected.candidateCommit!==request.candidateCommit||expected.candidateTree!==request.candidateTree
+              ||expected.stage!==terminal.stage||expected.digest!==terminal.evidenceRef)return false
+          }
+          for(const receipt of [...(terminal.initial?[]:[expected]),...policy.dependencyReceipts]){
             if(!verifyStoredWorkStageReceipt(receiptDirectory,JSON.stringify(receipt)).matches)return false
           }
           return !signal.aborted

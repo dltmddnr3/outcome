@@ -50,6 +50,11 @@ These are program responsibilities, not new agents, schedules or products. The c
 
 #### Candidate-bound stage receipt check · 2026-09-09
 
+- [x] AP4-04/05 initial queued work reaches one durable implementing reservation under authenticated current approval and dependencies, without fabricating a prior terminal receipt or running event. This is tested integration, not live start or Predicate closure.
+  CHECK: node --test server/outcome-work-local-runtime.test.mjs server/outcome-work-continuation.test.mjs
+  EXPECT: fail 0
+  EVIDENCE: 2026-09-09 RED initial scenario failed before correction. GREEN work-module suites: 50 PASS, 0 FAIL. Integrated initial cases cover one send/one receiver claim, reconstructed duplicate, revoked approval, missing dependency, blocked/stale queued state, fabricated prior receipt and unknown delivery without retry; journal stays queued/waiting after receipt. Scope is journal/controller/local-runtime and tests. Full npm test: 884 tests, 880 PASS, 4 FAIL in outcome-current-projection.test.mjs (source_digest_drift); baseline/regression classification remains OPEN, not waived. No Release PASS, live execution, deployment or Phase closure. Rollback is task-owned candidate revert only; user-owned files preserved.
+
 - [x] Native read-data restriction permits exact test input and runtime libraries but denies an outside file; inherited environment is minimal. This is platform feasibility only, not executor activation.
   CHECK: node --test server/outcome-work-sandbox.test.mjs
   EXPECT: fail 0
