@@ -29,6 +29,17 @@ export function createDestinationConfirmationRepository({transact,verifyReview}=
  const readSnapshot=async(query,scope)=>{
   const discovery=(await query('select * from outcome_destination_private.discovery_drafts where workspace_id=$1 and account_ref=$2 and draft_id=$3 for update',scope)).rows[0]
   const intake=(await query('select * from outcome_destination_private.drafts where workspace_id=$1 and account_ref=$2 and draft_id=$3 for share',scope)).rows[0]
+  if(intake?.document?.mode==='file_import'){
+   const document=parseDestinationDraft(JSON.stringify(intake.document))
+   if(!Number.isSafeInteger(intake.revision)||intake.revision<1)fail()
+   const blockers=[]
+   if(fields.some(k=>!document.answers[k]))blockers.push('intake_incomplete')
+   if(document.unknowns.length)blockers.push('residual_unknowns')
+   // Separate schema; never invent a discovery session or a question receipt.
+   const snapshot={schemaVersion:2,inputKind:'file_import',draftId:scope[2],intakeRevision:intake.revision,contextRevision:intake.revision,document,completionAuthority:false,executionAuthority:false}
+   const serialized=canonical(snapshot)
+   return {snapshot,serialized,reviewDigest:hash(serialized),blockers}
+  }
   if(!discovery||!intake||discovery.intake_revision!==intake.revision||discovery.state!=='draft'||discovery.completion_authority!==false)fail()
   const document=parseDestinationDraft(JSON.stringify(intake.document)),context=parseDiscoveryContext(JSON.stringify(discovery.context))
   if(context.revision!==discovery.revision||discoveryContextDigest(context)!==discovery.context_digest)fail()
@@ -69,7 +80,7 @@ export function createDestinationConfirmationRepository({transact,verifyReview}=
    const snapshot=row.snapshot,serialized=canonical(snapshot)
    if(row.workspace_id!==scope[0]||row.account_ref!==scope[1]||row.draft_id!==scope[2]||row.request_id!==input.requestId
     ||!digest(row.review_digest)||!digest(row.evidence_digest)||hash(serialized)!==row.review_digest
-    ||snapshot?.schemaVersion!==1||snapshot.draftId!==scope[2]||snapshot.completionAuthority!==false||snapshot.executionAuthority!==false
+    ||![1,2].includes(snapshot?.schemaVersion)||snapshot.draftId!==scope[2]||snapshot.completionAuthority!==false||snapshot.executionAuthority!==false
     ||snapshot.intakeRevision!==row.intake_revision||snapshot.contextRevision!==row.context_revision)fail()
    const evidenceDigest=await verifySnapshot(query,scope,serialized,row.review_digest)
    if(evidenceDigest!==row.evidence_digest)fail()

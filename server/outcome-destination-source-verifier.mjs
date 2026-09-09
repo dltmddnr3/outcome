@@ -25,8 +25,16 @@ export function createDestinationSourceVerifier({readAssessment,readSource,timeo
      if(![workspaceId,accountRef].every(v=>typeof v==='string'&&/^[A-Za-z0-9:_-]{1,128}$/.test(v))||!digest(reviewDigest))fail()
      const snapshot=parse(serializedSnapshot,10485760)
      if(hash(serializedSnapshot)!==reviewDigest||snapshot.completionAuthority!==false||snapshot.executionAuthority!==false)fail()
-     const checked=validateDestinationQuestionReceipt({serializedContext:JSON.stringify(snapshot.context),serializedReceipt:JSON.stringify(snapshot.questionReceipt)})
-     if(checked.plan.state!=='coverage_ready_for_review')fail()
+     const fileInput=snapshot.schemaVersion===2
+     let checked=null
+     if(fileInput){
+      exact(snapshot,['schemaVersion','inputKind','draftId','intakeRevision','contextRevision','document','completionAuthority','executionAuthority'])
+      const document=parseDestinationDraft(JSON.stringify(snapshot.document))
+      if(snapshot.inputKind!=='file_import'||document.mode!=='file_import'||document.unknowns.length||!Number.isSafeInteger(snapshot.intakeRevision)||snapshot.intakeRevision<1||snapshot.contextRevision!==snapshot.intakeRevision||['problem','targetUser','outcome','scope','nonGoals','constraints','acceptance','failureRecovery'].some(field=>!document.answers[field]))fail()
+     }else{
+      checked=validateDestinationQuestionReceipt({serializedContext:JSON.stringify(snapshot.context),serializedReceipt:JSON.stringify(snapshot.questionReceipt)})
+      if(checked.plan.state!=='coverage_ready_for_review')fail()
+     }
      const raw=await readAssessment({workspaceId,accountRef,reviewDigest,signal:controller.signal})
      if(controller.signal.aborted)fail()
      const assessment=parse(raw,131072)
@@ -37,9 +45,10 @@ export function createDestinationSourceVerifier({readAssessment,readSource,timeo
       exact(item,['domain','state','assessment','evidence'])
       if(!discoveryDomains.includes(item.domain)||seen.has(item.domain)||item.assessment!=='supported'||!['contract_ready','non_goal'].includes(item.state)||!Array.isArray(item.evidence)||!item.evidence.length||item.evidence.length>50)fail()
       seen.add(item.domain)
-      const coverage=checked.receipt.coverage.find(entry=>entry.domain===item.domain)
+      const coverage=checked?.receipt.coverage.find(entry=>entry.domain===item.domain)
       const refs=item.evidence.map(e=>e?.ref)
-      if(!coverage||coverage.state!==item.state||new Set(refs).size!==refs.length||refs.some(r=>!ref(r))||JSON.stringify([...refs].sort())!==JSON.stringify([...coverage.evidenceRefs].sort()))fail()
+      if(new Set(refs).size!==refs.length||refs.some(r=>!ref(r)))fail()
+      if(!fileInput&&(!coverage||coverage.state!==item.state||JSON.stringify([...refs].sort())!==JSON.stringify([...coverage.evidenceRefs].sort())))fail()
       for(const evidence of item.evidence){
        exact(evidence,['ref','contentDigest','startLine','endLine','quote'])
        if(!digest(evidence.contentDigest)||!Number.isSafeInteger(evidence.startLine)||!Number.isSafeInteger(evidence.endLine)||evidence.startLine<1||evidence.endLine<evidence.startLine||typeof evidence.quote!=='string'||!evidence.quote.trim()||Buffer.byteLength(evidence.quote)>16000)fail()

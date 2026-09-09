@@ -20,6 +20,40 @@ import {buildPackageModel} from './outcome-package.mjs'
 
 const scope={workspaceId:'workspace',accountRef:'owner',draftId:'00000000-0000-4000-8000-000000000001'}
 const requestId='00000000-0000-4000-8000-000000000010'
+test('file import confirms an exact source version and creates one package without a question receipt',async()=>{
+ const f=await fixture(),catalog=mkdtempSync(join(tmpdir(),'outcome-file-package-'))
+ try{
+  const labels=['문제','대상 사용자','결과','범위','비목표','제약','수용 기준','복구']
+  const fields=['problem','targetUser','outcome','scope','nonGoals','constraints','acceptance','failureRecovery']
+  const document={schemaVersion:1,mode:'file_import',source:fields.map((key,i)=>`# ${labels[i]}\n${f.document.answers[key]}`).join('\n'),answers:f.document.answers,unknowns:[]}
+  await f.drafts.save({...scope,requestId:'00000000-0000-4000-8000-000000000013',expectedRevision:1,document:JSON.stringify(document)})
+  const unverified=createDestinationConfirmationRepository({transact:f.transact})
+  const inspection=await unverified.inspect(scope)
+  const snapshot=JSON.parse(inspection.serializedSnapshot)
+  assert.equal(snapshot.schemaVersion,2);assert.equal(snapshot.inputKind,'file_import')
+  assert.equal(Object.hasOwn(snapshot,'questionReceipt'),false);assert.equal(Object.hasOwn(snapshot,'context'),false)
+  assert.deepEqual(inspection.blockers,[])
+  await assert.rejects(()=>unverified.review(scope),/verification_pending/)
+  const hash=value=>createHash('sha256').update(value).digest('hex')
+  const assessment={schemaVersion:1,workspaceId:scope.workspaceId,accountRef:scope.accountRef,reviewDigest:inspection.reviewDigest,verdict:'supported_for_owner_review',domains:discoveryDomains.map(domain=>({domain,state:'contract_ready',assessment:'supported',evidence:[{ref:'file',contentDigest:hash(document.source),startLine:2,endLine:2,quote:document.source.split('\n')[1]}]})),completionAuthority:false}
+  // Synthetic semantic assessment in this fixture only, never a live verdict.
+  const verifyReview=createDestinationSourceVerifier({readAssessment:async()=>JSON.stringify(assessment),readSource:async()=>document.source})
+  const repo=createDestinationConfirmationRepository({transact:f.transact,verifyReview})
+  const review=await repo.review(scope)
+  await assert.rejects(()=>repo.confirm({...scope,requestId,reviewDigest:review.reviewDigest,confirmed:false}))
+  const receipt=await repo.confirm({...scope,requestId,reviewDigest:review.reviewDigest,confirmed:true})
+  assert.equal(receipt.executionAuthority,false)
+  assert.deepEqual(await repo.confirm({...scope,requestId,reviewDigest:review.reviewDigest,confirmed:true}),receipt)
+  const publisher=createConfirmedPackagePublisher({catalog,confirmationRepository:repo})
+  const created=await publisher.publish({...scope,requestId})
+  assert.deepEqual(await publisher.publish({...scope,requestId}),created)
+  const entries=readCreatedProjectEntries(catalog);assert.equal(entries.length,1)
+  const contract=readFileSync(join(entries[0].root,entries[0].contract_file),'utf8')
+  assert.deepEqual(JSON.parse(contract.match(/```destination-source\n([^\n]+)\n```/)[1]).document,document)
+  assessment.reviewDigest='f'.repeat(64)
+  await assert.rejects(()=>repo.readConfirmedCreation({...scope,requestId}))
+ }finally{await f.db.close()}
+})
 test('default renderer consumes real SQL confirmation without a synthetic rendering capability',async()=>{
  const f=await fixture(),catalog=mkdtempSync(join(tmpdir(),'outcome-default-package-'));try{
   const repository=createDestinationConfirmationRepository(f),publisher=createConfirmedPackagePublisher({catalog,confirmationRepository:repository})
