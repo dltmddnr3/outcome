@@ -40,7 +40,7 @@ test('configured CLI starts once only after correlated running observation, neve
   const scope={projectId:'outcome',workId:'cli-work',runId:'cli-run',sessionRef:'d'.repeat(64),bindingVersion:1}
   const scopeJson=JSON.stringify(scope),journal=createWorkJournal(db),store=createWorkGrantStore(db)
   const grantJson=JSON.stringify({schemaVersion:2,...scope,ownerRef,candidateCommit,candidateTree,allowedStages:['implementing'],issuedAt:now-1,expiresAt:now+60000,
-    execution:{checkoutRef:'e'.repeat(64),writePaths:[],commands:[{id:'check',stage:'implementing',program:'node',args:['--version'],timeoutMs:1000}]}})
+    execution:{checkoutRef:createHash('sha256').update('outcome-work-checkout-v1\0').update(realpathSync(process.cwd())).digest('hex'),writePaths:[],commands:[{id:'check',stage:'implementing',program:'node',args:['--version'],timeoutMs:1000}]}})
   const authorityRef=createHash('sha256').update(grantJson).digest('hex')
   journal.append(scopeJson,JSON.stringify({sequence:1,observedAt:new Date(now).toISOString(),stage:'queued',attempt:1,activity:'waiting',candidateCommit:null,candidateTree:null,evidenceRef:null,nextAction:null,blocker:null}),0,now)
   const save=(name,value)=>{const path=join(root,name);writeFileSync(path,value,{mode:0o600});return path}
@@ -88,6 +88,18 @@ test('configured CLI starts once only after correlated running observation, neve
     assert.equal(JSON.parse(output).outcome,'already_claimed')
     assert.equal(await runOutcomeWorkOnce({...options,argv:['--observe',path,digest]}),0,output)
     assert.equal(JSON.parse(output).outcome,'start_recorded')
+    assert.equal(journal.read(scopeJson,now).projection.stage,'implementing')
+    bindingValid=false
+    assert.equal(await runOutcomeWorkOnce({...options,argv:['--execute',path,digest]}),70)
+    assert.equal(db.prepare('SELECT count(*) AS n FROM outcome_work_commands').get().n,0)
+    bindingValid=true
+    assert.equal(await runOutcomeWorkOnce({...options,identityFactory:wrongOwner,argv:['--execute',path,digest]}),70)
+    assert.equal(db.prepare('SELECT count(*) AS n FROM outcome_work_commands').get().n,0)
+    assert.equal(await runOutcomeWorkOnce({...options,argv:['--execute',path,digest]}),0,output)
+    assert.equal(JSON.parse(output).outcome,'command_exited_zero')
+    assert.equal(db.prepare('SELECT count(*) AS n FROM outcome_work_command_results').get().n,1)
+    assert.equal(await runOutcomeWorkOnce({...options,argv:['--execute',path,digest]}),70)
+    assert.equal(JSON.parse(output).outcome,'command_reconciliation_required')
     assert.equal(journal.read(scopeJson,now).projection.stage,'implementing')
     assert.equal(await runOutcomeWorkOnce({...options,argv:['--finalize',path,digest]}),70) // Running is not completed.
     assert.equal(await runOutcomeWorkOnce({...options,argv:['--observe',path,digest]}),0,output)

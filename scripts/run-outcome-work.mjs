@@ -5,6 +5,7 @@ import {fileURLToPath,pathToFileURL} from 'node:url'
 import {execFileSync} from 'node:child_process'
 import {DatabaseSync} from 'node:sqlite'
 import {createHash} from 'node:crypto'
+import {executeClaimedWorkCommand} from '../server/outcome-work-command-execution.mjs'
 import {verifyWorkExecutionGrant} from '../server/outcome-work-execution-grant.mjs'
 import {workQueueEnvelope} from '../server/outcome-work-queue.mjs'
 import {verifyWorkOutputCandidate} from '../server/outcome-work-output-candidate.mjs'
@@ -59,7 +60,7 @@ export async function runOutcomeWorkOnce({argv=process.argv.slice(2),write=text=
   identityFactory=createHostedIdentityRuntime,queueFactory=createCodexQueueAdapter,now=Date.now,sessionTokenReader}={}){
   let db
   try{
-    if(!Array.isArray(argv)||!['--dispatch','--receive','--approve','--observe','--finalize'].includes(argv[0])||argv.length!==(argv[0]==='--dispatch'?2:3)
+    if(!Array.isArray(argv)||!['--dispatch','--receive','--approve','--observe','--finalize','--execute'].includes(argv[0])||argv.length!==(argv[0]==='--dispatch'?2:3)
       ||argv[0]!=='--dispatch'&&!hash(argv[2],64))fail()
     const read=async path=>(await readDestinationProtectedBytes(path)).toString('utf8')
     const config=JSON.parse(await read(argv[1]))
@@ -110,6 +111,33 @@ export async function runOutcomeWorkOnce({argv=process.argv.slice(2),write=text=
     }
     const runtime=createLocalWorkRuntime({enabled:true,accountService:identity.service,readToken,grantStore,journal,
       receiptDirectory:config.receiptDirectory,queueAdapter,now,readCurrentPolicy})
+    if(argv[0]==='--execute'){
+      // Execution is separate from receipt finalization: exit zero cannot close
+      // a stage. Existing V2 grants expose no read-only manifest, so only their
+      // exact approved write files may be read; no whole-checkout access.
+      const {request}=JSON.parse(await readCurrentPolicy()),scope=JSON.parse(request.scopeJson)
+      const owner=await identity.service.resolveBridgeAuthority({token:await readToken()})
+      if(!owner?.project_ids?.includes(scope.projectId))fail()
+      const reserved=journal.readObservationRequest(request.scopeJson,argv[2],owner.account_ref,now())
+      if(['candidateCommit','candidateTree','authorityRef','action'].some(key=>request[key]!==reserved[key]))fail()
+      const saved=JSON.parse(grantStore.read(request.authorityRef,owner.account_ref)),grant=JSON.parse(saved.grantJson)
+      if(saved.status!=='active'||grant.schemaVersion!==2)fail()
+      const commands=grant.execution.commands.filter(command=>command.stage===request.action)
+      if(commands.length!==1)fail()
+      const readPaths=[]
+      for(const path of grant.execution.writePaths){
+        const absolute=join(checkout,path)
+        if(await realpath(absolute)!==absolute)fail()
+        readPaths.push(absolute)
+      }
+      await readCurrentPolicy()
+      const fresh=await identity.service.resolveBridgeAuthority({token:await readToken()})
+      if(fresh?.account_ref!==owner.account_ref||!fresh.project_ids?.includes(scope.projectId))fail()
+      const result=await executeClaimedWorkCommand({journal,scopeJson:request.scopeJson,reservationDigest:argv[2],ownerRef:owner.account_ref,
+        commandId:commands[0].id,cwd:checkout,readPaths,now})
+      write(JSON.stringify(result)+'\n')
+      return result.outcome==='command_exited_zero'?0:70
+    }
     if(argv[0]==='--finalize'){
       let timer
       const inspect=async()=>{

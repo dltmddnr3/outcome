@@ -61,6 +61,11 @@ Command containment correction: detached spawn with ignored stdio was denied inc
 
 Command composition regression at candidate `1bdb228`: `npm test` completed with 901 PASS, 0 fail/skip/TODO; `npm run build` PASS. Same-session verification only. Actual owner-authorized operational composition and Phase 4/5 direct-use acceptance remain open; no Preview/provider mutation occurred.
 
+- [ ] Operational `--execute` checks current protected policy, current Planner binding, authenticated owner, reserved action and live grant before one durable process launch; duplicate execution holds and command success does not finalize a stage.
+  CHECK: node --test server/outcome-work-runner.test.mjs
+  EXPECT: fail 0
+  EVIDENCE: pending. Existing V2 grants permit reading only their approved write files; read-only manifests and multi-command subprocess workloads remain open. Live owner configuration is not provisioned by this change.
+
 - [ ] Command receiver's internal process port executes an explicit Node command within exact-file read/write sandbox, denies network and outside files, bounds output/time, and exposes digest only. Unsupported programs hold.
   CHECK: node --test server/outcome-work-command.test.mjs
   EXPECT: fail 0
