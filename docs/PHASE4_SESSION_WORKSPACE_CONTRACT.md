@@ -60,6 +60,8 @@ These are program responsibilities, not new agents, schedules or products. The c
   CHECK: node scripts/local-session-connection-browser-check.mjs && node scripts/local-session-connection-browser-check.mjs --grant-test-permission
   EXPECT: denied-permission guard PASS and synthetic identity connection PASS
 
+  FINAL REGRESSION: `77c886e` frontend 236 PASS across 29 files, server 906 PASS with zero fail/skip/TODO, then sequential build PASS. Chrome denied and explicitly permission-granted disposable contexts both meet their expected outcomes. Initial TypeScript test Buffer use failed the build and was corrected to browser-compatible btoa; no dependency added. Default workspace UI remains unchanged unless a valid invitation fragment is present. Live owner use and intended-candidate Preview remain unproven; do not request or print a session token.
+
 - [ ] Execution CLI accepts explicit protected Preview identity configuration with in-memory session input; remote authenticated workspace proves identity only and never substitutes for current local grant, binding or evidence.
   CHECK: node --test server/outcome-work-runner.test.mjs server/outcome-preview-work-identity.test.mjs
   EXPECT: fail 0
