@@ -54,6 +54,11 @@ These are program responsibilities, not new agents, schedules or products. The c
 
 #### Candidate-bound stage receipt check · 2026-09-09
 
+- [ ] Existing local runtime has a one-shot CLI composition with explicit protected configuration, existing database, current identity and canonical binding; no implicit initialization, grants or scheduler.
+  CHECK: node --test server/outcome-work-runner.test.mjs
+  EXPECT: fail 0
+  EVIDENCE: pending. Scope scripts/run-outcome-work.mjs and runner tests. Missing/stale config must perform no dispatch. Rollback: task-owned commit only. Live configuration and real stage execution remain separate unmet requirements.
+
 - [x] AP4-04/05 initial queued work reaches one durable implementing reservation under authenticated current approval and dependencies, without fabricating a prior terminal receipt or running event. This is tested integration, not live start or Predicate closure.
   CHECK: node --test server/outcome-work-local-runtime.test.mjs server/outcome-work-continuation.test.mjs
   EXPECT: fail 0
