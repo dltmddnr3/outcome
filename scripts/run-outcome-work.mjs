@@ -87,7 +87,7 @@ export async function runOutcomeWorkOnce({argv=process.argv.slice(2),write=text=
     JSON.parse(policy) // Reject malformed input before opening the database.
     // readOnly preflight must prove schema exists; do not bootstrap an empty DB.
     db=new DatabaseSync(config.databasePath,{readOnly:true})
-    const required=['outcome_execution_grants','outcome_work_journals','outcome_work_reservations','outcome_work_dispatches','outcome_work_execution_claims','outcome_work_activity','outcome_work_starts']
+    const required=['outcome_execution_grants','outcome_work_journals','outcome_work_reservations','outcome_work_dispatches','outcome_work_execution_claims','outcome_work_activity','outcome_work_starts','outcome_work_commands']
     const tables=new Set(db.prepare("SELECT name FROM sqlite_master WHERE type='table'").all().map(row=>row.name))
     if(!required.every(name=>tables.has(name)))fail()
     db.close();db=null

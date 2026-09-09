@@ -52,6 +52,11 @@ These are program responsibilities, not new agents, schedules or products. The c
 
 ### Existing Phase 4 acceptance additions
 
+- [ ] Before process launch, atomically claim the exact approved command against received reservation, recorded running stage, same owner, active unexpired V2 grant and checkout reference; duplicate claims never relaunch.
+  CHECK: node --test server/outcome-work-command-claim.test.mjs
+  EXPECT: fail 0
+  EVIDENCE: Same-session targeted regression 2 PASS, 0 fail: one durable claim across journal reopen; no command returned on replay; missing start, foreign owner, wrong checkout, expiry, revocation and multiple commands reject without claim insertion. New table is local-schema-only; old runner databases hold at read-only preflight rather than automatic upgrade. Gate remains open: multi-command stages and process invocation composition are not connected or verified as actual continuous execution.
+
 Command containment correction: detached spawn with ignored stdio was denied incidentally, but inherited stdio reproduced a successful child spawn (regression RED). Added explicit process-fork denial to the single-process sandbox; regression GREEN. This deliberately supports only commands that do not fork; npm/git and subprocess-based test runners remain unsupported, not silently treated as successful. No grant/receiver activation. Native test PASS also verifies output flood termination and in-flight cancellation. IPC and production-level containment review remain open.
 
 - [ ] Command receiver's internal process port executes an explicit Node command within exact-file read/write sandbox, denies network and outside files, bounds output/time, and exposes digest only. Unsupported programs hold.

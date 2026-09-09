@@ -47,6 +47,10 @@ export function createWorkJournal(db) {
     CREATE TABLE IF NOT EXISTS outcome_work_starts (
       reservation_digest TEXT PRIMARY KEY, sequence INTEGER NOT NULL, source_digest TEXT NOT NULL
     ) STRICT;
+    CREATE TABLE IF NOT EXISTS outcome_work_commands (
+      reservation_digest TEXT NOT NULL, command_id TEXT NOT NULL, owner_ref TEXT NOT NULL,
+      claimed_at INTEGER NOT NULL, PRIMARY KEY(reservation_digest,command_id)
+    ) STRICT;
   `))
   const normalize=(scopeJson,nowMs)=>{
     if(typeof scopeJson!=='string' || Buffer.byteLength(scopeJson)>2048) fail()
@@ -74,6 +78,27 @@ export function createWorkJournal(db) {
     return action
   }
   return Object.freeze({
+    claimCommandExecution(scopeJson,reservationDigest,ownerRef,commandId,checkoutRef,nowMs){return transact(()=>{
+      const bound=normalize(scopeJson,nowMs),current=load(bound,nowMs),action=reservation(bound,reservationDigest)
+      const claim=db.prepare('SELECT owner_ref FROM outcome_work_execution_claims WHERE reservation_digest=?').get(reservationDigest)
+      const start=db.prepare('SELECT sequence FROM outcome_work_starts WHERE reservation_digest=?').get(reservationDigest)
+      const last=current.journal.events.at(-1)
+      if(!claim||claim.owner_ref!==ownerRef||!start||start.sequence!==current.sequence||last?.stage!==action[3]||last.activity!=='running')fail()
+      const stored=db.prepare('SELECT grant_json,owner_ref,revoked_at FROM outcome_execution_grants WHERE digest=?').get(action[6])
+      if(!stored||stored.owner_ref!==ownerRef||stored.revoked_at!==null)fail()
+      const expected=JSON.stringify({...bound.scope,ownerRef,candidateCommit:action[4],candidateTree:action[5],authorityRef:action[6],action:action[3],status:'active'})
+      if(!verifyWorkExecutionGrant(stored.grant_json,expected,nowMs).matches)fail()
+      const grant=JSON.parse(stored.grant_json)
+      if(grant.schemaVersion!==2||grant.execution.checkoutRef!==checkoutRef)fail()
+      const commands=grant.execution.commands.filter(command=>command.stage===action[3])
+      // Until ordered result reconciliation is implemented, only a single
+      // explicitly approved command can be claimed. Never execute a subset.
+      if(commands.length!==1||commands[0].id!==commandId||commands[0].program!=='node')fail()
+      const old=db.prepare('SELECT owner_ref FROM outcome_work_commands WHERE reservation_digest=? AND command_id=?').get(reservationDigest,commandId)
+      if(old){if(old.owner_ref!==ownerRef)fail();return Object.freeze({outcome:'command_already_claimed',executionAuthority:false,completionAuthority:false})}
+      db.prepare('INSERT INTO outcome_work_commands VALUES(?,?,?,?)').run(reservationDigest,commandId,ownerRef,nowMs)
+      return Object.freeze({outcome:'command_claimed',command:Object.freeze(commands[0]),writePaths:Object.freeze(grant.execution.writePaths),executionAuthority:false,completionAuthority:false})
+    })},
     recordVerifiedTerminal(scopeJson,reservationDigest,ownerRef,receiptDirectory,expectedJson,nowMs){return transact(()=>{
       const bound=normalize(scopeJson,nowMs),current=load(bound,nowMs),action=reservation(bound,reservationDigest)
       const claim=db.prepare('SELECT owner_ref FROM outcome_work_execution_claims WHERE reservation_digest=?').get(reservationDigest)
