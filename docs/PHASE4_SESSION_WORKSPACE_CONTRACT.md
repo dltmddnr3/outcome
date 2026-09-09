@@ -52,6 +52,11 @@ These are program responsibilities, not new agents, schedules or products. The c
 
 ### Existing Phase 4 acceptance additions
 
+- [ ] Local source composition joins the current authenticated binding, durable journal and owner-runtime snapshot; changed binding or cancellation returns unavailable, never a fabricated running state.
+  CHECK: node --test server/outcome-local-work-source.test.mjs
+  EXPECT: fail 0
+  EVIDENCE: pending. Local server composition only; hosted transport and actual owner-use remain open.
+
 - [x] Screen observation accepts the local journal's domain-separated opaque session reference only when it matches the observed private thread; legacy UUID compatibility remains exact and no identifier is exposed.
   CHECK: node --test server/outcome-codex-work-observation.test.mjs server/outcome-work-observation-access.test.mjs
   EXPECT: fail 0
