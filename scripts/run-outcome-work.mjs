@@ -7,6 +7,7 @@ import {DatabaseSync} from 'node:sqlite'
 import {createHash} from 'node:crypto'
 import {verifyWorkExecutionGrant} from '../server/outcome-work-execution-grant.mjs'
 import {workQueueEnvelope} from '../server/outcome-work-queue.mjs'
+import {verifyWorkOutputCandidate} from '../server/outcome-work-output-candidate.mjs'
 import {readDestinationProtectedBytes} from './run-destination-questions.mjs'
 import {createHostedIdentityRuntime} from '../server/account-access-hosted.mjs'
 import {createWorkJournal} from '../server/outcome-work-journal.mjs'
@@ -89,18 +90,10 @@ export async function runOutcomeWorkOnce({argv=process.argv.slice(2),write=text=
         if(['candidateCommit','candidateTree','authorityRef','action'].some(key=>request[key]!==reserved[key]))fail()
         const expectedJson=await read(config.terminalPath),expected=JSON.parse(expectedJson)
         if(!hash(expected.candidateCommit,40)||!hash(expected.candidateTree,40))fail()
-        const git=args=>execFileSync('git',args,{cwd:checkout,encoding:'utf8',timeout:5000,maxBuffer:1024*1024,stdio:['ignore','pipe','ignore']}).trim()
-        if(git(['rev-parse',`${expected.candidateCommit}^{tree}`])!==expected.candidateTree)fail()
-        if(expected.candidateCommit!==request.candidateCommit){
-          if(request.action!=='implementing')fail()
-          const saved=JSON.parse(grantStore.read(request.authorityRef,owner.account_ref)),grant=JSON.parse(saved.grantJson)
-          if(saved.status!=='active'||grant.schemaVersion!==2)fail()
-          git(['merge-base','--is-ancestor',request.candidateCommit,expected.candidateCommit])
-          const range=`${request.candidateCommit}..${expected.candidateCommit}`
-          const paths=[...git(['log','--format=','--name-only','--no-renames','--diff-merges=first-parent',range]).split('\n'),
-            ...git(['diff','--name-only','--no-renames',request.candidateCommit,expected.candidateCommit]).split('\n')].filter(Boolean)
-          if(paths.some(path=>!grant.execution.writePaths.includes(path)))fail()
-        }
+        const saved=JSON.parse(grantStore.read(request.authorityRef,owner.account_ref)),grant=JSON.parse(saved.grantJson)
+        if(saved.status!=='active'||expected.candidateCommit!==request.candidateCommit&&grant.schemaVersion!==2)fail()
+        if(!verifyWorkOutputCandidate({checkout,sourceCommit:request.candidateCommit,sourceTree:request.candidateTree,
+          outputCommit:expected.candidateCommit,outputTree:expected.candidateTree,stage:request.action,writePaths:grant.execution?.writePaths??[]}))fail()
         await readCurrentPolicy()
         if(await read(config.terminalPath)!==expectedJson)fail()
         const fresh=await identity.service.resolveBridgeAuthority({token:await read(config.tokenPath)})
