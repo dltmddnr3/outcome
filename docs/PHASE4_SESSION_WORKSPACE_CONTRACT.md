@@ -64,7 +64,7 @@ Command composition regression at candidate `1bdb228`: `npm test` completed with
 - [ ] Operational `--execute` checks current protected policy, current Planner binding, authenticated owner, reserved action and live grant before one durable process launch; duplicate execution holds and command success does not finalize a stage.
   CHECK: node --test server/outcome-work-runner.test.mjs
   EXPECT: fail 0
-  EVIDENCE: pending. Existing V2 grants permit reading only their approved write files; read-only manifests and multi-command subprocess workloads remain open. Live owner configuration is not provisioned by this change.
+  EVIDENCE: Candidate `4b7b0fe`, same-session full regression 902 PASS, 0 fail/skip/TODO and build PASS. Configured CLI integration proves wrong owner/binding prevents claims, one actual process result persists, replay holds, and stage remains implementing. Separate real-process regression proves grant revocation cancels within the local 100ms sampling cycle and stores cancellation rather than success. Gate remains open for actual owner use: existing V2 grants permit reading only their approved write files; read-only manifests and multi-command subprocess workloads remain open. Live owner configuration is not provisioned by this change. No provider/runtime activation or deployment.
 
 - [ ] Command receiver's internal process port executes an explicit Node command within exact-file read/write sandbox, denies network and outside files, bounds output/time, and exposes digest only. Unsupported programs hold.
   CHECK: node --test server/outcome-work-command.test.mjs
