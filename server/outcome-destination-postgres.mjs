@@ -1,5 +1,6 @@
 import { createHash } from 'node:crypto'
 import { types } from 'node:util'
+import { analyzeDestinationBrief } from '../src/lib/destination-brief-parser.mjs'
 
 const fields = ['problem','targetUser','outcome','scope','nonGoals','constraints','acceptance','failureRecovery']
 const fail = (code = 'destination_invalid') => { throw new Error(code) }
@@ -30,10 +31,15 @@ export function parseDestinationDraft(serialized) {
   let parsed
   try { parsed = JSON.parse(serialized) } catch { fail() }
   const value = plain(parsed, ['schemaVersion','mode','source','answers','unknowns'])
-  if (value.schemaVersion !== 1 || !['guided_200q','brief_gap'].includes(value.mode)) fail()
+  if (value.schemaVersion !== 1 || !['guided_200q','brief_gap','file_import'].includes(value.mode)) fail()
   safeText(value.source, 65536, true)
   if (!value.answers || Array.isArray(value.answers) || typeof value.answers !== 'object' || Object.keys(value.answers).some(key => !fields.includes(key))) fail()
   const answers = Object.fromEntries(fields.filter(key => Object.hasOwn(value.answers, key)).map(key => [key, safeText(value.answers[key], 16000)]))
+  if (value.mode === 'file_import') {
+    if (!value.source.trim()) fail()
+    const extracted = analyzeDestinationBrief(value.source).answers
+    if (fields.some(key => answers[key] !== extracted[key])) fail()
+  }
   if (!Array.isArray(value.unknowns) || value.unknowns.length > 200) fail()
   const document = { schemaVersion: 1, mode: value.mode, source: value.source, answers, unknowns: value.unknowns.map(item => safeText(item, 2000)) }
   if (Buffer.byteLength(JSON.stringify(document)) > 131072) fail()

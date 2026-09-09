@@ -13,6 +13,7 @@ export function parseDiscoveryContext(serialized) {
  let context
  try{context=JSON.parse(serialized)}catch{fail()}
  exact(context,['source','mode','seedAnswers','unknowns','answers','askedQuestionIds','revision'])
+ if(context.mode==='file_import')fail() // File review is not a question session.
  const intake=parseDestinationDraft(JSON.stringify({schemaVersion:1,mode:context.mode,source:context.source,answers:context.seedAnswers,unknowns:context.unknowns}))
  if(!Number.isSafeInteger(context.revision)||context.revision<0||!Array.isArray(context.answers)||context.answers.length>200||!Array.isArray(context.askedQuestionIds)||context.askedQuestionIds.length>200||context.askedQuestionIds.some(v=>!id(v))||new Set(context.askedQuestionIds).size!==context.askedQuestionIds.length)fail()
  const answered=new Set(),gaps=new Set()

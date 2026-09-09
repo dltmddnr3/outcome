@@ -9,6 +9,31 @@ import {handleDestinationDraftRequest} from './outcome-destination-api.mjs'
 import {createDestinationAnalysisSourceResolver,destinationDocumentDigest} from './outcome-destination-analysis-source.mjs'
 
 const document=()=>JSON.stringify({schemaVersion:1,mode:'brief_gap',source:'목적: 실행 결과 확인',answers:{problem:'작업 결과를 확인하기 어렵다'},unknowns:['수용 기준 확인 필요']})
+test('file imports bind derived fields to the exact original, retaining missing and conflicting fields',()=>{
+ const doc={schemaVersion:1,mode:'file_import',source:'# 결과\r\n  직접 확인  \r\n# 범위\r\n읽기\r\n# 범위\r\n쓰기\r\n',answers:{outcome:'직접 확인'},unknowns:['의미 검증 필요']}
+ assert.deepEqual(parseDestinationDraft(JSON.stringify(doc)),doc)
+ for(const answers of [{outcome:'다른 결과'},{outcome:'직접 확인',scope:'쓰기'},{}])assert.throws(()=>parseDestinationDraft(JSON.stringify({...doc,answers})),/destination_invalid/)
+ assert.throws(()=>parseDestinationDraft(JSON.stringify({...doc,source:''})),/destination_invalid/)
+})
+
+test('file import survives scoped SQL storage and version reload without normalizing original bytes',async()=>{
+ const db=await PGlite.create('memory://')
+ try{
+  await db.exec('create role anon nologin;create role authenticated nologin;')
+  await db.exec(await readFile(new URL('../supabase/migrations/20260908011009_outcome_destination_private_drafts.sql',import.meta.url),'utf8'))
+  const repo=createDestinationDraftRepository({transact:work=>db.transaction(async tx=>{await tx.exec('set local role outcome_destination_backend');return work({query:(sql,args)=>tx.query(sql,args)})})})
+  const scope={workspaceId:'file-workspace',accountRef:'file-owner',draftId:'00000000-0000-4000-8000-000000000001'}
+  const doc={schemaVersion:1,mode:'file_import',source:'# 결과\r\n  직접 확인  \r\n',answers:{outcome:'직접 확인'},unknowns:['의미 검증 필요']}
+  const input={...scope,requestId:'00000000-0000-4000-8000-000000000002',expectedRevision:0,document:JSON.stringify(doc)}
+  const saved=await repo.save(input)
+  assert.equal(saved.revision,1);assert.deepEqual(saved.document,doc)
+  assert.deepEqual(await repo.save(input),saved)
+  assert.deepEqual(await repo.load(scope),saved)
+  assert.equal(await repo.load({...scope,accountRef:'other'}),null)
+  await assert.rejects(()=>repo.save({...input,requestId:'00000000-0000-4000-8000-000000000003',expectedRevision:1,document:JSON.stringify({...doc,answers:{outcome:'改'}})}),/destination_invalid/)
+  assert.deepEqual(await repo.load(scope),saved)
+ }finally{await db.close()}
+})
 test('destination draft parser preserves unknowns and rejects secret-like or oversized content',()=>{
  assert.equal(parseDestinationDraft(document()).unknowns.length,1)
  for(const source of ['password=private-value','/Users/person/private','x'.repeat(65537)])assert.throws(()=>parseDestinationDraft(JSON.stringify({schemaVersion:1,mode:'brief_gap',source,answers:{},unknowns:[]})),/destination_invalid/)

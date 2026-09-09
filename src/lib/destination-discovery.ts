@@ -1,4 +1,4 @@
-export type DestinationMode = 'guided_200q' | 'brief_gap'
+export type DestinationMode = 'guided_200q' | 'brief_gap' | 'file_import'
 
 export type DestinationDomainId =
   | 'problem'
@@ -31,71 +31,9 @@ export const destinationQuestions: readonly DestinationQuestion[] = [
   { id: 'failureRecovery', label: '실패·복구', prompt: '실패하거나 결과가 불명할 때 어떻게 해야 하나요?', why: '복구 규칙이 없으면 재시도가 중복 변경을 만들 수 있어요.', choices: ['재시도 없이 멈추고 읽기 후 최소 교정한다', '이번 작업이 만든 변경만 되돌린다', '불명하면 완료로 표시하지 않고 차단 근거를 남긴다'] },
 ] as const
 
-const briefMatchers: Readonly<Record<DestinationDomainId, readonly string[]>> = {
-  problem: ['문제', 'problem'],
-  targetUser: ['대상 사용자', '타겟 사용자', 'target user', 'user'],
-  outcome: ['원하는 결과', '결과', 'outcome'],
-  scope: ['포함 범위', '범위', 'scope'],
-  nonGoals: ['비목표', '하지 않는 것', 'non-goal', 'non goal'],
-  constraints: ['제약', 'constraint'],
-  acceptance: ['수용 기준', '완료 조건', 'acceptance'],
-  failureRecovery: ['실패·복구', '실패/복구', '복구', 'failure', 'rollback'],
-}
-
-const stripPrefix = (line: string) => line.replace(/^\s{0,3}(?:[-*+]\s+|#{1,6}\s+|\d+[.)]\s+)?/, '').trim()
-
 export type BriefEvidence = { field: DestinationDomainId; startLine: number; endLine: number; value: string }
-
-export function analyzeDestinationBrief(text: string) {
-  const bytes = new TextEncoder().encode(text).byteLength
-  if (bytes > 65_536) throw new Error('payload_too_large')
-  const answers: DestinationAnswers = {}
-  const evidence: BriefEvidence[] = [], conflicts = new Set<DestinationDomainId>()
-  let active: { field: DestinationDomainId; startLine: number; endLine: number; lines: string[] } | null = null
-  let fence: string | null = null
-  const flush = () => {
-    if (!active) return
-    const value = active.lines.join('\n').trim()
-    if (value) {
-      evidence.push({ field: active.field, startLine: active.startLine, endLine: active.endLine, value })
-      const previous = answers[active.field]
-      if (previous && previous.replace(/\s+/g, ' ') !== value.replace(/\s+/g, ' ')) conflicts.add(active.field)
-      if (!conflicts.has(active.field)) answers[active.field] = value
-      else delete answers[active.field]
-    }
-    active = null
-  }
-  for (const [index, rawLine] of text.split(/\r?\n/).entries()) {
-    const fenceMatch = /^\s{0,3}(`{3,}|~{3,})/.exec(rawLine)
-    if (fenceMatch) {
-      if (fence === null) fence = fenceMatch[1]
-      else if (fenceMatch[1][0] === fence[0] && fenceMatch[1].length >= fence.length) fence = null
-      continue
-    }
-    if (fence) continue
-    const line = stripPrefix(rawLine)
-    if (!line) continue
-    const normalized = line.toLocaleLowerCase('ko-KR')
-    let found = false
-    for (const question of destinationQuestions) {
-      const marker = briefMatchers[question.id].find(candidate => {
-        const prefix = candidate.toLocaleLowerCase('ko-KR')
-        return normalized === prefix || normalized.startsWith(prefix) && /^\s*[:：—–-]\s*/.test(line.slice(candidate.length))
-      })
-      if (!marker) continue
-      flush()
-      const value = line.slice(marker.length).replace(/^\s*[:：—–-]\s*/, '').trim()
-      active = { field: question.id, startLine: index + 1, endLine: index + 1, lines: value ? [value] : [] }
-      found = true; break
-    }
-    if (found) continue
-    if (/^\s{0,3}#{1,6}\s/.test(rawLine)) { flush(); continue }
-    if (/^[^:：]{1,80}[:：]\s*\S/.test(line)) { flush(); continue }
-    if (active) { active.lines.push(rawLine.trim()); active.endLine = index + 1 }
-  }
-  flush()
-  return { answers, conflicts: [...conflicts], evidence }
-}
+import { analyzeDestinationBrief } from './destination-brief-parser.mjs'
+export { analyzeDestinationBrief }
 
 export function extractBriefAnswers(text: string): DestinationAnswers {
   return analyzeDestinationBrief(text).answers

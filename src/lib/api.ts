@@ -110,7 +110,7 @@ export const captureDestinationReviewBinding=()=>{
  return ()=>binding!==null&&binding===privateDestinationBinding&&generation===privateDecisionBindingVersion
 }
 export const activeDestinationDraftId = '00000000-0000-4000-8000-000000000001'
-export type DestinationDraftDocument = { schemaVersion: 1; mode: 'guided_200q' | 'brief_gap'; source: string; answers: import('./destination-discovery').DestinationAnswers; unknowns: string[] }
+export type DestinationDraftDocument = { schemaVersion: 1; mode: 'guided_200q' | 'brief_gap' | 'file_import'; source: string; answers: import('./destination-discovery').DestinationAnswers; unknowns: string[] }
 export type StoredDestinationDraft = { draftId: string; revision: number; document: DestinationDraftDocument; state: 'draft'; completionAuthority: false }
 export type StoredDiscovery = {draftId:string;revision:number;intakeRevision:number;context:DiscoveryContext;contextDigest:string;state:'draft';completionAuthority:false}
 export type DestinationConfirmationReview={reviewDigest:string;intakeRevision:number;contextRevision:number;completionAuthority:false;executionAuthority:false}
@@ -324,7 +324,7 @@ export function validateStoredDestinationDraft(value: unknown): StoredDestinatio
   if (!object(row, ['draftId','revision','document','state','completionAuthority']) || row.draftId !== activeDestinationDraftId || !Number.isSafeInteger(row.revision) || Number(row.revision) < 1 || row.state !== 'draft' || row.completionAuthority !== false) throw new Error('destination_response_invalid')
   const doc = row.document
   const fields = ['problem','targetUser','outcome','scope','nonGoals','constraints','acceptance','failureRecovery']
-  if (!object(doc, ['schemaVersion','mode','source','answers','unknowns']) || doc.schemaVersion !== 1 || !['guided_200q','brief_gap'].includes(String(doc.mode)) || typeof doc.source !== 'string' || new TextEncoder().encode(doc.source).length > 65536 || !doc.answers || typeof doc.answers !== 'object' || Array.isArray(doc.answers) || Object.entries(doc.answers).some(([k,v]) => !fields.includes(k) || typeof v !== 'string' || new TextEncoder().encode(v).length > 16000) || !Array.isArray(doc.unknowns) || doc.unknowns.length > 200 || doc.unknowns.some(v => typeof v !== 'string' || new TextEncoder().encode(v).length > 2000)) throw new Error('destination_response_invalid')
+  if (!object(doc, ['schemaVersion','mode','source','answers','unknowns']) || doc.schemaVersion !== 1 || !['guided_200q','brief_gap','file_import'].includes(String(doc.mode)) || typeof doc.source !== 'string' || new TextEncoder().encode(doc.source).length > 65536 || !doc.answers || typeof doc.answers !== 'object' || Array.isArray(doc.answers) || Object.entries(doc.answers).some(([k,v]) => !fields.includes(k) || typeof v !== 'string' || new TextEncoder().encode(v).length > 16000) || !Array.isArray(doc.unknowns) || doc.unknowns.length > 200 || doc.unknowns.some(v => typeof v !== 'string' || new TextEncoder().encode(v).length > 2000)) throw new Error('destination_response_invalid')
   return row as StoredDestinationDraft
 }
 

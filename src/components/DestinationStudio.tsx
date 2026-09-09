@@ -109,7 +109,7 @@ export function DestinationStudio({ open, onClose, fileBased = true }: { open: b
         setMode(doc.mode); setBriefText(doc.source); setAnswers(doc.answers); setUnknowns(doc.unknowns)
         const queue = unansweredDestinationQuestions(doc.answers).map(item=>item.id)
         setQuestionQueue(queue); setQuestionIndex(0); setDraftAnswer(''); setStep(fileBased ? 'brief' : queue.length ? 'question' : 'review')
-        setEvidence(doc.mode === 'brief_gap' ? analyzeDestinationBrief(doc.source).evidence : [])
+        setEvidence(doc.mode !== 'guided_200q' ? analyzeDestinationBrief(doc.source).evidence : [])
         setSourceNote(null); setError(null); setRevision(stored.revision); setStorageHold(false)
         setStorageNotice(`초안 버전 ${stored.revision} 불러옴 · 미확정`)
       }
@@ -151,7 +151,7 @@ export function DestinationStudio({ open, onClose, fileBased = true }: { open: b
       const extracted = analysis.answers
       setEvidence(analysis.evidence)
       if (fileBased) {
-        setMode('brief_gap'); setAnswers(extracted); setError(null); setStep('file-review'); return
+        setMode('file_import'); setAnswers(extracted); setError(null); setStep('file-review'); return
       }
       const count = Object.keys(extracted).length
       setSourceNote(count ? `명시된 제목에서 ${count}개 항목을 찾았어요. 충돌 ${analysis.conflicts.length}개를 포함해 빈 항목을 묻습니다. 자유 서술의 의미 분석은 아직 연결되지 않았어요.` : '확정할 수 있는 항목이 없어 첫 질문부터 시작합니다.')

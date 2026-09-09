@@ -391,6 +391,8 @@ Phase 4 entry에는 Phase 3 supported adapter evidence, account/private workspac
 
 ## File-based intake amendment · 2026-09-09
 
+File storage contract follow-up: `file_import` is now an explicit draft mode, distinct from preserved `brief_gap`/`guided_200q`. Shared deterministic heading parser runs in browser and server; server rejects supplied fields not equal to extraction, including arbitrary selection of a conflicting value. This proves source linkage, not semantic support or execution readiness. Existing question context rejects file imports rather than silently fabricating question receipts. No hosted schema/migration/config changed. CHECK: `node --test server/outcome-destination-postgres.test.mjs` (4 PASS, including scoped PGlite file import, idempotent reload, exact CRLF/space preservation and forged answer rejection); parser/UI 14 PASS; Chrome 4 PASS; TypeScript/Vite build PASS. Full confirmation/start integration remains pending.
+
 AP-5-04/05 and AP-4-09 prerequisite under the approved file-based MVP: default intake reads external planning text and presents source-grounded fields, missing fields and duplicate-heading conflicts without starting internal questions. Original source remains unchanged in the existing versioned draft. Reading/reviewing/saving does not authorize execution. Existing internal discovery implementation is retained but not the default entry.
 
 - [ ] Default entry and file review do not generate questions or claim execution readiness.
