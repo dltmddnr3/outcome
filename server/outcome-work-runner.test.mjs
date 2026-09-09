@@ -5,6 +5,7 @@ import {tmpdir} from 'node:os'
 import {join} from 'node:path'
 import {execFileSync} from 'node:child_process'
 import {DatabaseSync} from 'node:sqlite'
+import {createHash} from 'node:crypto'
 import {runOutcomeWorkOnce} from '../scripts/run-outcome-work.mjs'
 import {createWorkJournal} from './outcome-work-journal.mjs'
 import {createWorkGrantStore} from './outcome-work-grant-store.mjs'
@@ -25,17 +26,25 @@ test('configured CLI composes existing initial journal, grant and queue once wit
   const now=Date.now(),ownerRef='a'.repeat(64),candidateCommit=execFileSync('git',['rev-parse','HEAD'],{encoding:'utf8'}).trim(),candidateTree=execFileSync('git',['rev-parse','HEAD^{tree}'],{encoding:'utf8'}).trim()
   const scope={projectId:'outcome',workId:'cli-work',runId:'cli-run',sessionRef:'d'.repeat(64),bindingVersion:1}
   const scopeJson=JSON.stringify(scope),journal=createWorkJournal(db),store=createWorkGrantStore(db)
-  const grantJson=JSON.stringify({schemaVersion:1,...scope,ownerRef,candidateCommit,candidateTree,allowedStages:['implementing'],issuedAt:now-1,expiresAt:now+60000})
-  const {authorityRef}=store.record(grantJson,ownerRef,now)
+  const grantJson=JSON.stringify({schemaVersion:2,...scope,ownerRef,candidateCommit,candidateTree,allowedStages:['implementing'],issuedAt:now-1,expiresAt:now+60000,
+    execution:{checkoutRef:'e'.repeat(64),writePaths:[],commands:[{id:'check',stage:'implementing',program:'node',args:['--version'],timeoutMs:1000}]}})
+  const authorityRef=createHash('sha256').update(grantJson).digest('hex')
   journal.append(scopeJson,JSON.stringify({sequence:1,observedAt:new Date(now).toISOString(),stage:'queued',attempt:1,activity:'waiting',candidateCommit:null,candidateTree:null,evidenceRef:null,nextAction:null,blocker:null}),0,now)
   const save=(name,value)=>{const path=join(root,name);writeFileSync(path,value,{mode:0o600});return path}
   const policyPath=save('policy.json',JSON.stringify({request:{scopeJson,expectedSequence:1,candidateCommit,candidateTree,authorityRef,action:'implementing'},priorReceipt:null,dependencyReceipts:[]}))
-  const config={schemaVersion:1,candidatePin:execFileSync('git',['rev-parse','HEAD'],{encoding:'utf8'}).trim(),databasePath,receiptDirectory:root,policyPath,
+  const config={schemaVersion:2,approvalPath:save('approval.json',grantJson),candidatePin:execFileSync('git',['rev-parse','HEAD'],{encoding:'utf8'}).trim(),databasePath,receiptDirectory:root,policyPath,
     tokenPath:save('token','test-private-token'),identityPath:save('identity.json','{}'),snapshotPath:save('snapshot.json','{}'),registryPath:join(root,'.outcome-runtime','bindings.json'),ownerCwd:root,codexExecutable:process.execPath}
   const path=save('config.json',JSON.stringify(config));let sends=0,output='',bindingValid=true
   const options={now:()=>now,write:text=>output=text,identityFactory:()=>({service:{resolveBridgeAuthority:async({token})=>{assert.equal(token,'test-private-token');return {account_ref:ownerRef,project_ids:['outcome']}}}}),
     queueFactory:()=>({bindingResolver:async()=>({status:'active',freshness:'fresh',project_id:'outcome',role:'planner',destination:{}}),matchesWorkScope:()=>bindingValid,transport:async()=>{sends++;return {delivery:'acknowledged'}}})}
   try{
+    assert.equal(await runOutcomeWorkOnce({...options,argv:['--dispatch',path]}),70)
+    assert.equal(sends,0)
+    assert.equal(await runOutcomeWorkOnce({...options,argv:['--approve',path,'f'.repeat(64)]}),70)
+    assert.equal(db.prepare('SELECT count(*) AS n FROM outcome_execution_grants').get().n,0)
+    assert.equal(await runOutcomeWorkOnce({...options,argv:['--approve',path,authorityRef]}),0,output)
+    assert.equal(JSON.parse(output).outcome,'approval_recorded')
+    assert.equal(sends,0)
     assert.equal(await runOutcomeWorkOnce({...options,argv:['--dispatch',path]}),0,output)
     assert.equal(await runOutcomeWorkOnce({...options,argv:['--dispatch',path]}),0,output)
     assert.equal(sends,1)
@@ -55,6 +64,7 @@ test('configured CLI composes existing initial journal, grant and queue once wit
     assert.equal(await runOutcomeWorkOnce({...options,argv:['--dispatch',path]}),70)
     chmodSync(path,0o600)
     store.revoke(authorityRef,ownerRef,now)
+    assert.equal(await runOutcomeWorkOnce({...options,argv:['--approve',path,authorityRef]}),70)
     assert.equal(await runOutcomeWorkOnce({...options,argv:['--dispatch',path]}),70)
     assert.equal(sends,1)
     assert(!output.includes(root));assert(!output.includes('test-private-token'))

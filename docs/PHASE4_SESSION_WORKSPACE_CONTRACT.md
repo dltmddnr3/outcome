@@ -54,6 +54,11 @@ These are program responsibilities, not new agents, schedules or products. The c
 
 #### Candidate-bound stage receipt check · 2026-09-09
 
+- [ ] One-shot CLI issues only an explicit digest-confirmed V2 execution plan for the authenticated current owner and exact policy/binding/candidate; rejected or mismatched requests do not create approval.
+  CHECK: node --test server/outcome-work-runner.test.mjs
+  EXPECT: fail 0
+  EVIDENCE: pending. --approve is a new explicit owner action, never inferred from ordinary decision cards. No live grant issuance is part of this implementation test. Scope runner and tests; rollback task-owned candidate only.
+
 - [x] Existing local runtime has a one-shot CLI composition with explicit protected configuration, existing database, current identity and canonical binding; no implicit initialization, grants or scheduler. This proves entrypoint composition only, not actual stage execution.
   CHECK: node --test server/outcome-work-runner.test.mjs
   EXPECT: fail 0

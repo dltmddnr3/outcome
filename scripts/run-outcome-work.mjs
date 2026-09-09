@@ -4,6 +4,8 @@ import {homedir} from 'node:os'
 import {fileURLToPath,pathToFileURL} from 'node:url'
 import {execFileSync} from 'node:child_process'
 import {DatabaseSync} from 'node:sqlite'
+import {createHash} from 'node:crypto'
+import {verifyWorkExecutionGrant} from '../server/outcome-work-execution-grant.mjs'
 import {readDestinationProtectedBytes} from './run-destination-questions.mjs'
 import {createHostedIdentityRuntime} from '../server/account-access-hosted.mjs'
 import {createWorkJournal} from '../server/outcome-work-journal.mjs'
@@ -21,18 +23,19 @@ const privateDirectory=async path=>{
   if(!s.isDirectory()||s.isSymbolicLink()||s.uid!==process.getuid()||(s.mode&0o777)!==0o700)fail()
 }
 
-// Explicit one-shot composition, never a daemon or grant issuer. Production uses
+// Explicit one-shot composition, never a daemon or implicit grant issuer. Production uses
 // the defaults; injected ports exist only for isolated integration reproduction.
 export async function runOutcomeWorkOnce({argv=process.argv.slice(2),write=text=>process.stdout.write(text),
   identityFactory=createHostedIdentityRuntime,queueFactory=createCodexQueueAdapter,now=Date.now}={}){
   let db
   try{
-    if(!Array.isArray(argv)||!['--dispatch','--receive'].includes(argv[0])||argv.length!==(argv[0]==='--dispatch'?2:3)
-      ||argv[0]==='--receive'&&!hash(argv[2],64))fail()
+    if(!Array.isArray(argv)||!['--dispatch','--receive','--approve'].includes(argv[0])||argv.length!==(argv[0]==='--dispatch'?2:3)
+      ||argv[0]!=='--dispatch'&&!hash(argv[2],64))fail()
     const read=async path=>(await readDestinationProtectedBytes(path)).toString('utf8')
     const config=JSON.parse(await read(argv[1]))
-    if(!config||Array.isArray(config)||Object.keys(config).length!==keys.length||!keys.every(key=>Object.hasOwn(config,key))
-      ||config.schemaVersion!==1||!hash(config.candidatePin,40))fail()
+    const configKeys=config?.schemaVersion===2?[...keys,'approvalPath']:keys
+    if(!config||Array.isArray(config)||Object.keys(config).length!==configKeys.length||!configKeys.every(key=>Object.hasOwn(config,key))
+      ||![1,2].includes(config.schemaVersion)||!hash(config.candidatePin,40)||argv[0]==='--approve'&&config.schemaVersion!==2)fail()
     const checkout=await realpath(fileURLToPath(new URL('..',import.meta.url)))
     const head=execFileSync('git',['rev-parse','HEAD'],{cwd:checkout,encoding:'utf8',timeout:5000,stdio:['ignore','pipe','ignore']}).trim()
     if(head!==config.candidatePin)fail()
@@ -75,6 +78,32 @@ export async function runOutcomeWorkOnce({argv=process.argv.slice(2),write=text=
     }
     const runtime=createLocalWorkRuntime({enabled:true,accountService:identity.service,readToken:()=>read(config.tokenPath),grantStore,journal,
       receiptDirectory:config.receiptDirectory,queueAdapter,now,readCurrentPolicy})
+    if(argv[0]==='--approve'){
+      // The explicit argument is the digest of the exact plan the owner approves.
+      // Login, generic decision cards and dispatch requests never enter this branch.
+      let timer
+      const inspect=async()=>{
+        const grantJson=await read(config.approvalPath)
+        if(createHash('sha256').update(grantJson).digest('hex')!==argv[2]||JSON.parse(grantJson).schemaVersion!==2)fail()
+        const {request}=JSON.parse(await readCurrentPolicy()),scope=JSON.parse(request.scopeJson)
+        if(request.authorityRef!==argv[2])fail()
+        const owner=await identity.service.resolveBridgeAuthority({token:await read(config.tokenPath)})
+        if(!owner?.project_ids?.includes(scope.projectId)||!hash(owner.account_ref,64))fail()
+        const expected=JSON.stringify({...scope,ownerRef:owner.account_ref,candidateCommit:request.candidateCommit,candidateTree:request.candidateTree,authorityRef:argv[2],action:request.action,status:'active'})
+        if(!verifyWorkExecutionGrant(grantJson,expected,now()).matches)fail()
+        await readCurrentPolicy()
+        if(await read(config.approvalPath)!==grantJson)fail()
+        return {grantJson,ownerRef:owner.account_ref,expected}
+      }
+      let approved
+      try{approved=await Promise.race([inspect(),new Promise((_,reject)=>{timer=setTimeout(()=>reject(Error('approval_timeout')),5000)})])}finally{clearTimeout(timer)}
+      if(!verifyWorkExecutionGrant(approved.grantJson,approved.expected,now()).matches)fail()
+      const saved=grantStore.record(approved.grantJson,approved.ownerRef,now())
+      const confirmed=JSON.parse(grantStore.read(argv[2],approved.ownerRef))
+      if(saved.status!=='active'||confirmed.status!=='active'||confirmed.grantJson!==approved.grantJson)fail()
+      write('{"outcome":"approval_recorded","executionAuthority":false,"completionAuthority":false}\n')
+      return 0
+    }
     const result=argv[0]==='--dispatch'?await runtime.runOnce():await runtime.receiveOnce(argv[2])
     const permitted=['acknowledged','claimed','already_claimed','delivery_unknown','reconciliation_required']
     const outcome=permitted.includes(result.outcome)?result.outcome:'configuration_hold'
