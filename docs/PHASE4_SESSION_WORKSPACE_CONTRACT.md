@@ -54,10 +54,10 @@ These are program responsibilities, not new agents, schedules or products. The c
 
 #### Candidate-bound stage receipt check · 2026-09-09
 
-- [ ] Existing local runtime has a one-shot CLI composition with explicit protected configuration, existing database, current identity and canonical binding; no implicit initialization, grants or scheduler.
+- [x] Existing local runtime has a one-shot CLI composition with explicit protected configuration, existing database, current identity and canonical binding; no implicit initialization, grants or scheduler. This proves entrypoint composition only, not actual stage execution.
   CHECK: node --test server/outcome-work-runner.test.mjs
   EXPECT: fail 0
-  EVIDENCE: pending. Scope scripts/run-outcome-work.mjs and runner tests. Missing/stale config must perform no dispatch. Rollback: task-owned commit only. Live configuration and real stage execution remain separate unmet requirements.
+  EVIDENCE: 2026-09-09 CLI has --dispatch/--receive only; protected owner-only files, runner HEAD/tracked-code checks, existing SQLite schema and candidate Git tree verification precede action. No arguments yields configuration_hold with false authority and no dispatch. Integration uses real local files/database/grants/journal with fixture identity and queue: one send, one claim, duplicate readback, revoked approval, changed binding, wrong runner pin and permissive config rejection. Work suites 52 PASS and full npm test 886 PASS at fce4069; candidate-tree addition at b5a65c1 targeted runner tests 2 PASS. Fixture syntax failure in 450c262 corrected in ce1ec08; not a production run. Scope scripts/run-outcome-work.mjs and runner tests. Rollback: task-owned commits only. No live config, new grant, stage execution, start/terminal publication, schedule or deployment was created. Live configuration and real stage execution remain unmet requirements.
 
 - [x] AP4-04/05 initial queued work reaches one durable implementing reservation under authenticated current approval and dependencies, without fabricating a prior terminal receipt or running event. This is tested integration, not live start or Predicate closure.
   CHECK: node --test server/outcome-work-local-runtime.test.mjs server/outcome-work-continuation.test.mjs
