@@ -55,7 +55,7 @@ These are program responsibilities, not new agents, schedules or products. The c
 - [ ] Ordered stage execution requires each prior command's durable success; completed results are recovered without relaunch, uncertain claims and failed predecessors stop continuation.
   CHECK: node --test server/outcome-work-command-claim.test.mjs server/outcome-work-runner.test.mjs
   EXPECT: fail 0
-  EVIDENCE: pending. This extends only explicitly granted Node commands, not npm/git or automatic QA/Release acceptance. Actual owner run and candidate receipt reconciliation remain open.
+  EVIDENCE: Candidate `c17a894`, same-session full regression 903 PASS, zero fail/skip/TODO; build PASS. Real bounded processes verify ordered success, failed-predecessor hold and durable result recovery without new claims. CLI fixture chain now executes a real command at implementing, QA and Release; a passing protected receipt with its command result removed cannot advance the journal. This extends only explicitly granted Node commands, not npm/git or automatic QA/Release acceptance. Fixture commands are `node --version`, not substantive implementation/QA/Release workloads; identity/provider remain fixtures. Actual owner run, authenticated live configuration, required read-only manifests, substantive workloads and automatic next-policy preparation remain OPEN. No deployment, provider changes, new role or scheduler.
 
 - [ ] Before process launch, atomically claim the exact approved command against received reservation, recorded running stage, same owner, active unexpired V2 grant and checkout reference; duplicate claims never relaunch.
   CHECK: node --test server/outcome-work-command-claim.test.mjs
