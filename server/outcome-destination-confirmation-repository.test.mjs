@@ -20,6 +20,20 @@ import {buildPackageModel} from './outcome-package.mjs'
 
 const scope={workspaceId:'workspace',accountRef:'owner',draftId:'00000000-0000-4000-8000-000000000001'}
 const requestId='00000000-0000-4000-8000-000000000010'
+test('file confirmation FK migration preserves an existing question confirmation and owner isolation',async()=>{
+ const f=await fixture()
+ try{
+  const repo=createDestinationConfirmationRepository(f),review=await repo.review(scope)
+  const receipt=await repo.confirm({...scope,requestId,reviewDigest:review.reviewDigest,confirmed:true})
+  await f.db.exec(await readFile(new URL('../supabase/migrations/20260909123000_outcome_file_confirmation_source.sql',import.meta.url),'utf8'))
+  assert.deepEqual(await repo.load(scope),receipt)
+  assert.equal(await repo.load({...scope,accountRef:'other'}),null)
+  const fk=(await f.db.query("select confrelid::regclass::text target from pg_constraint where conrelid='outcome_destination_private.confirmations'::regclass and conname='confirmations_workspace_id_account_ref_draft_id_fkey'")).rows[0]
+  assert.equal(fk.target,'outcome_destination_private.drafts')
+  assert.equal((await repo.readConfirmedCreation({...scope,requestId})).reviewDigest,review.reviewDigest)
+  await assert.rejects(()=>f.transact(({query})=>query('delete from outcome_destination_private.confirmations')),/permission denied/)
+ }finally{await f.db.close()}
+})
 test('file import confirms an exact source version and creates one package without a question receipt',async()=>{
  const f=await fixture(),catalog=mkdtempSync(join(tmpdir(),'outcome-file-package-'))
  try{

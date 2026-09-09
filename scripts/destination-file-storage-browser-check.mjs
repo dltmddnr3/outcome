@@ -1,5 +1,9 @@
 import assert from 'node:assert/strict'
 import {readFile} from 'node:fs/promises'
+import {mkdtempSync} from 'node:fs'
+import {tmpdir} from 'node:os'
+import {join} from 'node:path'
+import {createHash} from 'node:crypto'
 import {once} from 'node:events'
 import {build} from 'esbuild'
 import {chromium} from '@playwright/test'
@@ -7,11 +11,17 @@ import {PGlite} from '@electric-sql/pglite'
 import {createOutcomeServer} from '../server/index.mjs'
 import {createDestinationDraftRepository} from '../server/outcome-destination-postgres.mjs'
 import {createDestinationConfirmationRepository} from '../server/outcome-destination-confirmation-repository.mjs'
+import {createDestinationSourceVerifier} from '../server/outcome-destination-source-verifier.mjs'
+import {discoveryDomains} from '../src/lib/destination-question-policy.mjs'
+import {createDestinationCreationStore} from '../server/outcome-destination-creation-store.mjs'
+import {createDestinationCreationWorker} from '../server/outcome-destination-creation-worker.mjs'
+import {createConfirmedPackagePublisher,readCreatedProjectEntries} from '../server/outcome-creation-catalog.mjs'
 
 // Disposable Chrome → real HTTP handlers → scoped SQL, synthetic identity only.
 // No semantic verifier is supplied: confirmation must remain unavailable.
 const origin='https://outcome-fixture-white-castle.vercel.app'
 const useOutcomeInput=process.argv.includes('--outcome-input')
+const verifiedFixture=process.argv.includes('--verified-fixture')
 const outcomeInput=useOutcomeInput?await readFile(new URL('../docs/OUTCOME_FILE_MVP_DOGFOOD.md',import.meta.url),'utf8'):null
 const compiled=await build({stdin:{contents:"import React from 'react';import{createRoot}from'react-dom/client';import{DestinationStudio}from'./src/components/DestinationStudio';import{fetchPrivateWorkspace}from'./src/lib/api';await fetchPrivateWorkspace('fixture-owner');createRoot(document.getElementById('root')).render(<DestinationStudio open onClose={()=>{}}/>);",loader:'tsx',resolveDir:process.cwd()},bundle:true,write:false,outdir:'fixture-build',format:'esm',jsx:'automatic',define:{'process.env.NODE_ENV':'"production"','import.meta.env':'{}'}})
 const js=compiled.outputFiles.find(file=>file.path.endsWith('.js')).text,css=compiled.outputFiles.find(file=>file.path.endsWith('.css')).text
@@ -24,8 +34,21 @@ try{
    await db.exec('create role anon nologin;create role authenticated nologin;')
    for(const file of ['20260908011009_outcome_destination_private_drafts.sql','20260908042838_outcome_destination_discovery_drafts.sql','20260908044800_outcome_discovery_question_receipts.sql','20260908072037_outcome_destination_confirmations.sql'])await db.exec(await readFile(new URL('../supabase/migrations/'+file,import.meta.url),'utf8'))
    const transact=work=>db.transaction(async tx=>{await tx.exec('set local role outcome_destination_backend');return work({query:(sql,args)=>tx.query(sql,args)})})
+   const scope={workspaceId:'workspace',accountRef:'owner',draftId:'00000000-0000-4000-8000-000000000001'}
+   const repository=createDestinationDraftRepository({transact})
+   const hash=value=>createHash('sha256').update(value).digest('hex')
+   // Synthetic trusted semantic verdict only, never a product PASS receipt.
+   const verifyReview=verifiedFixture?createDestinationSourceVerifier({readAssessment:async({reviewDigest})=>{
+    const document={source}
+    return JSON.stringify({schemaVersion:1,workspaceId:scope.workspaceId,accountRef:scope.accountRef,reviewDigest,verdict:'supported_for_owner_review',domains:discoveryDomains.map(domain=>({domain,state:'contract_ready',assessment:'supported',evidence:[{ref:'file',contentDigest:hash(document.source),startLine:1,endLine:1,quote:document.source.split('\n')[0]}]})),completionAuthority:false})
+   },readSource:async()=>source}):undefined
+   const confirmationRepository=createDestinationConfirmationRepository({transact,verifyReview})
+   await db.exec(await readFile(new URL('../supabase/migrations/20260909123000_outcome_file_confirmation_source.sql',import.meta.url),'utf8'))
+   await db.exec(await readFile(new URL('../supabase/migrations/20260908122836_outcome_destination_creation_results.sql',import.meta.url),'utf8'))
+   const store=createDestinationCreationStore({transact}),catalog=mkdtempSync(join(tmpdir(),'outcome-browser-created-'))
+   const publisher=createConfirmedPackagePublisher({catalog,confirmationRepository})
    const identity={authenticate:async token=>{if(token!=='fixture-owner')throw Error('denied')},resolveBridgeAuthority:async()=>({workspace_id:'workspace',account_ref:'owner',project_ids:['outcome']})}
-   server=createOutcomeServer({publicReadOnly:true,accountAccess:identity,destinationRuntime:{allowedOrigin:origin,csrfSecret:'fixture-csrf',repository:createDestinationDraftRepository({transact}),confirmationRepository:createDestinationConfirmationRepository({transact})}})
+   server=createOutcomeServer({publicReadOnly:true,accountAccess:identity,destinationRuntime:{allowedOrigin:origin,csrfSecret:'fixture-csrf',repository,confirmationRepository,creationRepository:{load:store.load}}})
    server.listen(0,'127.0.0.1');await once(server,'listening')
    page=await browser.newPage({viewport:{width,height:900}})
    await page.context().addCookies([{name:'__session',value:'fixture-owner',url:origin,secure:true,httpOnly:true,sameSite:'Lax'}])
@@ -56,11 +79,28 @@ try{
    await page.getByRole('button',{name:'기획 내용 확인',exact:true}).click()
    await page.getByRole('button',{name:'확정 요청 기록 조회'}).click()
    await page.getByRole('button',{name:'현재 초안 근거 검증'}).click()
-   await page.getByText('현재 초안의 근거 내용을 검증하는 연결이 아직 준비되지 않았습니다.',{exact:false}).waitFor()
-   assert.equal(await page.getByRole('checkbox').count(),0)
-   assert.deepEqual(mutations,['PUT'])
-   assert.equal((await db.query('select count(*)::int n from outcome_destination_private.confirmations')).rows[0].n,0)
+   if(verifiedFixture){
+    await page.getByRole('checkbox').waitFor()
+    assert.equal(await page.getByRole('button',{name:'이 버전으로 확정 요청'}).isDisabled(),true)
+    await page.getByRole('checkbox').check()
+    await page.getByRole('button',{name:'이 버전으로 확정 요청'}).click()
+    await page.getByText('확정 요청 기록됨 · 생성 결과 별도 확인',{exact:true}).waitFor()
+    const receipt=await confirmationRepository.load(scope)
+    const worker=createDestinationCreationWorker({confirmationRepository,store,publisher})
+    assert.equal((await worker.runOnce({...scope,requestId:receipt.requestId})).state,'PACKAGE_RECORDED')
+    assert.equal((await worker.runOnce({...scope,requestId:receipt.requestId})).state,'ALREADY_RECORDED')
+    await page.getByRole('button',{name:'생성 결과 다시 조회'}).click()
+    await page.getByText('프로젝트 등록이 확인되었습니다.',{exact:true}).waitFor()
+    assert.equal(readCreatedProjectEntries(catalog).length,1)
+    assert.deepEqual(mutations,['PUT','POST'])
+   }else{
+    await page.getByText('현재 초안의 근거 내용을 검증하는 연결이 아직 준비되지 않았습니다.',{exact:false}).waitFor()
+    assert.equal(await page.getByRole('checkbox').count(),0)
+    assert.deepEqual(mutations,['PUT'])
+   }
+   assert.equal((await db.query('select count(*)::int n from outcome_destination_private.confirmations')).rows[0].n,verifiedFixture?1:0)
+   assert.equal((await db.query('select count(*)::int n from outcome_destination_private.discovery_drafts')).rows[0].n,0)
   }finally{await page?.close();server?.closeAllConnections();if(server)await new Promise(resolve=>server.close(resolve));await db.close()}
  }
- console.log('PASS 2 Chrome→HTTP→SQL file save/reload/review cases; one save, no confirmation without evidence')
+ console.log(verifiedFixture?'PASS 2 Chrome→HTTP→SQL→package cases; explicit confirmation, one package, synthetic assessment only':'PASS 2 Chrome→HTTP→SQL file save/reload/review cases; one save, no confirmation without evidence')
 }finally{await browser.close()}
