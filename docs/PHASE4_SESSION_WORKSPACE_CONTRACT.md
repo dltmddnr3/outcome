@@ -54,10 +54,10 @@ These are program responsibilities, not new agents, schedules or products. The c
 
 #### Candidate-bound stage receipt check · 2026-09-09
 
-- [ ] Explicit one-shot session input can authenticate local execution without creating a token file; bounded input errors fail closed and do not print token bytes.
+- [x] Explicit one-shot session input can authenticate local execution without creating a token file; bounded input errors fail closed and do not print token bytes. Integration only, not a live sign-in.
   CHECK: node --test server/outcome-work-runner.test.mjs
   EXPECT: fail 0
-  EVIDENCE: pending. Scope runner/tests only; no live credentials/configuration created. Existing stored-token compatibility does not authorize new token storage.
+  EVIDENCE: 48d36aa full npm test 890 PASS. Explicit --session-stdin plus schema-v4 configuration omits tokenPath, takes one bounded in-memory stream, and reuses the current account verifier on each authority check. Empty/oversized/whitespace/invalid-UTF8 input and timeout reject generically; the full fixture stage chain creates no token file. Existing v1-v3 token-file compatibility is retained, not default permission to create new secret storage. Read-only inspection of 13 small top-level canonical runtime JSON files found no matching work-runner configuration (not an exhaustive machine-wide claim). No live credentials/configuration, grant or runtime initialization created. Scope runner/tests; rollback task-owned commits. Live owner authentication and operating configuration remain open.
 
 - [ ] Stage terminal publication requires a recorded start, completed correlated provider observation, current unrevoked grant and protected passing receipt for the same work; publication records one next action but never dispatches or accepts automatically.
   CHECK: node --test server/outcome-work-runner.test.mjs
