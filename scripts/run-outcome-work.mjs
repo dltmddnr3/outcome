@@ -93,6 +93,8 @@ export async function runOutcomeWorkOnce({argv=process.argv.slice(2),write=text=
         if(!verifyWorkExecutionGrant(grantJson,expected,now()).matches)fail()
         await readCurrentPolicy()
         if(await read(config.approvalPath)!==grantJson)fail()
+        const fresh=await identity.service.resolveBridgeAuthority({token:await read(config.tokenPath)})
+        if(fresh?.account_ref!==owner.account_ref||!fresh.project_ids?.includes(scope.projectId))fail()
         return {grantJson,ownerRef:owner.account_ref,expected}
       }
       let approved

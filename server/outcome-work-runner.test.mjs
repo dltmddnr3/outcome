@@ -42,6 +42,13 @@ test('configured CLI composes existing initial journal, grant and queue once wit
     assert.equal(sends,0)
     assert.equal(await runOutcomeWorkOnce({...options,argv:['--approve',path,'f'.repeat(64)]}),70)
     assert.equal(db.prepare('SELECT count(*) AS n FROM outcome_execution_grants').get().n,0)
+    const wrongOwner=()=>({service:{resolveBridgeAuthority:async()=>({account_ref:'f'.repeat(64),project_ids:['outcome']})}})
+    assert.equal(await runOutcomeWorkOnce({...options,identityFactory:wrongOwner,argv:['--approve',path,authorityRef]}),70)
+    assert.equal(db.prepare('SELECT count(*) AS n FROM outcome_execution_grants').get().n,0)
+    bindingValid=false
+    assert.equal(await runOutcomeWorkOnce({...options,argv:['--approve',path,authorityRef]}),70)
+    assert.equal(db.prepare('SELECT count(*) AS n FROM outcome_execution_grants').get().n,0)
+    bindingValid=true
     assert.equal(await runOutcomeWorkOnce({...options,argv:['--approve',path,authorityRef]}),0,output)
     assert.equal(JSON.parse(output).outcome,'approval_recorded')
     assert.equal(sends,0)
