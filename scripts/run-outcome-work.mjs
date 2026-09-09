@@ -28,9 +28,16 @@ export function readWorkSessionInput(stream,{timeoutMs=5000,maxBytes=16384}={}){
       stream?.pause?.();chunks.length=0
       if(error)reject(Error('session_input_unavailable'));else resolve(value)
     }
-    const data=chunk=>{const bytes=Buffer.from(chunk);size+=bytes.length;if(size>maxBytes)finish(true);else chunks.push(bytes)}
+    const data=chunk=>{
+      try{
+        if(!Buffer.isBuffer(chunk)&&typeof chunk!=='string')return finish(true)
+        const bytes=Buffer.from(chunk);size+=bytes.length;if(size>maxBytes)finish(true);else chunks.push(bytes)
+      }catch{finish(true)}
+    }
     const end=()=>{
-      const text=Buffer.concat(chunks).toString('utf8').replace(/\r?\n$/,'')
+      const bytes=Buffer.concat(chunks),decoded=bytes.toString('utf8')
+      if(!Buffer.from(decoded,'utf8').equals(bytes))return finish(true)
+      const text=decoded.replace(/\r?\n$/,'')
       if(!text||/\s|[\u0000-\u001f\u007f]/.test(text)||Buffer.byteLength(text)>maxBytes)return finish(true)
       finish(false,text)
     }

@@ -14,7 +14,7 @@ import {createWorkGrantStore} from './outcome-work-grant-store.mjs'
 test('session input is bounded, one-shot and never exposes rejected bytes',async()=>{
   const stream=new PassThrough(),ready=readWorkSessionInput(stream);stream.end('fixture-token\n')
   assert.equal(await ready,'fixture-token');assert.equal(stream.listenerCount('data'),0)
-  for(const bytes of ['','private secret','x'.repeat(16385)]){
+  for(const bytes of ['','private secret','x'.repeat(16385),Buffer.from([0xff])]){
     const stream=new PassThrough(),result=readWorkSessionInput(stream)
     stream.end(bytes)
     await assert.rejects(result,/^Error: session_input_unavailable$/)
