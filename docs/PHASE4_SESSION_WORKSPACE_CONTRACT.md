@@ -52,6 +52,11 @@ These are program responsibilities, not new agents, schedules or products. The c
 
 ### Existing Phase 4 acceptance additions
 
+- [x] Screen observation accepts the local journal's domain-separated opaque session reference only when it matches the observed private thread; legacy UUID compatibility remains exact and no identifier is exposed.
+  CHECK: node --test server/outcome-codex-work-observation.test.mjs server/outcome-work-observation-access.test.mjs
+  EXPECT: fail 0
+  EVIDENCE: Same-session regression reproduced unknown instead of active before correction; targeted observation/access suites 11 PASS after correction. Foreign/plain-hash/uppercase references and a hash masquerading as provider UUID reject; output excludes identifiers. Hosted source injection and actual owner use remain separate open requirements; this correction does not activate a source. Rollback only this task-owned projector/test change.
+
 #### Candidate-bound stage receipt check · 2026-09-09
 
 - [x] Explicit one-shot session input can authenticate local execution without creating a token file; bounded input errors fail closed and do not print token bytes. Integration only, not a live sign-in.

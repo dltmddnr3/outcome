@@ -1,4 +1,5 @@
 import { projectSingleSessionWork } from './outcome-work-observer.mjs'
+import { createHash } from 'node:crypto'
 
 const unavailable = () => Object.freeze({ state:'unknown', reason:'source_unavailable', observationAgeMs:null })
 const validTime = value => Number.isSafeInteger(value) && value >= 0 && value <= 8640000000000000
@@ -8,7 +9,8 @@ const uuid = value => typeof value === 'string' && /^[a-f0-9]{8}-[a-f0-9]{4}-[1-
 // thread.updatedAt, a stored turn timestamp, or a viewer refresh as a live probe.
 // The same protocol on an unrelated stdio server may report notLoaded.
 export function projectCodexRuntimeObservation(json, expectedThreadId, observedAtMs, nowMs, freshnessMs=15000) {
-  if(typeof json!=='string' || Buffer.byteLength(json)>262144 || !uuid(expectedThreadId)
+  const opaqueRef=typeof expectedThreadId==='string' && /^[a-f0-9]{64}$/.test(expectedThreadId)
+  if(typeof json!=='string' || Buffer.byteLength(json)>262144 || !(uuid(expectedThreadId)||opaqueRef)
     || !validTime(observedAtMs) || !validTime(nowMs) || observedAtMs>nowMs
     || !Number.isSafeInteger(freshnessMs) || freshnessMs<1 || freshnessMs>300000) return unavailable()
   try {
@@ -17,7 +19,9 @@ export function projectCodexRuntimeObservation(json, expectedThreadId, observedA
     if(raw?.method==='thread/status/changed') {id=raw.params?.threadId;status=raw.params?.status}
     else if(raw?.method===undefined && raw?.thread) {id=raw.thread.id;status=raw.thread.status}
     else return unavailable()
-    if(id!==expectedThreadId || !status || typeof status!=='object' || Array.isArray(status)) return unavailable()
+    if(!uuid(id)) return unavailable()
+    const observedRef=opaqueRef?createHash('sha256').update('outcome-work-session-v1\0').update(id).digest('hex'):id
+    if(observedRef!==expectedThreadId || !status || typeof status!=='object' || Array.isArray(status)) return unavailable()
     const age=nowMs-observedAtMs
     if(age>freshnessMs) return Object.freeze({state:'unknown',reason:'observation_stale',observationAgeMs:age})
     if(status.type==='active') {

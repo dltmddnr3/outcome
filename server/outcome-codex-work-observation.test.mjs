@@ -1,8 +1,19 @@
 import test from 'node:test'
 import assert from 'node:assert/strict'
+import {createHash} from 'node:crypto'
 import {projectCodexRuntimeObservation as project,projectObservedSingleSessionWork as compose} from './outcome-codex-work-observation.mjs'
 const id='11111111-1111-4111-8111-111111111111',now=20000
 const read=status=>JSON.stringify({thread:{id,status,updatedAt:9999999999,turns:[{status:'completed',items:[{text:'QA PASS release done'}]}]}})
+test('local opaque session reference matches exact private runtime identity without disclosure',()=>{
+  const ref=createHash('sha256').update('outcome-work-session-v1\0').update(id).digest('hex')
+  const raw=read({type:'active',activeFlags:[]})
+  const result=project(raw,ref,now,now)
+  assert.equal(result.state,'active')
+  assert(!JSON.stringify(result).includes(id));assert(!JSON.stringify(result).includes(ref))
+  for(const foreign of ['a'.repeat(64),createHash('sha256').update(id).digest('hex'),ref.toUpperCase()])
+    assert.equal(project(raw,foreign,now,now).state,'unknown')
+  assert.equal(project(JSON.stringify({thread:{id:ref,status:{type:'active',activeFlags:[]}}}),ref,now,now).state,'unknown')
+})
 test('actual runtime vocabulary distinguishes active, waiting flags, idle and unavailable',()=>{
   for(const [status,state,reason] of [
     [{type:'active',activeFlags:[]},'active',null],
