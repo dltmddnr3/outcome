@@ -54,10 +54,10 @@ These are program responsibilities, not new agents, schedules or products. The c
 
 #### Candidate-bound stage receipt check · 2026-09-09
 
-- [ ] Correlated provider activity distinguishes observed running/terminal from missing/unknown without exposing private text or granting stage acceptance.
+- [x] Correlated provider activity distinguishes observed running/terminal from missing/unknown without exposing private text or granting stage acceptance. Adapter implementation only; no claim of live observation.
   CHECK: node --test server/outcome-chat-result-source.test.mjs server/outcome-chat-codex-queue.test.mjs
   EXPECT: fail 0
-  EVIDENCE: pending. Scope existing source projector and queue reader. Actual stage journal publication still requires the approved reservation and validated stage receipt; model turn completion alone cannot close QA or Release.
+  EVIDENCE: ebe7cd2 full npm test 887 PASS, 0 FAIL/skip/TODO. Existing read-only bound thread reader now exposes a separate activity projector: exact correlated full turn, unique user envelope, validated terminal timestamp and provider status; missing is pending, malformed/ambiguous is unavailable. Returns only opaque digests/status/times, no private text/IDs, and false completion/execution authority. Queue tests prove reads do not dispatch and forged destinations fail. Scope existing source projector and queue reader. Actual stage journal publication still requires the approved reservation and validated stage receipt; model turn completion alone cannot close QA or Release. No live provider observation, start/terminal persistence or runtime activation occurred in this test turn.
 
 - [x] One-shot CLI issues only an explicit digest-confirmed V2 execution plan for the authenticated current owner and exact policy/binding/candidate; rejected or mismatched requests do not create approval. This is tested issuance, not a live owner grant.
   CHECK: node --test server/outcome-work-runner.test.mjs
