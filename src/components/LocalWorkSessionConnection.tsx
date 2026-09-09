@@ -43,6 +43,7 @@ export function LocalWorkSessionConnection({ getToken }: { getToken: () => Promi
   return <section aria-label="이 기기 실행 연결" data-completion-authority="false">
     <h2>이 기기에서 로그인 연결</h2>
     <p>OUTCOME 실행기에서 직접 연 연결인가요? 같은 컴퓨터의 실행기에 로그인 상태를 한 번 전달합니다. 작업 승인이나 배포 권한은 추가되지 않습니다.</p>
+    <p>브라우저가 로컬 연결 권한을 물으면, 직접 시작한 연결인지 확인한 뒤 허용해 주세요.</p>
     <button type="button" disabled={status !== 'idle'} onClick={() => void connect()}>이 기기의 실행기에 연결</button>
     <p role="status">{status === 'idle' ? '직접 시작한 연결인지 확인한 뒤 눌러 주세요.' : status === 'connecting' ? '로그인 상태를 확인하고 있습니다.' : status === 'connected' ? '로그인 연결을 확인했습니다. 작업 실행 여부는 별도로 확인합니다.' : '연결을 확인하지 못했습니다. 자동으로 재시도하지 않습니다.'}</p>
   </section>

@@ -55,7 +55,10 @@ These are program responsibilities, not new agents, schedules or products. The c
 - [ ] Explicit local session receiver accepts only exact Preview origin/loopback host and one unexpired random invitation, validates owner before exposing an in-memory token to the trusted caller, and never grants or executes work.
   CHECK: node --test server/outcome-local-session-receiver.test.mjs
   EXPECT: fail 0
-  EVIDENCE: pending. Default-off factory only; browser consent UI, verified Preview configuration and operational wiring remain open. No production listener or credential file.
+  EVIDENCE: Receiver native tests 2 PASS; frontend invitation/Clerk tests 19 PASS. Explicit --session-browser now creates a short-lived invitation only after protected config/policy preflight; signed-in owner UI appears only for the invitation fragment and requires a click. Token is memory-only, no execution grant added. Chrome initially denied public-to-loopback access; this is a browser permission requirement, not a bypass target (https://developer.chrome.com/blog/local-network-access). Disposable Chrome with explicit test permission completes the real loopback exchange; no user browser settings changed. Actual owner/Preview deployment, current live configuration and end-to-end execution remain OPEN. Test fixture origin/identity do not establish real owner use.
+
+  CHECK: node scripts/local-session-connection-browser-check.mjs && node scripts/local-session-connection-browser-check.mjs --grant-test-permission
+  EXPECT: denied-permission guard PASS and synthetic identity connection PASS
 
 - [ ] Execution CLI accepts explicit protected Preview identity configuration with in-memory session input; remote authenticated workspace proves identity only and never substitutes for current local grant, binding or evidence.
   CHECK: node --test server/outcome-work-runner.test.mjs server/outcome-preview-work-identity.test.mjs
