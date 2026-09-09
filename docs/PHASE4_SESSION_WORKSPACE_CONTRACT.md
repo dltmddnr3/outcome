@@ -400,6 +400,8 @@ AP-5-04/05 and AP-4-09 prerequisite under the approved file-based MVP: default i
 - [ ] File registration through explicit start and real project use.
   EVIDENCE: pending; review UI alone does not satisfy this outcome.
 
+2026-09-09 follow-up: `node scripts/destination-file-browser-check.mjs` PASS 4 real Chrome cases (1280px/390px, complete/conflicting synthetic Markdown). Actual file selection→review→back preserves source text, missing/conflicting fields and raw AX heading observed, zero automatic mutation and no page errors. This is a disposable component harness, not authenticated Preview proof. New file edits require review before saving to avoid carrying the previous file's extracted answers into the next revision. Source inspection confirms current confirmation repository and source verifier require a question receipt: a distinct file-review contract is still needed, not a bypass or fabricated receipt. Current creation confirmation explicitly grants no execution authority; a separate explicit start boundary remains required.
+
 ## Non-goals
 
 - Codex 화면의 픽셀 단위 복제

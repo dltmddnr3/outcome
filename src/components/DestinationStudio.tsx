@@ -81,6 +81,9 @@ export function DestinationStudio({ open, onClose, fileBased = true }: { open: b
   const savedIntakeMatches=savedDraft&&canonicalIntake(savedDraft.document)===canonicalIntake(storageDocument)
   const useStorage = async (save: boolean) => {
     if (storageLock.current || analysisLock.current) return
+    if (save && fileBased && step !== 'file-review') {
+      setStorageNotice('현재 파일의 기획 내용을 먼저 확인해 주세요. 이전 파일의 검토 결과로 저장하지 않았습니다.'); return
+    }
     if (save && (sensitiveContentHint(latestDraft.current) || /\/(?:Users|home|private\/tmp|tmp)\//.test(latestDraft.current.normalize('NFKC')))) {
       setStorageNotice('민감한 값이나 로컬 경로를 제거한 뒤 저장해 주세요. 서버에 전송하지 않았습니다.'); return
     }
@@ -233,7 +236,7 @@ export function DestinationStudio({ open, onClose, fileBased = true }: { open: b
         <strong>계정별 진행 중 초안 1개</strong>
         <span>{privateDestinationStorageAvailable() ? '저장 시 기획서 본문과 답변이 비공개 서버에 보관됩니다. 불러오기는 현재 입력을 대체합니다.' : '서버 초안 저장 연결 준비 중 · 현재 입력은 이 화면에서만 유지됩니다.'}</span>
         <div className="destination-studio__actions">
-          <button type="button" disabled={storageBusy || storageHold || !privateDestinationStorageAvailable()} onClick={()=>void useStorage(true)}>초안 저장</button>
+          <button type="button" disabled={storageBusy || storageHold || (fileBased && step !== 'file-review') || !privateDestinationStorageAvailable()} onClick={()=>void useStorage(true)}>초안 저장</button>
           <button type="button" disabled={storageBusy || !privateDestinationStorageAvailable()} onClick={()=>void useStorage(false)}>서버 초안 불러오기 · 현재 입력 대체</button>
         </div>
         {storageNotice && <p role="status">{storageNotice}</p>}
