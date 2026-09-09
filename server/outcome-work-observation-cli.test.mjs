@@ -9,7 +9,7 @@ import { DatabaseSync } from 'node:sqlite'
 import fixture from '../test/fixtures/account-access.json' with { type: 'json' }
 import { createAccountAccessService, createInMemoryAccountStore } from './account-access.mjs'
 import { readOutcomeWorkObservation } from '../scripts/read-outcome-work-observation.mjs'
-test('operational observation reads protected SQLite through account service without dispatch or storage writes', async () => {
+test('operational observation reads protected SQLite through account service without dispatch or storage writes', async t => {
   const root = realpathSync(mkdtempSync(join(tmpdir(), 'oc-read-work-'))), databasePath = join(root, 'work.db'), configPath = join(root, 'config.json')
   const now = 20000, threadId = '11111111-1111-4111-8111-111111111111'
   const identityFactory = ({ workObservationSource }) => ({ service: createAccountAccessService({ ownerSubject: 'synthetic-owner', now: () => now, workObservationSource,
@@ -41,6 +41,26 @@ test('operational observation reads protected SQLite through account service wit
     save({ ...config, candidatePin: 'f'.repeat(40) })
     assert.equal(await readOutcomeWorkObservation(options), 70)
     assert.equal(await readOutcomeWorkObservation({ ...options, configPath: '/nonexistent/outcome.json' }), 70)
+    assert.deepEqual(readFileSync(databasePath), before)
+    const previewOrigin = 'https://outcome-test-white-castle.vercel.app'
+    save({ ...config, schemaVersion: 2, previewOrigin })
+    const token = `e30.${Buffer.from(JSON.stringify({ sub: 'synthetic-owner', exp: 1000 })).toString('base64url')}.c2ln`
+    let calls = 0, denied = false
+    t.mock.method(globalThis, 'fetch', async (url, input) => {
+      calls++; assert.equal(url, previewOrigin + '/api/private/workspace')
+      assert.equal(input.headers.authorization, `Bearer ${token}`)
+      assert.equal(input.redirect, 'error')
+      if (denied) return new Response('{}', { status: 401 })
+      return new Response(JSON.stringify({ workspace: { access: 'private_read_only', workspace: { id: owner.workspace_id, role: 'owner-viewer' }, projects: [{ project: { id: 'outcome' } }], completionAuthority: false, session: { expiresAt: new Date(100000).toISOString() } } }), { headers: { 'content-type': 'application/json', 'cache-control': 'private, no-store' } })
+    })
+    const remoteOptions = { ...options, tokenReader: async () => token, identityFactory: () => { throw Error('must not require local secret') }, environment: {} }
+    assert.equal(await readOutcomeWorkObservation(remoteOptions), 0, output)
+    assert.equal(JSON.parse(output).observation.executionState, 'stage_unconfirmed')
+    assert.equal(calls, 1); assert.equal(runtimeReads, 2)
+    denied = true
+    assert.equal(await readOutcomeWorkObservation(remoteOptions), 70)
+    assert.equal(calls, 2); assert.equal(runtimeReads, 2)
+    for (const value of [token, threadId, root, owner.account_ref]) assert(!output.includes(value))
     assert.deepEqual(readFileSync(databasePath), before)
   } finally { rmSync(root, { recursive: true, force: true }) }
 })
