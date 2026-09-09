@@ -1,5 +1,6 @@
 import { sensitiveContentHint } from './PlannerConversation'
 import { DestinationFileReview } from './DestinationFileReview'
+import { DestinationFileConfirmation } from './DestinationFileConfirmation'
 import {DestinationDiscoveryPanel} from './DestinationDiscoveryPanel'
 import {DestinationUnknownEditor} from './DestinationUnknownEditor'
 import {captureDestinationReviewBinding} from '../lib/api'
@@ -35,7 +36,10 @@ export function DestinationStudio({ open, onClose, fileBased = true }: { open: b
   const storageLock = useRef(false)
   const [storageHold, setStorageHold] = useState(false)
   const [storageNotice, setStorageNotice] = useState<string | null>(null)
-  const [unknowns, setUnknowns] = useState<string[]>([...destinationUnverifiedQuestions])
+  // New file intake has no discovered decisions yet. Semantic verification is
+  // a separate server prerequisite, not an invented unresolved user decision.
+  // Loading an existing draft still restores every recorded unknown unchanged.
+  const [unknowns, setUnknowns] = useState<string[]>(fileBased ? [] : [...destinationUnverifiedQuestions])
   const latestDraft = useRef('')
   const [savedDraft,setSavedDraft]=useState<StoredDestinationDraft|null>(null)
   const [savedDraftGeneration,setSavedDraftGeneration]=useState(0)
@@ -209,6 +213,7 @@ export function DestinationStudio({ open, onClose, fileBased = true }: { open: b
         <button className="destination-studio__primary" type="button" disabled={reading || !briefText.trim()} onClick={analyzeBrief}>{reading ? '파일 읽는 중' : fileBased ? '기획 내용 확인' : '빈칸 찾기'}</button>
       </div>}
       {step === 'file-review' && <DestinationFileReview source={briefText} onEdit={() => setStep('brief')} />}
+      {fileBased && step === 'file-review' && savedDraft && savedIntakeMatches && savedDraft.document.mode === 'file_import' && <DestinationFileConfirmation draft={savedDraft}/>}
 
       {step === 'question' && currentQuestion && <div className="destination-studio__question">
         <div className="destination-studio__progress"><span>{mode === 'guided_200q' ? '기본 질문' : '기획서 빈칸'}</span><strong>{questionIndex + 1} / {questionQueue.length}</strong></div>

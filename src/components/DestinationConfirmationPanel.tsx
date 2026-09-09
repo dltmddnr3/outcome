@@ -1,5 +1,5 @@
 import {useEffect,useRef,useState} from 'react'
-import {captureDestinationReviewBinding,requestDestinationConfirmation,requestDestinationConfirmationReview,type DestinationConfirmation,type DestinationConfirmationReview,type StoredDiscovery} from '../lib/api'
+import {captureDestinationReviewBinding,requestDestinationConfirmation,requestDestinationConfirmationReview,type DestinationConfirmation,type DestinationConfirmationReview,type DestinationReviewTarget} from '../lib/api'
 import {DestinationCreationResult} from './DestinationCreationResult'
 
 const readinessNotices:Record<string,string>={
@@ -15,7 +15,7 @@ export function destinationConfirmationFailureNotice(error:unknown){
  return Object.hasOwn(readinessNotices,code)?`${readinessNotices[code]} 확정 요청은 보내지 않았습니다.`:'현재 초안의 근거 검증 결과를 확인하지 못했습니다. 서버 연결 또는 검증 상태를 확인해야 하며 확정 요청은 보내지 않았습니다.'
 }
 
-export function DestinationConfirmationPanel({discovery}:{discovery:StoredDiscovery}){
+export function DestinationConfirmationPanel({discovery,fileBased=false}:{discovery:DestinationReviewTarget;fileBased?:boolean}){
  const [isCurrent]=useState(()=>captureDestinationReviewBinding())
  const [checked,setChecked]=useState(false),[busy,setBusy]=useState(false),[ack,setAck]=useState(false),[attempted,setAttempted]=useState(false)
  const [review,setReview]=useState<DestinationConfirmationReview|null>(null)
@@ -53,13 +53,13 @@ export function DestinationConfirmationPanel({discovery}:{discovery:StoredDiscov
  return <section className="destination-studio__unknowns" aria-label="목적지 확정 요청" aria-busy={busy}>
   <h4>목적지 확정 요청</h4>
   <p role="status">{notice}</p>
-  {!receipt&&<p>{`기본 초안 버전 ${discovery.intakeRevision} · 후속 답변 버전 ${discovery.revision}`}</p>}
+  {!receipt&&<p>{fileBased?`기획 파일 버전 ${discovery.intakeRevision}`:`기본 초안 버전 ${discovery.intakeRevision} · 후속 답변 버전 ${discovery.revision}`}</p>}
   <div className="destination-studio__actions">
    <button type="button" disabled={busy} onClick={()=>void act('read')}>확정 요청 기록 조회</button>
    {!receipt&&<button type="button" disabled={busy||!checked||attempted||!!review} onClick={()=>void act('prepare')}>현재 초안 근거 검증</button>}
   </div>
   {review&&!receipt&&<>
-   <fieldset><legend>최종 확인</legend><label><input type="checkbox" checked={ack} disabled={busy} onChange={event=>setAck(event.currentTarget.checked)}/>위 기본 초안과 저장된 추가 결정을 검토했고, 이 버전으로 목적지 확정을 요청합니다.</label></fieldset>
+   <fieldset><legend>최종 확인</legend><label><input type="checkbox" checked={ack} disabled={busy} onChange={event=>setAck(event.currentTarget.checked)}/>{fileBased?'위 기획 파일의 목표·범위·완료 조건을 검토했고, 이 버전으로 프로젝트 등록을 요청합니다. 개발 실행 승인은 별도입니다.':'위 기본 초안과 저장된 추가 결정을 검토했고, 이 버전으로 목적지 확정을 요청합니다.'}</label></fieldset>
    <div className="destination-studio__actions">
     <button type="button" disabled={busy} onClick={()=>{setReview(null);setAck(false);setNotice('확정을 취소했습니다. 요청을 보내지 않았습니다.')}}>확정 취소</button>
     <button className="destination-studio__primary" type="button" disabled={busy||!ack||attempted} onClick={()=>void act('confirm')}>이 버전으로 확정 요청</button>

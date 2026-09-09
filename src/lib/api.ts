@@ -120,7 +120,8 @@ const confirmationReceipts=new WeakMap<DestinationConfirmation,{binding:Destinat
 const confirmationReviews=new WeakMap<DestinationConfirmationReview,{binding:DestinationBinding;generation:number;contextDigest:string;attempted:boolean}>()
 const confirmationExact=(v:unknown,keys:string[]):v is Record<string,unknown>=>!!v&&typeof v==='object'&&!Array.isArray(v)&&Object.keys(v).length===keys.length&&keys.every(k=>Object.hasOwn(v,k))
 const confirmationHash=(v:unknown):v is string=>typeof v==='string'&&/^[a-f0-9]{64}$/.test(v)
-export async function requestDestinationConfirmationReview(discovery:StoredDiscovery,signal?:AbortSignal):Promise<DestinationConfirmationReview>{
+export type DestinationReviewTarget = Pick<StoredDiscovery, 'draftId'|'revision'|'intakeRevision'|'contextDigest'>
+export async function requestDestinationConfirmationReview(discovery:DestinationReviewTarget,signal?:AbortSignal):Promise<DestinationConfirmationReview>{
  const binding=privateDestinationBinding,generation=privateDecisionBindingVersion
  const pinned={draftId:discovery.draftId,revision:discovery.revision,intakeRevision:discovery.intakeRevision,contextDigest:discovery.contextDigest}
  if(!binding||pinned.draftId!==activeDestinationDraftId)throw Error('destination_unavailable')
@@ -136,7 +137,7 @@ export async function requestDestinationConfirmationReview(discovery:StoredDisco
  confirmationReviews.set(review,{binding,generation,contextDigest:pinned.contextDigest,attempted:false})
  return review
 }
-export async function requestDestinationConfirmation(discovery:StoredDiscovery,review?:DestinationConfirmationReview,signal?:AbortSignal):Promise<DestinationConfirmation|null>{
+export async function requestDestinationConfirmation(discovery:DestinationReviewTarget,review?:DestinationConfirmationReview,signal?:AbortSignal):Promise<DestinationConfirmation|null>{
  const binding=privateDestinationBinding,generation=privateDecisionBindingVersion
  const pinned={draftId:discovery.draftId,revision:discovery.revision,intakeRevision:discovery.intakeRevision,contextDigest:discovery.contextDigest}
  if(!binding||pinned.draftId!==activeDestinationDraftId)throw Error('destination_unavailable')
@@ -157,7 +158,7 @@ export async function requestDestinationConfirmation(discovery:StoredDiscovery,r
  confirmationReceipts.set(receipt,{binding,generation,contextDigest:pinned.contextDigest})
  return receipt
 }
-export async function requestDestinationCreation(discovery:StoredDiscovery,receipt:DestinationConfirmation,signal?:AbortSignal):Promise<DestinationCreation|null>{
+export async function requestDestinationCreation(discovery:DestinationReviewTarget,receipt:DestinationConfirmation,signal?:AbortSignal):Promise<DestinationCreation|null>{
  const binding=privateDestinationBinding,generation=privateDecisionBindingVersion,capability=confirmationReceipts.get(receipt)
  const draftId=discovery.draftId
  if(!binding||!capability||capability.binding!==binding||capability.generation!==generation||capability.contextDigest!==discovery.contextDigest

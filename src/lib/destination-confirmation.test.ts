@@ -11,6 +11,19 @@ async function setup(handler:(url:string,options:RequestInit)=>Promise<Response>
  const mock=vi.fn((url:string,options:RequestInit)=>url.endsWith('/workspace')?Promise.resolve(workspace()):Promise.resolve(handler(url,options)))
  vi.stubGlobal('fetch',mock);await fetchPrivateWorkspace('owner',refresh);return mock
 }
+it('file version target confirms once without a fabricated discovery context and rejects a changed file',async()=>{
+ const target={draftId:activeDestinationDraftId,revision:3,intakeRevision:3,contextDigest:'c'.repeat(64)}
+ const fileReview={...review,intakeRevision:3,contextRevision:3}
+ const fileReceipt={...receipt,...fileReview}
+ const mock=await setup((url)=>json(url.includes('/confirmation-review/')?{confirmationReview:fileReview,completionAuthority:false}:url.includes('/creations/')?{creation,completionAuthority:false}:{confirmation:fileReceipt,completionAuthority:false}))
+ const prepared=await requestDestinationConfirmationReview(target)
+ await expect(requestDestinationConfirmation({...target,contextDigest:'d'.repeat(64)},prepared)).rejects.toThrow('confirmation_review_changed')
+ const confirmed=(await requestDestinationConfirmation(target,prepared))!
+ await expect(requestDestinationConfirmation(target,prepared)).rejects.toThrow('confirmation_review_changed')
+ expect(await requestDestinationCreation(target,confirmed)).toEqual(creation)
+ expect(mock.mock.calls.filter(([,options])=>options?.method==='POST')).toHaveLength(1)
+ expect(Object.hasOwn(target,'context')).toBe(false)
+})
 it('creation read requires a minted current confirmation and sends only a no-store GET with fresh credentials',async()=>{
  const refresh=vi.fn(async()=>'fresh-owner'),mock=await setup(url=>json(url.includes('/creations/')?{creation,completionAuthority:false}:{confirmation:receipt,completionAuthority:false}),refresh)
  await expect(requestDestinationCreation(discovery,{...receipt})).rejects.toThrow()

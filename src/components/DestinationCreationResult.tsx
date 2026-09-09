@@ -1,5 +1,5 @@
 import {useCallback,useEffect,useRef,useState} from 'react'
-import {requestDestinationCreation,type DestinationConfirmation,type StoredDiscovery} from '../lib/api'
+import {requestDestinationCreation,type DestinationConfirmation,type DestinationReviewTarget} from '../lib/api'
 
 export type CreationResultState='loading'|'registered'|'missing'|'unavailable'
 export const creationResultNotice=(state:CreationResultState)=>({
@@ -9,7 +9,7 @@ export const creationResultNotice=(state:CreationResultState)=>({
  unavailable:'생성 결과를 확인하지 못했습니다. 재생성하지 않고 조회만 다시 시도할 수 있습니다.',
 })[state]
 
-export function DestinationCreationResult({discovery,receipt}:{discovery:StoredDiscovery;receipt:DestinationConfirmation}){
+export function DestinationCreationResult({discovery,receipt}:{discovery:DestinationReviewTarget;receipt:DestinationConfirmation}){
  const [state,setState]=useState<CreationResultState>('loading')
  const current=useRef(0),controller=useRef<AbortController|null>(null)
  const load=useCallback(async()=>{
