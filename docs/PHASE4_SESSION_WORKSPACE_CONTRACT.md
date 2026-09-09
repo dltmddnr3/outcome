@@ -52,6 +52,8 @@ These are program responsibilities, not new agents, schedules or products. The c
 
 ### Existing Phase 4 acceptance additions
 
+Secretless reader integration at f3a9f51: schema-v2 protected config now exercised through readOutcomeWorkObservation with empty local identity environment and a local identity factory that throws if invoked. The pinned remote workspace request authenticates the same token before SQLite/desktop observation; subsequent 401 prevents additional runtime reads. No token/config identity appears in result, DB bytes unchanged. Full npm test 897 PASS (0 fail/skip/TODO), build PASS. Remote HTTP and desktop inputs remain simulated in this integration. Actual browser-to-local token handoff, protected live work configuration and journal initialization, hosted observation transport, actual stage execution, and Phase 5 source closure remain unmet; do not replace these with another passing fixture count.
+
 - [ ] Explicit protected Preview identity mode delegates token validation to the existing authenticated workspace endpoint; no Clerk secret import, redirect, grant issuance or private response disclosure.
   CHECK: node --test server/outcome-preview-work-identity.test.mjs
   EXPECT: fail 0
