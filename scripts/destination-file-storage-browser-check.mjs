@@ -11,6 +11,8 @@ import {createDestinationConfirmationRepository} from '../server/outcome-destina
 // Disposable Chrome → real HTTP handlers → scoped SQL, synthetic identity only.
 // No semantic verifier is supplied: confirmation must remain unavailable.
 const origin='https://outcome-fixture-white-castle.vercel.app'
+const useOutcomeInput=process.argv.includes('--outcome-input')
+const outcomeInput=useOutcomeInput?await readFile(new URL('../docs/OUTCOME_FILE_MVP_DOGFOOD.md',import.meta.url),'utf8'):null
 const compiled=await build({stdin:{contents:"import React from 'react';import{createRoot}from'react-dom/client';import{DestinationStudio}from'./src/components/DestinationStudio';import{fetchPrivateWorkspace}from'./src/lib/api';await fetchPrivateWorkspace('fixture-owner');createRoot(document.getElementById('root')).render(<DestinationStudio open onClose={()=>{}}/>);",loader:'tsx',resolveDir:process.cwd()},bundle:true,write:false,outdir:'fixture-build',format:'esm',jsx:'automatic',define:{'process.env.NODE_ENV':'"production"','import.meta.env':'{}'}})
 const js=compiled.outputFiles.find(file=>file.path.endsWith('.js')).text,css=compiled.outputFiles.find(file=>file.path.endsWith('.css')).text
 const browser=await chromium.launch({headless:true,executablePath:'/Applications/Google Chrome.app/Contents/MacOS/Google Chrome'})
@@ -41,7 +43,7 @@ try{
    })
    await page.goto(origin+'/workspace')
    await page.getByRole('button',{name:/기획 파일로 시작/}).click()
-   const source=['문제','대상 사용자','결과','범위','비목표','제약','수용 기준','복구'].map(label=>`# ${label}\n확인된 ${label}`).join('\n')
+   const source=outcomeInput??['문제','대상 사용자','결과','범위','비목표','제약','수용 기준','복구'].map(label=>`# ${label}\n확인된 ${label}`).join('\n')
    await page.locator('input[type=file]').setInputFiles({name:'plan.md',mimeType:'text/markdown',buffer:Buffer.from(source)})
    assert.equal(await page.getByRole('button',{name:'초안 저장',exact:true}).isDisabled(),true)
    await page.getByRole('button',{name:'기획 내용 확인',exact:true}).click()
