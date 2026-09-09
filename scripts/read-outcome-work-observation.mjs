@@ -9,6 +9,7 @@ import { readDestinationProtectedBytes } from './run-destination-questions.mjs'
 import { readWorkSessionInput } from './run-outcome-work.mjs'
 import { loadRegistry } from '../server/outcome-session-registry-persistence.mjs'
 import { createHostedIdentityRuntime } from '../server/account-access-hosted.mjs'
+import { createPreviewWorkIdentity } from '../server/outcome-preview-work-identity.mjs'
 import { createDesktopObservationReader } from '../server/outcome-desktop-observation-reader.mjs'
 import { createLocalWorkObservationSource, createStoredWorkJournalReader } from '../server/outcome-local-work-source.mjs'
 
@@ -22,7 +23,8 @@ export async function readOutcomeWorkObservation({ configPath, tokenReader, envi
     const configBytes = await readDestinationProtectedBytes(configPath)
     const config = JSON.parse(configBytes)
     const keys = ['schemaVersion', 'candidatePin', 'databasePath', 'scopeJson', 'accountRef', 'workspaceId', 'ownerCwd']
-    if (!config || Object.keys(config).length !== keys.length || keys.some(key => !Object.hasOwn(config, key)) || config.schemaVersion !== 1) throw Error()
+    if (config?.schemaVersion === 2) keys.push('previewOrigin')
+    if (!config || Object.keys(config).length !== keys.length || keys.some(key => !Object.hasOwn(config, key)) || ![1, 2].includes(config.schemaVersion)) throw Error()
     const checkout = fileURLToPath(new URL('..', import.meta.url))
     const git = args => execFileSync('git', args, { cwd: checkout, encoding: 'utf8', timeout: 5000, stdio: ['ignore', 'pipe', 'ignore'], env: { ...process.env, GIT_NO_REPLACE_OBJECTS: '1' } }).trim()
     if (git(['rev-parse', 'HEAD']) !== config.candidatePin) throw Error()
@@ -45,7 +47,9 @@ export async function readOutcomeWorkObservation({ configPath, tokenReader, envi
         return JSON.stringify({ ...account, scopeJson: config.scopeJson, threadId: rows[0].locator_ref })
       },
     })
-    const runtime = identityFactory({ environment, sealedSnapshot: snapshot, workObservationSource: source, now })
+    const runtime = config.schemaVersion === 2
+      ? createPreviewWorkIdentity({ previewOrigin: config.previewOrigin, accountRef: config.accountRef, workspaceId: config.workspaceId, projectId: scope.projectId, workObservationSource: source, now })
+      : identityFactory({ environment, sealedSnapshot: snapshot, workObservationSource: source, now })
     if (typeof runtime?.service?.readWorkObservation !== 'function' || typeof tokenReader !== 'function') throw Error()
     token = await tokenReader()
     if (typeof token !== 'string' || !token || Buffer.byteLength(token) > 16384 || /\s|[\u0000-\u001f\u007f]/.test(token)) throw Error()
