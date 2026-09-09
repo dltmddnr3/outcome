@@ -1,7 +1,8 @@
 import test from 'node:test'
 import assert from 'node:assert/strict'
 import { createHash } from 'node:crypto'
-import { createLocalWorkObservationSource } from './outcome-local-work-source.mjs'
+import { createLocalWorkObservationSource, createStoredWorkJournalReader } from './outcome-local-work-source.mjs'
+import { DatabaseSync } from 'node:sqlite'
 import { readScopedWorkObservation } from './outcome-work-observation-access.mjs'
 const now = 20000, threadId = '11111111-1111-4111-8111-111111111111'
 const account = { accountRef: 'a'.repeat(64), workspaceId: 'workspace-one', projectId: 'outcome' }
@@ -12,6 +13,28 @@ const queued = { sequence: 1, observedAt: new Date(now - 100).toISOString(), sta
 const journal = JSON.stringify({ schemaVersion: 1, scope, events: [queued, { ...queued, sequence: 2, stage: 'implementing', activity: 'running' }] })
 const snapshot = { runtimeJson: JSON.stringify({ thread: { id: threadId, status: { type: 'active', activeFlags: [] } } }), observedAtMs: now - 50 }
 const options = () => ({ resolveBinding: async () => binding, readJournal: async () => journal, readRuntime: async () => snapshot, now: () => now })
+test('stored journal reader uses SQLite rows without schema initialization or writes', async () => {
+  const db = new DatabaseSync(':memory:')
+  try {
+    const readJournal = createStoredWorkJournalReader(db, { now: () => now })
+    assert.equal(await readJournal(scopeJson), null)
+    assert.equal(db.prepare("SELECT count(*) n FROM sqlite_master WHERE type='table'").get().n, 0)
+    db.exec('CREATE TABLE outcome_work_journals(project_id TEXT,work_id TEXT,scope_json TEXT,sequence INTEGER,journal_json TEXT)')
+    const insert = db.prepare('INSERT INTO outcome_work_journals VALUES(?,?,?,?,?)')
+    insert.run(scope.projectId, scope.workId, scopeJson, 2, journal)
+    db.exec('PRAGMA query_only=ON')
+    const source = createLocalWorkObservationSource({ ...options(), readJournal })
+    const result = await readScopedWorkObservation({ ...account, now: () => now, readSource: source })
+    assert.equal(result.executionState, 'running')
+    assert.equal(await readJournal(JSON.stringify({ ...scope, runId: 'other-run' })), null)
+    assert.equal(await readJournal(JSON.stringify({ ...scope, projectId: 'other-project' })), null)
+    db.exec('PRAGMA query_only=OFF')
+    db.prepare('UPDATE outcome_work_journals SET sequence=3').run()
+    assert.equal(await readJournal(scopeJson), null)
+    db.prepare('UPDATE outcome_work_journals SET sequence=2,journal_json=?').run(journal.replace('"sequence":2', '"sequence":1'))
+    assert.equal(await readJournal(scopeJson), null)
+  } finally { db.close() }
+})
 test('local journal and private runtime compose into scoped public observation with original times', async () => {
   let reads = 0
   const source = createLocalWorkObservationSource({ ...options(), readRuntime: async id => { reads++; assert.equal(id, threadId); return snapshot } })

@@ -1,5 +1,26 @@
 import { createHash } from 'node:crypto'
 import { readScopedWorkObservation } from './outcome-work-observation-access.mjs'
+import { projectSingleSessionWork } from './outcome-work-observer.mjs'
+
+// The caller opens an existing database read-only and owns its lifetime. This
+// reader does not instantiate the journal writer (which initializes tables).
+export function createStoredWorkJournalReader(database, { now = Date.now } = {}) {
+  return async (scopeJson, { signal } = {}) => {
+    try {
+      if (signal?.aborted || typeof scopeJson !== 'string' || Buffer.byteLength(scopeJson) > 2048) return null
+      const scope = JSON.parse(scopeJson), time = now()
+      projectSingleSessionWork(JSON.stringify({ schemaVersion: 1, scope, events: [] }), scopeJson, time)
+      const row = database.prepare('SELECT scope_json,sequence,journal_json FROM outcome_work_journals WHERE project_id=? AND work_id=?').get(scope.projectId, scope.workId)
+      if (!row || typeof row.scope_json !== 'string' || typeof row.journal_json !== 'string' || Buffer.byteLength(row.journal_json) > 262144) return null
+      const storedScope = JSON.parse(row.scope_json)
+      if (Object.keys(storedScope).length !== Object.keys(scope).length || Object.keys(scope).some(key => storedScope[key] !== scope[key])) return null
+      projectSingleSessionWork(row.journal_json, scopeJson, time)
+      const events = JSON.parse(row.journal_json).events
+      if (events.length !== row.sequence || events.some((event, index) => event.sequence !== index + 1) || signal?.aborted) return null
+      return row.journal_json
+    } catch { return null }
+  }
+}
 
 // Local trusted composition. resolveBinding reads current protected owner/run
 // configuration, not browser input. No registry writes, dispatch or timestamps

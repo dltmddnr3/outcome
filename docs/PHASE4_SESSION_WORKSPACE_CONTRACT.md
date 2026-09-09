@@ -52,6 +52,11 @@ These are program responsibilities, not new agents, schedules or products. The c
 
 ### Existing Phase 4 acceptance additions
 
+- [x] Local observation reads persisted SQLite journal rows without invoking the schema-initializing writer; missing tables, wrong run and corrupt sequence remain unavailable.
+  CHECK: node --test server/outcome-local-work-source.test.mjs
+  EXPECT: fail 0
+  EVIDENCE: Same-session source suite 3 PASS, real SQLite query_only mode composes a running projection; absent table creates no schema, foreign project/run and sequence corruption reject. No live DB was opened or changed. Canonical top-level small JSON key-only inspection still has no work-runner configuration; nested files not exhaustively checked. This adds the database read port, not operating configuration or hosted activation.
+
 - [x] Local source composition joins the current authenticated binding, durable journal and owner-runtime snapshot; changed binding or cancellation returns unavailable, never a fabricated running state.
   CHECK: node --test server/outcome-local-work-source.test.mjs
   EXPECT: fail 0
