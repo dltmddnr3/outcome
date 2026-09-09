@@ -1,10 +1,14 @@
 import assert from 'node:assert/strict'
 import {build} from 'esbuild'
 import {chromium} from '@playwright/test'
+import {readFile} from 'node:fs/promises'
+import {analyzeDestinationBrief} from '../src/lib/destination-brief-parser.mjs'
 
 // Real Chrome interaction with the production component; synthetic input only.
 // No account, private API or live project mutation is part of this check.
 const origin='https://outcome-fixture-white-castle.vercel.app'
+const template=await readFile(new URL('../public/outcome-planning-template.md',import.meta.url),'utf8')
+assert.deepEqual(analyzeDestinationBrief(template).answers,{})
 const compiled=await build({stdin:{contents:"import React from 'react';import{createRoot}from'react-dom/client';import{DestinationStudio}from'./src/components/DestinationStudio';createRoot(document.getElementById('root')).render(<DestinationStudio open onClose={()=>{}}/>);",loader:'tsx',resolveDir:process.cwd()},bundle:true,write:false,outdir:'fixture-build',format:'esm',jsx:'automatic',define:{'process.env.NODE_ENV':'"production"','import.meta.env':'{}'}})
 const js=compiled.outputFiles.find(file=>file.path.endsWith('.js')).text
 const css=compiled.outputFiles.find(file=>file.path.endsWith('.css')).text
@@ -22,6 +26,7 @@ try{
   await page.goto(origin+'/workspace')
   assert.equal(await page.getByRole('button',{name:'질문으로 시작',exact:true}).count(),0)
   await page.getByRole('button',{name:/기획 파일로 시작/}).click()
+  assert.equal(await page.getByRole('link',{name:'기획 파일 양식 내려받기'}).getAttribute('download'),'')
   const source='# 문제\n작업 단절\n# 대상 사용자\n소유자\n# 결과\n완주 확인\n# 범위\n파일 등록'+(conflict?'\n# 범위\n다른 범위':'\n# 비목표\n외부 출시\n# 제약\n명시 승인\n# 수용 기준\n실사용 확인\n# 복구\n이번 변경만 복구')
   await page.locator('input[type=file]').setInputFiles({name:'plan.md',mimeType:'text/markdown',buffer:Buffer.from(source)})
   await page.getByRole('button',{name:'기획 내용 확인',exact:true}).click()

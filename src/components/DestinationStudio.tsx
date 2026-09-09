@@ -61,7 +61,7 @@ export function DestinationStudio({ open, onClose, fileBased = true }: { open: b
     const onKeyDown = (event: KeyboardEvent) => {
       if (event.key === 'Escape') { event.preventDefault(); onClose(); return }
       if (event.key !== 'Tab') return
-      const items = Array.from(dialogRef.current?.querySelectorAll<HTMLElement>('button:not([disabled]), input:not([disabled]), textarea:not([disabled])') ?? []).filter((item) => item.tabIndex >= 0)
+      const items = Array.from(dialogRef.current?.querySelectorAll<HTMLElement>('a[href], button:not([disabled]), input:not([disabled]), textarea:not([disabled])') ?? []).filter((item) => item.tabIndex >= 0)
       if (!items.length) return
       const first = items[0]; const last = items[items.length - 1]
       if (event.shiftKey && document.activeElement === first) { event.preventDefault(); last.focus() }
@@ -204,6 +204,7 @@ export function DestinationStudio({ open, onClose, fileBased = true }: { open: b
       </div>}
 
       {step === 'brief' && <div className="destination-studio__brief">
+        {fileBased && <a href="/outcome-planning-template.md" download>기획 파일 양식 내려받기</a>}
         <button className="destination-studio__back" type="button" onClick={() => setStep('entry')}><ArrowLeft size={17} aria-hidden="true" />시작 방식</button>
         <div><h3>{fileBased ? '기획 파일을 넣어 주세요' : '기획서의 빈칸만 찾을게요'}</h3><p>헤더에 `문제`, `대상 사용자`, `결과`, `범위`, `비목표`, `제약`, `수용 기준`, `복구`를 쓰면 더 정확해요.</p></div>
         <label className="destination-studio__file"><span>이 기기에서 파일 읽기</span><input type="file" accept=".md,.markdown,.txt,text/plain,text/markdown" onChange={(event) => void readLocalFile(event.currentTarget.files?.[0])} /><small>읽기만으로는 서버 업로드 없음 · 초안 저장은 별도 · 64KB 이하</small></label>
