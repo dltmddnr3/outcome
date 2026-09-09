@@ -52,6 +52,8 @@ These are program responsibilities, not new agents, schedules or products. The c
 
 ### Existing Phase 4 acceptance additions
 
+Command containment correction: detached spawn with ignored stdio was denied incidentally, but inherited stdio reproduced a successful child spawn (regression RED). Added explicit process-fork denial to the single-process sandbox; regression GREEN. This deliberately supports only commands that do not fork; npm/git and subprocess-based test runners remain unsupported, not silently treated as successful. No grant/receiver activation. Native test PASS also verifies output flood termination and in-flight cancellation. IPC and production-level containment review remain open.
+
 - [ ] Command receiver's internal process port executes an explicit Node command within exact-file read/write sandbox, denies network and outside files, bounds output/time, and exposes digest only. Unsupported programs hold.
   CHECK: node --test server/outcome-work-command.test.mjs
   EXPECT: fail 0

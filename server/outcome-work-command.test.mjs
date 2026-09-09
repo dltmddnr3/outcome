@@ -18,5 +18,14 @@ test('real command obeys exact-file sandbox and never returns raw output', { ski
     const controller = new AbortController(); controller.abort()
     assert.equal((await runBoundedWorkCommand({ ...base, args: [], signal: controller.signal })).outcome, 'command_unavailable')
     assert.equal((await runBoundedWorkCommand({ ...base, program: 'npm', args: [] })).outcome, 'command_unavailable')
+    // The internal single-process port must not allow a detached process to
+    // escape the process group and outlive cancellation.
+    const forkCode = `const r=require('node:child_process').spawnSync(process.execPath,['-e','process.exit(0)'],{detached:true,stdio:'inherit'});process.exit(r.error&&['EPERM','EACCES'].includes(r.error.code)?0:9)`
+    assert.equal((await runBoundedWorkCommand({ ...base, timeoutMs: 5000, args: ['-e', forkCode] })).outcome, 'command_exited_zero')
+    assert.equal((await runBoundedWorkCommand({ ...base, timeoutMs: 5000, args: ['-e', `process.stdout.write('x'.repeat(2097152))`] })).outcome, 'command_output_limit')
+    const active = new AbortController()
+    const executing = runBoundedWorkCommand({ ...base, timeoutMs: 5000, signal: active.signal, args: ['-e', 'setInterval(()=>{},1000)'] })
+    const abortTimer = setTimeout(() => active.abort(), 50)
+    try { assert.equal((await executing).outcome, 'command_cancelled') } finally { clearTimeout(abortTimer) }
   } finally { rmSync(root, { recursive: true, force: true }) }
 })

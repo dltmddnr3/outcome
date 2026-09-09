@@ -18,7 +18,7 @@ export async function runBoundedWorkCommand({ program, args, cwd, readPaths, wri
     // Exact files only: no implicit cwd/home/.git read or write permission.
     const executable = realpathSync(process.execPath)
     const literals = paths => paths.map(path => `(literal ${JSON.stringify(path)})`).join(' ')
-    const profile = `(version 1)(allow default)(deny network*)(deny file-write*)(deny file-read-data)(allow file-read-data (literal "/") (subpath "/System") (subpath "/usr/lib") ${literals(['/dev/null', '/dev/random', '/dev/urandom', executable, ...readPaths])})${writePaths.length ? `(allow file-write* ${literals(writePaths)})` : ''}`
+    const profile = `(version 1)(allow default)(deny process-fork)(deny network*)(deny file-write*)(deny file-read-data)(allow file-read-data (literal "/") (subpath "/System") (subpath "/usr/lib") ${literals(['/dev/null', '/dev/random', '/dev/urandom', executable, ...readPaths])})${writePaths.length ? `(allow file-write* ${literals(writePaths)})` : ''}`
     return await new Promise(resolve => {
       let child, timer, reason = null, bytes = 0, settled = false
       const digest = createHash('sha256')
