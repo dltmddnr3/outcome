@@ -72,6 +72,11 @@ test('configured CLI composes existing initial journal, grant and queue once wit
     assert.equal(await runOutcomeWorkOnce({...options,argv:['--observe',path,digest]}),0,output)
     assert.equal(JSON.parse(output).outcome,'already_observed')
     const running=observation
+    for(const change of [{turnRef:'0'.repeat(64)},{observedAt:new Date(now+1000).toISOString()},{privateText:'must-not-store'}]){
+      observation={...running,...change}
+      assert.equal(await runOutcomeWorkOnce({...options,argv:['--observe',path,digest]}),70)
+      assert(!db.prepare('SELECT observation_json FROM outcome_work_activity').get().observation_json.includes('must-not-store'))
+    }
     observation={...running,activity:'terminal',providerStatus:'completed',terminalAt:new Date(now).toISOString(),sourceDigest:'7'.repeat(64)}
     assert.equal(await runOutcomeWorkOnce({...options,argv:['--observe',path,digest]}),0,output)
     observation={...running,sourceDigest:'6'.repeat(64)}
