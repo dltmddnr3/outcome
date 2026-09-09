@@ -54,10 +54,10 @@ These are program responsibilities, not new agents, schedules or products. The c
 
 #### Candidate-bound stage receipt check · 2026-09-09
 
-- [ ] Claimed reservation activity is collected through the exact dispatched envelope and persisted separately from stage acceptance, with replay and terminal-regression protection.
+- [x] Claimed reservation activity is collected through the exact dispatched envelope and persisted separately from stage acceptance, with replay and terminal-regression protection. Integration proof only, not live operation.
   CHECK: node --test server/outcome-work-runner.test.mjs server/outcome-work-queue.test.mjs
   EXPECT: fail 0
-  EVIDENCE: pending. Scope local journal/queue/one-shot runner/tests. No runtime migration or live observation authorized by these tests; existing local stores without the new table must hold, not auto-upgrade.
+  EVIDENCE: 4f41669 full npm test 887 PASS. Additional hostile cases at 7480cb2 targeted runner tests 2 PASS. --observe resolves current authenticated owner/binding, exact claimed reservation and same deterministic message used for dispatch, then stores bounded activity only. No unclaimed observation, private extras, future timestamps, changed turn identity or terminal-to-running regression accepted. Same source replay leaves original observation time intact; no stage journal sequence or acceptance advance. Activity table is latest-observation storage, not complete event history. Source adapter is real implementation; identity/provider observations are fixtures in this test. No runtime migration or live observation occurred; existing local stores without the new table hold rather than auto-upgrade. Scope local journal/queue/one-shot runner/tests; rollback task-owned commits. Actual authorized execution, stage receipt publication and next-stage transition remain open.
 
 - [x] Correlated provider activity distinguishes observed running/terminal from missing/unknown without exposing private text or granting stage acceptance. Adapter implementation only; no claim of live observation.
   CHECK: node --test server/outcome-chat-result-source.test.mjs server/outcome-chat-codex-queue.test.mjs
