@@ -139,6 +139,15 @@ export function createWorkJournal(db) {
       const grant=db.prepare('SELECT grant_json,owner_ref,revoked_at FROM outcome_execution_grants WHERE digest=?').get(action[6])
       const grantExpected=JSON.stringify({...bound.scope,ownerRef,candidateCommit:action[4],candidateTree:action[5],authorityRef:action[6],action:action[3],status:'active'})
       if(!grant||grant.owner_ref!==ownerRef||grant.revoked_at!==null||!verifyWorkExecutionGrant(grant.grant_json,grantExpected,nowMs).matches)fail()
+      const executionGrant=JSON.parse(grant.grant_json)
+      if(executionGrant.schemaVersion===2){
+        for(const command of executionGrant.execution.commands.filter(command=>command.stage===action[3])){
+          const row=db.prepare('SELECT result_json FROM outcome_work_command_results WHERE reservation_digest=? AND command_id=?').get(reservationDigest,command.id)
+          if(!row)fail()
+          const result=JSON.parse(row.result_json)
+          if(result.outcome!=='command_exited_zero'||result.exitCode!==0||!sha(result.outputDigest,64))fail()
+        }
+      }
       const nextAction={implementing:'qa_verifying',qa_verifying:'release_verifying',release_verifying:'awaiting_owner'}[action[3]]
       if(last.activity==='terminal'){
         if(last.evidenceRef!==expected.digest||last.candidateCommit!==expected.candidateCommit||last.candidateTree!==expected.candidateTree||last.nextAction!==nextAction)fail()

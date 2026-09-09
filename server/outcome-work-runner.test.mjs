@@ -157,6 +157,8 @@ test('configured CLI starts once only after correlated running observation, neve
       observation={...running,sourceDigest:String(index+2).repeat(64),turnRef:String(index+3).repeat(64)}
       assert.equal(await runOutcomeWorkOnce({...options,argv:['--observe',path,reservation]}),0,output)
       assert.equal(journal.read(scopeJson,now).projection.stage,stage)
+      assert.equal(await runOutcomeWorkOnce({...options,argv:['--execute',path,reservation]}),0,output)
+      assert.equal(JSON.parse(output).outcome,'commands_completed')
       const stageReceipt={...receipt,stage},bytes=JSON.stringify(stageReceipt),stageDigest=createHash('sha256').update(bytes).digest('hex')
       const stored=save(`${stageDigest}.json`,bytes);chmodSync(stored,0o400)
       priorReceipt={...receiptFields,stage,digest:stageDigest,requiredChecks:['check']}
