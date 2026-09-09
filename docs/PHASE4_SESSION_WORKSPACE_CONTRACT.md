@@ -54,6 +54,11 @@ These are program responsibilities, not new agents, schedules or products. The c
 
 #### Candidate-bound stage receipt check · 2026-09-09
 
+- [ ] Explicit one-shot session input can authenticate local execution without creating a token file; bounded input errors fail closed and do not print token bytes.
+  CHECK: node --test server/outcome-work-runner.test.mjs
+  EXPECT: fail 0
+  EVIDENCE: pending. Scope runner/tests only; no live credentials/configuration created. Existing stored-token compatibility does not authorize new token storage.
+
 - [ ] Stage terminal publication requires a recorded start, completed correlated provider observation, current unrevoked grant and protected passing receipt for the same work; publication records one next action but never dispatches or accepts automatically.
   CHECK: node --test server/outcome-work-runner.test.mjs
   EXPECT: fail 0

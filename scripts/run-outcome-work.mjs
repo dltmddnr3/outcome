@@ -19,6 +19,27 @@ import {createPlannerOwnerProbe} from '../server/outcome-chat-owner-probe.mjs'
 const fail=()=>{throw Error('work_configuration_unavailable')}
 const hash=(value,n)=>typeof value==='string'&&new RegExp(`^[a-f0-9]{${n}}$`).test(value)
 const keys=['schemaVersion','candidatePin','databasePath','receiptDirectory','policyPath','tokenPath','identityPath','snapshotPath','registryPath','ownerCwd','codexExecutable']
+export function readWorkSessionInput(stream,{timeoutMs=5000,maxBytes=16384}={}){
+  return new Promise((resolve,reject)=>{
+    let timer,done=false;const chunks=[];let size=0
+    const finish=(error,value)=>{
+      if(done)return;done=true;clearTimeout(timer)
+      stream?.removeListener?.('data',data);stream?.removeListener?.('end',end);stream?.removeListener?.('error',errorHandler);stream?.removeListener?.('close',close)
+      stream?.pause?.();chunks.length=0
+      if(error)reject(Error('session_input_unavailable'));else resolve(value)
+    }
+    const data=chunk=>{const bytes=Buffer.from(chunk);size+=bytes.length;if(size>maxBytes)finish(true);else chunks.push(bytes)}
+    const end=()=>{
+      const text=Buffer.concat(chunks).toString('utf8').replace(/\r?\n$/,'')
+      if(!text||/\s|[\u0000-\u001f\u007f]/.test(text)||Buffer.byteLength(text)>maxBytes)return finish(true)
+      finish(false,text)
+    }
+    const errorHandler=()=>finish(true),close=()=>{if(!done)finish(true)}
+    if(typeof stream?.on!=='function'||!Number.isSafeInteger(timeoutMs)||timeoutMs<1||timeoutMs>5000||!Number.isSafeInteger(maxBytes)||maxBytes<1||maxBytes>16384){finish(true);return}
+    timer=setTimeout(()=>finish(true),timeoutMs)
+    stream.on('data',data);stream.once('end',end);stream.once('error',errorHandler);stream.once('close',close)
+  })
+}
 const privateDirectory=async path=>{
   if(typeof path!=='string'||!isAbsolute(path)||await realpath(path)!==path)fail()
   const s=await lstat(path)
@@ -28,16 +49,18 @@ const privateDirectory=async path=>{
 // Explicit one-shot composition, never a daemon or implicit grant issuer. Production uses
 // the defaults; injected ports exist only for isolated integration reproduction.
 export async function runOutcomeWorkOnce({argv=process.argv.slice(2),write=text=>process.stdout.write(text),
-  identityFactory=createHostedIdentityRuntime,queueFactory=createCodexQueueAdapter,now=Date.now}={}){
+  identityFactory=createHostedIdentityRuntime,queueFactory=createCodexQueueAdapter,now=Date.now,sessionTokenReader}={}){
   let db
   try{
     if(!Array.isArray(argv)||!['--dispatch','--receive','--approve','--observe','--finalize'].includes(argv[0])||argv.length!==(argv[0]==='--dispatch'?2:3)
       ||argv[0]!=='--dispatch'&&!hash(argv[2],64))fail()
     const read=async path=>(await readDestinationProtectedBytes(path)).toString('utf8')
     const config=JSON.parse(await read(argv[1]))
-    const configKeys=config?.schemaVersion===3?[...keys,'approvalPath','terminalPath']:config?.schemaVersion===2?[...keys,'approvalPath']:keys
+    const configKeys=config?.schemaVersion===4?[...keys.filter(key=>key!=='tokenPath'),'approvalPath','terminalPath']:config?.schemaVersion===3?[...keys,'approvalPath','terminalPath']:config?.schemaVersion===2?[...keys,'approvalPath']:keys
     if(!config||Array.isArray(config)||Object.keys(config).length!==configKeys.length||!configKeys.every(key=>Object.hasOwn(config,key))
-      ||![1,2,3].includes(config.schemaVersion)||!hash(config.candidatePin,40)||argv[0]==='--approve'&&config.schemaVersion<2||argv[0]==='--finalize'&&config.schemaVersion!==3)fail()
+      ||![1,2,3,4].includes(config.schemaVersion)||!hash(config.candidatePin,40)||argv[0]==='--approve'&&config.schemaVersion<2||argv[0]==='--finalize'&&config.schemaVersion<3)fail()
+    if(config.schemaVersion===4&&typeof sessionTokenReader!=='function')fail()
+    const readToken=()=>config.schemaVersion===4?sessionTokenReader():read(config.tokenPath)
     const checkout=await realpath(fileURLToPath(new URL('..',import.meta.url)))
     const head=execFileSync('git',['rev-parse','HEAD'],{cwd:checkout,encoding:'utf8',timeout:5000,stdio:['ignore','pipe','ignore']}).trim()
     if(head!==config.candidatePin)fail()
@@ -78,13 +101,13 @@ export async function runOutcomeWorkOnce({argv=process.argv.slice(2),write=text=
       if(queueAdapter.matchesWorkScope(binding?.destination,request.scopeJson)!==true)fail()
       return latest
     }
-    const runtime=createLocalWorkRuntime({enabled:true,accountService:identity.service,readToken:()=>read(config.tokenPath),grantStore,journal,
+    const runtime=createLocalWorkRuntime({enabled:true,accountService:identity.service,readToken,grantStore,journal,
       receiptDirectory:config.receiptDirectory,queueAdapter,now,readCurrentPolicy})
     if(argv[0]==='--finalize'){
       let timer
       const inspect=async()=>{
         const {request}=JSON.parse(await readCurrentPolicy()),scope=JSON.parse(request.scopeJson)
-        const owner=await identity.service.resolveBridgeAuthority({token:await read(config.tokenPath)})
+        const owner=await identity.service.resolveBridgeAuthority({token:await readToken()})
         if(!owner?.project_ids?.includes(scope.projectId))fail()
         const reserved=journal.readObservationRequest(request.scopeJson,argv[2],owner.account_ref,now())
         if(['candidateCommit','candidateTree','authorityRef','action'].some(key=>request[key]!==reserved[key]))fail()
@@ -96,7 +119,7 @@ export async function runOutcomeWorkOnce({argv=process.argv.slice(2),write=text=
           outputCommit:expected.candidateCommit,outputTree:expected.candidateTree,stage:request.action,writePaths:grant.execution?.writePaths??[]}))fail()
         await readCurrentPolicy()
         if(await read(config.terminalPath)!==expectedJson)fail()
-        const fresh=await identity.service.resolveBridgeAuthority({token:await read(config.tokenPath)})
+        const fresh=await identity.service.resolveBridgeAuthority({token:await readToken()})
         if(fresh?.account_ref!==owner.account_ref||!fresh.project_ids?.includes(scope.projectId))fail()
         return {request,ownerRef:owner.account_ref,expectedJson}
       }
@@ -109,7 +132,7 @@ export async function runOutcomeWorkOnce({argv=process.argv.slice(2),write=text=
       let timer
       const inspect=async()=>{
         const {request}=JSON.parse(await readCurrentPolicy()),scope=JSON.parse(request.scopeJson)
-        const owner=await identity.service.resolveBridgeAuthority({token:await read(config.tokenPath)})
+        const owner=await identity.service.resolveBridgeAuthority({token:await readToken()})
         if(!owner?.project_ids?.includes(scope.projectId))fail()
         const reserved=journal.readObservationRequest(request.scopeJson,argv[2],owner.account_ref,now())
         if(['candidateCommit','candidateTree','authorityRef','action'].some(key=>request[key]!==reserved[key]))fail()
@@ -117,7 +140,7 @@ export async function runOutcomeWorkOnce({argv=process.argv.slice(2),write=text=
         if(!queueAdapter.matchesWorkScope(binding?.destination,request.scopeJson))fail()
         const observation=await queueAdapter.readPlannerActivity({destination:binding.destination,...workQueueEnvelope(reserved)})
         await readCurrentPolicy()
-        const fresh=await identity.service.resolveBridgeAuthority({token:await read(config.tokenPath)})
+        const fresh=await identity.service.resolveBridgeAuthority({token:await readToken()})
         if(fresh?.account_ref!==owner.account_ref||!fresh.project_ids?.includes(scope.projectId))fail()
         return {request,ownerRef:owner.account_ref,observation}
       }
@@ -139,13 +162,13 @@ export async function runOutcomeWorkOnce({argv=process.argv.slice(2),write=text=
         if(createHash('sha256').update(grantJson).digest('hex')!==argv[2]||JSON.parse(grantJson).schemaVersion!==2)fail()
         const {request}=JSON.parse(await readCurrentPolicy()),scope=JSON.parse(request.scopeJson)
         if(request.authorityRef!==argv[2])fail()
-        const owner=await identity.service.resolveBridgeAuthority({token:await read(config.tokenPath)})
+        const owner=await identity.service.resolveBridgeAuthority({token:await readToken()})
         if(!owner?.project_ids?.includes(scope.projectId)||!hash(owner.account_ref,64))fail()
         const expected=JSON.stringify({...scope,ownerRef:owner.account_ref,candidateCommit:request.candidateCommit,candidateTree:request.candidateTree,authorityRef:argv[2],action:request.action,status:'active'})
         if(!verifyWorkExecutionGrant(grantJson,expected,now()).matches)fail()
         await readCurrentPolicy()
         if(await read(config.approvalPath)!==grantJson)fail()
-        const fresh=await identity.service.resolveBridgeAuthority({token:await read(config.tokenPath)})
+        const fresh=await identity.service.resolveBridgeAuthority({token:await readToken()})
         if(fresh?.account_ref!==owner.account_ref||!fresh.project_ids?.includes(scope.projectId))fail()
         return {grantJson,ownerRef:owner.account_ref,expected}
       }
@@ -166,4 +189,10 @@ export async function runOutcomeWorkOnce({argv=process.argv.slice(2),write=text=
   }catch{try{write('{"outcome":"configuration_hold","executionAuthority":false,"completionAuthority":false}\n')}catch{};return 70}
   finally{if(db)try{db.close()}catch{}}
 }
-if(typeof process.argv[1]==='string'&&pathToFileURL(process.argv[1]).href===import.meta.url)process.exitCode=await runOutcomeWorkOnce()
+if(typeof process.argv[1]==='string'&&pathToFileURL(process.argv[1]).href===import.meta.url){
+  const argv=process.argv.slice(2),useInput=argv[0]==='--session-stdin'
+  let token
+  process.exitCode=await runOutcomeWorkOnce({argv:useInput?argv.slice(1):argv,
+    sessionTokenReader:useInput?()=>token??=readWorkSessionInput(process.stdin):undefined})
+  token=undefined
+}

@@ -1,14 +1,27 @@
 import test from 'node:test'
 import assert from 'node:assert/strict'
-import {mkdtempSync,realpathSync,writeFileSync,rmSync,chmodSync} from 'node:fs'
+import {mkdtempSync,realpathSync,writeFileSync,rmSync,chmodSync,existsSync} from 'node:fs'
+import {PassThrough} from 'node:stream'
 import {tmpdir} from 'node:os'
 import {join} from 'node:path'
 import {execFileSync} from 'node:child_process'
 import {DatabaseSync} from 'node:sqlite'
 import {createHash} from 'node:crypto'
-import {runOutcomeWorkOnce} from '../scripts/run-outcome-work.mjs'
+import {runOutcomeWorkOnce,readWorkSessionInput} from '../scripts/run-outcome-work.mjs'
 import {createWorkJournal} from './outcome-work-journal.mjs'
 import {createWorkGrantStore} from './outcome-work-grant-store.mjs'
+
+test('session input is bounded, one-shot and never exposes rejected bytes',async()=>{
+  const stream=new PassThrough(),ready=readWorkSessionInput(stream);stream.end('fixture-token\n')
+  assert.equal(await ready,'fixture-token');assert.equal(stream.listenerCount('data'),0)
+  for(const bytes of ['','private secret','x'.repeat(16385)]){
+    const stream=new PassThrough(),result=readWorkSessionInput(stream)
+    stream.end(bytes)
+    await assert.rejects(result,/^Error: session_input_unavailable$/)
+    assert.equal(stream.listenerCount('data'),0)
+  }
+  await assert.rejects(readWorkSessionInput(new PassThrough(),{timeoutMs:1}),/session_input_unavailable/)
+})
 
 test('one-shot work CLI fails closed without explicit protected configuration',async()=>{
   for(const argv of [[],['--run','/missing'],['--receive','/missing','bad'],['--dispatch','/missing']]){
@@ -37,12 +50,12 @@ test('configured CLI starts once only after correlated running observation, neve
   const receiptPath=save(`${receiptDigest}.json`,receiptJson);chmodSync(receiptPath,0o400)
   const {schemaVersion,checks,...receiptFields}=receipt
   const terminalPath=save('terminal.json',JSON.stringify({...receiptFields,digest:receiptDigest,requiredChecks:['check']}))
-  const config={schemaVersion:3,terminalPath,approvalPath:save('approval.json',grantJson),candidatePin:execFileSync('git',['rev-parse','HEAD'],{encoding:'utf8'}).trim(),databasePath,receiptDirectory:root,policyPath,
-    tokenPath:save('token','test-private-token'),identityPath:save('identity.json','{}'),snapshotPath:save('snapshot.json','{}'),registryPath:join(root,'.outcome-runtime','bindings.json'),ownerCwd:root,codexExecutable:process.execPath}
+  const config={schemaVersion:4,terminalPath,approvalPath:save('approval.json',grantJson),candidatePin:execFileSync('git',['rev-parse','HEAD'],{encoding:'utf8'}).trim(),databasePath,receiptDirectory:root,policyPath,
+    identityPath:save('identity.json','{}'),snapshotPath:save('snapshot.json','{}'),registryPath:join(root,'.outcome-runtime','bindings.json'),ownerCwd:root,codexExecutable:process.execPath}
   const path=save('config.json',JSON.stringify(config));let sends=0,output='',bindingValid=true
   let activeAuthority=authorityRef
   let observation={outcome:'observed',activity:'running',providerStatus:'inProgress',observedAt:new Date(now).toISOString(),terminalAt:null,sourceDigest:'8'.repeat(64),turnRef:'9'.repeat(64),executionAuthority:false,completionAuthority:false}
-  const options={now:()=>now,write:text=>output=text,identityFactory:()=>({service:{resolveBridgeAuthority:async({token})=>{assert.equal(token,'test-private-token');return {account_ref:ownerRef,project_ids:['outcome']}}}}),
+  const options={sessionTokenReader:async()=>'test-private-token',now:()=>now,write:text=>output=text,identityFactory:()=>({service:{resolveBridgeAuthority:async({token})=>{assert.equal(token,'test-private-token');return {account_ref:ownerRef,project_ids:['outcome']}}}}),
     queueFactory:()=>({bindingResolver:async()=>({status:'active',freshness:'fresh',project_id:'outcome',role:'planner',destination:{}}),matchesWorkScope:()=>bindingValid,transport:async()=>{sends++;return {delivery:'acknowledged'}},readPlannerActivity:async({message})=>{assert(message.includes(activeAuthority));return observation}})}
   try{
     assert.equal(await runOutcomeWorkOnce({...options,argv:['--dispatch',path]}),70)
@@ -148,5 +161,6 @@ test('configured CLI starts once only after correlated running observation, neve
     assert.equal(await runOutcomeWorkOnce({...options,argv:['--dispatch',path]}),0,output)
     assert.equal(JSON.parse(output).outcome,'needs_owner')
     assert.equal(sends,3)
+    assert.equal(existsSync(join(root,'token')),false)
   }finally{db.close();rmSync(root,{recursive:true,force:true})}
 })
