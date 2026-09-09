@@ -52,6 +52,8 @@ These are program responsibilities, not new agents, schedules or products. The c
 
 ### Existing Phase 4 acceptance additions
 
+2026-09-09 live fallback evidence: official Vercel CLI authentication refresh succeeded under Cherry approval. Canonical white-castle/outcome inventory has six identity configuration rows, all sensitive and Preview-only, no branch override; no values retrieved, no project/environment/deployment mutation. Secret export route is unavailable, not an authority question. Existing Chrome Preview at outcome-u6nkqlbet-white-castle.vercel.app/workspace exposes the saved Phase 5 base draft version 1 and follow-up answers version 2. Read-only confirmation-history lookup completed from loading to "기존 확정 요청이 없습니다. 현재 초안의 근거 검증을 요청할 수 있습니다." No confirmation, question request, save or project creation was submitted. This is live existing-Preview read evidence, not provenance proof for current local HEAD or Phase closure. Next: resolve this deployment's exact candidate before using it for additional product verification; do not ask for secret extraction again.
+
 - [x] Operational one-shot observation entry point wires protected scope/current registry, read-only existing DB, desktop reader and authenticated account projection without token persistence or writes.
   CHECK: node --test server/outcome-work-observation-cli.test.mjs
   EXPECT: fail 0
