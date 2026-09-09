@@ -1,20 +1,5 @@
 # OUTCOME — Codex 운영 진입점
 
-## Cherry 승인 단일 세션 운영 · 격리 checkout 동기화
-
-2026-09-07 승인된 운영 변경과 2026-09-09 현재 세션의 목표 수정 요청에 따라,
-현재 Phase 4~5 작업에는 이 절이 아래의 과거 역할 분리 규칙보다 우선한다.
-현재 세션이 기존 계약·Gate에 실행 범위를 정리하고 격리 구현 → QA 검증 → Release 검증을 수행한다.
-새 역할 세션·자동 스케줄은 만들지 않는다. 과거 4/4 관측기 티켓을 현재 실행 연결의 권한으로 재사용하지 않는다.
-
-- 기존 Phase 4~5 목적지와 완료 조건은 유지한다. 목표 UI 문구 변경 가능 여부는 제품 구현의 선행 조건이 아니다.
-- 제품 소스·테스트·후보 commit은 격리 checkout에서 수행하고 사용자 변경은 보존한다.
-- 검증은 `same-session verification`이며 독립 QA/Audit 또는 Cherry 수용으로 표시하지 않는다.
-- 기존 Gate에 exact source pin·변경 범위·검증·rollback을 연결한다. 문서나 테스트 수를 제품 완료율로 계산하지 않는다.
-- 자동 실행기에 주입하는 실제 승인·현재 담당자·의존성·후보 검증은 별개로 검증해야 한다. 이 운영 지침으로 runtime grant를 만들거나 검증을 우회하지 않는다.
-- 디자인은 보류한다. Preview는 후보별 기존 승인 범위를 확인한다. Production·stable/custom domain·유료 변경·외부 출시 및 미승인 provider/DB/환경변수 변경은 금지한다.
-- 완료는 실제 사용 증거와 사용자 확인으로 판정한다. 진행 중인 목표를 문구 수정 목적으로 허위 완료 처리하지 않는다.
-
 OUTCOME의 안정된 입력은 `docs/OUTCOME_CONTRACT.md`, `docs/OUTCOME_MODEL_V2.md`, 승인된 Acceptance Predicate와 immutable evidence다. `docs/OUTCOME_MAP.md`와 `GATES*.md`는 v2 live activation 전까지의 compatibility input이며 activation 뒤 Map/current/progress는 deterministic projection이다. 실행 역할은 문서와 분리된
 runtime binding이며, 현재 채팅 기억이나 자연어 완료 주장이 Gate·receipt를 대신하지 않는다.
 

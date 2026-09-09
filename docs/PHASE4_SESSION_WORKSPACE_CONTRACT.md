@@ -9,6 +9,8 @@ Cherry requested review and reapplication of Observer for the current one-sessio
 
 ### Work ownership and observation unit
 
+2026-09-09 continuation clarification: this same-session amendment and Cherry's current instructions remain the operating authority. The historical O1 package pins AGENTS.md bytes; do not rewrite that evidence carrier merely to synchronize instructions. Commit 71ac2e6's task-owned AGENTS addition caused source_digest_drift and is rolled back without changing the pinned projection hashes or weakening tests. Goal UI editing and locating an old role ticket are not prerequisites for the already-approved local work. This does not manufacture runtime execution grants or authorize live activation.
+
 - Primary unit: one outcome-linked work item and its current run, not a role slot or a desired session count. Each work item binds one Milestone/Acceptance Predicate and exactly one active execution session.
 - `implementing`, `qa_verifying`, and `release_verifying` are stages within that same session. A stage switch creates neither a new session nor a new role binding. The Planner composer remains the single owner communication channel.
 - If multiple independent work items are later explicitly enabled, each session owns its own complete implementation–QA–Release loop. Dependencies and overlapping write scopes prevent concurrent conflicting runs; four occupied slots is not a success condition.
