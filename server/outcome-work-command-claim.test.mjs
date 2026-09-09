@@ -5,15 +5,17 @@ import {createWorkJournal} from './outcome-work-journal.mjs'
 import {createWorkGrantStore} from './outcome-work-grant-store.mjs'
 import {executeClaimedWorkCommand} from './outcome-work-command-execution.mjs'
 import {createHash} from 'node:crypto'
-import {realpathSync} from 'node:fs'
+import {realpathSync,mkdtempSync,writeFileSync,readFileSync,rmSync} from 'node:fs'
+import {tmpdir} from 'node:os'
+import {join} from 'node:path'
 
 const now=20000, owner='a'.repeat(64), cwd=realpathSync(process.cwd()),checkout=createHash('sha256').update('outcome-work-checkout-v1\0').update(cwd).digest('hex')
 const scope={projectId:'outcome',workId:'work-a',runId:'run-a',sessionRef:'session-a',bindingVersion:1}
 const raw=JSON.stringify(scope)
-function setup({start=true,multiple=false,args=['--version']}={}){
+function setup({start=true,multiple=false,args=['--version'],workCwd=cwd,readPaths=[],writePaths=[],commands}={}){
   const db=new DatabaseSync(':memory:'), journal=createWorkJournal(db), grants=createWorkGrantStore(db)
   const command={id:'check',stage:'implementing',program:'node',args,timeoutMs:1000}
-  const grant=JSON.stringify({schemaVersion:2,...scope,ownerRef:owner,candidateCommit:'c'.repeat(40),candidateTree:'d'.repeat(40),allowedStages:['implementing'],issuedAt:now-1,expiresAt:now+1000,execution:{checkoutRef:checkout,writePaths:[],commands:multiple?[command,{...command,id:'second'}]:[command]}})
+  const grant=JSON.stringify({schemaVersion:2,...scope,ownerRef:owner,candidateCommit:'c'.repeat(40),candidateTree:'d'.repeat(40),allowedStages:['implementing'],issuedAt:now-1,expiresAt:now+1000,execution:{checkoutRef:createHash('sha256').update('outcome-work-checkout-v1\0').update(workCwd).digest('hex'),readPaths,writePaths,commands:commands??(multiple?[command,{...command,id:'second'}]:[command])}})
   const {authorityRef}=grants.record(grant,owner,now)
   journal.append(raw,JSON.stringify({sequence:1,observedAt:new Date(now).toISOString(),stage:'queued',attempt:1,activity:'waiting',candidateCommit:null,candidateTree:null,evidenceRef:null,nextAction:null,blocker:null}),0,now)
   const {reservationDigest}=journal.reserveContinuation(raw,1,'c'.repeat(40),'d'.repeat(40),authorityRef,now)
@@ -92,4 +94,24 @@ test('ordered commands require prior success and recover completed results witho
       }
     }finally{s.db.close()}
   }
+})
+test('approved source edit and behavioral verification run with exact manifests',async()=>{
+  const root=realpathSync(mkdtempSync(join(tmpdir(),'outcome-source-command-')))
+  writeFileSync(join(root,'result.cjs'),'module.exports = 0\n')
+  writeFileSync(join(root,'verify.cjs'),"const assert=require('node:assert/strict'),fs=require('node:fs');assert.equal(require('./result.cjs'),42);assert.throws(()=>fs.readFileSync('outside.txt'));assert.throws(()=>fs.writeFileSync('verify.cjs','changed'))\n")
+  writeFileSync(join(root,'outside.txt'),'private sentinel')
+  writeFileSync(join(root,'package.json'),'{"type":"commonjs"}')
+  const command=(id,args)=>({id,stage:'implementing',program:'node',args,timeoutMs:1000})
+  const s=setup({workCwd:root,readPaths:['verify.cjs','package.json'],writePaths:['result.cjs'],commands:[
+    command('edit',['--eval',"require('node:fs').writeFileSync('result.cjs','module.exports = 42\\n')"]),
+    command('verify',['verify.cjs'])
+  ]})
+  const input={journal:s.journal,scopeJson:raw,reservationDigest:s.reservationDigest,ownerRef:owner,cwd:root,now:()=>now}
+  try{
+    assert.equal((await executeClaimedWorkCommand({...input,commandId:'edit'})).outcome,'command_exited_zero')
+    assert.equal(readFileSync(join(root,'result.cjs'),'utf8'),'module.exports = 42\n')
+    assert.equal((await executeClaimedWorkCommand({...input,commandId:'verify'})).outcome,'command_exited_zero')
+    assert.equal(readFileSync(join(root,'outside.txt'),'utf8'),'private sentinel')
+    assert.equal((await executeClaimedWorkCommand({...input,commandId:'edit'})).recovered,true)
+  }finally{s.db.close();rmSync(root,{recursive:true,force:true})}
 })

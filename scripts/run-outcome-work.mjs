@@ -113,8 +113,8 @@ export async function runOutcomeWorkOnce({argv=process.argv.slice(2),write=text=
       receiptDirectory:config.receiptDirectory,queueAdapter,now,readCurrentPolicy})
     if(argv[0]==='--execute'){
       // Execution is separate from receipt finalization: exit zero cannot close
-      // a stage. Existing V2 grants expose no read-only manifest, so only their
-      // exact approved write files may be read; no whole-checkout access.
+      // a stage. File access comes exclusively from the immutable grant's
+      // explicit manifests; no whole-checkout or caller-supplied read access.
       const {request}=JSON.parse(await readCurrentPolicy()),scope=JSON.parse(request.scopeJson)
       const owner=await identity.service.resolveBridgeAuthority({token:await readToken()})
       if(!owner?.project_ids?.includes(scope.projectId))fail()
@@ -124,12 +124,6 @@ export async function runOutcomeWorkOnce({argv=process.argv.slice(2),write=text=
       if(saved.status!=='active'||grant.schemaVersion!==2)fail()
       const commands=grant.execution.commands.filter(command=>command.stage===request.action)
       if(!commands.length||commands.some(command=>command.program!=='node'))fail()
-      const readPaths=[]
-      for(const path of grant.execution.writePaths){
-        const absolute=join(checkout,path)
-        if(await realpath(absolute)!==absolute)fail()
-        readPaths.push(absolute)
-      }
       await readCurrentPolicy()
       const fresh=await identity.service.resolveBridgeAuthority({token:await readToken()})
       if(fresh?.account_ref!==owner.account_ref||!fresh.project_ids?.includes(scope.projectId))fail()
@@ -138,7 +132,7 @@ export async function runOutcomeWorkOnce({argv=process.argv.slice(2),write=text=
         const currentOwner=await identity.service.resolveBridgeAuthority({token:await readToken()})
         if(currentOwner?.account_ref!==owner.account_ref||!currentOwner.project_ids?.includes(scope.projectId))fail()
         const result=await executeClaimedWorkCommand({journal,scopeJson:request.scopeJson,reservationDigest:argv[2],ownerRef:owner.account_ref,
-          commandId:command.id,cwd:checkout,readPaths,now})
+          commandId:command.id,cwd:checkout,now})
         if(result.outcome!=='command_exited_zero'){write(JSON.stringify(result)+'\n');return 70}
       }
       write('{"outcome":"commands_completed","executionAuthority":false,"completionAuthority":false}\n')

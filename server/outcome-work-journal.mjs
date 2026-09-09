@@ -124,7 +124,7 @@ export function createWorkJournal(db) {
         return Object.freeze(result?{outcome:'command_result_recovered',result:JSON.parse(result.result_json),executionAuthority:false,completionAuthority:false}:{outcome:'command_already_claimed',executionAuthority:false,completionAuthority:false})
       }
       db.prepare('INSERT INTO outcome_work_commands VALUES(?,?,?,?)').run(reservationDigest,commandId,ownerRef,nowMs)
-      return Object.freeze({outcome:'command_claimed',command:Object.freeze(commands[index]),writePaths:Object.freeze(grant.execution.writePaths),executionAuthority:false,completionAuthority:false})
+      return Object.freeze({outcome:'command_claimed',command:Object.freeze(commands[index]),readPaths:Object.freeze(grant.execution.readPaths??[]),writePaths:Object.freeze(grant.execution.writePaths),executionAuthority:false,completionAuthority:false})
     })},
     recordVerifiedTerminal(scopeJson,reservationDigest,ownerRef,receiptDirectory,expectedJson,nowMs){return transact(()=>{
       const bound=normalize(scopeJson,nowMs),current=load(bound,nowMs),action=reservation(bound,reservationDigest)

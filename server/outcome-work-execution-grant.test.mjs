@@ -12,11 +12,13 @@ test('exact local grant matches without granting execution or completion',()=>{
 test('v2 binds explicit commands and paths without converting v1 or granting execution',()=>{
   const scoped={...grant,schemaVersion:2,allowedStages:['qa_verifying'],execution:{checkoutRef:'e'.repeat(64),writePaths:[],commands:[{id:'regression',stage:'qa_verifying',program:'node',args:['--test','server/outcome-work-execution-grant.test.mjs'],timeoutMs:10000}]}}
   assert.deepEqual(check(scoped),{matches:true,executionAuthority:false,completionAuthority:false})
+  assert.equal(check({...scoped,execution:{...scoped.execution,readPaths:['server/check.mjs']}}).matches,true)
   const originalDigest=createHash('sha256').update(JSON.stringify(scoped)).digest('hex')
-  for(const mutate of [g=>g.execution.commands[0].args.push('--help'),g=>g.execution.writePaths.push('src/main.ts'),g=>g.execution.checkoutRef='f'.repeat(64)]){
+  for(const mutate of [g=>g.execution.readPaths=['server/check.mjs'],g=>g.execution.commands[0].args.push('--help'),g=>g.execution.writePaths.push('src/main.ts'),g=>g.execution.checkoutRef='f'.repeat(64)]){
     const value=structuredClone(scoped);mutate(value);assert.equal(check(value,{authorityRef:originalDigest}).matches,false)
   }
   for(const paths of [['../outside'],['/tmp/test'],['.env'],['src/../private'],['src//x'],['src/*'],['src/x','src/x']])assert.equal(check({...scoped,execution:{...scoped.execution,writePaths:paths}}).matches,false)
+  for(const paths of [['../outside'],['/tmp/test'],['.env'],['src//x'],['src/*'],['src/x','src/x'],null])assert.equal(check({...scoped,execution:{...scoped.execution,readPaths:paths}}).matches,false)
   for(const mutate of [g=>g.execution.commands=[],g=>g.execution.commands[0].stage='implementing',g=>g.execution.commands[0].program='sh',g=>g.execution.commands[0].timeoutMs=0,g=>g.execution.commands[0].args=['bad\nargument'],g=>g.execution.commands.push(g.execution.commands[0]),g=>delete g.execution]){
     const value=structuredClone(scoped);mutate(value);assert.equal(check(value).matches,false)
   }

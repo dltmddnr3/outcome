@@ -9,9 +9,10 @@ const result=matches=>Object.freeze({matches,executionAuthority:false,completion
 const relativePath=v=>typeof v==='string'&&v.length<=512&&/^[a-zA-Z0-9_-][a-zA-Z0-9_./-]*$/.test(v)
   &&v.split('/').every(part=>part!==''&&part!=='.'&&part!=='..'&&!part.startsWith('.'))
 const executionContract=(v,allowed)=>{
-  if(!exact(v,['checkoutRef','writePaths','commands'])||!hash(v.checkoutRef,64)
+  if(!exact(v,['checkoutRef','writePaths','commands',...(Object.hasOwn(v??{},'readPaths')?['readPaths']:[])])||!hash(v.checkoutRef,64)
     ||!Array.isArray(v.writePaths)||v.writePaths.length>128||!v.writePaths.every(relativePath)||new Set(v.writePaths).size!==v.writePaths.length
     ||!Array.isArray(v.commands)||v.commands.length<1||v.commands.length>32)return false
+  if(Object.hasOwn(v,'readPaths')&&(!Array.isArray(v.readPaths)||v.readPaths.length>128||!v.readPaths.every(relativePath)||new Set(v.readPaths).size!==v.readPaths.length))return false
   const seen=new Set()
   for(const command of v.commands){
     if(!exact(command,['id','stage','program','args','timeoutMs'])||!id(command.id)||seen.has(command.id)

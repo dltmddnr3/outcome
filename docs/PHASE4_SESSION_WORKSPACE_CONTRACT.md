@@ -52,6 +52,11 @@ These are program responsibilities, not new agents, schedules or products. The c
 
 ### Existing Phase 4 acceptance additions
 
+- [ ] Explicit read-only manifest is bound to immutable grant bytes; command composition derives all file access from the grant, and actual source edit plus behavioral check runs without outside-file access.
+  CHECK: node --test server/outcome-work-execution-grant.test.mjs server/outcome-work-command-claim.test.mjs
+  EXPECT: fail 0
+  EVIDENCE: pending. Optional readPaths does not alter old grant bytes or create live approval. Existing-file and no-subprocess limitations remain; this is not Phase completion.
+
 - [ ] Ordered stage execution requires each prior command's durable success; completed results are recovered without relaunch, uncertain claims and failed predecessors stop continuation.
   CHECK: node --test server/outcome-work-command-claim.test.mjs server/outcome-work-runner.test.mjs
   EXPECT: fail 0
