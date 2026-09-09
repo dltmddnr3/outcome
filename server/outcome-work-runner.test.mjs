@@ -10,6 +10,7 @@ import {createHash} from 'node:crypto'
 import {runOutcomeWorkOnce,readWorkSessionInput} from '../scripts/run-outcome-work.mjs'
 import {createWorkJournal} from './outcome-work-journal.mjs'
 import {createWorkGrantStore} from './outcome-work-grant-store.mjs'
+import {createPreviewWorkIdentity} from './outcome-preview-work-identity.mjs'
 
 test('session input is bounded, one-shot and never exposes rejected bytes',async()=>{
   const stream=new PassThrough(),ready=readWorkSessionInput(stream);stream.end('fixture-token\n')
@@ -36,7 +37,7 @@ test('configured CLI starts once only after correlated running observation, neve
   const root=realpathSync(mkdtempSync(join(tmpdir(),'outcome-work-cli-')))
   const databasePath=join(root,'work.sqlite'),db=new DatabaseSync(databasePath)
   chmodSync(databasePath,0o600)
-  const now=Date.now(),ownerRef='a'.repeat(64),candidateCommit=execFileSync('git',['rev-parse','HEAD'],{encoding:'utf8'}).trim(),candidateTree=execFileSync('git',['rev-parse','HEAD^{tree}'],{encoding:'utf8'}).trim()
+  const now=Date.now(),ownerRef=createHash('sha256').update('outcome-bridge-account-v1\0fixture-owner').digest('hex'),candidateCommit=execFileSync('git',['rev-parse','HEAD'],{encoding:'utf8'}).trim(),candidateTree=execFileSync('git',['rev-parse','HEAD^{tree}'],{encoding:'utf8'}).trim()
   const scope={projectId:'outcome',workId:'cli-work',runId:'cli-run',sessionRef:'d'.repeat(64),bindingVersion:1}
   const scopeJson=JSON.stringify(scope),journal=createWorkJournal(db),store=createWorkGrantStore(db)
   const grantJson=JSON.stringify({schemaVersion:2,...scope,ownerRef,candidateCommit,candidateTree,allowedStages:['implementing'],issuedAt:now-1,expiresAt:now+60000,
@@ -102,6 +103,24 @@ test('configured CLI starts once only after correlated running observation, neve
     assert.equal(JSON.parse(output).outcome,'commands_completed')
     assert.equal(db.prepare('SELECT count(*) AS n FROM outcome_work_commands').get().n,1)
     assert.equal(journal.read(scopeJson,now).projection.stage,'implementing')
+    const {identityPath,snapshotPath,...baseConfig}=config
+    const previewConfig={...baseConfig,schemaVersion:5,previewOrigin:'https://outcome-fixture-white-castle.vercel.app',accountRef:ownerRef,workspaceId:'workspace-a'}
+    writeFileSync(path,JSON.stringify(previewConfig))
+    const sessionToken=`e30.${Buffer.from(JSON.stringify({sub:'fixture-owner',exp:Math.floor(now/1000)+60})).toString('base64url')}.signature`
+    let remoteStatus=200,remoteChecks=0
+    const remoteOptions={...options,sessionTokenReader:async()=>sessionToken,identityFactory:()=>{throw Error('local identity must not be read')},
+      previewIdentityFactory:input=>createPreviewWorkIdentity({...input,fetchImpl:async(url,request)=>{
+        remoteChecks++;assert.equal(url,previewConfig.previewOrigin+'/api/private/workspace');assert.equal(request.headers.authorization,`Bearer ${sessionToken}`)
+        return new Response(JSON.stringify({workspace:{access:'private_read_only',workspace:{id:'workspace-a',role:'owner-viewer'},completionAuthority:false,projects:[{project:{id:'outcome'}}],session:{expiresAt:new Date(now+60000).toISOString()}}}),{status:remoteStatus,headers:{'content-type':'application/json','cache-control':'no-store'}})
+      }})}
+    assert.equal(await runOutcomeWorkOnce({...remoteOptions,argv:['--execute',path,digest]}),0,output)
+    assert(remoteChecks>=2)
+    assert.equal(db.prepare('SELECT count(*) AS n FROM outcome_work_commands').get().n,1)
+    remoteStatus=401
+    assert.equal(await runOutcomeWorkOnce({...remoteOptions,argv:['--execute',path,digest]}),70)
+    assert(!output.includes(sessionToken))
+    assert.equal(db.prepare('SELECT count(*) AS n FROM outcome_work_commands').get().n,1)
+    writeFileSync(path,JSON.stringify(config))
     assert.equal(await runOutcomeWorkOnce({...options,argv:['--finalize',path,digest]}),70) // Running is not completed.
     assert.equal(await runOutcomeWorkOnce({...options,argv:['--observe',path,digest]}),0,output)
     assert.equal(JSON.parse(output).outcome,'start_already_recorded')

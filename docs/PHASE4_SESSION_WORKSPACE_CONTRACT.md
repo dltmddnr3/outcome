@@ -52,6 +52,11 @@ These are program responsibilities, not new agents, schedules or products. The c
 
 ### Existing Phase 4 acceptance additions
 
+- [ ] Execution CLI accepts explicit protected Preview identity configuration with in-memory session input; remote authenticated workspace proves identity only and never substitutes for current local grant, binding or evidence.
+  CHECK: node --test server/outcome-work-runner.test.mjs server/outcome-preview-work-identity.test.mjs
+  EXPECT: fail 0
+  EVIDENCE: pending. No credential export, token file, provider setting or implicit grant. Live browser token handoff and protected work configuration remain separate open requirements.
+
 - [ ] Explicit read-only manifest is bound to immutable grant bytes; command composition derives all file access from the grant, and actual source edit plus behavioral check runs without outside-file access.
   CHECK: node --test server/outcome-work-execution-grant.test.mjs server/outcome-work-command-claim.test.mjs
   EXPECT: fail 0

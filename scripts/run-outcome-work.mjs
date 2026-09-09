@@ -6,6 +6,7 @@ import {execFileSync} from 'node:child_process'
 import {DatabaseSync} from 'node:sqlite'
 import {createHash} from 'node:crypto'
 import {executeClaimedWorkCommand} from '../server/outcome-work-command-execution.mjs'
+import {createPreviewWorkIdentity} from '../server/outcome-preview-work-identity.mjs'
 import {verifyWorkExecutionGrant} from '../server/outcome-work-execution-grant.mjs'
 import {workQueueEnvelope} from '../server/outcome-work-queue.mjs'
 import {verifyWorkOutputCandidate} from '../server/outcome-work-output-candidate.mjs'
@@ -57,18 +58,18 @@ const privateDirectory=async path=>{
 // Explicit one-shot composition, never a daemon or implicit grant issuer. Production uses
 // the defaults; injected ports exist only for isolated integration reproduction.
 export async function runOutcomeWorkOnce({argv=process.argv.slice(2),write=text=>process.stdout.write(text),
-  identityFactory=createHostedIdentityRuntime,queueFactory=createCodexQueueAdapter,now=Date.now,sessionTokenReader}={}){
+  identityFactory=createHostedIdentityRuntime,previewIdentityFactory=createPreviewWorkIdentity,queueFactory=createCodexQueueAdapter,now=Date.now,sessionTokenReader}={}){
   let db
   try{
     if(!Array.isArray(argv)||!['--dispatch','--receive','--approve','--observe','--finalize','--execute'].includes(argv[0])||argv.length!==(argv[0]==='--dispatch'?2:3)
       ||argv[0]!=='--dispatch'&&!hash(argv[2],64))fail()
     const read=async path=>(await readDestinationProtectedBytes(path)).toString('utf8')
     const config=JSON.parse(await read(argv[1]))
-    const configKeys=config?.schemaVersion===4?[...keys.filter(key=>key!=='tokenPath'),'approvalPath','terminalPath']:config?.schemaVersion===3?[...keys,'approvalPath','terminalPath']:config?.schemaVersion===2?[...keys,'approvalPath']:keys
+    const configKeys=config?.schemaVersion===5?[...keys.filter(key=>!['tokenPath','identityPath','snapshotPath'].includes(key)),'approvalPath','terminalPath','previewOrigin','accountRef','workspaceId']:config?.schemaVersion===4?[...keys.filter(key=>key!=='tokenPath'),'approvalPath','terminalPath']:config?.schemaVersion===3?[...keys,'approvalPath','terminalPath']:config?.schemaVersion===2?[...keys,'approvalPath']:keys
     if(!config||Array.isArray(config)||Object.keys(config).length!==configKeys.length||!configKeys.every(key=>Object.hasOwn(config,key))
-      ||![1,2,3,4].includes(config.schemaVersion)||!hash(config.candidatePin,40)||argv[0]==='--approve'&&config.schemaVersion<2||argv[0]==='--finalize'&&config.schemaVersion<3)fail()
-    if(config.schemaVersion===4&&typeof sessionTokenReader!=='function')fail()
-    const readToken=()=>config.schemaVersion===4?sessionTokenReader():read(config.tokenPath)
+      ||![1,2,3,4,5].includes(config.schemaVersion)||!hash(config.candidatePin,40)||argv[0]==='--approve'&&config.schemaVersion<2||argv[0]==='--finalize'&&config.schemaVersion<3)fail()
+    if(config.schemaVersion>=4&&typeof sessionTokenReader!=='function')fail()
+    const readToken=()=>config.schemaVersion>=4?sessionTokenReader():read(config.tokenPath)
     const checkout=await realpath(fileURLToPath(new URL('..',import.meta.url)))
     const head=execFileSync('git',['rev-parse','HEAD'],{cwd:checkout,encoding:'utf8',timeout:5000,stdio:['ignore','pipe','ignore']}).trim()
     if(head!==config.candidatePin)fail()
@@ -81,8 +82,11 @@ export async function runOutcomeWorkOnce({argv=process.argv.slice(2),write=text=
     await privateDirectory(dirname(config.databasePath))
     const before=await lstat(config.databasePath)
     if(!before.isFile()||before.isSymbolicLink()||before.uid!==process.getuid()||(before.mode&0o777)!==0o600||before.nlink!==1)fail()
-    const environment=JSON.parse(await read(config.identityPath)),sealedSnapshot=JSON.parse(await read(config.snapshotPath))
-    const identity=identityFactory({environment,sealedSnapshot,now})
+    // Remote workspace authentication proves identity only. Protected policy,
+    // explicit local grant, binding and dependency checks remain mandatory.
+    const identity=config.schemaVersion===5
+      ?previewIdentityFactory({previewOrigin:config.previewOrigin,accountRef:config.accountRef,workspaceId:config.workspaceId,projectId:'outcome',now})
+      :identityFactory({environment:JSON.parse(await read(config.identityPath)),sealedSnapshot:JSON.parse(await read(config.snapshotPath)),now})
     if(typeof identity?.service?.resolveBridgeAuthority!=='function')fail()
     const policy=await read(config.policyPath)
     JSON.parse(policy) // Reject malformed input before opening the database.
