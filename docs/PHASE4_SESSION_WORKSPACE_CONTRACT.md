@@ -54,10 +54,10 @@ These are program responsibilities, not new agents, schedules or products. The c
 
 #### Candidate-bound stage receipt check · 2026-09-09
 
-- [ ] A running observation for an exact claimed reservation records the stage start once; terminal-only observation cannot synthesize a missed start or stage acceptance.
+- [x] A running observation for an exact claimed reservation records the stage start once; terminal-only observation cannot synthesize a missed start or stage acceptance. Tested integration, not live owner use.
   CHECK: node --test server/outcome-work-runner.test.mjs server/outcome-work-journal.test.mjs
   EXPECT: fail 0
-  EVIDENCE: pending. Scope local journal/runner/tests; no live schema migration or activation. Same-session observation is not independent QA.
+  EVIDENCE: c7f5c45 full npm test 888 PASS, 0 FAIL/skip/TODO. --observe persists activity then atomically records one start event and its source digest against the claimed reservation. Existing start survives replay without another event. Tests cover initial implementing and implementing-to-QA same-candidate start; missing claim and terminal-only evidence cannot create a start. Terminal activity alone leaves nextAction null and creates no passing receipt. New starts table is required at CLI preflight; no existing live DB auto-migrated. Scope local journal/runner/tests; no live schema migration, provider execution or activation. Same-session observation is not independent QA. Validated terminal receipt publication and continuous next-stage routing remain open.
 
 - [x] Claimed reservation activity is collected through the exact dispatched envelope and persisted separately from stage acceptance, with replay and terminal-regression protection. Integration proof only, not live operation.
   CHECK: node --test server/outcome-work-runner.test.mjs server/outcome-work-queue.test.mjs
