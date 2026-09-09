@@ -59,6 +59,8 @@ These are program responsibilities, not new agents, schedules or products. The c
 
 Command containment correction: detached spawn with ignored stdio was denied incidentally, but inherited stdio reproduced a successful child spawn (regression RED). Added explicit process-fork denial to the single-process sandbox; regression GREEN. This deliberately supports only commands that do not fork; npm/git and subprocess-based test runners remain unsupported, not silently treated as successful. No grant/receiver activation. Native test PASS also verifies output flood termination and in-flight cancellation. IPC and production-level containment review remain open.
 
+Command composition regression at candidate `1bdb228`: `npm test` completed with 901 PASS, 0 fail/skip/TODO; `npm run build` PASS. Same-session verification only. Actual owner-authorized operational composition and Phase 4/5 direct-use acceptance remain open; no Preview/provider mutation occurred.
+
 - [ ] Command receiver's internal process port executes an explicit Node command within exact-file read/write sandbox, denies network and outside files, bounds output/time, and exposes digest only. Unsupported programs hold.
   CHECK: node --test server/outcome-work-command.test.mjs
   EXPECT: fail 0
