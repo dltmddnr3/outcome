@@ -54,6 +54,11 @@ These are program responsibilities, not new agents, schedules or products. The c
 
 #### Candidate-bound stage receipt check · 2026-09-09
 
+- [ ] Correlated provider activity distinguishes observed running/terminal from missing/unknown without exposing private text or granting stage acceptance.
+  CHECK: node --test server/outcome-chat-result-source.test.mjs server/outcome-chat-codex-queue.test.mjs
+  EXPECT: fail 0
+  EVIDENCE: pending. Scope existing source projector and queue reader. Actual stage journal publication still requires the approved reservation and validated stage receipt; model turn completion alone cannot close QA or Release.
+
 - [x] One-shot CLI issues only an explicit digest-confirmed V2 execution plan for the authenticated current owner and exact policy/binding/candidate; rejected or mismatched requests do not create approval. This is tested issuance, not a live owner grant.
   CHECK: node --test server/outcome-work-runner.test.mjs
   EXPECT: fail 0

@@ -3,7 +3,7 @@ import { createHash } from 'node:crypto'
 import { types } from 'node:util'
 import { isAbsolute } from 'node:path'
 import { loadRegistry } from './outcome-session-registry-persistence.mjs'
-import { plannerRequestEnvelope, projectCompletedPlannerResponse } from './outcome-chat-result-source.mjs'
+import { plannerRequestEnvelope, projectCompletedPlannerResponse, projectPlannerActivity } from './outcome-chat-result-source.mjs'
 import { createPlannerThreadReader } from './outcome-chat-thread-reader.mjs'
 
 const CURRENT = new Set(['active'])
@@ -29,6 +29,20 @@ export function createCodexQueueAdapter({ enabled = false, registryPath, spawnPr
   if (ownerProbe !== null && (typeof ownerProbe !== 'function' || typeof expectedCwd !== 'string' || !isAbsolute(expectedCwd))) return null
   try { reader = readThread ?? createPlannerThreadReader({ executable:codexExecutable }) } catch { return null }
   const destinations = new WeakMap(), bindings = new WeakMap(), invoked = new WeakSet()
+  const readBound=async(input,project)=>{
+    try{
+      const request=exact(input,['destination','message','correlation_id'])
+      const locator=destinations.get(request.destination),expected=bindings.get(request.destination)
+      if(!locator||!expected||typeof reader!=='function')return {outcome:'unavailable'}
+      const currentMatches=()=>loadRegistry(registryPath).bindings.filter(row=>row.project_id===expected.projectId&&row.role==='planner'&&['active','idle'].includes(row.status))
+      const matches=currentMatches()
+      if(matches.length!==1||matches[0].binding_version!==expected.version||matches[0].locator_ref!==locator)return {outcome:'unavailable'}
+      const json=await reader(locator,{requestEnvelope:plannerRequestEnvelope(request.message,request.correlation_id)})
+      const after=currentMatches()
+      if(after.length!==1||after[0].binding_version!==expected.version||after[0].locator_ref!==locator)return {outcome:'unavailable'}
+      return project({json,threadId:locator,message:request.message,correlationId:request.correlation_id})
+    }catch{return {outcome:'unavailable'}}
+  }
   const liveBinding = async binding => {
     if (await ownerProbe(binding.locator_ref) !== true) return false
     const raw = await reader(binding.locator_ref, { includeTurns: false })
@@ -63,20 +77,8 @@ export function createCodexQueueAdapter({ enabled = false, registryPath, spawnPr
       bindings.set(destination, { projectId:request.project_id, version:binding.binding_version })
       return { project_id: request.project_id, role: 'planner', binding_version: binding.binding_version, status: 'active', freshness: 'fresh', destination }
     },
-    async readPlannerResponse(input) {
-      try {
-        const request = exact(input, ['destination','message','correlation_id'])
-        const locator = destinations.get(request.destination), expected = bindings.get(request.destination)
-        if (!locator || !expected || typeof reader !== 'function') return { outcome:'unavailable' }
-        const currentMatches = () => loadRegistry(registryPath).bindings.filter(row => row.project_id === expected.projectId && row.role === 'planner' && ['active','idle'].includes(row.status))
-        const matches = currentMatches()
-        if (matches.length !== 1 || matches[0].binding_version !== expected.version || matches[0].locator_ref !== locator) return { outcome:'unavailable' }
-        const json = await reader(locator, { requestEnvelope:plannerRequestEnvelope(request.message, request.correlation_id) })
-        const after = currentMatches()
-        if (after.length !== 1 || after[0].binding_version !== expected.version || after[0].locator_ref !== locator) return { outcome:'unavailable' }
-        return projectCompletedPlannerResponse({json,threadId:locator,message:request.message,correlationId:request.correlation_id})
-      } catch { return { outcome:'unavailable' } }
-    },
+    readPlannerResponse:input=>readBound(input,projectCompletedPlannerResponse),
+    readPlannerActivity:input=>readBound(input,projectPlannerActivity),
     async transport(input,{signal}={}) {
       if(signal?.aborted)return unknown
       let request

@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict'
 import test from 'node:test'
-import { plannerRequestEnvelope, projectCompletedPlannerResponse } from './outcome-chat-result-source.mjs'
+import { plannerRequestEnvelope, projectCompletedPlannerResponse, projectPlannerActivity } from './outcome-chat-result-source.mjs'
 
 const request = { threadId:'synthetic-thread-identity', message:'Please review the result', correlationId:'message-0123456789abcdef' }
 const fixture = () => ({ thread:{ id:request.threadId, cwd:'/Users/private/workspace', turns:[{
@@ -10,6 +10,23 @@ const fixture = () => ({ thread:{ id:request.threadId, cwd:'/Users/private/works
     { type:'agentMessage',id:'answer-1',phase:'final_answer',text:'The result is ready for review.' }],
 }] } })
 const project = data => projectCompletedPlannerResponse({ ...request, observedAt:'2030-01-01T00:00:00.000Z', json:JSON.stringify(data) })
+
+test('provider activity is correlated, private and separate from stage success',()=>{
+  const observe=data=>projectPlannerActivity({...request,observedAt:'2030-01-01T00:00:00.000Z',json:JSON.stringify(data)})
+  for(const status of ['inProgress','completed','failed','interrupted']){
+    const data=fixture(),turn=data.thread.turns[0];turn.status=status
+    if(status==='inProgress')turn.completedAt=null
+    const result=observe(data)
+    assert.equal(result.outcome,'observed');assert.equal(result.activity,status==='inProgress'?'running':'terminal')
+    assert.equal(result.providerStatus,status);assert.equal(result.completionAuthority,false)
+    assert.match(result.sourceDigest,/^[a-f0-9]{64}$/)
+    assert.doesNotMatch(JSON.stringify(result),/synthetic-thread|synthetic-turn|Users|ready for review|working/)
+  }
+  for(const mutate of [d=>d.thread.id='other',d=>d.thread.turns.push(d.thread.turns[0]),d=>d.thread.turns[0].itemsView='summary',d=>d.thread.turns[0].status='unknown',d=>d.thread.turns[0].completedAt=9999999999]){
+    const data=fixture();mutate(data);assert.equal(observe(data).outcome,'unavailable')
+  }
+  const absent=fixture();absent.thread.turns=[];assert.equal(observe(absent).outcome,'pending')
+})
 
 test('one completed correlated full turn yields only the final reply and opaque source digest', () => {
   const result = project(fixture())

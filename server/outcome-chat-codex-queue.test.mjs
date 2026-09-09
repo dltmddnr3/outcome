@@ -95,7 +95,7 @@ test('response reader uses only opaque current binding and never dispatches work
   let reads=0,spawns=0
   const correlation_id='message-0123456789abcdef', message='question'
   const adapter=createCodexQueueAdapter({enabled:true,registryPath:registry(),now:()=>now,spawnProcess:()=>{spawns++},readThread:async threadId=>{
-    reads++;return JSON.stringify({thread:{id:threadId,turns:[{id:'turn-test',status:'completed',completedAt:1700000000,items:[
+    reads++;return JSON.stringify({thread:{id:threadId,turns:[{id:'turn-test',status:'completed',itemsView:'full',completedAt:1700000000,items:[
       {type:'userMessage',content:[{type:'text',text:plannerRequestEnvelope(message,correlation_id)}]},
       {type:'agentMessage',id:'answer-test',phase:'final_answer',text:'answer'},
     ]}]}})
@@ -103,7 +103,11 @@ test('response reader uses only opaque current binding and never dispatches work
   const binding=await adapter.bindingResolver({project_id:'outcome',role:'planner'})
   assert.equal((await adapter.readPlannerResponse({destination:binding.destination,message,correlation_id})).outcome,'completed')
   assert.deepEqual(await adapter.readPlannerResponse({destination:{opaque:true},message,correlation_id}),{outcome:'unavailable'})
-  assert.equal(reads,1);assert.equal(spawns,0)
+  const activity=await adapter.readPlannerActivity({destination:binding.destination,message,correlation_id})
+  assert.equal(activity.outcome,'observed');assert.equal(activity.activity,'terminal');assert.equal(activity.completionAuthority,false)
+  assert(!JSON.stringify(activity).includes('answer'))
+  assert.deepEqual(await adapter.readPlannerActivity({destination:{opaque:true},message,correlation_id}),{outcome:'unavailable'})
+  assert.equal(reads,2);assert.equal(spawns,0)
 })
 
 test('exact current Planner binding becomes one shell-free queue argv attempt', async () => {
