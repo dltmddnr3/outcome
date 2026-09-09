@@ -96,7 +96,9 @@ export async function runOutcomeWorkOnce({argv=process.argv.slice(2),write=text=
           const saved=JSON.parse(grantStore.read(request.authorityRef,owner.account_ref)),grant=JSON.parse(saved.grantJson)
           if(saved.status!=='active'||grant.schemaVersion!==2)fail()
           git(['merge-base','--is-ancestor',request.candidateCommit,expected.candidateCommit])
-          const paths=git(['log','--format=','--name-only',`${request.candidateCommit}..${expected.candidateCommit}`]).split('\n').filter(Boolean)
+          const range=`${request.candidateCommit}..${expected.candidateCommit}`
+          const paths=[...git(['log','--format=','--name-only','--no-renames','--diff-merges=first-parent',range]).split('\n'),
+            ...git(['diff','--name-only','--no-renames',request.candidateCommit,expected.candidateCommit]).split('\n')].filter(Boolean)
           if(paths.some(path=>!grant.execution.writePaths.includes(path)))fail()
         }
         await readCurrentPolicy()
