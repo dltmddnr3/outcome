@@ -52,6 +52,11 @@ These are program responsibilities, not new agents, schedules or products. The c
 
 ### Existing Phase 4 acceptance additions
 
+- [ ] Ordered stage execution requires each prior command's durable success; completed results are recovered without relaunch, uncertain claims and failed predecessors stop continuation.
+  CHECK: node --test server/outcome-work-command-claim.test.mjs server/outcome-work-runner.test.mjs
+  EXPECT: fail 0
+  EVIDENCE: pending. This extends only explicitly granted Node commands, not npm/git or automatic QA/Release acceptance. Actual owner run and candidate receipt reconciliation remain open.
+
 - [ ] Before process launch, atomically claim the exact approved command against received reservation, recorded running stage, same owner, active unexpired V2 grant and checkout reference; duplicate claims never relaunch.
   CHECK: node --test server/outcome-work-command-claim.test.mjs
   EXPECT: fail 0

@@ -47,7 +47,8 @@ test('real bounded process result persists and replay cannot launch again',async
     assert.equal(result.completionAuthority,false)
     const row=s.db.prepare('SELECT result_json FROM outcome_work_command_results').get()
     assert.equal(JSON.parse(row.result_json).outputDigest,result.outputDigest)
-    assert.equal((await executeClaimedWorkCommand(input)).outcome,'command_reconciliation_required')
+    assert.equal((await executeClaimedWorkCommand(input)).recovered,true)
+    assert.equal(s.db.prepare('SELECT count(*) AS n FROM outcome_work_commands').get().n,1)
     assert.throws(()=>s.journal.recordCommandResult(s.reservationDigest,'check',owner,{...result,exitCode:1}),/work_journal_unavailable/)
     assert.equal(s.journal.read(raw,now).sequence,2)
   }finally{s.db.close()}
@@ -63,13 +64,32 @@ test('grant revocation during execution cancels process and preserves non-succes
     assert.equal(s.journal.read(raw,now).sequence,2)
   }finally{clearTimeout(timer);s.db.close()}
 })
-test('missing start, wrong owner/checkout, expiry, revocation and multi-command fail closed',()=>{
-  for(const variant of ['start','owner','checkout','expiry','revoked','multiple']){
-    const s=setup({start:variant!=='start',multiple:variant==='multiple'})
+test('missing start, wrong owner/checkout, expiry and revocation fail closed',()=>{
+  for(const variant of ['start','owner','checkout','expiry','revoked']){
+    const s=setup({start:variant!=='start'})
     try{
       if(variant==='revoked')s.grants.revoke(s.authorityRef,owner,now)
       assert.throws(()=>s.claim(variant==='owner'?'e'.repeat(64):owner,variant==='checkout'?'e'.repeat(64):checkout,variant==='expiry'?now+2000:now),/work_journal_unavailable/,variant)
       assert.equal(s.db.prepare('SELECT count(*) AS n FROM outcome_work_commands').get().n,0)
+    }finally{s.db.close()}
+  }
+})
+test('ordered commands require prior success and recover completed results without relaunch',async()=>{
+  for(const args of [['--version'],['--eval','process.exit(7)']]){
+    const s=setup({multiple:true,args})
+    const input={journal:s.journal,scopeJson:raw,reservationDigest:s.reservationDigest,ownerRef:owner,cwd,readPaths:[],now:()=>now}
+    try{
+      await assert.rejects(executeClaimedWorkCommand({...input,commandId:'second'}),/work_journal_unavailable/)
+      const first=await executeClaimedWorkCommand({...input,commandId:'check'})
+      if(first.outcome==='command_exited_zero'){
+        assert.equal((await executeClaimedWorkCommand({...input,commandId:'second'})).outcome,'command_exited_zero')
+        assert.equal((await executeClaimedWorkCommand({...input,commandId:'check'})).recovered,true)
+        assert.equal((await executeClaimedWorkCommand({...input,commandId:'second'})).recovered,true)
+        assert.equal(s.db.prepare('SELECT count(*) AS n FROM outcome_work_commands').get().n,2)
+      }else{
+        await assert.rejects(executeClaimedWorkCommand({...input,commandId:'second'}),/work_journal_unavailable/)
+        assert.equal(s.db.prepare('SELECT count(*) AS n FROM outcome_work_commands').get().n,1)
+      }
     }finally{s.db.close()}
   }
 })

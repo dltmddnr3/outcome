@@ -9,6 +9,7 @@ export async function executeClaimedWorkCommand({journal,scopeJson,reservationDi
   if(realpathSync(cwd)!==cwd)throw Error('command_checkout_unavailable')
   const checkoutRef=createHash('sha256').update('outcome-work-checkout-v1\0').update(cwd).digest('hex')
   const claim=journal.claimCommandExecution(scopeJson,reservationDigest,ownerRef,commandId,checkoutRef,now())
+  if(claim.outcome==='command_result_recovered')return {...claim.result,recovered:true}
   if(claim.outcome!=='command_claimed')return {outcome:'command_reconciliation_required',executionAuthority:false,completionAuthority:false}
   const writePaths=claim.writePaths.map(path=>{
     const absolute=resolve(cwd,path)

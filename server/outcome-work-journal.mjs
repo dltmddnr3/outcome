@@ -109,13 +109,22 @@ export function createWorkJournal(db) {
       const grant=JSON.parse(stored.grant_json)
       if(grant.schemaVersion!==2||grant.execution.checkoutRef!==checkoutRef)fail()
       const commands=grant.execution.commands.filter(command=>command.stage===action[3])
-      // Until ordered result reconciliation is implemented, only a single
-      // explicitly approved command can be claimed. Never execute a subset.
-      if(commands.length!==1||commands[0].id!==commandId||commands[0].program!=='node')fail()
+      const index=commands.findIndex(command=>command.id===commandId)
+      // Reject unsupported plans before any subset is executed. Each preceding
+      // command needs a durable zero result, not merely a claim or chat reply.
+      if(index<0||commands.some(command=>command.program!=='node'))fail()
+      for(const prior of commands.slice(0,index)){
+        const row=db.prepare('SELECT result_json FROM outcome_work_command_results WHERE reservation_digest=? AND command_id=?').get(reservationDigest,prior.id)
+        if(!row||JSON.parse(row.result_json).outcome!=='command_exited_zero')fail()
+      }
       const old=db.prepare('SELECT owner_ref FROM outcome_work_commands WHERE reservation_digest=? AND command_id=?').get(reservationDigest,commandId)
-      if(old){if(old.owner_ref!==ownerRef)fail();return Object.freeze({outcome:'command_already_claimed',executionAuthority:false,completionAuthority:false})}
+      if(old){
+        if(old.owner_ref!==ownerRef)fail()
+        const result=db.prepare('SELECT result_json FROM outcome_work_command_results WHERE reservation_digest=? AND command_id=?').get(reservationDigest,commandId)
+        return Object.freeze(result?{outcome:'command_result_recovered',result:JSON.parse(result.result_json),executionAuthority:false,completionAuthority:false}:{outcome:'command_already_claimed',executionAuthority:false,completionAuthority:false})
+      }
       db.prepare('INSERT INTO outcome_work_commands VALUES(?,?,?,?)').run(reservationDigest,commandId,ownerRef,nowMs)
-      return Object.freeze({outcome:'command_claimed',command:Object.freeze(commands[0]),writePaths:Object.freeze(grant.execution.writePaths),executionAuthority:false,completionAuthority:false})
+      return Object.freeze({outcome:'command_claimed',command:Object.freeze(commands[index]),writePaths:Object.freeze(grant.execution.writePaths),executionAuthority:false,completionAuthority:false})
     })},
     recordVerifiedTerminal(scopeJson,reservationDigest,ownerRef,receiptDirectory,expectedJson,nowMs){return transact(()=>{
       const bound=normalize(scopeJson,nowMs),current=load(bound,nowMs),action=reservation(bound,reservationDigest)

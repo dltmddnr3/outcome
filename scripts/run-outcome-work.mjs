@@ -123,7 +123,7 @@ export async function runOutcomeWorkOnce({argv=process.argv.slice(2),write=text=
       const saved=JSON.parse(grantStore.read(request.authorityRef,owner.account_ref)),grant=JSON.parse(saved.grantJson)
       if(saved.status!=='active'||grant.schemaVersion!==2)fail()
       const commands=grant.execution.commands.filter(command=>command.stage===request.action)
-      if(commands.length!==1)fail()
+      if(!commands.length||commands.some(command=>command.program!=='node'))fail()
       const readPaths=[]
       for(const path of grant.execution.writePaths){
         const absolute=join(checkout,path)
@@ -133,10 +133,16 @@ export async function runOutcomeWorkOnce({argv=process.argv.slice(2),write=text=
       await readCurrentPolicy()
       const fresh=await identity.service.resolveBridgeAuthority({token:await readToken()})
       if(fresh?.account_ref!==owner.account_ref||!fresh.project_ids?.includes(scope.projectId))fail()
-      const result=await executeClaimedWorkCommand({journal,scopeJson:request.scopeJson,reservationDigest:argv[2],ownerRef:owner.account_ref,
-        commandId:commands[0].id,cwd:checkout,readPaths,now})
-      write(JSON.stringify(result)+'\n')
-      return result.outcome==='command_exited_zero'?0:70
+      for(const command of commands){
+        await readCurrentPolicy()
+        const currentOwner=await identity.service.resolveBridgeAuthority({token:await readToken()})
+        if(currentOwner?.account_ref!==owner.account_ref||!currentOwner.project_ids?.includes(scope.projectId))fail()
+        const result=await executeClaimedWorkCommand({journal,scopeJson:request.scopeJson,reservationDigest:argv[2],ownerRef:owner.account_ref,
+          commandId:command.id,cwd:checkout,readPaths,now})
+        if(result.outcome!=='command_exited_zero'){write(JSON.stringify(result)+'\n');return 70}
+      }
+      write('{"outcome":"commands_completed","executionAuthority":false,"completionAuthority":false}\n')
+      return 0
     }
     if(argv[0]==='--finalize'){
       let timer
