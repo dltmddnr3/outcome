@@ -32,6 +32,8 @@ test('real Git output scope rejects reverted forbidden changes, merges, unrelate
     assert.equal(check(git(['rev-parse','HEAD'])),false)
     const unrelated=git(['commit-tree',sourceTree], 'unrelated\n')
     assert.equal(check(unrelated),false)
+    git(['replace',unrelated,allowed])
+    assert.equal(verifyWorkOutputCandidate({checkout,sourceCommit,sourceTree,outputCommit:unrelated,outputTree:git(['rev-parse',`${allowed}^{tree}`]),stage:'implementing',writePaths:['allowed.txt']}),false)
     assert.equal(check(sourceCommit,{writePaths:['../forbidden.txt']}),false)
   }finally{rmSync(checkout,{recursive:true,force:true})}
 })

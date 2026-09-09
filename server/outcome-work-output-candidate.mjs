@@ -9,7 +9,8 @@ export function verifyWorkOutputCandidate({checkout,sourceCommit,sourceTree,outp
     if(typeof checkout!=='string'||!isAbsolute(checkout)||![sourceCommit,sourceTree,outputCommit,outputTree].every(sha)
       ||!['implementing','qa_verifying','release_verifying'].includes(stage)
       ||!Array.isArray(writePaths)||writePaths.length>128||!writePaths.every(path=>typeof path==='string'&&/^[a-zA-Z0-9_-][a-zA-Z0-9_./-]*$/.test(path)&&path.split('/').every(part=>part&&!part.startsWith('.'))))return false
-    const git=args=>execFileSync('git',args,{cwd:checkout,encoding:'utf8',timeout:5000,maxBuffer:1024*1024,stdio:['ignore','pipe','ignore']}).trim()
+    // Immutable candidate identity must not follow mutable refs/replace overlays.
+    const git=args=>execFileSync('git',args,{cwd:checkout,env:{...process.env,GIT_NO_REPLACE_OBJECTS:'1'},encoding:'utf8',timeout:5000,maxBuffer:1024*1024,stdio:['ignore','pipe','ignore']}).trim()
     if(git(['cat-file','-t',sourceCommit])!=='commit'||git(['cat-file','-t',outputCommit])!=='commit')return false
     if(git(['rev-parse',`${sourceCommit}^{tree}`])!==sourceTree||git(['rev-parse',`${outputCommit}^{tree}`])!==outputTree)return false
     if(sourceCommit===outputCommit)return true
