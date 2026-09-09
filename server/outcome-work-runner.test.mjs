@@ -40,9 +40,10 @@ test('configured CLI starts once only after correlated running observation, neve
   const config={schemaVersion:3,terminalPath,approvalPath:save('approval.json',grantJson),candidatePin:execFileSync('git',['rev-parse','HEAD'],{encoding:'utf8'}).trim(),databasePath,receiptDirectory:root,policyPath,
     tokenPath:save('token','test-private-token'),identityPath:save('identity.json','{}'),snapshotPath:save('snapshot.json','{}'),registryPath:join(root,'.outcome-runtime','bindings.json'),ownerCwd:root,codexExecutable:process.execPath}
   const path=save('config.json',JSON.stringify(config));let sends=0,output='',bindingValid=true
+  let activeAuthority=authorityRef
   let observation={outcome:'observed',activity:'running',providerStatus:'inProgress',observedAt:new Date(now).toISOString(),terminalAt:null,sourceDigest:'8'.repeat(64),turnRef:'9'.repeat(64),executionAuthority:false,completionAuthority:false}
   const options={now:()=>now,write:text=>output=text,identityFactory:()=>({service:{resolveBridgeAuthority:async({token})=>{assert.equal(token,'test-private-token');return {account_ref:ownerRef,project_ids:['outcome']}}}}),
-    queueFactory:()=>({bindingResolver:async()=>({status:'active',freshness:'fresh',project_id:'outcome',role:'planner',destination:{}}),matchesWorkScope:()=>bindingValid,transport:async()=>{sends++;return {delivery:'acknowledged'}},readPlannerActivity:async({message})=>{assert(message.includes(authorityRef));return observation}})}
+    queueFactory:()=>({bindingResolver:async()=>({status:'active',freshness:'fresh',project_id:'outcome',role:'planner',destination:{}}),matchesWorkScope:()=>bindingValid,transport:async()=>{sends++;return {delivery:'acknowledged'}},readPlannerActivity:async({message})=>{assert(message.includes(activeAuthority));return observation}})}
   try{
     assert.equal(await runOutcomeWorkOnce({...options,argv:['--dispatch',path]}),70)
     assert.equal(sends,0)
@@ -112,5 +113,40 @@ test('configured CLI starts once only after correlated running observation, neve
     assert.equal(await runOutcomeWorkOnce({...options,argv:['--dispatch',path]}),70)
     assert.equal(sends,1)
     assert(!output.includes(root));assert(!output.includes('test-private-token'))
+    let priorReceipt={...receiptFields,digest:receiptDigest,requiredChecks:['check']}
+    for(const [index,stage] of ['qa_verifying','release_verifying'].entries()){
+      const stageGrant=JSON.stringify({...JSON.parse(grantJson),allowedStages:[stage],execution:{...JSON.parse(grantJson).execution,commands:[{id:'check',stage,program:'node',args:['--version'],timeoutMs:1000}]}})
+      activeAuthority=createHash('sha256').update(stageGrant).digest('hex')
+      writeFileSync(config.approvalPath,stageGrant)
+      const stagePolicy={request:{scopeJson,expectedSequence:journal.read(scopeJson,now).sequence,candidateCommit,candidateTree,authorityRef:activeAuthority,action:stage},priorReceipt,dependencyReceipts:[]}
+      writeFileSync(policyPath,JSON.stringify(stagePolicy))
+      assert.equal(await runOutcomeWorkOnce({...options,argv:['--dispatch',path]}),70) // No inherited approval.
+      assert.equal(await runOutcomeWorkOnce({...options,argv:['--approve',path,activeAuthority]}),0,output)
+      writeFileSync(policyPath,JSON.stringify({...stagePolicy,priorReceipt:{...priorReceipt,digest:'0'.repeat(64)}}))
+      assert.equal(await runOutcomeWorkOnce({...options,argv:['--dispatch',path]}),70) // Exact prior evidence required.
+      writeFileSync(policyPath,JSON.stringify(stagePolicy))
+      assert.equal(await runOutcomeWorkOnce({...options,argv:['--dispatch',path]}),0,output)
+      const reservation=db.prepare('SELECT reservation_digest FROM outcome_work_reservations WHERE stage=?').get(index===0?'implementing':'qa_verifying').reservation_digest
+      assert.equal(await runOutcomeWorkOnce({...options,argv:['--receive',path,reservation]}),0,output)
+      observation={...running,sourceDigest:String(index+2).repeat(64),turnRef:String(index+3).repeat(64)}
+      assert.equal(await runOutcomeWorkOnce({...options,argv:['--observe',path,reservation]}),0,output)
+      assert.equal(journal.read(scopeJson,now).projection.stage,stage)
+      const stageReceipt={...receipt,stage},bytes=JSON.stringify(stageReceipt),stageDigest=createHash('sha256').update(bytes).digest('hex')
+      const stored=save(`${stageDigest}.json`,bytes);chmodSync(stored,0o400)
+      priorReceipt={...receiptFields,stage,digest:stageDigest,requiredChecks:['check']}
+      writeFileSync(terminalPath,JSON.stringify(priorReceipt))
+      observation={...observation,activity:'terminal',providerStatus:'completed',terminalAt:new Date(now).toISOString(),sourceDigest:String(index+4).repeat(64)}
+      assert.equal(await runOutcomeWorkOnce({...options,argv:['--observe',path,reservation]}),0,output)
+      assert.equal(await runOutcomeWorkOnce({...options,argv:['--finalize',path,reservation]}),0,output)
+      assert.equal(await runOutcomeWorkOnce({...options,argv:['--finalize',path,reservation]}),0,output)
+      assert.equal(JSON.parse(output).outcome,'terminal_already_recorded')
+      assert.equal(sends,index+2)
+    }
+    assert.equal(journal.read(scopeJson,now).sequence,7)
+    assert.equal(journal.read(scopeJson,now).projection.nextAction,'awaiting_owner')
+    writeFileSync(policyPath,JSON.stringify({request:{scopeJson,expectedSequence:7,candidateCommit,candidateTree,authorityRef:activeAuthority,action:'awaiting_owner'},priorReceipt,dependencyReceipts:[]}))
+    assert.equal(await runOutcomeWorkOnce({...options,argv:['--dispatch',path]}),0,output)
+    assert.equal(JSON.parse(output).outcome,'needs_owner')
+    assert.equal(sends,3)
   }finally{db.close();rmSync(root,{recursive:true,force:true})}
 })
