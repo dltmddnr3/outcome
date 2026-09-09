@@ -1,14 +1,24 @@
 import {createServer} from 'node:http'
-import {randomBytes,timingSafeEqual} from 'node:crypto'
+import {createHash,randomBytes,timingSafeEqual} from 'node:crypto'
+import {verifyWorkExecutionGrant} from './outcome-work-execution-grant.mjs'
 
 // Explicit local pairing only. The caller pins the Preview and verifier from
 // protected configuration. No server starts on import, no credential is stored,
 // and pairing never records an execution grant or launches work.
-export async function createLocalSessionReceiver({previewOrigin,verifySession,timeoutMs=60000}={}){
+export async function createLocalSessionReceiver({previewOrigin,verifySession,timeoutMs=60000,approval=null}={}){
   if(typeof previewOrigin!=='string'||!/^https:\/\/outcome-[a-z0-9]+-white-castle\.vercel\.app$/.test(previewOrigin)
     ||typeof verifySession!=='function'||!Number.isSafeInteger(timeoutMs)||timeoutMs<1||timeoutMs>300000)throw Error('session_receiver_unavailable')
+  if(approval!==null){
+    if(!approval||Object.keys(approval).sort().join(',')!=='digest,grantJson'||typeof approval.grantJson!=='string'||Buffer.byteLength(approval.grantJson)>8192||createHash('sha256').update(approval.grantJson).digest('hex')!==approval.digest)throw Error('session_receiver_unavailable')
+    let grant;try{grant=JSON.parse(approval.grantJson)}catch{throw Error('session_receiver_unavailable')}
+    const identity=Object.fromEntries(['projectId','workId','runId','sessionRef','bindingVersion','ownerRef','candidateCommit','candidateTree'].map(key=>[key,grant?.[key]]))
+    if(grant?.schemaVersion!==2||!verifyWorkExecutionGrant(approval.grantJson,JSON.stringify({...identity,authorityRef:approval.digest,action:grant.allowedStages?.[0],status:'active'}),Date.now()).matches)throw Error('session_receiver_unavailable')
+    // Do not send secrets or absolute private paths in an approval display.
+    if(/(?:\/(?:Users|home|private\/tmp|tmp)\/|-----BEGIN .*PRIVATE KEY-----|\b(?:bearer|basic)\s+\S+|\b(?:password|secret|token|api[_ -]?key)\s*[:=]\s*\S+)/i.test(approval.grantJson.normalize('NFKC')))throw Error('session_receiver_unavailable')
+    approval=Object.freeze({...approval})
+  }
   const challenge=randomBytes(32).toString('hex'),expiresAt=Date.now()+timeoutMs
-  let token=null,used=false,done=false,port,timer,resolveReady
+  let token=null,used=false,done=false,port,timer,resolveReady,reviewed=false
   const ready=new Promise(resolve=>{resolveReady=resolve})
   const controller=new AbortController()
   const finish=outcome=>{
@@ -39,11 +49,20 @@ export async function createLocalSessionReceiver({previewOrigin,verifySession,ti
       const bytes=Buffer.concat(chunks),text=bytes.toString('utf8')
       if(!Buffer.from(text).equals(bytes))throw Error()
       const value=JSON.parse(text)
-      if(!value||Object.keys(value).length!==2||typeof value.challenge!=='string'||!/^[a-f0-9]{64}$/.test(value.challenge)
+      const reviewRequest=approval!==null&&value?.action==='review'
+      const expectedKeys=approval===null?['challenge','token']:reviewRequest?['action','challenge','token']:['approvalDigest','challenge','token']
+      if(!value||Object.keys(value).sort().join(',')!==expectedKeys.sort().join(',')||typeof value.challenge!=='string'||!/^[a-f0-9]{64}$/.test(value.challenge)
         ||!timingSafeEqual(Buffer.from(value.challenge),Buffer.from(challenge))||typeof value.token!=='string'||value.token.length>16384||!value.token)throw Error()
       if(used||done||Date.now()>=expiresAt)throw Error()
+      if(approval!==null&&!reviewRequest&&(!reviewed||value.approvalDigest!==approval.digest))throw Error()
       used=true // An ambiguous verifier result consumes this invitation too.
       if(await verifySession(value.token,{signal:controller.signal})!==true||done||Date.now()>=expiresAt)throw Error()
+      if(reviewRequest){
+        if(reviewed)throw Error()
+        reviewed=true;used=false
+        res.writeHead(200,{'content-type':'application/json','cache-control':'no-store','access-control-allow-origin':previewOrigin,'vary':'Origin'})
+        res.end(JSON.stringify({outcome:'approval_review',grantJson:approval.grantJson,approvalDigest:approval.digest,executionAuthority:false,completionAuthority:false}));return
+      }
       token=value.token
       reply(200,'session_connected');finish('session_connected')
     }catch{
@@ -57,7 +76,7 @@ export async function createLocalSessionReceiver({previewOrigin,verifySession,ti
   port=server.address().port
   timer=setTimeout(()=>finish('session_expired'),timeoutMs)
   return Object.freeze({
-    invitation:Object.freeze({schemaVersion:1,endpoint:`http://127.0.0.1:${port}/outcome-session`,previewOrigin,challenge,expiresAt}),
+    invitation:Object.freeze({schemaVersion:approval===null?1:2,endpoint:`http://127.0.0.1:${port}/outcome-session`,previewOrigin,challenge,expiresAt,...(approval===null?{}:{approvalDigest:approval.digest})}),
     ready,
     readToken(){if(!done||!token)throw Error('session_unavailable');return token},
     dispose(){token=null;finish('session_closed');server.closeAllConnections()},

@@ -240,7 +240,13 @@ if(typeof process.argv[1]==='string'&&pathToFileURL(process.argv[1]).href===impo
       const config=JSON.parse((await readDestinationProtectedBytes(argv[2])).toString('utf8'))
       if(config.schemaVersion!==5)fail()
       const identity=createPreviewWorkIdentity({previewOrigin:config.previewOrigin,accountRef:config.accountRef,workspaceId:config.workspaceId,projectId:'outcome'})
-      receiver=await createLocalSessionReceiver({previewOrigin:config.previewOrigin,verifySession:async session=>{
+      let approval=null
+      if(argv[1]==='--approve'){
+        const grantJson=(await readDestinationProtectedBytes(config.approvalPath)).toString('utf8')
+        if(createHash('sha256').update(grantJson).digest('hex')!==argv[3])fail()
+        approval={grantJson,digest:argv[3]}
+      }
+      receiver=await createLocalSessionReceiver({previewOrigin:config.previewOrigin,approval,verifySession:async session=>{
         await identity.service.resolveBridgeAuthority({token:session});return true
       }})
       const fragment=Buffer.from(JSON.stringify(receiver.invitation)).toString('base64url')
