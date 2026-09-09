@@ -52,6 +52,11 @@ These are program responsibilities, not new agents, schedules or products. The c
 
 ### Existing Phase 4 acceptance additions
 
+- [x] SQLite observation reaches the real account HTTP handler and Chrome component at mobile/desktop widths, without mocked observation responses; revoked source removes running state.
+  CHECK: node scripts/single-session-observation-browser-check.mjs
+  EXPECT: SQLite/HTTP Chrome PASS at 390 and 1440
+  EVIDENCE: Chrome 390/1440 both PASS: actual SQLite query-only read, account HTTP handler and component polling, raw AX running literal, private identity exclusion, no horizontal overflow, anonymous 401 and revoked-source state removal. Existing synthetic freshness/project-switch/logout scenarios also PASS. Identity/desktop input are synthetic; no observation API response interception in the new scenario. Real owner use and production composition remain open. No provider, live DB, credential, deployment or schedule changes.
+
 - [x] Local observation reads persisted SQLite journal rows without invoking the schema-initializing writer; missing tables, wrong run and corrupt sequence remain unavailable.
   CHECK: node --test server/outcome-local-work-source.test.mjs
   EXPECT: fail 0

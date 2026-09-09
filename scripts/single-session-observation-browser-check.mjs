@@ -4,6 +4,32 @@ import { once } from 'node:events'
 import { readFileSync } from 'node:fs'
 import { build } from 'esbuild'
 import { chromium } from '@playwright/test'
+import { DatabaseSync } from 'node:sqlite'
+import { createHash } from 'node:crypto'
+import fixture from '../test/fixtures/account-access.json' with { type: 'json' }
+import { createAccountAccessService, createInMemoryAccountStore } from '../server/account-access.mjs'
+import { handlePrivateAccessRequest } from '../server/account-access-api.mjs'
+import { createLocalWorkObservationSource, createStoredWorkJournalReader } from '../server/outcome-local-work-source.mjs'
+
+// Real SQLite -> account authorization -> HTTP -> component integration. Only
+// identity and desktop snapshot are synthetic; no owner login is claimed.
+const database = new DatabaseSync(':memory:')
+const threadId = '11111111-1111-4111-8111-111111111111'
+const scope = { projectId: 'outcome', workId: 'browser-work', runId: 'browser-run', sessionRef: createHash('sha256').update('outcome-work-session-v1\0').update(threadId).digest('hex'), bindingVersion: 1 }
+const scopeJson = JSON.stringify(scope)
+const queued = { sequence: 1, observedAt: new Date(19900).toISOString(), stage: 'queued', attempt: 1, activity: 'waiting', candidateCommit: null, candidateTree: null, evidenceRef: null, nextAction: null, blocker: null }
+database.exec('CREATE TABLE outcome_work_journals(project_id TEXT,work_id TEXT,scope_json TEXT,sequence INTEGER,journal_json TEXT)')
+database.prepare('INSERT INTO outcome_work_journals VALUES(?,?,?,?,?)').run('outcome', scope.workId, scopeJson, 2, JSON.stringify({ schemaVersion: 1, scope, events: [queued, { ...queued, sequence: 2, stage: 'implementing', activity: 'running' }] }))
+database.exec('PRAGMA query_only=ON')
+let sourceEnabled = true, observationReads = 0
+const workObservationSource = createLocalWorkObservationSource({
+  resolveBinding: async account => sourceEnabled && account.projectId === 'outcome' ? JSON.stringify({ ...account, scopeJson, threadId }) : null,
+  readJournal: createStoredWorkJournalReader(database, { now: () => 20000 }),
+  readRuntime: async () => ({ runtimeJson: JSON.stringify({ thread: { id: threadId, status: { type: 'active', activeFlags: [] } } }), observedAtMs: 20000 }), now: () => 20000,
+})
+const service = createAccountAccessService({ ownerSubject: 'synthetic-owner', now: () => 20000,
+  authProvider: { verify: async token => ['fixture-owner', 'fixture-fresh'].includes(token) ? { subject: 'synthetic-owner', issuedAt: 19000, expiresAt: 1000000 } : null },
+  store: createInMemoryAccountStore(fixture), workObservationSource })
 
 // Isolated synthetic component/API reproduction. No owner session or provider.
 const compiled = await build({ stdin: { contents: `
@@ -21,8 +47,13 @@ window.logoutFixture=()=>endPrivateSession();
 window.renderObservation(undefined);
 `, loader: 'tsx', resolveDir: process.cwd() }, bundle: true, write: false, format: 'esm', define: { 'process.env.NODE_ENV': '"production"' }, jsx: 'automatic' })
 const css = readFileSync('src/styles.css', 'utf8')
-const server = createServer((request, response) => {
+const server = createServer(async (request, response) => {
   response.setHeader('Cache-Control', 'no-store')
+  if (request.url.startsWith('/api/private/')) {
+    if (request.url.startsWith('/api/private/work-observation/')) observationReads++
+    const result = await handlePrivateAccessRequest({ method: request.method, pathname: request.url, token: request.headers.authorization?.replace(/^Bearer /, ''), service })
+    response.writeHead(result.status, { 'content-type': 'application/json', ...result.headers }); response.end(JSON.stringify(result.body)); return
+  }
   if (request.url === '/app.js') { response.setHeader('Content-Type', 'text/javascript'); response.end(compiled.outputFiles[0].text); return }
   if (request.url === '/app.css') { response.setHeader('Content-Type', 'text/css'); response.end(css); return }
   response.setHeader('Content-Type', 'text/html; charset=utf-8')
@@ -110,8 +141,28 @@ try {
     await live.evaluate(() => window.unmountObservation()); assert.deepEqual(liveErrors, [])
     await live.close()
     console.log(`PASS synthetic Chrome width=${width}: scoped refresh, unchanged bindings, cross-project late response, logout stop`)
+
+    const integrated = await browser.newPage({ viewport: { width, height: 900 } })
+    await integrated.route('**/*', route => route.request().url().startsWith(origin + '/') ? route.continue() : route.abort())
+    sourceEnabled = true
+    await integrated.clock.install({ time: new Date(20000) }); await integrated.goto(origin)
+    await integrated.evaluate(async () => { await window.initializeWorkspace(); window.switchProject('outcome') })
+    await integrated.getByRole('heading', { name: '실행 관측됨', exact: true }).waitFor()
+    const rawAX = await (await integrated.context().newCDPSession(integrated)).send('Accessibility.getFullAXTree')
+    assert(rawAX.nodes.some(node => node.name?.value === '실행 관측됨'))
+    for (const value of [threadId, scope.sessionRef, 'synthetic-owner', 'browser-work']) assert(!(await integrated.locator('body').innerText()).includes(value))
+    assert(await integrated.evaluate(() => document.documentElement.scrollWidth <= innerWidth))
+    assert.equal((await fetch(origin + '/api/private/work-observation/outcome')).status, 401)
+    sourceEnabled = false
+    const refreshed = integrated.waitForResponse(response => response.url().endsWith('/work-observation/outcome'))
+    await integrated.clock.fastForward(11000); await refreshed
+    await integrated.getByRole('heading', { name: '연결 확인 전', exact: true }).waitFor()
+    assert(observationReads > 0)
+    await integrated.close()
+    console.log(`PASS SQLite/HTTP Chrome width=${width}: authorized projection, raw AX, privacy, anonymous denial, revoked source`)
   }
 } finally {
   await browser?.close()
   await new Promise(resolve => server.close(resolve))
+  database.close()
 }
