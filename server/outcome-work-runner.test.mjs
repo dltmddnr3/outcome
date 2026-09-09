@@ -5,7 +5,6 @@ import {tmpdir} from 'node:os'
 import {join} from 'node:path'
 import {execFileSync} from 'node:child_process'
 import {DatabaseSync} from 'node:sqlite'
-import {createHash} from 'node:crypto'
 import {runOutcomeWorkOnce} from '../scripts/run-outcome-work.mjs'
 import {createWorkJournal} from './outcome-work-journal.mjs'
 import {createWorkGrantStore} from './outcome-work-grant-store.mjs'
@@ -34,7 +33,7 @@ test('configured CLI composes existing initial journal, grant and queue once wit
   const config={schemaVersion:1,candidatePin:execFileSync('git',['rev-parse','HEAD'],{encoding:'utf8'}).trim(),databasePath,receiptDirectory:root,policyPath,
     tokenPath:save('token','test-private-token'),identityPath:save('identity.json','{}'),snapshotPath:save('snapshot.json','{}'),registryPath:join(root,'.outcome-runtime','bindings.json'),ownerCwd:root,codexExecutable:process.execPath}
   const path=save('config.json',JSON.stringify(config));let sends=0,output=''
-  const options={now:()=>now,write:text=>output=text,identityFactory:()=>({service:{resolveBridgeAuthority:async({token})=>{assert.equal(token,'test-private-token');return {account_ref:ownerRef,project_ids:['outcome']}}}),
+  const options={now:()=>now,write:text=>output=text,identityFactory:()=>({service:{resolveBridgeAuthority:async({token})=>{assert.equal(token,'test-private-token');return {account_ref:ownerRef,project_ids:['outcome']}}}}),
     queueFactory:()=>({bindingResolver:async()=>({status:'active',freshness:'fresh',project_id:'outcome',role:'planner',destination:{}}),matchesWorkScope:()=>true,transport:async()=>{sends++;return {delivery:'acknowledged'}}})}
   try{
     assert.equal(await runOutcomeWorkOnce({...options,argv:['--dispatch',path]}),0,output)
