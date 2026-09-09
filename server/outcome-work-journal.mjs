@@ -43,6 +43,9 @@ export function createWorkJournal(db) {
     CREATE TABLE IF NOT EXISTS outcome_work_activity (
       reservation_digest TEXT PRIMARY KEY, observation_json TEXT NOT NULL
     ) STRICT;
+    CREATE TABLE IF NOT EXISTS outcome_work_starts (
+      reservation_digest TEXT PRIMARY KEY, sequence INTEGER NOT NULL, source_digest TEXT NOT NULL
+    ) STRICT;
   `))
   const normalize=(scopeJson,nowMs)=>{
     if(typeof scopeJson!=='string' || Buffer.byteLength(scopeJson)>2048) fail()
@@ -70,6 +73,32 @@ export function createWorkJournal(db) {
     return action
   }
   return Object.freeze({
+    recordObservedStart(scopeJson,reservationDigest,ownerRef,nowMs){return transact(()=>{
+      const bound=normalize(scopeJson,nowMs),current=load(bound,nowMs),action=reservation(bound,reservationDigest)
+      const claim=db.prepare('SELECT owner_ref FROM outcome_work_execution_claims WHERE reservation_digest=?').get(reservationDigest)
+      if(!sha(ownerRef,64)||claim?.owner_ref!==ownerRef)fail()
+      const old=db.prepare('SELECT sequence,source_digest FROM outcome_work_starts WHERE reservation_digest=?').get(reservationDigest)
+      if(old){
+        if(!Number.isSafeInteger(old.sequence)||old.sequence<1||old.sequence>current.sequence||!sha(old.source_digest,64))fail()
+        return Object.freeze({outcome:'start_already_recorded',executionAuthority:false,completionAuthority:false})
+      }
+      const row=db.prepare('SELECT observation_json FROM outcome_work_activity WHERE reservation_digest=?').get(reservationDigest)
+      if(!row)fail()
+      const observation=JSON.parse(row.observation_json),last=current.journal.events.at(-1)
+      if(observation.activity!=='running'||observation.providerStatus!=='inProgress'||!sha(observation.sourceDigest,64)
+        ||JSON.stringify(actionFor(bound.scopeJson,last,action[4],action[5],action[6]))!==JSON.stringify(action)
+        ||!(initialEvent(last)||last?.activity==='terminal'&&last.blocker===null))fail()
+      const event={sequence:current.sequence+1,observedAt:observation.observedAt,stage:action[3],
+        attempt:action[2]+(action[1]!=='queued'&&action[3]==='implementing'?1:0),activity:'running',
+        candidateCommit:action[3]==='implementing'?null:action[4],candidateTree:action[3]==='implementing'?null:action[5],evidenceRef:null,nextAction:null,blocker:null}
+      const next={...current.journal,events:[...current.journal.events,event]}
+      projectSingleSessionWork(JSON.stringify(next),bound.scopeJson,nowMs)
+      const updated=db.prepare('UPDATE outcome_work_journals SET sequence=?,journal_json=? WHERE project_id=? AND work_id=? AND sequence=?')
+        .run(event.sequence,JSON.stringify(next),bound.scope.projectId,bound.scope.workId,current.sequence)
+      if(updated.changes!==1)fail()
+      db.prepare('INSERT INTO outcome_work_starts VALUES(?,?,?)').run(reservationDigest,event.sequence,observation.sourceDigest)
+      return Object.freeze({outcome:'start_recorded',executionAuthority:false,completionAuthority:false})
+    })},
     readObservationRequest(scopeJson,reservationDigest,ownerRef,nowMs){return guarded(()=>{
       const bound=normalize(scopeJson,nowMs);load(bound,nowMs)
       const action=reservation(bound,reservationDigest)

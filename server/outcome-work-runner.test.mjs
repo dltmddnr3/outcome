@@ -68,9 +68,11 @@ test('configured CLI composes existing initial journal, grant and queue once wit
     assert.equal(await runOutcomeWorkOnce({...options,argv:['--receive',path,digest]}),0,output)
     assert.equal(JSON.parse(output).outcome,'already_claimed')
     assert.equal(await runOutcomeWorkOnce({...options,argv:['--observe',path,digest]}),0,output)
-    assert.equal(JSON.parse(output).outcome,'observation_recorded')
+    assert.equal(JSON.parse(output).outcome,'start_recorded')
+    assert.equal(journal.read(scopeJson,now).projection.stage,'implementing')
     assert.equal(await runOutcomeWorkOnce({...options,argv:['--observe',path,digest]}),0,output)
-    assert.equal(JSON.parse(output).outcome,'already_observed')
+    assert.equal(JSON.parse(output).outcome,'start_already_recorded')
+    assert.equal(db.prepare('SELECT count(*) AS n FROM outcome_work_starts').get().n,1)
     const running=observation
     for(const change of [{turnRef:'0'.repeat(64)},{observedAt:new Date(now+1000).toISOString()},{privateText:'must-not-store'}]){
       observation={...running,...change}
@@ -82,7 +84,8 @@ test('configured CLI composes existing initial journal, grant and queue once wit
     observation={...running,sourceDigest:'6'.repeat(64)}
     assert.equal(await runOutcomeWorkOnce({...options,argv:['--observe',path,digest]}),70)
     assert.equal(JSON.parse(db.prepare('SELECT observation_json FROM outcome_work_activity').get().observation_json).activity,'terminal')
-    assert.equal(journal.read(scopeJson,now).sequence,1) // Activity is not stage acceptance.
+    assert.equal(journal.read(scopeJson,now).sequence,2) // Terminal activity is not stage acceptance.
+    assert.equal(journal.read(scopeJson,now).projection.nextAction,null)
     writeFileSync(path,JSON.stringify({...config,candidatePin:'0'.repeat(40)}))
     assert.equal(await runOutcomeWorkOnce({...options,argv:['--dispatch',path]}),70)
     writeFileSync(path,JSON.stringify(config));chmodSync(path,0o644)

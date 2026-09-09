@@ -56,7 +56,7 @@ export async function runOutcomeWorkOnce({argv=process.argv.slice(2),write=text=
     JSON.parse(policy) // Reject malformed input before opening the database.
     // readOnly preflight must prove schema exists; do not bootstrap an empty DB.
     db=new DatabaseSync(config.databasePath,{readOnly:true})
-    const required=['outcome_execution_grants','outcome_work_journals','outcome_work_reservations','outcome_work_dispatches','outcome_work_execution_claims','outcome_work_activity']
+    const required=['outcome_execution_grants','outcome_work_journals','outcome_work_reservations','outcome_work_dispatches','outcome_work_execution_claims','outcome_work_activity','outcome_work_starts']
     const tables=new Set(db.prepare("SELECT name FROM sqlite_master WHERE type='table'").all().map(row=>row.name))
     if(!required.every(name=>tables.has(name)))fail()
     db.close();db=null
@@ -100,7 +100,8 @@ export async function runOutcomeWorkOnce({argv=process.argv.slice(2),write=text=
       if(found.observation?.outcome!=='observed'){
         write('{"outcome":"observation_unavailable","executionAuthority":false,"completionAuthority":false}\n');return 70
       }
-      const result=journal.recordActivity(found.request.scopeJson,argv[2],found.ownerRef,JSON.stringify(found.observation),now())
+      let result=journal.recordActivity(found.request.scopeJson,argv[2],found.ownerRef,JSON.stringify(found.observation),now())
+      if(found.observation.activity==='running')result=journal.recordObservedStart(found.request.scopeJson,argv[2],found.ownerRef,now())
       write(JSON.stringify(result)+'\n');return 0
     }
     if(argv[0]==='--approve'){
