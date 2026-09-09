@@ -1,4 +1,5 @@
 import { sensitiveContentHint } from './PlannerConversation'
+import { DestinationFileReview } from './DestinationFileReview'
 import {DestinationDiscoveryPanel} from './DestinationDiscoveryPanel'
 import {DestinationUnknownEditor} from './DestinationUnknownEditor'
 import {captureDestinationReviewBinding} from '../lib/api'
@@ -9,12 +10,12 @@ import { useEffect, useMemo, useRef, useState } from 'react'
 import { ArrowLeft, Check, FileText, Lightbulb, Sparkles, X } from 'lucide-react'
 import { createDestinationReview, destinationQuestions, analyzeDestinationBrief, unansweredDestinationQuestions, type DestinationAnswers, type DestinationDomainId, type DestinationMode, type BriefEvidence } from '../lib/destination-discovery'
 
-type DestinationStep = 'entry' | 'brief' | 'question' | 'review'
+type DestinationStep = 'entry' | 'brief' | 'question' | 'review' | 'file-review'
 
 const reviewRows: ReadonlyArray<{ id: DestinationDomainId; label: string }> = destinationQuestions.map(({ id, label }) => ({ id, label }))
 const primaryReviewIds: readonly DestinationDomainId[] = ['outcome', 'scope', 'acceptance']
 
-export function DestinationStudio({ open, onClose }: { open: boolean; onClose: () => void }) {
+export function DestinationStudio({ open, onClose, fileBased = true }: { open: boolean; onClose: () => void; fileBased?: boolean }) {
   const [step, setStep] = useState<DestinationStep>('entry')
   const [mode, setMode] = useState<DestinationMode>('guided_200q')
   const [briefText, setBriefText] = useState('')
@@ -104,7 +105,7 @@ export function DestinationStudio({ open, onClose }: { open: boolean; onClose: (
         setAnalysis(null);setAnalysisAttempted(true);setAnalysisRequest({id:restoredAnalysisId!,draft:stored,input:JSON.stringify(doc)});setAnalysisNotice('기존 분석은 결과 확인으로 복구할 수 있습니다. 자동 전송하지 않습니다.')
         setMode(doc.mode); setBriefText(doc.source); setAnswers(doc.answers); setUnknowns(doc.unknowns)
         const queue = unansweredDestinationQuestions(doc.answers).map(item=>item.id)
-        setQuestionQueue(queue); setQuestionIndex(0); setDraftAnswer(''); setStep(queue.length ? 'question' : 'review')
+        setQuestionQueue(queue); setQuestionIndex(0); setDraftAnswer(''); setStep(fileBased ? 'brief' : queue.length ? 'question' : 'review')
         setEvidence(doc.mode === 'brief_gap' ? analyzeDestinationBrief(doc.source).evidence : [])
         setSourceNote(null); setError(null); setRevision(stored.revision); setStorageHold(false)
         setStorageNotice(`초안 버전 ${stored.revision} 불러옴 · 미확정`)
@@ -146,6 +147,9 @@ export function DestinationStudio({ open, onClose }: { open: boolean; onClose: (
       const analysis = analyzeDestinationBrief(briefText)
       const extracted = analysis.answers
       setEvidence(analysis.evidence)
+      if (fileBased) {
+        setMode('brief_gap'); setAnswers(extracted); setError(null); setStep('file-review'); return
+      }
       const count = Object.keys(extracted).length
       setSourceNote(count ? `명시된 제목에서 ${count}개 항목을 찾았어요. 충돌 ${analysis.conflicts.length}개를 포함해 빈 항목을 묻습니다. 자유 서술의 의미 분석은 아직 연결되지 않았어요.` : '확정할 수 있는 항목이 없어 첫 질문부터 시작합니다.')
       beginQuestions('brief_gap', extracted)
@@ -184,23 +188,24 @@ export function DestinationStudio({ open, onClose }: { open: boolean; onClose: (
       </header>
 
       {step === 'entry' && <div className="destination-studio__entry">
-        <p>아이디어 또는 제목이 명시된 기획서에서 목적지 초안을 정리합니다. 저장하지 않은 입력은 이 화면의 메모리에만 있으며 새로고침하면 사라집니다.</p>
+        <p>{fileBased ? '별도 기획 세션에서 작성한 파일로 개발할 내용을 확인합니다.' : '아이디어 또는 제목이 명시된 기획서에서 목적지 초안을 정리합니다.'} 저장하지 않은 입력은 이 화면의 메모리에만 있으며 새로고침하면 사라집니다.</p>
         <div className="destination-studio__entry-grid">
-          <button type="button" onClick={() => { setSourceNote(null); setEvidence([]); beginQuestions('guided_200q') }}><Sparkles size={22} aria-hidden="true" /><span><strong>질문으로 시작</strong><small>먼저 기본 내용을 정리합니다. 저장한 초안에서 추가 질문을 요청할 수 있습니다.</small></span></button>
-          <button type="button" onClick={() => { setMode('brief_gap'); setStep('brief'); setError(null) }}><FileText size={22} aria-hidden="true" /><span><strong>기획서에서 빈칸 찾기</strong><small>텍스트·마크다운을 이 기기에서만 읽고, 없거나 충돌하는 항목만 묻습니다.</small></span></button>
+          {!fileBased && <button type="button" onClick={() => { setSourceNote(null); setEvidence([]); beginQuestions('guided_200q') }}><Sparkles size={22} aria-hidden="true" /><span><strong>질문으로 시작</strong><small>먼저 기본 내용을 정리합니다. 저장한 초안에서 추가 질문을 요청할 수 있습니다.</small></span></button>}
+          <button type="button" onClick={() => { setMode('brief_gap'); setStep('brief'); setError(null) }}><FileText size={22} aria-hidden="true" /><span><strong>{fileBased ? '기획 파일로 시작' : '기획서에서 빈칸 찾기'}</strong><small>{fileBased ? '텍스트·마크다운의 목표, 범위, 완료 조건을 확인합니다.' : '텍스트·마크다운을 이 기기에서만 읽고, 없거나 충돌하는 항목만 묻습니다.'}</small></span></button>
         </div>
         <p className="destination-studio__boundary"><Lightbulb size={16} aria-hidden="true" />목적지를 확정하기 전에는 프로젝트나 작업을 만들지 않습니다.</p>
       </div>}
 
       {step === 'brief' && <div className="destination-studio__brief">
         <button className="destination-studio__back" type="button" onClick={() => setStep('entry')}><ArrowLeft size={17} aria-hidden="true" />시작 방식</button>
-        <div><h3>기획서의 빈칸만 찾을게요</h3><p>헤더에 `문제`, `대상 사용자`, `결과`, `범위`, `비목표`, `제약`, `수용 기준`, `복구`를 쓰면 더 정확해요.</p></div>
+        <div><h3>{fileBased ? '기획 파일을 넣어 주세요' : '기획서의 빈칸만 찾을게요'}</h3><p>헤더에 `문제`, `대상 사용자`, `결과`, `범위`, `비목표`, `제약`, `수용 기준`, `복구`를 쓰면 더 정확해요.</p></div>
         <label className="destination-studio__file"><span>이 기기에서 파일 읽기</span><input type="file" accept=".md,.markdown,.txt,text/plain,text/markdown" onChange={(event) => void readLocalFile(event.currentTarget.files?.[0])} /><small>읽기만으로는 서버 업로드 없음 · 초안 저장은 별도 · 64KB 이하</small></label>
         <label><span>또는 내용 붙여넣기</span><textarea rows={12} value={briefText} disabled={reading} onChange={(event) => setBriefText(event.currentTarget.value)} placeholder="텍스트 또는 마크다운 기획서" /></label>
         {sourceNote && <p className="destination-studio__note" role="status">{sourceNote}</p>}
         {error && <p className="destination-studio__error" role="alert">{error}</p>}
-        <button className="destination-studio__primary" type="button" disabled={reading || !briefText.trim()} onClick={analyzeBrief}>{reading ? '파일 읽는 중' : '빈칸 찾기'}</button>
+        <button className="destination-studio__primary" type="button" disabled={reading || !briefText.trim()} onClick={analyzeBrief}>{reading ? '파일 읽는 중' : fileBased ? '기획 내용 확인' : '빈칸 찾기'}</button>
       </div>}
+      {step === 'file-review' && <DestinationFileReview source={briefText} onEdit={() => setStep('brief')} />}
 
       {step === 'question' && currentQuestion && <div className="destination-studio__question">
         <div className="destination-studio__progress"><span>{mode === 'guided_200q' ? '기본 질문' : '기획서 빈칸'}</span><strong>{questionIndex + 1} / {questionQueue.length}</strong></div>
@@ -233,7 +238,7 @@ export function DestinationStudio({ open, onClose }: { open: boolean; onClose: (
         </div>
         {storageNotice && <p role="status">{storageNotice}</p>}
       </section>
-      <section className="destination-studio__unknowns" aria-label="플래너 문서 분석" aria-busy={analysisBusy}>
+      {!fileBased && <section className="destination-studio__unknowns" aria-label="플래너 문서 분석" aria-busy={analysisBusy}>
         <details className="destination-studio__analysis-tools">
         <summary>저장한 기획서를 플래너와 검토하기</summary>
         <p>저장한 문서에서 제안을 받습니다. 제안은 직접 확인한 뒤 답변에 반영할 수 있습니다.</p>
@@ -249,7 +254,7 @@ export function DestinationStudio({ open, onClose }: { open: boolean; onClose: (
           <blockquote>{proposal.quote}</blockquote><small>원문 {proposal.startLine}–{proposal.endLine}행{analysis.conflicts.includes(proposal.field)?' · 해석 충돌, 하나를 직접 검토하세요.':''}</small>
           <button type="button" onClick={()=>{editAnswer(proposal.field);setDraftAnswer(proposal.value)}}>이 제안으로 답변 편집</button>
         </article>)}
-      </section>
+      </section>}
     </section>
   </div>
 }

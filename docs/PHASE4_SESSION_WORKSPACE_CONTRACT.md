@@ -389,6 +389,17 @@ No session activity changes progress, health, confidence, Gate state or completi
 
 Phase 4 entry에는 Phase 3 supported adapter evidence, account/private workspace authorization, ordered event persistence, reconnect recovery와 mutation approval architecture가 필요하다. 이 문서 작성은 Phase 3·4 진행률, 구현 완료, QA, Release Audit, Cherry acceptance 또는 `EXTERNAL_OUTCOME_COMPLETE`를 의미하지 않는다.
 
+## File-based intake amendment · 2026-09-09
+
+AP-5-04/05 and AP-4-09 prerequisite under the approved file-based MVP: default intake reads external planning text and presents source-grounded fields, missing fields and duplicate-heading conflicts without starting internal questions. Original source remains unchanged in the existing versioned draft. Reading/reviewing/saving does not authorize execution. Existing internal discovery implementation is retained but not the default entry.
+
+- [ ] Default entry and file review do not generate questions or claim execution readiness.
+  CHECK: npx vitest run src/components/DestinationStudio.test.tsx src/components/DestinationFileReview.test.tsx
+  EXPECT: all cases pass; missing/conflicting fields visible, source excerpts escaped, completion authority false.
+  EVIDENCE: 2026-09-09 same-session static render verification: focused 4/4 and full frontend 239/239 PASS; TypeScript/Vite build and git diff check PASS. Default entry omits question-start and legacy analysis tools; file-review shows extracted fields, missing/conflicting original passages and false authority. Browser interaction, authenticated version restore and start integration remain unverified, so the outcome remains unchecked. No deployment or authority change.
+- [ ] File registration through explicit start and real project use.
+  EVIDENCE: pending; review UI alone does not satisfy this outcome.
+
 ## Non-goals
 
 - Codex 화면의 픽셀 단위 복제
