@@ -52,6 +52,8 @@ These are program responsibilities, not new agents, schedules or products. The c
 
 ### Existing Phase 4 acceptance additions
 
+Preview authority checkpoint: intended candidate `e25849f8b7cda4b2720fcdfdb28a179eb5ddbe51`, tree `a59d6b7f9e2318e04df0d582cc48f63e8af425e4`. Existing renewal authorization names `9000cfb929a167a3fc6f504c704e8c5df97c4228` and one already-completed branch push; it does not authorize this candidate. Same-session `npm run test:security` PASS: 65 server checks, stable snapshot no prohibited disclosures/Gate fields, client environment boundary PASS. Full frontend/server/build and disposable Chrome evidence recorded below. Await new bounded unique Preview authorization before push/deployment; no provider mutation performed. Local operating configuration and actual owner connection remain open, not satisfied by these checks.
+
 - [ ] Explicit local session receiver accepts only exact Preview origin/loopback host and one unexpired random invitation, validates owner before exposing an in-memory token to the trusted caller, and never grants or executes work.
   CHECK: node --test server/outcome-local-session-receiver.test.mjs
   EXPECT: fail 0
