@@ -54,6 +54,11 @@ These are program responsibilities, not new agents, schedules or products. The c
 
 #### Candidate-bound stage receipt check · 2026-09-09
 
+- [ ] Claimed reservation activity is collected through the exact dispatched envelope and persisted separately from stage acceptance, with replay and terminal-regression protection.
+  CHECK: node --test server/outcome-work-runner.test.mjs server/outcome-work-queue.test.mjs
+  EXPECT: fail 0
+  EVIDENCE: pending. Scope local journal/queue/one-shot runner/tests. No runtime migration or live observation authorized by these tests; existing local stores without the new table must hold, not auto-upgrade.
+
 - [x] Correlated provider activity distinguishes observed running/terminal from missing/unknown without exposing private text or granting stage acceptance. Adapter implementation only; no claim of live observation.
   CHECK: node --test server/outcome-chat-result-source.test.mjs server/outcome-chat-codex-queue.test.mjs
   EXPECT: fail 0

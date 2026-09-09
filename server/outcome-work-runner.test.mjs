@@ -35,8 +35,9 @@ test('configured CLI composes existing initial journal, grant and queue once wit
   const config={schemaVersion:2,approvalPath:save('approval.json',grantJson),candidatePin:execFileSync('git',['rev-parse','HEAD'],{encoding:'utf8'}).trim(),databasePath,receiptDirectory:root,policyPath,
     tokenPath:save('token','test-private-token'),identityPath:save('identity.json','{}'),snapshotPath:save('snapshot.json','{}'),registryPath:join(root,'.outcome-runtime','bindings.json'),ownerCwd:root,codexExecutable:process.execPath}
   const path=save('config.json',JSON.stringify(config));let sends=0,output='',bindingValid=true
+  let observation={outcome:'observed',activity:'running',providerStatus:'inProgress',observedAt:new Date(now).toISOString(),terminalAt:null,sourceDigest:'8'.repeat(64),turnRef:'9'.repeat(64),executionAuthority:false,completionAuthority:false}
   const options={now:()=>now,write:text=>output=text,identityFactory:()=>({service:{resolveBridgeAuthority:async({token})=>{assert.equal(token,'test-private-token');return {account_ref:ownerRef,project_ids:['outcome']}}}}),
-    queueFactory:()=>({bindingResolver:async()=>({status:'active',freshness:'fresh',project_id:'outcome',role:'planner',destination:{}}),matchesWorkScope:()=>bindingValid,transport:async()=>{sends++;return {delivery:'acknowledged'}}})}
+    queueFactory:()=>({bindingResolver:async()=>({status:'active',freshness:'fresh',project_id:'outcome',role:'planner',destination:{}}),matchesWorkScope:()=>bindingValid,transport:async()=>{sends++;return {delivery:'acknowledged'}},readPlannerActivity:async({message})=>{assert(message.includes(authorityRef));return observation}})}
   try{
     assert.equal(await runOutcomeWorkOnce({...options,argv:['--dispatch',path]}),70)
     assert.equal(sends,0)
@@ -57,6 +58,7 @@ test('configured CLI composes existing initial journal, grant and queue once wit
     assert.equal(sends,1)
     assert.equal(journal.read(scopeJson,now).projection.stage,'queued')
     const digest=db.prepare('SELECT reservation_digest FROM outcome_work_reservations').get().reservation_digest
+    assert.equal(await runOutcomeWorkOnce({...options,argv:['--observe',path,digest]}),70)
     bindingValid=false
     assert.equal(await runOutcomeWorkOnce({...options,argv:['--receive',path,digest]}),70)
     assert.equal(db.prepare('SELECT count(*) AS n FROM outcome_work_execution_claims').get().n,0)
@@ -65,6 +67,17 @@ test('configured CLI composes existing initial journal, grant and queue once wit
     assert.equal(JSON.parse(output).outcome,'claimed')
     assert.equal(await runOutcomeWorkOnce({...options,argv:['--receive',path,digest]}),0,output)
     assert.equal(JSON.parse(output).outcome,'already_claimed')
+    assert.equal(await runOutcomeWorkOnce({...options,argv:['--observe',path,digest]}),0,output)
+    assert.equal(JSON.parse(output).outcome,'observation_recorded')
+    assert.equal(await runOutcomeWorkOnce({...options,argv:['--observe',path,digest]}),0,output)
+    assert.equal(JSON.parse(output).outcome,'already_observed')
+    const running=observation
+    observation={...running,activity:'terminal',providerStatus:'completed',terminalAt:new Date(now).toISOString(),sourceDigest:'7'.repeat(64)}
+    assert.equal(await runOutcomeWorkOnce({...options,argv:['--observe',path,digest]}),0,output)
+    observation={...running,sourceDigest:'6'.repeat(64)}
+    assert.equal(await runOutcomeWorkOnce({...options,argv:['--observe',path,digest]}),70)
+    assert.equal(JSON.parse(db.prepare('SELECT observation_json FROM outcome_work_activity').get().observation_json).activity,'terminal')
+    assert.equal(journal.read(scopeJson,now).sequence,1) // Activity is not stage acceptance.
     writeFileSync(path,JSON.stringify({...config,candidatePin:'0'.repeat(40)}))
     assert.equal(await runOutcomeWorkOnce({...options,argv:['--dispatch',path]}),70)
     writeFileSync(path,JSON.stringify(config));chmodSync(path,0o644)

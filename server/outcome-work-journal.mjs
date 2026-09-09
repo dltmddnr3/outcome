@@ -40,6 +40,9 @@ export function createWorkJournal(db) {
       reservation_digest TEXT PRIMARY KEY, owner_ref TEXT NOT NULL,
       claimed_at INTEGER NOT NULL
     ) STRICT;
+    CREATE TABLE IF NOT EXISTS outcome_work_activity (
+      reservation_digest TEXT PRIMARY KEY, observation_json TEXT NOT NULL
+    ) STRICT;
   `))
   const normalize=(scopeJson,nowMs)=>{
     if(typeof scopeJson!=='string' || Buffer.byteLength(scopeJson)>2048) fail()
@@ -67,6 +70,36 @@ export function createWorkJournal(db) {
     return action
   }
   return Object.freeze({
+    readObservationRequest(scopeJson,reservationDigest,ownerRef,nowMs){return guarded(()=>{
+      const bound=normalize(scopeJson,nowMs);load(bound,nowMs)
+      const action=reservation(bound,reservationDigest)
+      const claim=db.prepare('SELECT owner_ref FROM outcome_work_execution_claims WHERE reservation_digest=?').get(reservationDigest)
+      if(!sha(ownerRef,64)||claim?.owner_ref!==ownerRef)fail()
+      return Object.freeze({scopeJson:bound.scopeJson,candidateCommit:action[4],candidateTree:action[5],authorityRef:action[6],action:action[3],reservationDigest})
+    })},
+    recordActivity(scopeJson,reservationDigest,ownerRef,observationJson,nowMs){return transact(()=>{
+      const bound=normalize(scopeJson,nowMs);load(bound,nowMs);reservation(bound,reservationDigest)
+      const claim=db.prepare('SELECT owner_ref FROM outcome_work_execution_claims WHERE reservation_digest=?').get(reservationDigest)
+      if(!sha(ownerRef,64)||claim?.owner_ref!==ownerRef||typeof observationJson!=='string'||Buffer.byteLength(observationJson)>2048)fail()
+      const value=JSON.parse(observationJson),keys=['outcome','activity','providerStatus','observedAt','terminalAt','sourceDigest','turnRef','executionAuthority','completionAuthority']
+      if(!value||Array.isArray(value)||Object.keys(value).length!==keys.length||!keys.every(k=>Object.hasOwn(value,k))
+        ||value.outcome!=='observed'||value.executionAuthority!==false||value.completionAuthority!==false||!sha(value.sourceDigest,64)||!sha(value.turnRef,64))fail()
+      const observed=Date.parse(value.observedAt),terminal=value.activity==='terminal'
+      if(!Number.isFinite(observed)||new Date(observed).toISOString()!==value.observedAt||observed>nowMs
+        ||(!terminal&&(value.activity!=='running'||value.providerStatus!=='inProgress'||value.terminalAt!==null))
+        ||(terminal&&(!['completed','failed','interrupted'].includes(value.providerStatus)||!Number.isFinite(Date.parse(value.terminalAt))||new Date(Date.parse(value.terminalAt)).toISOString()!==value.terminalAt||Date.parse(value.terminalAt)>observed)))fail()
+      const previous=db.prepare('SELECT observation_json FROM outcome_work_activity WHERE reservation_digest=?').get(reservationDigest)
+      if(previous){
+        const old=JSON.parse(previous.observation_json)
+        if(old.turnRef!==value.turnRef||Date.parse(old.observedAt)>observed||old.activity==='terminal'&&(value.activity!=='terminal'||value.providerStatus!==old.providerStatus||value.terminalAt!==old.terminalAt))fail()
+        if(old.sourceDigest===value.sourceDigest){
+          if(keys.filter(k=>k!=='observedAt').some(k=>old[k]!==value[k]))fail()
+          return Object.freeze({outcome:'already_observed',executionAuthority:false,completionAuthority:false})
+        }
+      }
+      db.prepare('INSERT INTO outcome_work_activity VALUES(?,?) ON CONFLICT(reservation_digest) DO UPDATE SET observation_json=excluded.observation_json').run(reservationDigest,JSON.stringify(Object.fromEntries(keys.map(k=>[k,value[k]]))))
+      return Object.freeze({outcome:'observation_recorded',executionAuthority:false,completionAuthority:false})
+    })},
     // Caller authenticates current owner and verifies current binding/dependencies/
     // receipt coverage first. Claim is not start evidence or a mutation capability.
     // Grant store MUST share this database; no cross-database fallback is allowed.

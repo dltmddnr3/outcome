@@ -6,6 +6,7 @@ import {execFileSync} from 'node:child_process'
 import {DatabaseSync} from 'node:sqlite'
 import {createHash} from 'node:crypto'
 import {verifyWorkExecutionGrant} from '../server/outcome-work-execution-grant.mjs'
+import {workQueueEnvelope} from '../server/outcome-work-queue.mjs'
 import {readDestinationProtectedBytes} from './run-destination-questions.mjs'
 import {createHostedIdentityRuntime} from '../server/account-access-hosted.mjs'
 import {createWorkJournal} from '../server/outcome-work-journal.mjs'
@@ -29,7 +30,7 @@ export async function runOutcomeWorkOnce({argv=process.argv.slice(2),write=text=
   identityFactory=createHostedIdentityRuntime,queueFactory=createCodexQueueAdapter,now=Date.now}={}){
   let db
   try{
-    if(!Array.isArray(argv)||!['--dispatch','--receive','--approve'].includes(argv[0])||argv.length!==(argv[0]==='--dispatch'?2:3)
+    if(!Array.isArray(argv)||!['--dispatch','--receive','--approve','--observe'].includes(argv[0])||argv.length!==(argv[0]==='--dispatch'?2:3)
       ||argv[0]!=='--dispatch'&&!hash(argv[2],64))fail()
     const read=async path=>(await readDestinationProtectedBytes(path)).toString('utf8')
     const config=JSON.parse(await read(argv[1]))
@@ -55,7 +56,7 @@ export async function runOutcomeWorkOnce({argv=process.argv.slice(2),write=text=
     JSON.parse(policy) // Reject malformed input before opening the database.
     // readOnly preflight must prove schema exists; do not bootstrap an empty DB.
     db=new DatabaseSync(config.databasePath,{readOnly:true})
-    const required=['outcome_execution_grants','outcome_work_journals','outcome_work_reservations','outcome_work_dispatches','outcome_work_execution_claims']
+    const required=['outcome_execution_grants','outcome_work_journals','outcome_work_reservations','outcome_work_dispatches','outcome_work_execution_claims','outcome_work_activity']
     const tables=new Set(db.prepare("SELECT name FROM sqlite_master WHERE type='table'").all().map(row=>row.name))
     if(!required.every(name=>tables.has(name)))fail()
     db.close();db=null
@@ -78,6 +79,30 @@ export async function runOutcomeWorkOnce({argv=process.argv.slice(2),write=text=
     }
     const runtime=createLocalWorkRuntime({enabled:true,accountService:identity.service,readToken:()=>read(config.tokenPath),grantStore,journal,
       receiptDirectory:config.receiptDirectory,queueAdapter,now,readCurrentPolicy})
+    if(argv[0]==='--observe'){
+      let timer
+      const inspect=async()=>{
+        const {request}=JSON.parse(await readCurrentPolicy()),scope=JSON.parse(request.scopeJson)
+        const owner=await identity.service.resolveBridgeAuthority({token:await read(config.tokenPath)})
+        if(!owner?.project_ids?.includes(scope.projectId))fail()
+        const reserved=journal.readObservationRequest(request.scopeJson,argv[2],owner.account_ref,now())
+        if(['candidateCommit','candidateTree','authorityRef','action'].some(key=>request[key]!==reserved[key]))fail()
+        const binding=await queueAdapter.bindingResolver({project_id:scope.projectId,role:'planner'})
+        if(!queueAdapter.matchesWorkScope(binding?.destination,request.scopeJson))fail()
+        const observation=await queueAdapter.readPlannerActivity({destination:binding.destination,...workQueueEnvelope(reserved)})
+        await readCurrentPolicy()
+        const fresh=await identity.service.resolveBridgeAuthority({token:await read(config.tokenPath)})
+        if(fresh?.account_ref!==owner.account_ref||!fresh.project_ids?.includes(scope.projectId))fail()
+        return {request,ownerRef:owner.account_ref,observation}
+      }
+      let found
+      try{found=await Promise.race([inspect(),new Promise((_,reject)=>{timer=setTimeout(()=>reject(Error('observation_timeout')),5000)})])}finally{clearTimeout(timer)}
+      if(found.observation?.outcome!=='observed'){
+        write('{"outcome":"observation_unavailable","executionAuthority":false,"completionAuthority":false}\n');return 70
+      }
+      const result=journal.recordActivity(found.request.scopeJson,argv[2],found.ownerRef,JSON.stringify(found.observation),now())
+      write(JSON.stringify(result)+'\n');return 0
+    }
     if(argv[0]==='--approve'){
       // The explicit argument is the digest of the exact plan the owner approves.
       // Login, generic decision cards and dispatch requests never enter this branch.
