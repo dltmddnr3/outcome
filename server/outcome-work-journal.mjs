@@ -51,6 +51,10 @@ export function createWorkJournal(db) {
       reservation_digest TEXT NOT NULL, command_id TEXT NOT NULL, owner_ref TEXT NOT NULL,
       claimed_at INTEGER NOT NULL, PRIMARY KEY(reservation_digest,command_id)
     ) STRICT;
+    CREATE TABLE IF NOT EXISTS outcome_work_command_results (
+      reservation_digest TEXT NOT NULL, command_id TEXT NOT NULL, result_json TEXT NOT NULL,
+      PRIMARY KEY(reservation_digest,command_id)
+    ) STRICT;
   `))
   const normalize=(scopeJson,nowMs)=>{
     if(typeof scopeJson!=='string' || Buffer.byteLength(scopeJson)>2048) fail()
@@ -78,6 +82,20 @@ export function createWorkJournal(db) {
     return action
   }
   return Object.freeze({
+    recordCommandResult(reservationDigest,commandId,ownerRef,result){return transact(()=>{
+      const claim=db.prepare('SELECT owner_ref FROM outcome_work_commands WHERE reservation_digest=? AND command_id=?').get(reservationDigest,commandId)
+      if(!claim||claim.owner_ref!==ownerRef||!result||typeof result!=='object')fail()
+      const allowed=['command_exited_zero','command_failed','command_timeout','command_cancelled','command_output_limit','command_unavailable']
+      if(!allowed.includes(result.outcome)||result.executionAuthority!==false||result.completionAuthority!==false)fail()
+      // Only count/digest metadata is durable. Raw output is never accepted.
+      const safe={outcome:result.outcome,exitCode:result.exitCode??null,outputBytes:result.outputBytes??0,outputDigest:result.outputDigest??null,executionAuthority:false,completionAuthority:false}
+      if(safe.exitCode!==null&&!Number.isInteger(safe.exitCode)||!Number.isSafeInteger(safe.outputBytes)||safe.outputBytes<0||safe.outputDigest!==null&&!sha(safe.outputDigest,64))fail()
+      if(safe.outcome==='command_exited_zero'&&(safe.exitCode!==0||safe.outputDigest===null))fail()
+      const json=JSON.stringify(safe),old=db.prepare('SELECT result_json FROM outcome_work_command_results WHERE reservation_digest=? AND command_id=?').get(reservationDigest,commandId)
+      if(old&&old.result_json!==json)fail()
+      if(!old)db.prepare('INSERT INTO outcome_work_command_results VALUES(?,?,?)').run(reservationDigest,commandId,json)
+      return Object.freeze({outcome:old?'command_result_already_recorded':'command_result_recorded',executionAuthority:false,completionAuthority:false})
+    })},
     claimCommandExecution(scopeJson,reservationDigest,ownerRef,commandId,checkoutRef,nowMs){return transact(()=>{
       const bound=normalize(scopeJson,nowMs),current=load(bound,nowMs),action=reservation(bound,reservationDigest)
       const claim=db.prepare('SELECT owner_ref FROM outcome_work_execution_claims WHERE reservation_digest=?').get(reservationDigest)
