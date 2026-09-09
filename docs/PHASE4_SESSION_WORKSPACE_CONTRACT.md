@@ -57,7 +57,7 @@ These are program responsibilities, not new agents, schedules or products. The c
 - [ ] Stage terminal publication requires a recorded start, completed correlated provider observation, current unrevoked grant and protected passing receipt for the same work; publication records one next action but never dispatches or accepts automatically.
   CHECK: node --test server/outcome-work-runner.test.mjs
   EXPECT: fail 0
-  EVIDENCE: pending. Scope journal/one-shot runner/tests; implementing output must be the source or its allowed-path descendant, QA/Release remain exact-candidate. No live publication or release.
+  EVIDENCE: Partial at e8c48d4, full npm test 888 PASS. Schema-v3 --finalize composes current owner/binding, original grant, recorded start, completed observation and protected passing receipt; writes terminal event plus nextAction exactly once without dispatch. Initial implementing same-candidate fixture passes; running observation and writable receipt reject. Git output guard checks ancestry, intermediate/merged and net changed paths for a new implementing candidate; QA/Release require exact source candidate. Gate remains OPEN: descendant/merge hostile cases, end-to-end QA→Release→owner chain and real owner execution are not yet proven. Scope journal/one-shot runner/tests. No live publication, activation or release; rollback task-owned commits only.
 
 - [x] A running observation for an exact claimed reservation records the stage start once; terminal-only observation cannot synthesize a missed start or stage acceptance. Tested integration, not live owner use.
   CHECK: node --test server/outcome-work-runner.test.mjs server/outcome-work-journal.test.mjs
