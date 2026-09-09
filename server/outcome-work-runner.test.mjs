@@ -19,7 +19,7 @@ test('one-shot work CLI fails closed without explicit protected configuration',a
   }
 })
 
-test('configured CLI composes existing initial journal, grant and queue once without stage start',async()=>{
+test('configured CLI starts once only after correlated running observation, never on acknowledgement',async()=>{
   const root=realpathSync(mkdtempSync(join(tmpdir(),'outcome-work-cli-')))
   const databasePath=join(root,'work.sqlite'),db=new DatabaseSync(databasePath)
   chmodSync(databasePath,0o600)

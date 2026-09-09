@@ -14,6 +14,29 @@ const seed=store=>{
   store.append(scopeJson,event(3,{stage:'implementing',activity:'terminal',candidateCommit:commit,candidateTree:tree,evidenceRef:'d'.repeat(64),nextAction:'qa_verifying'}),2,now)
 }
 const reserve=store=>store.reserveContinuation(scopeJson,3,commit,tree,authority,now)
+test('observed start requires a claim and running evidence; terminal-only evidence cannot invent a start',()=>{
+  for(const terminal of [false,true]){
+    const db=new DatabaseSync(':memory:')
+    try{
+      const store=createWorkJournal(db);seed(store)
+      const {reservationDigest}=reserve(store),owner='e'.repeat(64)
+      assert.throws(()=>store.recordObservedStart(scopeJson,reservationDigest,owner,now))
+      // Synthetic claim fixture: this test checks recording, not grant issuance.
+      db.prepare('INSERT INTO outcome_work_execution_claims VALUES(?,?,?)').run(reservationDigest,owner,now)
+      const observation={outcome:'observed',activity:terminal?'terminal':'running',providerStatus:terminal?'completed':'inProgress',observedAt:new Date(now).toISOString(),terminalAt:terminal?new Date(now).toISOString():null,sourceDigest:'f'.repeat(64),turnRef:'1'.repeat(64),executionAuthority:false,completionAuthority:false}
+      store.recordActivity(scopeJson,reservationDigest,owner,JSON.stringify(observation),now)
+      if(terminal){
+        assert.throws(()=>store.recordObservedStart(scopeJson,reservationDigest,owner,now))
+        assert.equal(store.read(scopeJson,now).sequence,3)
+      }else{
+        assert.equal(store.recordObservedStart(scopeJson,reservationDigest,owner,now).outcome,'start_recorded')
+        assert.equal(store.read(scopeJson,now).projection.stage,'qa_verifying')
+        assert.equal(store.recordObservedStart(scopeJson,reservationDigest,owner,now).outcome,'start_already_recorded')
+        assert.equal(store.read(scopeJson,now).sequence,4)
+      }
+    }finally{db.close()}
+  }
+})
 test('disk journal and reservation survive close/reopen; second connection cannot own same action',()=>{
   const dir=mkdtempSync(join(tmpdir(),'outcome-work-journal-test-'));chmodSync(dir,0o700)
   const path=join(dir,'work.sqlite');let a,b
