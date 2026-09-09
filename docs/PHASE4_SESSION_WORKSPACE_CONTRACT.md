@@ -55,7 +55,7 @@ These are program responsibilities, not new agents, schedules or products. The c
 - [ ] Explicit read-only manifest is bound to immutable grant bytes; command composition derives all file access from the grant, and actual source edit plus behavioral check runs without outside-file access.
   CHECK: node --test server/outcome-work-execution-grant.test.mjs server/outcome-work-command-claim.test.mjs
   EXPECT: fail 0
-  EVIDENCE: pending. Optional readPaths does not alter old grant bytes or create live approval. Existing-file and no-subprocess limitations remain; this is not Phase completion.
+  EVIDENCE: Candidate `739536b`, same-session full regression 904 PASS, 0 fail/skip/TODO and build PASS. Native isolated test edits a granted existing source file from export 0 to 42, then executes a separate verifier against that source; unlisted sibling reads and read-only verifier writes reject. Initial RED exposed uv_cwd EPERM; allowing only the cwd directory literal (not subtree) fixes it. This permits directory-name listing, not sibling contents; no broader containment claim. Optional readPaths is digest-bound, cannot reuse prior approval, and does not change old grant bytes. Existing-file/no-subprocess limitations and actual owner configuration/Phase acceptance remain OPEN. No live grant or provider mutation.
 
 - [ ] Ordered stage execution requires each prior command's durable success; completed results are recovered without relaunch, uncertain claims and failed predecessors stop continuation.
   CHECK: node --test server/outcome-work-command-claim.test.mjs server/outcome-work-runner.test.mjs
